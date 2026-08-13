@@ -56,7 +56,7 @@ guarantees the wallet relies on are only meaningful there.
 
 You can boot a disposable demo with no server at all:
 
-[Launch in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/paymanshafayan/IGBZ-PW/arena/019ffbb1-igbz-pw/_playground/blueprint.json)
+[Launch in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/paymanshafayan/IGBZ-PW/refs/heads/arena/019ffbb1-igbz-pw/_playground/blueprint.json)
 
 Outbound HTTP is proxied there, so payment gateways and the Manus/ManyChat calls will not reach
 real endpoints.
