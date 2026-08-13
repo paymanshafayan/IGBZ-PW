@@ -35,11 +35,31 @@ touching the rest of the plugin. No direct Graph calls exist in this codebase.
 | WordPress | 6.3 or newer |
 | WooCommerce | 8.0 or newer (HPOS and cart/checkout blocks are both declared compatible) |
 | PHP | 8.1 or newer |
-| MySQL / MariaDB | 5.7+ / 10.3+ |
+| MySQL / MariaDB | 5.7+ / 10.3+ (SQLite also works — see below) |
 | PHP extensions | `openssl` (required — settings are encrypted at rest), `mbstring`, `json`, `hash` |
 | Cron | WordPress cron must run. A real system cron is strongly recommended (see below). |
 
 No Composer install is needed. The plugin ships its own PSR-4 autoloader.
+
+### SQLite / WordPress Playground
+
+The plugin detects SQLite (WordPress Playground, or the `sqlite-database-integration` plugin) and
+adapts the two pieces of SQL that are not portable:
+
+* `Db::upsert()` emits `INSERT … ON DUPLICATE KEY UPDATE` on MySQL and
+  `INSERT … ON CONFLICT … DO UPDATE` on SQLite, mapping `GREATEST` onto SQLite's multi-argument
+  `MAX`. Used by the wallet balance cache, Instagram insights and LMS lesson progress.
+* `Db::lock()` uses `GET_LOCK` on MySQL. SQLite is single-writer, so locking is a no-op there.
+
+SQLite is fine for demos and review. **Use MySQL or MariaDB in production** — the concurrency
+guarantees the wallet relies on are only meaningful there.
+
+You can boot a disposable demo with no server at all:
+
+[Launch in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/paymanshafayan/IGBZ-PW/arena/019ffbb1-igbz-pw/_playground/blueprint.json)
+
+Outbound HTTP is proxied there, so payment gateways and the Manus/ManyChat calls will not reach
+real endpoints.
 
 ---
 

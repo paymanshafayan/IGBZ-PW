@@ -223,17 +223,21 @@ final class WalletService {
 	}
 
 	private function write_balance( int $user_id, int $tenant_id, float $balance ): void {
-		$table    = $this->db->table( 'wallet_balances' );
 		$currency = (string) igbz()->settings()->get( 'general.default_currency', 'IRT' );
-		$this->db->query(
-			"INSERT INTO {$table} (tenant_id, user_id, balance, currency, updated_at)
-			 VALUES (%d, %d, %f, %s, %s)
-			 ON DUPLICATE KEY UPDATE balance = VALUES(balance), updated_at = VALUES(updated_at)",
-			$tenant_id,
-			$user_id,
-			$balance,
-			$currency,
-			current_time( 'mysql', true )
+		$this->db->upsert(
+			'wallet_balances',
+			[
+				'tenant_id'  => $tenant_id,
+				'user_id'    => $user_id,
+				'balance'    => $balance,
+				'currency'   => $currency,
+				'updated_at' => current_time( 'mysql', true ),
+			],
+			[
+				'balance'    => 'value',
+				'updated_at' => 'value',
+			],
+			[ 'tenant_id', 'user_id' ]
 		);
 	}
 

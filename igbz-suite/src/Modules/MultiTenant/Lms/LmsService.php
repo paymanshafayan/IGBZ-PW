@@ -227,22 +227,25 @@ final class LmsService {
 			return;
 		}
 
-		$table = $this->db->table( 'lesson_progress' );
-		$this->db->query(
-			"INSERT INTO {$table} (enrollment_id, lesson_id, user_id, seconds_watched, completed, completed_at, updated_at)
-			 VALUES (%d, %d, %d, %d, %d, %s, %s)
-			 ON DUPLICATE KEY UPDATE
-				seconds_watched = GREATEST(seconds_watched, VALUES(seconds_watched)),
-				completed = GREATEST(completed, VALUES(completed)),
-				completed_at = COALESCE(completed_at, VALUES(completed_at)),
-				updated_at = VALUES(updated_at)",
-			$enrollment_id,
-			$lesson_id,
-			(int) $enrollment['user_id'],
-			$seconds_watched,
-			$completed ? 1 : 0,
-			$completed ? current_time( 'mysql', true ) : null,
-			current_time( 'mysql', true )
+		$this->db->upsert(
+			'lesson_progress',
+			[
+				'enrollment_id'   => $enrollment_id,
+				'lesson_id'       => $lesson_id,
+				'user_id'         => (int) $enrollment['user_id'],
+				'seconds_watched' => $seconds_watched,
+				'completed'       => $completed ? 1 : 0,
+				'completed_at'    => $completed ? current_time( 'mysql', true ) : null,
+				'updated_at'      => current_time( 'mysql', true ),
+			],
+			[
+				// Never let a re-watch shrink the recorded progress, and never un-complete a lesson.
+				'seconds_watched' => 'greatest',
+				'completed'       => 'greatest',
+				'completed_at'    => 'coalesce',
+				'updated_at'      => 'value',
+			],
+			[ 'enrollment_id', 'lesson_id' ]
 		);
 
 		$this->refresh_progress( $enrollment_id );

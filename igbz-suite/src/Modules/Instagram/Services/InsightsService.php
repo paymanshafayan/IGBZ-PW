@@ -87,18 +87,19 @@ final class InsightsService {
 	}
 
 	private function upsert( int $account_id, int $tenant_id, string $metric, string $dimension, float $value, string $day ): void {
-		$table = $this->db->table( 'ig_insights' );
-		$this->db->query(
-			"INSERT INTO {$table} (tenant_id, account_id, metric, dimension, value, captured_for, created_at)
-			 VALUES (%d, %d, %s, %s, %f, %s, %s)
-			 ON DUPLICATE KEY UPDATE value = VALUES(value)",
-			$tenant_id,
-			$account_id,
-			$metric,
-			$dimension,
-			$value,
-			$day,
-			current_time( 'mysql', true )
+		$this->db->upsert(
+			'ig_insights',
+			[
+				'tenant_id'    => $tenant_id,
+				'account_id'   => $account_id,
+				'metric'       => $metric,
+				'dimension'    => $dimension,
+				'value'        => $value,
+				'captured_for' => $day,
+				'created_at'   => current_time( 'mysql', true ),
+			],
+			[ 'value' => 'value' ],
+			[ 'account_id', 'metric', 'dimension', 'captured_for' ]
 		);
 	}
 

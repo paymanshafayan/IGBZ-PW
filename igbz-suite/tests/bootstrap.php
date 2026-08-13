@@ -116,8 +116,17 @@ function wp_generate_uuid4(): string {
 }
 
 /** Just enough of $wpdb for Schema to build its statements. */
-final class IGBZ_Test_Wpdb {
+/**
+ * Named `wpdb` so that Db::wpdb()'s `: \wpdb` return type is satisfied. Real WordPress declares
+ * this class in wp-includes/wp-db.php, which is not loaded here.
+ */
+class wpdb {
 	public string $prefix = 'wp_';
+
+	/** Every query passed to query(), so tests can assert on generated SQL. */
+	public array $queries = [];
+
+	public int $insert_id = 0;
 
 	public function get_charset_collate(): string {
 		return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
@@ -127,9 +136,18 @@ final class IGBZ_Test_Wpdb {
 		$query = str_replace( [ '%d', '%f' ], '%s', $query );
 		return vsprintf( $query, array_map( static fn ( $a ): string => "'" . $a . "'", $args ) );
 	}
+
+	public function query( string $sql ): int {
+		$this->queries[] = $sql;
+		return 1;
+	}
+
+	public function last_query(): string {
+		return $this->queries ? $this->queries[ count( $this->queries ) - 1 ] : '';
+	}
 }
 
-$GLOBALS['wpdb'] = new IGBZ_Test_Wpdb();
+$GLOBALS['wpdb'] = new wpdb();
 
 require_once dirname( __DIR__ ) . '/src/Support/Autoloader.php';
 \IGBZ\Suite\Support\Autoloader::register( 'IGBZ\\Suite\\', dirname( __DIR__ ) . '/src' );

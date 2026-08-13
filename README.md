@@ -29,6 +29,24 @@ publisher and generator sit behind interfaces so a Graph adapter can be added ba
 
 Tenancy is single-site with `tenant_id` columns — not WordPress Multisite.
 
+## Try it in the browser (WordPress Playground)
+
+No server needed — this boots a throwaway WordPress with WooCommerce and the plugin already
+activated, in about 30 seconds:
+
+**[▶ Launch the demo](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/paymanshafayan/IGBZ-PW/arena/019ffbb1-igbz-pw/_playground/blueprint.json)**
+
+The blueprint lives in [`_playground/blueprint.json`](_playground/blueprint.json).
+
+Caveats, because Playground is not a normal host:
+
+* It runs on **SQLite**, not MySQL. The plugin supports both, but Playground is not a substitute
+  for testing on a real MySQL host before going live.
+* Outbound HTTP is proxied, so the payment gateways and the Manus/ManyChat calls will not complete
+  against real endpoints. Use it to review the admin screens, the database schema and the
+  storefront pages.
+* Everything is wiped when you close the tab.
+
 ## Install
 
 Copy `igbz-suite/` into `wp-content/plugins/` and activate. Requires WordPress 6.3+,
