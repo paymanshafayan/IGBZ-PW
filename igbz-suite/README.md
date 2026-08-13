@@ -41,6 +41,19 @@ touching the rest of the plugin. No direct Graph calls exist in this codebase.
 
 No Composer install is needed. The plugin ships its own PSR-4 autoloader.
 
+### Verified against
+
+Last verified on a live install running **WordPress 6.5 / WooCommerce 9.4.2 / PHP 8.2** with HPOS
+enabled, exercising real `WC_Product` and `WC_Order` objects through the WooCommerce CRUD layer:
+
+- all six gateways (`igbz_wallet`, `igbz_bnpl`, `igbz_zarinpal`, `igbz_idpay`, `igbz_nextpay`,
+  `igbz_payir`) appear in **WooCommerce → Settings → Payments** and their settings screens render;
+- paying a real order with the wallet gateway debits the ledger for the exact order total, moves the
+  order to `processing`, sets the transaction id and credits the configured cashback;
+- the ManyChat funnel answers a real webhook delivery with the v2 envelope, is idempotent per
+  `comment_id` and enforces `per_user_limit`;
+- WooCommerce's own admin screens (Home, Settings, Status, Products, Orders) stay clean.
+
 ### SQLite / WordPress Playground
 
 The plugin detects SQLite (WordPress Playground, or the `sqlite-database-integration` plugin) and
