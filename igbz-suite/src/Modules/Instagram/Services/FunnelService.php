@@ -315,6 +315,24 @@ final class FunnelService {
 			];
 		}
 
+		// The per-subscriber cap has to be enforced here too, not only in handle_event(). This is
+		// the path the ManyChat webhook actually uses, so without it a funnel configured "one per
+		// user" handed out an unlimited number of links — and, for coupon funnels, an unlimited
+		// number of discount codes — to the same person simply by commenting again.
+		if ( $this->over_user_limit( $funnel, (string) ( $event['subscriber_id'] ?? '' ) ) ) {
+			$this->db->update( 'ig_funnel_hits', [ 'delivery_error' => 'per_user_limit' ], [ 'id' => $hit_id ] );
+
+			return [
+				'matched'   => true,
+				'duplicate' => true,
+				'funnel'    => $funnel,
+				'hit_id'    => $hit_id,
+				'link'      => $this->resolve_link( $funnel ),
+				'coupon'    => '',
+				'text'      => '',
+			];
+		}
+
 		$this->db->query(
 			'UPDATE ' . $this->db->table( 'ig_funnels' ) . ' SET hits = hits + 1, conversions = conversions + 1 WHERE id = %d',
 			(int) $funnel['id']

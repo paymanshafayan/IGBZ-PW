@@ -16,6 +16,16 @@ defined( 'ABSPATH' ) || exit;
  */
 final class Authenticator {
 
+	/**
+	 * Prefixes within `igbz/v1` that perform their own authentication.
+	 *
+	 * @var string[]
+	 */
+	private const SELF_AUTHENTICATING_ROUTES = [
+		'/manychat/',
+		'/manus/',
+	];
+
 	private ?array $resolved = null;
 
 	public function __construct( private TokenService $tokens, private Logger $logger ) {}
@@ -53,7 +63,35 @@ final class Authenticator {
 
 	public static function is_api_request(): bool {
 		$uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
-		return str_contains( $uri, '/' . BaseController::NAMESPACE . '/' );
+
+		if ( ! str_contains( $uri, '/' . BaseController::NAMESPACE . '/' ) ) {
+			return false;
+		}
+
+		return ! self::is_self_authenticating_route( $uri );
+	}
+
+	/**
+	 * Routes inside `igbz/v1` that carry their own shared-secret check and must not be touched here.
+	 *
+	 * The Manus and ManyChat webhooks live in this namespace but authenticate with a shared token
+	 * that may arrive as `Authorization: Bearer <token>` — the same header this class uses for JWT
+	 * access tokens. Without this exclusion the authenticator saw the webhook secret, failed to
+	 * validate it as a JWT and short-circuited the request with a 401 from
+	 * `rest_authentication_errors`, so the route's own `authorize()` never ran and every webhook
+	 * delivery was rejected. These endpoints are third-party callbacks: they are anonymous by
+	 * design and their permission_callback is the security boundary.
+	 *
+	 * @param string $uri Request URI, which may be either /wp-json/<ns>/... or ?rest_route=/<ns>/...
+	 */
+	private static function is_self_authenticating_route( string $uri ): bool {
+		foreach ( self::SELF_AUTHENTICATING_ROUTES as $route ) {
+			if ( str_contains( $uri, '/' . BaseController::NAMESPACE . $route ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**

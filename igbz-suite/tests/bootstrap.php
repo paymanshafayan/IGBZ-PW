@@ -156,6 +156,78 @@ class wpdb {
 	public function last_query(): string {
 		return $this->queries ? $this->queries[ count( $this->queries ) - 1 ] : '';
 	}
+
+	/**
+	 * Column-name => format map, mirroring the real wpdb::$field_types.
+	 *
+	 * Only the entries that collide with IGBZ column names are modelled. `post_id` is the dangerous
+	 * one: core forces it to %d even on a VARCHAR column in a plugin table.
+	 *
+	 * @var array<string,string>
+	 */
+	public array $field_types = [
+		'post_id' => '%d',
+		'user_id' => '%d',
+		'ID'      => '%d',
+	];
+
+	/** Records the [$data, $formats] of the last write, so tests can assert on the formats. */
+	public array $last_write = [];
+
+	/**
+	 * Mirrors wpdb::insert(), including the name-based format guessing applied when $format is
+	 * omitted — that guess is exactly what silently cast ig_funnels.post_id to 0.
+	 */
+	public function insert( string $table, array $data, $format = null ): int|bool {
+		$this->last_write = [
+			'table'   => $table,
+			'data'    => $data,
+			'formats' => $format ?? $this->guess_formats( $data ),
+			'guessed' => null === $format,
+		];
+
+		$this->queries[] = 'INSERT INTO ' . $table;
+		++$this->insert_id;
+
+		return $this->fail_query ? false : 1;
+	}
+
+	public function update( string $table, array $data, array $where, $format = null, $where_format = null ): int|bool {
+		$this->last_write = [
+			'table'   => $table,
+			'data'    => $data,
+			'formats' => $format ?? $this->guess_formats( $data ),
+			'guessed' => null === $format,
+		];
+
+		$this->queries[] = 'UPDATE ' . $table;
+
+		return $this->fail_query ? false : 1;
+	}
+
+	public function delete( string $table, array $where, $where_format = null ): int|bool {
+		$this->last_write = [
+			'table'   => $table,
+			'data'    => $where,
+			'formats' => $where_format ?? $this->guess_formats( $where ),
+			'guessed' => null === $where_format,
+		];
+
+		$this->queries[] = 'DELETE FROM ' . $table;
+
+		return $this->fail_query ? false : 1;
+	}
+
+	/** @return string[] */
+	private function guess_formats( array $data ): array {
+		$out = [];
+
+		foreach ( $data as $column => $value ) {
+			$out[] = $this->field_types[ $column ] ?? '%s';
+		}
+
+		return $out;
+	}
 }
 
 $GLOBALS['wpdb'] = new wpdb();

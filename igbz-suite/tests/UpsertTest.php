@@ -43,7 +43,46 @@ final class UpsertTest extends TestCase {
 		$this->test_strategies();
 		$this->test_null_and_types();
 		$this->test_failed_upsert_raises();
+		$this->test_write_formats_are_explicit();
 		$this->test_locking_is_skipped_on_sqlite();
+	}
+
+	/**
+	 * insert()/update()/delete() must pass explicit formats to $wpdb.
+	 *
+	 * Left to itself $wpdb guesses the format from the column *name* via its $field_types map,
+	 * which is hard-coded for core tables yet applied to every table. `post_id` is forced to %d
+	 * there, so the VARCHAR Instagram media id in ig_funnels.post_id was cast to 0 and the funnel
+	 * stopped matching any comment — silently, on MySQL and SQLite alike.
+	 */
+	private function test_write_formats_are_explicit(): void {
+		$wpdb = $GLOBALS['wpdb'];
+		$db   = $this->db( false );
+
+		$db->insert(
+			'ig_funnels',
+			[ 'tenant_id' => 1, 'post_id' => 'POST-123', 'keyword' => 'coffee', 'grant_wallet_credit' => 2.5, 'is_active' => 1 ]
+		);
+
+		$this->assert_false( $wpdb->last_write['guessed'], 'insert() never lets wpdb guess formats' );
+
+		$formats = $wpdb->last_write['formats'];
+		$columns = array_keys( $wpdb->last_write['data'] );
+		$by_name = array_combine( $columns, $formats );
+
+		$this->assert_same( '%s', $by_name['post_id'], 'a string post_id is bound as a string, not %d' );
+		$this->assert_same( '%d', $by_name['tenant_id'], 'an int column is bound as %d' );
+		$this->assert_same( '%f', $by_name['grant_wallet_credit'], 'a float column is bound as %f' );
+		$this->assert_same( '%s', $by_name['keyword'], 'a string column is bound as %s' );
+
+		// The same guard has to apply to updates, which is how an existing funnel is edited.
+		$db->update( 'ig_funnels', [ 'post_id' => 'POST-456' ], [ 'id' => 3 ] );
+		$this->assert_false( $wpdb->last_write['guessed'], 'update() never lets wpdb guess formats' );
+		$this->assert_same( '%s', $wpdb->last_write['formats'][0], 'update binds a string post_id as %s' );
+
+		$db->delete( 'ig_funnels', [ 'post_id' => 'POST-456' ] );
+		$this->assert_false( $wpdb->last_write['guessed'], 'delete() never lets wpdb guess formats' );
+		$this->assert_same( '%s', $wpdb->last_write['formats'][0], 'delete binds a string post_id as %s' );
 	}
 
 	private function test_mysql_dialect(): void {

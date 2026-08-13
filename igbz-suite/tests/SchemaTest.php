@@ -47,6 +47,8 @@ final class SchemaTest extends TestCase {
 
 		$this->assert_same( 'wp_igbz_tenants', Schema::table( 'tenants' ), 'table() prefixes correctly' );
 
+		$this->assert_no_unsafe_core_column_names( $statements );
+
 		// Tenant scoping is the backbone of the suite: nearly every table must carry the column.
 		// lesson_progress inherits its tenant through enrollment_id, so it deliberately has none.
 		$unscoped = [ 'plans', 'logs', 'jobs', 'tenant_domains', 'tenant_members', 'tenants', 'lesson_progress' ];
@@ -58,5 +60,55 @@ final class SchemaTest extends TestCase {
 			}
 			$this->assert_contains( 'tenant_id', $sql, "{$name} carries a tenant_id column" );
 		}
+	}
+
+	/**
+	 * Guard against column names that wpdb silently casts.
+	 *
+	 * wpdb::$field_types maps a set of core column *names* to formats and applies them to any
+	 * table when insert()/update() are called without an explicit format list. `post_id` is mapped
+	 * to %d there, so a VARCHAR column of that name in a plugin table had every value cast to an
+	 * integer: ig_funnels.post_id stored 0 instead of an Instagram media id and funnel matching
+	 * broke silently on both MySQL and SQLite.
+	 *
+	 * Db::insert()/update()/delete() now always pass explicit formats, which neutralises the map.
+	 * This test is the second line of defence: if a new non-integer column reuses one of these
+	 * names, it flags the collision so the risk is a deliberate choice rather than an accident.
+	 *
+	 * @param string[] $statements
+	 */
+	private function assert_no_unsafe_core_column_names( array $statements ): void {
+		// The subset of wpdb::$field_types entries plausible in this schema, all forced to %d.
+		$numeric_in_core = [ 'post_id', 'user_id', 'parent', 'count', 'active', 'public', 'deleted', 'object_id', 'term_id' ];
+
+		$found = [];
+
+		foreach ( $statements as $sql ) {
+			preg_match( '/CREATE TABLE\s+wp_igbz_(\S+)\s*\(/', $sql, $m );
+			$table = $m[1] ?? '';
+
+			foreach ( explode( "\n", $sql ) as $line ) {
+				$line = trim( $line );
+
+				if ( ! preg_match( '/^([a-z_]+)\s+(VARCHAR|TEXT|LONGTEXT|CHAR|DATETIME|DATE|DECIMAL|FLOAT|DOUBLE)/i', $line, $col ) ) {
+					continue;
+				}
+
+				if ( in_array( $col[1], $numeric_in_core, true ) ) {
+					$found[] = $table . '.' . $col[1] . ' (' . strtoupper( $col[2] ) . ')';
+				}
+			}
+		}
+
+		// ig_funnels.post_id and ig_funnel_hits.post_id are intentional: they hold Instagram media
+		// ids, which are opaque strings. They are safe only because Db always sends formats.
+		$known = [ 'ig_funnels.post_id (VARCHAR)', 'ig_funnel_hits.post_id (VARCHAR)' ];
+		$new   = array_values( array_diff( $found, $known ) );
+
+		$this->assert_same(
+			[],
+			$new,
+			'no new non-integer column reuses a name that wpdb::$field_types casts to %d'
+		);
 	}
 }

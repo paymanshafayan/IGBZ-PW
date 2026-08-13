@@ -55,8 +55,42 @@ final class Db {
 	 * @return int Inserted id, 0 on failure.
 	 */
 	public function insert( string $table, array $data ): int {
-		$ok = $this->wpdb()->insert( $this->table( $table ), $data ); // phpcs:ignore
+		$ok = $this->wpdb()->insert( $this->table( $table ), $data, $this->formats( $data ) ); // phpcs:ignore
 		return $ok ? (int) $this->wpdb()->insert_id : 0;
+	}
+
+	/**
+	 * Derive an explicit placeholder format for every column from its PHP value.
+	 *
+	 * This must never be omitted. When $wpdb is not given formats it guesses them from the *column
+	 * name* using its internal `$field_types` map, which is hard-coded for WordPress core tables and
+	 * applied to any table. Several of those names are generic enough to collide with ours — most
+	 * importantly `post_id`, which core forces to `%d`.
+	 *
+	 * `ig_funnels.post_id` and `ig_funnel_hits.post_id` are VARCHARs holding Instagram media ids
+	 * such as "17912345678901234" or "POST-123", so the guess silently cast every value to an
+	 * integer and stored 0. The funnel row then matched no incoming comment and the entire
+	 * "comment a keyword and I'll DM you the link" feature failed with no error anywhere. This is
+	 * core behaviour, not an SQLite quirk, so it broke on MySQL identically.
+	 *
+	 * @param array<string,mixed> $data
+	 * @return string[]
+	 */
+	private function formats( array $data ): array {
+		$formats = [];
+
+		foreach ( $data as $value ) {
+			if ( is_int( $value ) || is_bool( $value ) ) {
+				$formats[] = '%d';
+			} elseif ( is_float( $value ) ) {
+				$formats[] = '%f';
+			} else {
+				// Strings and nulls; $wpdb replaces a null value with a literal NULL regardless.
+				$formats[] = '%s';
+			}
+		}
+
+		return $formats;
 	}
 
 	/**
@@ -64,12 +98,13 @@ final class Db {
 	 * @param array<string,mixed> $where
 	 */
 	public function update( string $table, array $data, array $where ): int {
-		return (int) $this->wpdb()->update( $this->table( $table ), $data, $where ); // phpcs:ignore
+		// Explicit formats for the same reason as insert() — see formats().
+		return (int) $this->wpdb()->update( $this->table( $table ), $data, $where, $this->formats( $data ), $this->formats( $where ) ); // phpcs:ignore
 	}
 
 	/** @param array<string,mixed> $where */
 	public function delete( string $table, array $where ): int {
-		return (int) $this->wpdb()->delete( $this->table( $table ), $where ); // phpcs:ignore
+		return (int) $this->wpdb()->delete( $this->table( $table ), $where, $this->formats( $where ) ); // phpcs:ignore
 	}
 
 	public function last_error(): string {
