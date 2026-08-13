@@ -1,0 +1,25 @@
+# Dependencies (the plugin ships its own autoloader; nothing here is required to run it)
+/vendor/
+/node_modules/
+
+# Build output
+/dist/
+/build/
+*.zip
+
+# Compiled translations — the .pot is tracked, .mo files are generated
+*.mo
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Local tooling
+.phpunit.result.cache
+.php-cs-fixer.cache
+/phpcs.xml
+/.phpcs.xml

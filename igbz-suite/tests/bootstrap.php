@@ -1,0 +1,186 @@
+<?php
+/**
+ * A very small WordPress test double.
+ *
+ * The suite has no Composer tree and CI has no WordPress install, so instead of pulling in the
+ * WordPress test library we stub the handful of core functions the pure-logic classes touch.
+ * Only classes that do not talk to the database or the network are exercised here; anything that
+ * does is covered by the health checks on the Status screen instead.
+ */
+
+declare( strict_types=1 );
+
+define( 'ABSPATH', __DIR__ . '/' );
+define( 'AUTH_KEY', 'test-auth-key-0123456789abcdefghijklmnop' );
+define( 'SECURE_AUTH_SALT', 'test-secure-salt-0123456789abcdefghijkl' );
+define( 'DAY_IN_SECONDS', 86400 );
+define( 'HOUR_IN_SECONDS', 3600 );
+define( 'MINUTE_IN_SECONDS', 60 );
+define( 'OBJECT', 'OBJECT' );
+define( 'ARRAY_A', 'ARRAY_A' );
+
+$GLOBALS['igbz_test_options'] = [];
+
+function get_option( string $name, $default = false ) {
+	return $GLOBALS['igbz_test_options'][ $name ] ?? $default;
+}
+
+function update_option( string $name, $value, $autoload = null ): bool {
+	$GLOBALS['igbz_test_options'][ $name ] = $value;
+	return true;
+}
+
+function delete_option( string $name ): bool {
+	unset( $GLOBALS['igbz_test_options'][ $name ] );
+	return true;
+}
+
+function wp_json_encode( $data, int $flags = 0 ) {
+	return json_encode( $data, $flags | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES );
+}
+
+function home_url( string $path = '' ): string {
+	return 'https://shop.test' . $path;
+}
+
+function site_url( string $path = '' ): string {
+	return home_url( $path );
+}
+
+function rest_url( string $path = '' ): string {
+	return home_url( '/wp-json/' . ltrim( $path, '/' ) );
+}
+
+function esc_url_raw( string $url ): string {
+	return $url;
+}
+
+function sanitize_key( string $key ): string {
+	return strtolower( preg_replace( '/[^a-z0-9_\-]/i', '', $key ) );
+}
+
+function sanitize_text_field( string $value ): string {
+	return trim( strip_tags( $value ) );
+}
+
+function absint( $value ): int {
+	return abs( (int) $value );
+}
+
+function wp_parse_args( $args, array $defaults = [] ): array {
+	return array_merge( $defaults, is_array( $args ) ? $args : [] );
+}
+
+function apply_filters( string $hook, $value, ...$rest ) {
+	return $value;
+}
+
+function do_action( string $hook, ...$args ): void {}
+
+function add_action( string $hook, $callback, int $priority = 10, int $accepted = 1 ): bool {
+	return true;
+}
+
+function add_filter( string $hook, $callback, int $priority = 10, int $accepted = 1 ): bool {
+	return true;
+}
+
+function __( string $text, string $domain = '' ): string {
+	return $text;
+}
+
+function esc_html__( string $text, string $domain = '' ): string {
+	return $text;
+}
+
+function _n( string $single, string $plural, int $number, string $domain = '' ): string {
+	return 1 === $number ? $single : $plural;
+}
+
+function current_time( string $type = 'mysql', $gmt = 0 ): string {
+	return gmdate( 'Y-m-d H:i:s' );
+}
+
+function wp_generate_uuid4(): string {
+	return sprintf(
+		'%04x%04x-%04x-%04x-%04x-%04x%04x%04x',
+		random_int( 0, 0xffff ),
+		random_int( 0, 0xffff ),
+		random_int( 0, 0xffff ),
+		random_int( 0, 0x0fff ) | 0x4000,
+		random_int( 0, 0x3fff ) | 0x8000,
+		random_int( 0, 0xffff ),
+		random_int( 0, 0xffff ),
+		random_int( 0, 0xffff )
+	);
+}
+
+/** Just enough of $wpdb for Schema to build its statements. */
+final class IGBZ_Test_Wpdb {
+	public string $prefix = 'wp_';
+
+	public function get_charset_collate(): string {
+		return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+	}
+
+	public function prepare( string $query, ...$args ): string {
+		$query = str_replace( [ '%d', '%f' ], '%s', $query );
+		return vsprintf( $query, array_map( static fn ( $a ): string => "'" . $a . "'", $args ) );
+	}
+}
+
+$GLOBALS['wpdb'] = new IGBZ_Test_Wpdb();
+
+require_once dirname( __DIR__ ) . '/src/Support/Autoloader.php';
+\IGBZ\Suite\Support\Autoloader::register( 'IGBZ\\Suite\\', dirname( __DIR__ ) . '/src' );
+
+function get_bloginfo( string $show = '' ): string {
+	return 'IGBZ Test Store';
+}
+
+function wp_timezone_string(): string {
+	return 'Asia/Tehran';
+}
+
+function wp_timezone(): DateTimeZone {
+	return new DateTimeZone( wp_timezone_string() );
+}
+
+function number_format_i18n( $number, int $decimals = 0 ): string {
+	return number_format( (float) $number, $decimals );
+}
+
+function wp_date( string $format, ?int $timestamp = null, ?DateTimeZone $timezone = null ) {
+	$date = new DateTimeImmutable( '@' . ( $timestamp ?? time() ) );
+	return $date->setTimezone( $timezone ?? wp_timezone() )->format( $format );
+}
+
+function is_admin(): bool {
+	return false;
+}
+
+function wp_next_scheduled( string $hook ) {
+	return false;
+}
+
+function igbz(): \IGBZ\Suite\Support\Plugin {
+	return \IGBZ\Suite\Support\Plugin::instance();
+}
+
+// Boot the container without the WordPress hook side effects that boot() would add.
+( function (): void {
+	$plugin     = \IGBZ\Suite\Support\Plugin::instance();
+	$reflection = new ReflectionMethod( $plugin, 'register_core_services' );
+	$reflection->invoke( $plugin );
+} )();
+
+/**
+ * Wipe the stored options and hand back a clean Settings instance that is also the one the
+ * container (and therefore every service reached through igbz()) will use.
+ */
+function igbz_test_reset_settings(): \IGBZ\Suite\Support\Settings {
+	$GLOBALS['igbz_test_options'] = [];
+	igbz()->bind( 'settings', static fn () => new \IGBZ\Suite\Support\Settings() );
+	igbz()->bind( 'logger', static fn ( $c ) => new \IGBZ\Suite\Support\Logger( $c->get( 'settings' ) ) );
+	return igbz()->settings();
+}
