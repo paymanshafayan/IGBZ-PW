@@ -128,6 +128,11 @@ class wpdb {
 
 	public int $insert_id = 0;
 
+	public string $last_error = '';
+
+	/** When true, query() reports a driver-level rejection (as $wpdb does) instead of succeeding. */
+	public bool $fail_query = false;
+
 	public function get_charset_collate(): string {
 		return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
 	}
@@ -137,8 +142,14 @@ class wpdb {
 		return vsprintf( $query, array_map( static fn ( $a ): string => "'" . $a . "'", $args ) );
 	}
 
-	public function query( string $sql ): int {
+	public function query( string $sql ): int|bool {
 		$this->queries[] = $sql;
+
+		// The real $wpdb returns false when the driver rejects a statement.
+		if ( $this->fail_query ) {
+			return false;
+		}
+
 		return 1;
 	}
 

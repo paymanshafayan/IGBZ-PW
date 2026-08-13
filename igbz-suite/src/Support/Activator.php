@@ -239,6 +239,10 @@ final class Activator {
 	}
 
 	public static function schedule_events(): void {
+		// Guarantee the custom recurrences are known even if this runs before the plugin
+		// bootstrap did it (e.g. a direct call from an upgrade routine or WP-CLI).
+		Cron::register_schedules();
+
 		foreach ( Cron::events() as $hook => $recurrence ) {
 			if ( ! wp_next_scheduled( $hook ) ) {
 				wp_schedule_event( time() + 60, $recurrence, $hook );

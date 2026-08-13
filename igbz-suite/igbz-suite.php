@@ -27,6 +27,12 @@ define( 'IGBZ_BASENAME', plugin_basename( __FILE__ ) );
 require_once IGBZ_DIR . 'src/Support/Autoloader.php';
 \IGBZ\Suite\Support\Autoloader::register( 'IGBZ\\Suite\\', IGBZ_DIR . 'src/' );
 
+// Custom cron recurrences must exist before Activator::schedule_events() runs. Activation
+// fires on a request where this file is loaded after `plugins_loaded`, so registering them
+// from inside a `plugins_loaded` callback would be too late and wp_schedule_event() would
+// silently refuse the unknown `igbz_five_minutes` recurrence.
+\IGBZ\Suite\Support\Cron::register_schedules();
+
 register_activation_hook( __FILE__, [ \IGBZ\Suite\Support\Activator::class, 'activate' ] );
 register_deactivation_hook( __FILE__, [ \IGBZ\Suite\Support\Activator::class, 'deactivate' ] );
 

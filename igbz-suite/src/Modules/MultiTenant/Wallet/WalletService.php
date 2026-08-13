@@ -135,9 +135,15 @@ final class WalletService {
 		try {
 			return $this->db->transaction(
 				function () use ( $user_id, $tenant_id, $signed_amount, $reason, $reference_code, $meta, $order_id, $note, $enforce_funds ) {
-					$table   = $this->db->table( 'wallet_balances' );
-					$current = $this->db->scalar(
-						"SELECT balance FROM {$table} WHERE user_id = %d AND tenant_id = %d FOR UPDATE",
+					$table = $this->db->table( 'wallet_balances' );
+
+					// FOR UPDATE is MySQL-only row locking. SQLite has no such clause and the
+					// sqlite-database-integration translator cannot parse it, so it is appended
+					// only on MySQL. SQLite serialises writers at the database level anyway, and
+					// Db::lock() already guards the MySQL path, so correctness is preserved.
+					$for_update = $this->db->is_sqlite() ? '' : ' FOR UPDATE';
+					$current    = $this->db->scalar(
+						"SELECT balance FROM {$table} WHERE user_id = %d AND tenant_id = %d{$for_update}",
 						$user_id,
 						$tenant_id
 					);

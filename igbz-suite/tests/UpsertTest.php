@@ -1,11 +1,16 @@
 <?php
 /**
- * Db::upsert() has to emit valid SQL on two different engines: MySQL/MariaDB on a normal host,
- * and SQLite under WordPress Playground or the sqlite-database-integration plugin.
+ * Db::upsert() must emit MySQL dialect on BOTH supported engines.
  *
- * The dialects are mutually exclusive — `ON DUPLICATE KEY UPDATE`, `VALUES(col)` and `GREATEST`
- * are MySQL-only, while `ON CONFLICT ... DO UPDATE`, `excluded.col` and multi-arg `MAX` are the
- * SQLite spellings. A mistake here fails only at runtime on one engine, so it is asserted here.
+ * That is deliberate and was learned the hard way. $wpdb always speaks MySQL: under WordPress
+ * Playground the `sqlite-database-integration` drop-in is a MySQL-to-SQLite *translator*, not a
+ * raw SQLite connection. An earlier revision emitted native SQLite spelling (`ON CONFLICT ... DO
+ * UPDATE SET excluded.col`) whenever is_sqlite() was true; the translator could not parse it, the
+ * statement aborted the surrounding transaction, and because $wpdb still reported success the
+ * wallet reported credited balances that were never actually written.
+ *
+ * These tests therefore pin the dialect to MySQL on both engines and assert that a rejected
+ * statement raises instead of silently returning.
  */
 
 declare( strict_types=1 );
@@ -34,9 +39,10 @@ final class UpsertTest extends TestCase {
 
 	public function run(): void {
 		$this->test_mysql_dialect();
-		$this->test_sqlite_dialect();
+		$this->test_sqlite_uses_mysql_dialect_too();
 		$this->test_strategies();
 		$this->test_null_and_types();
+		$this->test_failed_upsert_raises();
 		$this->test_locking_is_skipped_on_sqlite();
 	}
 
@@ -58,7 +64,7 @@ final class UpsertTest extends TestCase {
 		$this->assert_false( str_contains( $sql, 'excluded.' ), 'mysql never emits excluded.col' );
 	}
 
-	private function test_sqlite_dialect(): void {
+	private function test_sqlite_uses_mysql_dialect_too(): void {
 		$this->reset_queries();
 
 		$this->db( true )->upsert(
@@ -69,10 +75,14 @@ final class UpsertTest extends TestCase {
 		);
 
 		$sql = $this->last();
-		$this->assert_contains( 'ON CONFLICT (tenant_id, user_id) DO UPDATE SET', $sql, 'sqlite names the conflict target' );
-		$this->assert_contains( 'balance = excluded.balance', $sql, 'sqlite refers to the incoming row as excluded.col' );
-		$this->assert_false( str_contains( $sql, 'ON DUPLICATE KEY' ), 'sqlite never emits ON DUPLICATE KEY' );
-		$this->assert_false( str_contains( $sql, 'VALUES(balance)' ), 'sqlite never emits VALUES(col) as a reference' );
+
+		// The sqlite drop-in parses MySQL, so the statement must be identical to the MySQL one.
+		$this->assert_contains( 'ON DUPLICATE KEY UPDATE', $sql, 'sqlite still receives ON DUPLICATE KEY UPDATE' );
+		$this->assert_contains( 'balance = VALUES(balance)', $sql, 'sqlite still receives VALUES(col)' );
+
+		// Native SQLite spelling is unparseable by the translator and must never be emitted.
+		$this->assert_false( str_contains( $sql, 'ON CONFLICT' ), 'never emits native SQLite ON CONFLICT' );
+		$this->assert_false( str_contains( $sql, 'excluded.' ), 'never emits native SQLite excluded.col' );
 	}
 
 	private function test_strategies(): void {
@@ -95,10 +105,40 @@ final class UpsertTest extends TestCase {
 		$this->db( true )->upsert( 'lesson_progress', $data, $update, $keys );
 		$sqlite = $this->last();
 
-		// SQLite has no GREATEST(); multi-argument MAX() is the equivalent.
-		$this->assert_contains( 'seconds_watched = MAX(seconds_watched, excluded.seconds_watched)', $sqlite, 'sqlite maps greatest onto MAX' );
-		$this->assert_contains( 'completed_at = COALESCE(completed_at, excluded.completed_at)', $sqlite, 'sqlite coalesce strategy' );
-		$this->assert_false( str_contains( $sqlite, 'GREATEST' ), 'sqlite never emits GREATEST' );
+		// GREATEST() is translated for us, so the SQLite path emits the same MySQL text.
+		$this->assert_same( $mysql, $sqlite, 'both engines receive byte-identical SQL' );
+		$this->assert_contains( 'seconds_watched = GREATEST(seconds_watched, VALUES(seconds_watched))', $sqlite, 'greatest strategy stays MySQL' );
+		$this->assert_false( str_contains( $sqlite, 'MAX(' ), 'never rewrites GREATEST into SQLite MAX()' );
+	}
+
+	private function test_failed_upsert_raises(): void {
+		// A rejected statement must not look like a successful write. $wpdb->query() returns false
+		// on error; upsert() has to turn that into an exception so the caller's transaction rolls
+		// back instead of committing a half-written record.
+		$this->reset_queries();
+
+		$wpdb             = $GLOBALS['wpdb'];
+		$wpdb->fail_query = true;
+		$wpdb->last_error = 'Failed to parse the MySQL query.';
+
+		$raised = false;
+		try {
+			$this->db( true )->upsert(
+				'wallet_balances',
+				[ 'tenant_id' => 1, 'user_id' => 7, 'balance' => 250.5 ],
+				[ 'balance' => 'value' ],
+				[ 'tenant_id', 'user_id' ]
+			);
+		} catch ( \RuntimeException $e ) {
+			$raised = true;
+			$this->assert_contains( 'wp_igbz_wallet_balances', $e->getMessage(), 'the error names the table' );
+			$this->assert_contains( 'Failed to parse', $e->getMessage(), 'the driver error is preserved' );
+		} finally {
+			$wpdb->fail_query = false;
+			$wpdb->last_error = '';
+		}
+
+		$this->assert_true( $raised, 'a rejected upsert raises instead of returning silently' );
 	}
 
 	private function test_null_and_types(): void {

@@ -101,8 +101,12 @@ final class Db {
 	 * True when the site runs on something other than MySQL/MariaDB — in practice SQLite, which is
 	 * what WordPress Playground and the `sqlite-database-integration` plugin use.
 	 *
-	 * MySQL-only syntax (ON DUPLICATE KEY UPDATE, GET_LOCK) has to be avoided on that path, so the
-	 * result is cached for the request.
+	 * Note that this does NOT mean "write SQLite SQL". The drop-in translates MySQL into SQLite, so
+	 * ordinary MySQL statements — including ON DUPLICATE KEY UPDATE — must still be emitted. Only
+	 * constructs the translator has no equivalent for need branching here: `SELECT ... FOR UPDATE`
+	 * row locks and the `GET_LOCK`/`RELEASE_LOCK` advisory-lock functions.
+	 *
+	 * The result is cached for the request.
 	 */
 	public function is_sqlite(): bool {
 		if ( null === $this->is_sqlite ) {
@@ -116,15 +120,26 @@ final class Db {
 	/**
 	 * Portable "insert or update" for tables with a UNIQUE key.
 	 *
-	 * MySQL gets a single atomic `INSERT ... ON DUPLICATE KEY UPDATE`. SQLite gets the equivalent
-	 * `INSERT ... ON CONFLICT (...) DO UPDATE SET ...`, which needs the conflicting columns named
-	 * explicitly, hence `$conflict_keys`.
+	 * The statement is always written in MySQL dialect — `INSERT ... ON DUPLICATE KEY UPDATE` with
+	 * `VALUES(col)` and `GREATEST()`. That is correct on both supported engines because $wpdb only
+	 * ever speaks MySQL: the `sqlite-database-integration` drop-in used by WordPress Playground is a
+	 * MySQL *translator*, not a raw SQLite connection, so it parses MySQL and rewrites it.
+	 *
+	 * Emitting native SQLite spelling here (`ON CONFLICT ... DO UPDATE SET excluded.col`) is a bug:
+	 * the translator cannot parse it and fails with "Failed to parse the MySQL query." Worse, that
+	 * failure aborts the surrounding transaction while $wpdb still reports success, so callers such
+	 * as WalletService::post() committed a ledger entry that silently never landed. Hence the
+	 * explicit failure check below — a broken upsert must never look like a successful write.
 	 *
 	 * @param array<string,mixed>  $data          Column => value for the INSERT.
 	 * @param array<string,string> $update        Column => strategy applied on conflict. Strategies:
 	 *                                            `value` overwrite, `greatest` keep the larger,
 	 *                                            `coalesce` keep the existing non-null.
-	 * @param string[]             $conflict_keys Columns forming the UNIQUE key. Required for SQLite.
+	 * @param string[]             $conflict_keys Columns forming the UNIQUE key. Not emitted into the
+	 *                                            SQL (MySQL infers the target from the index) but kept
+	 *                                            so callers document which index they rely on.
+	 *
+	 * @throws \RuntimeException When the database rejects the statement.
 	 */
 	public function upsert( string $table, array $data, array $update, array $conflict_keys = [] ): int {
 		$full         = $this->table( $table );
@@ -141,17 +156,15 @@ final class Db {
 			$values[]       = $value;
 		}
 
-		$sqlite = $this->is_sqlite();
-		$sets   = [];
+		unset( $conflict_keys );
+
+		$sets = [];
 
 		foreach ( $update as $column => $strategy ) {
-			// On MySQL the incoming row is VALUES(col); on SQLite it is excluded.col.
-			$incoming = $sqlite ? 'excluded.' . $column : 'VALUES(' . $column . ')';
+			$incoming = 'VALUES(' . $column . ')';
 			switch ( $strategy ) {
 				case 'greatest':
-					// SQLite has no GREATEST; its multi-argument MAX() does the same job.
-					$fn     = $sqlite ? 'MAX' : 'GREATEST';
-					$sets[] = "{$column} = {$fn}({$column}, {$incoming})";
+					$sets[] = "{$column} = GREATEST({$column}, {$incoming})";
 					break;
 				case 'coalesce':
 					$sets[] = "{$column} = COALESCE({$column}, {$incoming})";
@@ -164,15 +177,17 @@ final class Db {
 		$sql = 'INSERT INTO ' . $full . ' (' . implode( ', ', $columns ) . ') VALUES (' . implode( ', ', $placeholders ) . ')';
 
 		if ( $sets ) {
-			if ( $sqlite ) {
-				$target = $conflict_keys ? ' (' . implode( ', ', $conflict_keys ) . ')' : '';
-				$sql   .= ' ON CONFLICT' . $target . ' DO UPDATE SET ' . implode( ', ', $sets );
-			} else {
-				$sql .= ' ON DUPLICATE KEY UPDATE ' . implode( ', ', $sets );
-			}
+			$sql .= ' ON DUPLICATE KEY UPDATE ' . implode( ', ', $sets );
 		}
 
-		return $this->query( $sql, ...$values );
+		$wpdb   = $this->wpdb();
+		$result = $wpdb->query( $this->prepare( $sql, ...$values ) ); // phpcs:ignore
+
+		if ( false === $result ) {
+			throw new \RuntimeException( 'Upsert into ' . $full . ' failed: ' . $this->last_error() );
+		}
+
+		return (int) $result;
 	}
 
 	/**

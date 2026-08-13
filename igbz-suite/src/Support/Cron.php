@@ -23,15 +23,32 @@ final class Cron {
 	}
 
 	public function register(): void {
-		add_filter( 'cron_schedules', [ $this, 'add_schedules' ] ); // phpcs:ignore WordPress.WP.CronInterval
+		self::register_schedules();
 		add_action( self::HOOK_DAILY, [ $this, 'housekeeping' ] );
+	}
+
+	/**
+	 * Register the custom recurrences on the `cron_schedules` filter.
+	 *
+	 * This is deliberately static and separate from register() so it can run at plugin
+	 * load time, before `plugins_loaded`. Activation happens on a request where the
+	 * plugin file is included *after* `plugins_loaded` has already fired, so anything
+	 * that only hooks itself inside `plugins_loaded` is absent when
+	 * Activator::schedule_events() runs — and wp_schedule_event() silently returns
+	 * false for an unknown recurrence, leaving the five-minute event unscheduled.
+	 *
+	 * add_filter() de-duplicates identical callbacks at the same priority, so calling
+	 * this more than once is harmless.
+	 */
+	public static function register_schedules(): void {
+		add_filter( 'cron_schedules', [ self::class, 'add_schedules' ] ); // phpcs:ignore WordPress.WP.CronInterval
 	}
 
 	/**
 	 * @param array<string,array{interval:int,display:string}> $schedules
 	 * @return array<string,array{interval:int,display:string}>
 	 */
-	public function add_schedules( array $schedules ): array {
+	public static function add_schedules( array $schedules ): array {
 		$schedules['igbz_five_minutes'] = [
 			'interval' => 300,
 			'display'  => __( 'Every five minutes (IGBZ)', 'igbz-suite' ),
