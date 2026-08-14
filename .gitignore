@@ -7,6 +7,15 @@
 /build/
 *.zip
 
+# ...but the offline test environment's WordPress and WooCommerce zips are tracked on purpose.
+# The sandbox this is developed in cannot reach wordpress.org and its /tmp is wiped between
+# sessions, so these are the only way to rebuild a working site. See _devenv/README.md.
+!/_devenv/wordpress-*.zip
+!/_devenv/woocommerce-*.zip
+
+# Everything the test environment builds from those zips is disposable.
+/_devenv/.work/
+
 # Compiled translations — the .pot is tracked, .mo files are generated
 *.mo
 
