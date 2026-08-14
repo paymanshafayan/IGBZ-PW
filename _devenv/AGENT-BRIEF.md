@@ -188,10 +188,29 @@ zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs bet
   "already received" message).
 
 **ManyChat webhook contract**: `POST /?rest_route=/igbz/v1/manychat/comment`, auth via
-`Authorization: Bearer <manychat.webhook_token>`, `?token=`, or `X-IGBZ-Token`. Body keys:
+`Authorization: Bearer <token>`, `?token=`, or `X-IGBZ-Token`. Body keys:
 `text|comment_text|last_input_text`, `subscriber_id|id`, `comment_id`, `post_id|media_id`,
-`tenant_id`, `account_id`, `username|ig_username`. A match requires `tenant_id`/`account_id` to
-match the funnel, or the funnel to have `account_id = 0`.
+`username|ig_username`.
+
+**The token is the identity (DB v6).** It is per account, stored in
+`ig_accounts.manychat_webhook_token` / `manus_webhook_token`, and the tenant is read from the
+matched row — a `tenant_id` in the request body is ignored. Before this, one global token plus a
+body-supplied `tenant_id` let any authenticated caller fire another tenant's funnels and spend
+their coupons and wallet credit.
+
+**Credentials are per account, not per install.** `ig_accounts` carries `manus_api_key` /
+`manychat_api_key` (encrypted with `Crypto`) and a `credential_mode`:
+
+- `own` — the account's own keys, unlimited. Never falls back to the shared key.
+- `trial` — borrows the operator's `manus.api_key` / `manychat.api_key`, metered by
+  `trial.task_quota` (default 25, `0` = unlimited) and `trial.days` (default 14). A closed trial
+  returns an empty key rather than falling through.
+
+This is forced by the products themselves: a ManyChat API key is scoped by ManyChat to a *single
+page*, so one shared key can only ever drive one Instagram account. `AccountCredentials` is the
+only place that resolves a key or counts trial usage, so the quota cannot be bypassed. Fair-share
+scheduling lives in `ContentScheduler::fair_share()` with a per-account cap from
+`manus.account_concurrency` (default 3).
 
 **Never call `__()` on a code path that can run before `init`.** WordPress 6.7+ answers with a
 `_load_textdomain_just_in_time` doing-it-wrong notice. Two such paths existed and were fixed by

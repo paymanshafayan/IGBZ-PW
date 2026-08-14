@@ -2,6 +2,7 @@
 namespace IGBZ\Suite\Modules\Instagram;
 
 use IGBZ\Suite\Modules\Instagram\Gateways\ManyChatClient;
+use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
 use IGBZ\Suite\Modules\Instagram\Services\ContentScheduler;
 use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
 use IGBZ\Suite\Modules\Instagram\Services\InsightsService;
@@ -46,10 +47,16 @@ final class InstagramModule implements ModuleInterface {
 		( new ManyChatWebhook(
 			$plugin->get( 'ig.funnels' ),
 			$plugin->get( 'ig.subscribers' ),
-			$plugin->logger()
+			$plugin->logger(),
+			$plugin->get( 'ig.credentials' )
 		) )->register();
 
-		( new ManusWebhook( $plugin->db(), $plugin->get( 'ig.manus' ), $plugin->logger() ) )->register();
+		( new ManusWebhook(
+			$plugin->db(),
+			$plugin->get( 'ig.manus' ),
+			$plugin->logger(),
+			$plugin->get( 'ig.credentials' )
+		) )->register();
 
 		add_action( Cron::HOOK_FIVE_MINUTES, [ $this, 'run_five_minutes' ] );
 		add_action( Cron::HOOK_HOURLY, [ $this, 'run_hourly' ] );
@@ -69,14 +76,26 @@ final class InstagramModule implements ModuleInterface {
 
 	private function bind_services( Plugin $plugin ): void {
 		$plugin->bind( 'ig.prompts', static fn () => new PromptBuilder() );
+		$plugin->bind( 'ig.credentials', static fn ( Plugin $c ) => new AccountCredentials( $c->db() ) );
 		$plugin->bind( 'ig.manus_client', static fn ( Plugin $c ) => new ManusClient( $c->http(), $c->logger() ) );
 		$plugin->bind(
 			'ig.manus',
-			static fn ( Plugin $c ) => new ManusService( $c->db(), $c->get( 'ig.manus_client' ), $c->get( 'ig.prompts' ), $c->logger() )
+			static fn ( Plugin $c ) => new ManusService(
+				$c->db(),
+				$c->get( 'ig.manus_client' ),
+				$c->get( 'ig.prompts' ),
+				$c->logger(),
+				$c->get( 'ig.credentials' )
+			)
 		);
 		$plugin->bind(
 			'ig.scheduler',
-			static fn ( Plugin $c ) => new ContentScheduler( $c->db(), $c->get( 'ig.manus' ), $c->logger() )
+			static fn ( Plugin $c ) => new ContentScheduler(
+				$c->db(),
+				$c->get( 'ig.manus' ),
+				$c->logger(),
+				$c->get( 'ig.credentials' )
+			)
 		);
 		$plugin->bind(
 			'ig.insights',
@@ -85,7 +104,12 @@ final class InstagramModule implements ModuleInterface {
 		$plugin->bind( 'ig.manychat', static fn ( Plugin $c ) => new ManyChatClient( $c->http(), $c->logger() ) );
 		$plugin->bind(
 			'ig.subscribers',
-			static fn ( Plugin $c ) => new SubscriberService( $c->db(), $c->get( 'ig.manychat' ), $c->logger() )
+			static fn ( Plugin $c ) => new SubscriberService(
+				$c->db(),
+				$c->get( 'ig.manychat' ),
+				$c->logger(),
+				$c->get( 'ig.credentials' )
+			)
 		);
 		$plugin->bind(
 			'ig.funnels',
@@ -96,7 +120,8 @@ final class InstagramModule implements ModuleInterface {
 				$c->has( 'wallet' )
 					? $c->get( 'wallet' )
 					: new \IGBZ\Suite\Modules\MultiTenant\Wallet\WalletService( $c->db(), $c->logger() ),
-				$c->logger()
+				$c->logger(),
+				$c->get( 'ig.credentials' )
 			)
 		);
 	}
@@ -143,39 +168,100 @@ final class InstagramModule implements ModuleInterface {
 		$rows     = [];
 
 		/** @var ManusService $manus */
-		$manus  = igbz()->get( 'ig.manus' );
-		$rows[] = [
-			'label'  => __( 'Manus API', 'igbz-suite' ),
-			'status' => $manus->is_configured() ? 'ok' : 'error',
-			'detail' => $manus->is_configured()
-				? sprintf(
-					/* translators: %s: agent profile */
-					__( 'Key present. Agent profile: %s', 'igbz-suite' ),
-					$settings->string( 'manus.agent_profile', 'manus-1.6' )
-				)
-				: __( 'manus.api_key is empty; content generation and publishing are disabled.', 'igbz-suite' ),
-		];
+		$manus = igbz()->get( 'ig.manus' );
+		/** @var AccountCredentials $credentials */
+		$credentials = igbz()->get( 'ig.credentials' );
 
-		$manychat_key = $settings->string( 'manychat.api_key', '' );
-		$rows[]       = [
-			'label'  => __( 'ManyChat API', 'igbz-suite' ),
-			'status' => '' !== $manychat_key ? 'ok' : 'error',
-			'detail' => '' !== $manychat_key
-				? __( 'Bearer token present (a ManyChat Pro plan is required).', 'igbz-suite' )
-				: __( 'manychat.api_key is empty; subscriber lookups and flow sending are disabled.', 'igbz-suite' ),
-		];
+		// Credentials are per account now, so health is a tally over the active accounts rather
+		// than one look at a global option.
+		$active     = $manus->all_accounts( true );
+		$ready      = [ AccountCredentials::SERVICE_MANUS => 0, AccountCredentials::SERVICE_MANYCHAT => 0 ];
+		$on_trial   = 0;
+		$trial_dead = 0;
+		foreach ( $active as $account ) {
+			foreach ( array_keys( $ready ) as $service ) {
+				if ( $credentials->has_key( $account, $service ) ) {
+					++$ready[ $service ];
+				}
+			}
+			if ( AccountCredentials::MODE_TRIAL === $credentials->mode( $account ) ) {
+				++$on_trial;
+				if ( ! $credentials->trial_is_open( $account ) ) {
+					++$trial_dead;
+				}
+			}
+		}
+		$total = count( $active );
 
-		$token  = $settings->string( 'manychat.webhook_token', '' );
+		foreach (
+			[
+				AccountCredentials::SERVICE_MANUS    => [
+					__( 'Manus API', 'igbz-suite' ),
+					sprintf(
+						/* translators: %s: agent profile */
+						__( 'Agent profile: %s', 'igbz-suite' ),
+						$settings->string( 'manus.agent_profile', 'manus-1.6' )
+					),
+					__( 'No active account has a usable Manus key; content generation and publishing are disabled.', 'igbz-suite' ),
+				],
+				AccountCredentials::SERVICE_MANYCHAT => [
+					__( 'ManyChat API', 'igbz-suite' ),
+					__( 'A ManyChat Pro plan is required per page.', 'igbz-suite' ),
+					__( 'No active account has a usable ManyChat key; subscriber lookups and flow sending are disabled.', 'igbz-suite' ),
+				],
+			] as $service => $labels
+		) {
+			[ $label, $note, $empty ] = $labels;
+			$count                    = $ready[ $service ];
+
+			$rows[] = [
+				'label'  => $label,
+				'status' => $count > 0 ? ( $count === $total ? 'ok' : 'warn' ) : 'error',
+				'detail' => $count > 0
+					? sprintf(
+						/* translators: 1: accounts with a key, 2: total active accounts, 3: extra note */
+						__( '%1$d of %2$d active accounts have a key. %3$s', 'igbz-suite' ),
+						$count,
+						$total,
+						$note
+					)
+					: $empty,
+			];
+		}
+
+		if ( $on_trial > 0 ) {
+			$rows[] = [
+				'label'  => __( 'Free trial accounts', 'igbz-suite' ),
+				'status' => $trial_dead > 0 ? 'warn' : 'ok',
+				'detail' => sprintf(
+					/* translators: 1: accounts on trial, 2: accounts whose trial ended */
+					__( '%1$d account(s) run on the shared trial key; %2$d have used it up or expired.', 'igbz-suite' ),
+					$on_trial,
+					$trial_dead
+				),
+			];
+		}
+
+		$untokened = 0;
+		foreach ( $active as $account ) {
+			if ( '' === (string) ( $account['manychat_webhook_token'] ?? '' ) ) {
+				++$untokened;
+			}
+		}
 		$rows[] = [
 			'label'  => __( 'ManyChat webhook', 'igbz-suite' ),
-			'status' => '' !== $token ? 'ok' : 'error',
-			'detail' => '' !== $token
+			'status' => 0 === $untokened ? 'ok' : 'error',
+			'detail' => 0 === $untokened
 				? sprintf(
 					/* translators: %s: webhook URL */
-					__( 'External Request URL: %s', 'igbz-suite' ),
+					__( 'Every account has its own External Request URL, e.g. %s', 'igbz-suite' ),
 					esc_url_raw( add_query_arg( 'token', '***', rest_url( ManyChatWebhook::NAMESPACE . '/manychat/comment' ) ) )
 				)
-				: __( 'No webhook token; incoming ManyChat requests will be rejected.', 'igbz-suite' ),
+				: sprintf(
+					/* translators: %d: number of accounts */
+					__( '%d active account(s) have no webhook token; their incoming ManyChat requests are rejected. Re-save the account to mint one.', 'igbz-suite' ),
+					$untokened
+				),
 		];
 
 		$accounts = (int) $db->scalar( 'SELECT COUNT(*) FROM ' . $db->table( 'ig_accounts' ) . ' WHERE is_active = 1' );

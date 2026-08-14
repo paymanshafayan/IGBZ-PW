@@ -19,34 +19,126 @@ final class ContentScheduler {
 
 	private const BATCH = 20;
 
-	public function __construct( private Db $db, private ManusService $manus, private Logger $logger ) {}
+	/**
+	 * How many rows to inspect before fair-sharing. Wider than BATCH so a tenant sitting behind a
+	 * large backlog is still visible to the round-robin.
+	 */
+	private const CANDIDATE_WINDOW = 500;
+
+	public function __construct(
+		private Db $db,
+		private ManusService $manus,
+		private Logger $logger,
+		private AccountCredentials $credentials
+	) {}
 
 	/** Runs on igbz_cron_five_minutes. */
 	public function tick(): void {
-		if ( ! $this->manus->is_configured() ) {
-			return;
-		}
 		$this->start_pending_generation();
 		$this->sync_running_generation();
 		$this->auto_schedule_ready();
 		$this->publish_due();
 	}
 
+	/**
+	 * Hand drafts to Manus, fairly.
+	 *
+	 * The naive "ORDER BY id LIMIT 20" this replaced starved tenants: one tenant queueing 500
+	 * drafts owned every cron tick until their backlog drained, and everyone else waited. Rows are
+	 * now round-robined across tenants, and each account gets a concurrency cap so a single
+	 * account cannot fill the batch either.
+	 */
 	private function start_pending_generation(): void {
 		$rows = $this->db->results(
-			'SELECT id FROM ' . $this->db->table( 'ig_content' ) . '
+			'SELECT id, tenant_id, account_id FROM ' . $this->db->table( 'ig_content' ) . '
 			 WHERE status = %s AND provider_task_id = %s AND retry_count < 3
 			 ORDER BY id LIMIT %d',
 			ManusService::STATUS_DRAFT,
 			'',
-			self::BATCH
+			self::CANDIDATE_WINDOW
 		);
-		foreach ( $rows as $row ) {
+
+		$running = $this->running_per_account();
+		$cap     = $this->per_account_cap();
+
+		foreach ( $this->fair_share( $rows, self::BATCH ) as $row ) {
+			$account_id = (int) $row['account_id'];
+
+			if ( ( $running[ $account_id ] ?? 0 ) >= $cap ) {
+				continue;
+			}
 			if ( ! $this->should_autogenerate( (int) $row['id'] ) ) {
 				continue;
 			}
+
+			// Skip silently when the account has no usable key: leaving the row as a draft lets it
+			// start the moment keys are added, whereas failing it would burn a retry on a
+			// configuration problem the tenant can still fix.
+			$account = $this->manus->account( $account_id );
+			if ( ! $account || ! $this->manus->account_is_configured( $account ) ) {
+				continue;
+			}
+
 			$this->manus->generate( (int) $row['id'] );
+			$running[ $account_id ] = ( $running[ $account_id ] ?? 0 ) + 1;
 		}
+	}
+
+	/**
+	 * Interleave rows tenant by tenant so every tenant with pending work gets a slice of the batch.
+	 *
+	 * @param array<int,array<string,mixed>> $rows
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function fair_share( array $rows, int $limit ): array {
+		$queues = [];
+		foreach ( $rows as $row ) {
+			$queues[ (int) ( $row['tenant_id'] ?? 0 ) ][] = $row;
+		}
+		if ( ! $queues ) {
+			return [];
+		}
+
+		$picked = [];
+		while ( count( $picked ) < $limit && $queues ) {
+			foreach ( array_keys( $queues ) as $tenant_id ) {
+				$next = array_shift( $queues[ $tenant_id ] );
+				if ( null === $next ) {
+					unset( $queues[ $tenant_id ] );
+					continue;
+				}
+				$picked[] = $next;
+				if ( count( $picked ) >= $limit ) {
+					break;
+				}
+			}
+		}
+		return $picked;
+	}
+
+	/**
+	 * In-flight Manus tasks per account, so the cap counts real provider load.
+	 *
+	 * @return array<int,int>
+	 */
+	private function running_per_account(): array {
+		$rows = $this->db->results(
+			'SELECT account_id, COUNT(*) AS total FROM ' . $this->db->table( 'ig_content' ) . '
+			 WHERE status IN (%s, %s) GROUP BY account_id',
+			ManusService::STATUS_GENERATING,
+			ManusService::STATUS_PUBLISHING
+		);
+
+		$counts = [];
+		foreach ( $rows as $row ) {
+			$counts[ (int) $row['account_id'] ] = (int) $row['total'];
+		}
+		return $counts;
+	}
+
+	private function per_account_cap(): int {
+		$cap = (int) igbz()->settings()->int( 'manus.account_concurrency', 3 );
+		return max( 1, (int) apply_filters( 'igbz_ig_account_concurrency', $cap ) );
 	}
 
 	private function should_autogenerate( int $content_id ): bool {
@@ -136,7 +228,11 @@ final class ContentScheduler {
 		);
 
 		foreach ( $rows as $row ) {
-			$state = $this->manus->client()->task_state( (string) $row['provider_task_id'] );
+			$account = $this->manus->account( (int) $row['account_id'] );
+			if ( ! $account ) {
+				continue;
+			}
+			$state = $this->manus->client_for( $account )->task_state( (string) $row['provider_task_id'] );
 			if ( ManusClient::STATUS_ERROR === $state['status'] ) {
 				$this->manus->fail( (int) $row['id'], __( 'The Manus publishing task failed.', 'igbz-suite' ) );
 				continue;

@@ -24,6 +24,7 @@ $cases = [
 	'PromptBuilderTest',
 	'UpsertTest',
 	'CronScheduleTest',
+	'AccountCredentialsTest',
 ];
 
 foreach ( $cases as $case ) {

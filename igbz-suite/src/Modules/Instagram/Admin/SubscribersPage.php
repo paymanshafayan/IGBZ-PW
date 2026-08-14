@@ -1,7 +1,8 @@
 <?php
 namespace IGBZ\Suite\Modules\Instagram\Admin;
 
-use IGBZ\Suite\Modules\Instagram\Gateways\ManyChatClient;
+use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
+use IGBZ\Suite\Modules\Instagram\Services\ManusService;
 use IGBZ\Suite\Modules\Instagram\Services\SubscriberService;
 use IGBZ\Suite\Support\Admin\Menu;
 use IGBZ\Suite\Support\Admin\View;
@@ -33,8 +34,8 @@ final class SubscribersPage {
 		return igbz()->get( 'ig.subscribers' );
 	}
 
-	private function manychat(): ManyChatClient {
-		return igbz()->get( 'ig.manychat' );
+	private function manus(): ManusService {
+		return igbz()->get( 'ig.manus' );
 	}
 
 	public function render(): void {
@@ -92,8 +93,16 @@ final class SubscribersPage {
 		}
 		echo '</div>';
 
-		if ( ! $this->manychat()->is_configured() ) {
-			View::notice( __( 'No ManyChat API key yet — subscriber profiles cannot be refreshed from the API.', 'igbz-suite' ), 'warning' );
+		// Keys live on the accounts, so warn only when none of this tenant's accounts has one.
+		$credentials = $this->manus()->credentials();
+		$keyed       = 0;
+		foreach ( $this->manus()->accounts( igbz()->tenancy()->id(), true ) as $account ) {
+			if ( $credentials->has_key( $account, AccountCredentials::SERVICE_MANYCHAT ) ) {
+				++$keyed;
+			}
+		}
+		if ( 0 === $keyed ) {
+			View::notice( __( 'No account has a usable ManyChat API key — subscriber profiles cannot be refreshed from the API.', 'igbz-suite' ), 'warning' );
 		}
 	}
 
@@ -303,7 +312,11 @@ final class SubscribersPage {
 			return;
 		}
 
-		$ok = $this->subscribers()->push_fields( (string) $subscriber['manychat_subscriber_id'], [ $field => $value ] );
+		$ok = $this->subscribers()->push_fields(
+			(string) $subscriber['manychat_subscriber_id'],
+			[ $field => $value ],
+			(int) $subscriber['tenant_id']
+		);
 		View::notice(
 			$ok ? __( 'Field pushed to ManyChat.', 'igbz-suite' ) : __( 'ManyChat rejected the update.', 'igbz-suite' ),
 			$ok ? 'success' : 'error'

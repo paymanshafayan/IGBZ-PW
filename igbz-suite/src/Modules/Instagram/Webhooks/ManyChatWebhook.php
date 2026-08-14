@@ -2,9 +2,9 @@
 namespace IGBZ\Suite\Modules\Instagram\Webhooks;
 
 use IGBZ\Suite\Modules\Instagram\Gateways\ManyChatClient;
+use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
 use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
 use IGBZ\Suite\Modules\Instagram\Services\SubscriberService;
-use IGBZ\Suite\Support\Crypto;
 use IGBZ\Suite\Support\Logger;
 
 defined( 'ABSPATH' ) || exit;
@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  * "External Request" action inside a Flow. The flow POSTs a JSON body we define (comment text,
  * subscriber id, post id, timestamp) to:
  *
- *   POST /wp-json/igbz/v1/manychat/comment?token=<shared secret>
+ *   POST /wp-json/igbz/v1/manychat/comment?token=<per-account token>
  *
  * ManyChat gives up after roughly ten seconds, so this controller does only local work and
  * answers with a Dynamic Content envelope plus a field map; every outbound API call is deferred
@@ -26,10 +26,17 @@ final class ManyChatWebhook {
 
 	public const NAMESPACE = 'igbz/v1';
 
+	/**
+	 * The account resolved from the request token, set by authorize() and consumed by the
+	 * callbacks. Tenancy is taken from here and never from the request body.
+	 */
+	private ?array $account = null;
+
 	public function __construct(
 		private FunnelService $funnels,
 		private SubscriberService $subscribers,
-		private Logger $logger
+		private Logger $logger,
+		private AccountCredentials $credentials
 	) {}
 
 	public function register(): void {
@@ -58,16 +65,37 @@ final class ManyChatWebhook {
 	}
 
 	/**
-	 * Shared-secret auth. The token may arrive as ?token=, X-IGBZ-Token or a Bearer header, so the
-	 * External Request can be configured either way.
+	 * Per-account token auth. The token may arrive as ?token=, X-IGBZ-Token or a Bearer header, so
+	 * the External Request can be configured either way.
+	 *
+	 * The token identifies the account, and the account supplies the tenant. Previously the token
+	 * was global and tenant_id/account_id were read from the POST body, so any tenant holding the
+	 * shared token could fire another tenant's funnel and spend their coupons and wallet credit.
 	 */
 	public function authorize( \WP_REST_Request $request ): bool {
-		$expected = igbz()->settings()->string( 'manychat.webhook_token', '' );
-		if ( '' === $expected ) {
-			$this->logger->warning( 'manychat', 'Webhook rejected: no token configured' );
+		$this->account = null;
+
+		$given = $this->token_from( $request );
+		if ( '' === $given ) {
+			$this->logger->warning( 'manychat', 'Webhook rejected: no token supplied' );
 			return false;
 		}
 
+		$account = $this->credentials->account_by_webhook_token( $given, AccountCredentials::SERVICE_MANYCHAT );
+		if ( ! $account ) {
+			$this->logger->warning( 'manychat', 'Webhook rejected: unknown token' );
+			return false;
+		}
+		if ( ! (int) ( $account['is_active'] ?? 0 ) ) {
+			$this->logger->warning( 'manychat', 'Webhook rejected: account is inactive', [ 'account_id' => (int) $account['id'] ] );
+			return false;
+		}
+
+		$this->account = $account;
+		return true;
+	}
+
+	private function token_from( \WP_REST_Request $request ): string {
 		$given = (string) $request->get_param( 'token' );
 		if ( '' === $given ) {
 			$given = (string) $request->get_header( 'x_igbz_token' );
@@ -75,13 +103,7 @@ final class ManyChatWebhook {
 		if ( '' === $given ) {
 			$given = trim( str_ireplace( 'Bearer', '', (string) $request->get_header( 'authorization' ) ) );
 		}
-
-		if ( ! Crypto::hmac_equals( $expected, $given ) ) {
-			$this->logger->warning( 'manychat', 'Webhook rejected: bad token' );
-			return false;
-		}
-
-		return true;
+		return trim( $given );
 	}
 
 	public function handle_ping(): \WP_REST_Response {
@@ -102,7 +124,9 @@ final class ManyChatWebhook {
 	 * Expected body (all optional except the comment text and subscriber id):
 	 *   { "subscriber_id": "...", "comment_text": "...", "comment_id": "...", "post_id": "...",
 	 *     "timestamp": 1723459200, "ig_username": "...", "ig_user_id": "...",
-	 *     "first_name": "...", "last_name": "...", "account_id": 1, "tenant_id": 0 }
+	 *     "first_name": "...", "last_name": "..." }
+	 *
+	 * The account and tenant come from the token, not the body.
 	 */
 	public function handle_comment( \WP_REST_Request $request ): \WP_REST_Response {
 		$event  = $this->normalize_request( $request );
@@ -207,7 +231,7 @@ final class ManyChatWebhook {
 				'phone'                  => (string) $request->get_param( 'phone' ),
 				'email'                  => (string) $request->get_param( 'email' ),
 			],
-			(int) $request->get_param( 'tenant_id' )
+			(int) ( $this->account['tenant_id'] ?? 0 )
 		);
 
 		$user_id = $this->subscribers->maybe_link_user( $row_id );
@@ -253,8 +277,9 @@ final class ManyChatWebhook {
 			'last_name'     => sanitize_text_field( (string) ( $body['last_name'] ?? '' ) ),
 			'timestamp'     => (int) $timestamp,
 			'event'         => 'comment',
-			'tenant_id'     => (int) ( $body['tenant_id'] ?? 0 ),
-			'account_id'    => (int) ( $body['account_id'] ?? 0 ),
+			// Authoritative, from the token lookup. Any tenant_id/account_id in the body is ignored.
+			'tenant_id'     => (int) ( $this->account['tenant_id'] ?? 0 ),
+			'account_id'    => (int) ( $this->account['id'] ?? 0 ),
 		];
 	}
 

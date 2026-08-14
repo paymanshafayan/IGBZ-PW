@@ -4,6 +4,7 @@ namespace IGBZ\Suite\Modules\Instagram\Services;
 use IGBZ\Suite\Modules\Instagram\Contracts\ContentGeneratorInterface;
 use IGBZ\Suite\Modules\Instagram\Contracts\PublishResult;
 use IGBZ\Suite\Modules\Instagram\Contracts\PublisherInterface;
+use IGBZ\Suite\Support\Crypto;
 use IGBZ\Suite\Support\Db;
 use IGBZ\Suite\Support\Logger;
 
@@ -39,8 +40,27 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		private Db $db,
 		private ManusClient $client,
 		private PromptBuilder $prompts,
-		private Logger $logger
+		private Logger $logger,
+		private AccountCredentials $credentials
 	) {}
+
+	/**
+	 * The Manus client bound to one account's own key.
+	 *
+	 * @param array<string,mixed> $account
+	 */
+	public function client_for( array $account ): ManusClient {
+		return $this->client->for_key( $this->credentials->key( $account, AccountCredentials::SERVICE_MANUS ) );
+	}
+
+	/** @param array<string,mixed> $account */
+	public function account_is_configured( array $account ): bool {
+		return $this->credentials->has_key( $account, AccountCredentials::SERVICE_MANUS );
+	}
+
+	public function credentials(): AccountCredentials {
+		return $this->credentials;
+	}
 
 	public function id(): string {
 		return 'manus';
@@ -50,14 +70,27 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		return __( 'Manus', 'igbz-suite' );
 	}
 
+	/**
+	 * Whether *any* account on this install can reach Manus. Credentials are per account, so this
+	 * is only a coarse health signal for the status screen -- use account_is_configured() before
+	 * acting on a specific account.
+	 */
 	public function is_configured(): bool {
-		return $this->client->is_configured();
+		$configured = (int) $this->db->scalar(
+			'SELECT COUNT(*) FROM ' . $this->db->table( 'ig_accounts' ) . "
+			 WHERE is_active = 1 AND manus_api_key IS NOT NULL AND manus_api_key <> ''"
+		);
+		return $configured > 0 || $this->credentials->trial_available();
 	}
 
 	public function supports( string $kind ): bool {
 		return in_array( $kind, [ self::KIND_POST, self::KIND_CAROUSEL, self::KIND_STORY, self::KIND_REEL ], true );
 	}
 
+	/**
+	 * The unbound client. It carries no key, so callers must bind one with for_key(); prefer
+	 * client_for( $account ).
+	 */
 	public function client(): ManusClient {
 		return $this->client;
 	}
@@ -78,6 +111,20 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		return $this->db->results( $sql . ' ORDER BY id', $tenant_id );
 	}
 
+	/**
+	 * Every account on the install, ignoring tenancy. For site-wide health and cron sweeps only --
+	 * anything user-facing must go through accounts() so it stays scoped to one tenant.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	public function all_accounts( bool $active_only = true ): array {
+		$sql = 'SELECT * FROM ' . $this->db->table( 'ig_accounts' );
+		if ( $active_only ) {
+			$sql .= ' WHERE is_active = 1';
+		}
+		return $this->db->results( $sql . ' ORDER BY id' );
+	}
+
 	/** @param array<string,mixed> $data */
 	public function save_account( array $data, int $id = 0 ): int {
 		$now     = current_time( 'mysql', true );
@@ -95,12 +142,57 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			'updated_at'       => $now,
 		];
 
+		if ( isset( $data['credential_mode'] ) ) {
+			$payload['credential_mode'] = AccountCredentials::MODE_TRIAL === $data['credential_mode']
+				? AccountCredentials::MODE_TRIAL
+				: AccountCredentials::MODE_OWN;
+		}
+
+		// A key is only written when a new value was actually typed. The edit form renders stored
+		// keys as a mask, so an untouched field must leave the ciphertext alone.
+		foreach ( [ 'manus_api_key', 'manychat_api_key' ] as $field ) {
+			if ( ! array_key_exists( $field, $data ) ) {
+				continue;
+			}
+			$value = trim( (string) $data[ $field ] );
+			if ( Crypto::MASK === $value ) {
+				continue;
+			}
+			$payload[ $field ] = '' === $value ? null : $this->credentials->encrypt_key( $value );
+		}
+
 		if ( $id > 0 ) {
 			$this->db->update( 'ig_accounts', $payload, [ 'id' => $id ] );
+			$this->after_account_saved( $id, $payload );
 			return $id;
 		}
+
 		$payload['created_at'] = $now;
-		return $this->db->insert( 'ig_accounts', $payload );
+		$new_id                = $this->db->insert( 'ig_accounts', $payload );
+		if ( $new_id > 0 ) {
+			$this->after_account_saved( $new_id, $payload );
+		}
+		return $new_id;
+	}
+
+	/**
+	 * Give a freshly saved account the pieces it cannot work without: its own webhook tokens, and
+	 * a trial clock when it is running on the shared key.
+	 *
+	 * @param array<string,mixed> $payload
+	 */
+	private function after_account_saved( int $id, array $payload ): void {
+		$account = $this->account( $id );
+		if ( ! $account ) {
+			return;
+		}
+
+		$this->credentials->webhook_token( $account, AccountCredentials::SERVICE_MANUS );
+		$this->credentials->webhook_token( $account, AccountCredentials::SERVICE_MANYCHAT );
+
+		if ( AccountCredentials::MODE_TRIAL === $this->credentials->mode( $account ) ) {
+			$this->credentials->start_trial( $id );
+		}
 	}
 
 	public function delete_account( int $id ): bool {
@@ -212,7 +304,17 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 	 * @param array<int,string>   $connectors
 	 */
 	private function dispatch( string $prompt, array $account, string $title, array $connectors = [] ): string {
-		$result = $this->client->create_task(
+		if ( ! $this->account_is_configured( $account ) ) {
+			$reason = $this->credentials->trial_blocked_reason( $account );
+			$this->logger->error(
+				'manus',
+				'Task creation skipped: no usable Manus key for this account',
+				[ 'account_id' => (int) ( $account['id'] ?? 0 ), 'reason' => $reason ]
+			);
+			return '';
+		}
+
+		$result = $this->client_for( $account )->create_task(
 			$prompt,
 			[
 				'project_id' => (string) ( $account['manus_project_id'] ?? '' ),
@@ -225,6 +327,9 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			$this->logger->error( 'manus', 'Task creation failed', [ 'title' => $title, 'error' => $result['error'] ] );
 			return '';
 		}
+
+		// Only a task that really reached Manus on the shared key costs the tenant trial quota.
+		$this->credentials->consume_trial_task( $account );
 
 		$this->logger->info( 'manus', 'Task created', [ 'task_id' => $result['task_id'], 'title' => $title ] );
 		return $result['task_id'];
@@ -295,7 +400,12 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			return self::STATUS_FAILED;
 		}
 
-		$state = $this->client->task_state( (string) $content['provider_task_id'] );
+		$account = $this->account( (int) $content['account_id'] );
+		if ( ! $account ) {
+			return self::STATUS_FAILED;
+		}
+
+		$state = $this->client_for( $account )->task_state( (string) $content['provider_task_id'] );
 
 		if ( ManusClient::STATUS_ERROR === $state['status'] ) {
 			$this->fail( $content_id, __( 'The Manus task ended with an error.', 'igbz-suite' ) );
@@ -433,9 +543,12 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		do_action( 'igbz_ig_content_failed', $content_id, $error );
 	}
 
-	/** @return array{status:string,messages:array<int,mixed>,attachments:array<int,array<string,mixed>>,output:array<string,mixed>} */
-	public function task_state( string $task_id ): array {
-		$state = $this->client->task_state( $task_id );
+	/**
+	 * @param array<string,mixed> $account
+	 * @return array{status:string,messages:array<int,mixed>,attachments:array<int,array<string,mixed>>,output:array<string,mixed>}
+	 */
+	public function task_state( string $task_id, array $account = [] ): array {
+		$state = $this->client_for( $account )->task_state( $task_id );
 		return [
 			'status'      => $state['status'],
 			'messages'    => [],

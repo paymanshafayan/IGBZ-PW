@@ -16,13 +16,17 @@ final class InsightsService {
 
 	/** Runs on igbz_cron_daily. */
 	public function collect_all(): void {
-		if ( ! $this->manus->is_configured() || ! igbz()->settings()->bool( 'manus.collect_insights', true ) ) {
+		if ( ! igbz()->settings()->bool( 'manus.collect_insights', true ) ) {
 			return;
 		}
 
 		$accounts = $this->db->results( 'SELECT * FROM ' . $this->db->table( 'ig_accounts' ) . ' WHERE is_active = 1' );
 		foreach ( $accounts as $account ) {
-			$task_id = $this->manus->client()->create_task(
+			// Each account pays for its own insight task with its own key.
+			if ( ! $this->manus->account_is_configured( $account ) ) {
+				continue;
+			}
+			$task_id = $this->manus->client_for( $account )->create_task(
 				$this->prompts->insights( $account ),
 				[
 					'project_id'        => (string) $account['manus_project_id'],
@@ -45,7 +49,7 @@ final class InsightsService {
 			if ( ! $task_id ) {
 				continue;
 			}
-			$state = $this->manus->client()->task_state( (string) $task_id );
+			$state = $this->manus->client_for( $account )->task_state( (string) $task_id );
 			if ( ManusClient::STATUS_STOPPED !== $state['status'] ) {
 				continue;
 			}

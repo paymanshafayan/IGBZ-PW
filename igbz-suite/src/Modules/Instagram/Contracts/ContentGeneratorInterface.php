@@ -49,7 +49,10 @@ interface ContentGeneratorInterface {
 	/**
 	 * Poll a task and return its current state plus any produced assets.
 	 *
+	 * The account is required because credentials are per account, not per install.
+	 *
+	 * @param array<string,mixed> $account
 	 * @return array{status:string,messages:array<int,mixed>,attachments:array<int,array<string,mixed>>,output:array<string,mixed>}
 	 */
-	public function task_state( string $task_id ): array;
+	public function task_state( string $task_id, array $account = [] ): array;
 }

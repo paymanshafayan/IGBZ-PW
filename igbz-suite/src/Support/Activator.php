@@ -44,8 +44,65 @@ final class Activator {
 		self::install_tables();
 		self::add_roles();
 		self::seed_defaults();
+		self::migrate( $current );
 		self::schedule_events();
 		update_option( self::VERSION_OPTION, IGBZ_DB_VERSION, true );
+	}
+
+	/**
+	 * Data migrations that dbDelta cannot express.
+	 *
+	 * dbDelta adds the new columns, but existing rows still need values, so each step is written
+	 * to be idempotent and safe to re-run.
+	 */
+	private static function migrate( int $from ): void {
+		if ( $from > 0 && $from < 6 ) {
+			self::migrate_to_v6();
+		}
+	}
+
+	/**
+	 * v6: Manus and ManyChat credentials moved from one global key to per-account keys.
+	 *
+	 * Existing accounts are switched to the trial engine so a live site keeps working on the
+	 * operator's key after the upgrade instead of going dark, and every account is given its own
+	 * webhook tokens. The old global webhook tokens are intentionally left in settings: they no
+	 * longer authenticate anything, but keeping them avoids breaking a rollback.
+	 */
+	private static function migrate_to_v6(): void {
+		$db    = new Db();
+		$table = $db->table( 'ig_accounts' );
+
+		$rows = $db->results( "SELECT id, manus_webhook_token, manychat_webhook_token FROM {$table}" );
+		if ( ! $rows ) {
+			return;
+		}
+
+		$now     = current_time( 'mysql', true );
+		$days    = (int) ( new Settings() )->int( 'trial.days', 14 );
+		$expires = gmdate( 'Y-m-d H:i:s', strtotime( $now . ' UTC' ) + ( $days * DAY_IN_SECONDS ) );
+
+		foreach ( $rows as $row ) {
+			$update = [];
+
+			if ( '' === (string) ( $row['manus_webhook_token'] ?? '' ) ) {
+				$update['manus_webhook_token'] = Crypto::token( 24 );
+			}
+			if ( '' === (string) ( $row['manychat_webhook_token'] ?? '' ) ) {
+				$update['manychat_webhook_token'] = Crypto::token( 24 );
+			}
+			// Rows that predate v6 have no key of their own, so they start on the trial engine.
+			// dbDelta has already stamped them with the 'own' column default, hence the explicit
+			// overwrite rather than a check for an empty mode.
+			$update['credential_mode']  = 'trial';
+			$update['trial_started_at'] = $now;
+			$update['trial_expires_at'] = $expires;
+			$update['trial_tasks_used'] = 0;
+
+			if ( $update ) {
+				$db->update( 'ig_accounts', $update, [ 'id' => (int) $row['id'] ] );
+			}
+		}
 	}
 
 	public static function install_tables(): void {
@@ -205,6 +262,10 @@ final class Activator {
 			'manus.min_gap_minutes'         => 90,
 			'manus.reel_seconds'            => 25,
 			'manus.weekly_slots'            => 5,
+			'manus.account_concurrency'     => 3,
+			'trial.enabled'                 => true,
+			'trial.days'                    => 14,
+			'trial.task_quota'              => 25,
 			'manychat.async_reply'          => true,
 			'manychat.link_field_name'      => 'igbz_link',
 			'manychat.coupon_field_name'    => 'igbz_coupon',

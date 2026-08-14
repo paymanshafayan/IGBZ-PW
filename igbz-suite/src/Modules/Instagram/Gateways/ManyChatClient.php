@@ -26,16 +26,32 @@ final class ManyChatClient {
 	public const ERROR_INVALID_CONTENT      = 3011;
 	public const ERROR_TAG_REQUIRED         = 3021;
 
+	/**
+	 * Page-scoped key this instance authenticates with. ManyChat issues one key per page, so this
+	 * is necessarily per-account rather than per-install.
+	 */
+	private string $api_key = '';
+
 	public function __construct( private Http $http, private Logger $logger ) {}
 
+	/**
+	 * A copy of this client bound to one account's key. See ManusClient::for_key() for why this
+	 * clones instead of mutating.
+	 */
+	public function for_key( string $api_key ): self {
+		$clone          = clone $this;
+		$clone->api_key = trim( $api_key );
+		return $clone;
+	}
+
 	public function is_configured(): bool {
-		return '' !== igbz()->settings()->string( 'manychat.api_key', '' );
+		return '' !== $this->api_key;
 	}
 
 	/** @return array<string,string> */
 	private function headers(): array {
 		return [
-			'Authorization' => 'Bearer ' . igbz()->settings()->string( 'manychat.api_key', '' ),
+			'Authorization' => 'Bearer ' . $this->api_key,
 			'Content-Type'  => 'application/json',
 			'Accept'        => 'application/json',
 		];

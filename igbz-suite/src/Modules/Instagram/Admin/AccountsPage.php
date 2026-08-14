@@ -1,11 +1,13 @@
 <?php
 namespace IGBZ\Suite\Modules\Instagram\Admin;
 
+use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
 use IGBZ\Suite\Modules\Instagram\Services\ContentScheduler;
 use IGBZ\Suite\Modules\Instagram\Services\ManusService;
 use IGBZ\Suite\Support\Admin\Menu;
 use IGBZ\Suite\Support\Admin\View;
 use IGBZ\Suite\Support\Capabilities;
+use IGBZ\Suite\Support\Crypto;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -33,6 +35,10 @@ final class AccountsPage {
 
 	private function scheduler(): ContentScheduler {
 		return igbz()->get( 'ig.scheduler' );
+	}
+
+	private function credentials(): AccountCredentials {
+		return igbz()->get( 'ig.credentials' );
 	}
 
 	public function render(): void {
@@ -144,6 +150,11 @@ final class AccountsPage {
 			'brand_voice'      => '',
 			'peak_hours'       => '',
 			'is_active'        => 1,
+			'credential_mode'  => AccountCredentials::MODE_OWN,
+			'manus_api_key'    => '',
+			'manychat_api_key' => '',
+			'trial_tasks_used' => 0,
+			'trial_expires_at' => '',
 		];
 
 		printf(
@@ -189,6 +200,10 @@ final class AccountsPage {
 
 		$this->text_row( 'manus_project_id', __( 'Manus project ID', 'igbz-suite' ), (string) $account['manus_project_id'], __( 'Optional. Keeps this account\'s tasks inside one Manus project.', 'igbz-suite' ) );
 		$this->text_row( 'manychat_page_id', __( 'ManyChat page ID', 'igbz-suite' ), (string) $account['manychat_page_id'], __( 'Optional. Used to route incoming funnel events to the right account.', 'igbz-suite' ) );
+
+		echo '</tbody></table>';
+		$this->render_credentials( $account, $account_id );
+		echo '<table class="form-table" role="presentation"><tbody>';
 
 		echo '<tr><th scope="row">' . esc_html__( 'Active', 'igbz-suite' ) . '</th><td><label>';
 		printf( '<input type="checkbox" name="is_active" value="1" %s /> ', checked( (int) $account['is_active'], 1, false ) );
@@ -240,6 +255,154 @@ final class AccountsPage {
 		echo '</form>';
 	}
 
+	/**
+	 * API keys and webhook endpoints for one account.
+	 *
+	 * Keys are per account on purpose: a ManyChat key is scoped to a single page by ManyChat, so a
+	 * shared key could only ever drive one page. Stored keys are shown masked and only overwritten
+	 * when a new value is typed.
+	 *
+	 * @param array<string,mixed> $account
+	 */
+	private function render_credentials( array $account, int $account_id ): void {
+		$credentials = $this->credentials();
+		$mode        = $credentials->mode( $account );
+		$saved       = $account_id > 0;
+
+		echo '<h2>' . esc_html__( 'API credentials', 'igbz-suite' ) . '</h2>';
+		printf(
+			'<p class="description">%s</p>',
+			esc_html__( 'Each account talks to Manus and ManyChat with its own keys, so tenants never share a quota or a page.', 'igbz-suite' )
+		);
+
+		echo '<table class="form-table" role="presentation"><tbody>';
+
+		echo '<tr><th scope="row">' . esc_html__( 'Key source', 'igbz-suite' ) . '</th><td>';
+		foreach (
+			[
+				AccountCredentials::MODE_OWN   => __( 'Own keys — unlimited.', 'igbz-suite' ),
+				AccountCredentials::MODE_TRIAL => __( 'Free trial — borrows the shared keys of this site, limited.', 'igbz-suite' ),
+			] as $value => $label
+		) {
+			printf(
+				'<label style="display:block;margin-bottom:4px"><input type="radio" name="credential_mode" value="%1$s" %2$s /> %3$s</label>',
+				esc_attr( $value ),
+				checked( $value, $mode, false ),
+				esc_html( $label )
+			);
+		}
+		if ( ! $credentials->trial_available() ) {
+			printf(
+				'<p class="description">%s</p>',
+				esc_html__( 'No shared key is set on this site yet, so the trial cannot run. Add manus.api_key / manychat.api_key in Settings.', 'igbz-suite' )
+			);
+		}
+		echo '</td></tr>';
+
+		if ( AccountCredentials::MODE_TRIAL === $mode && $saved ) {
+			$quota   = $credentials->trial_quota();
+			$used    = (int) ( $account['trial_tasks_used'] ?? 0 );
+			$expires = (string) ( $account['trial_expires_at'] ?? '' );
+			$reason  = $credentials->trial_blocked_reason( $account );
+
+			echo '<tr><th scope="row">' . esc_html__( 'Trial status', 'igbz-suite' ) . '</th><td>';
+			printf(
+				'<p>%s</p>',
+				esc_html(
+					sprintf(
+						/* translators: 1: tasks used, 2: task quota */
+						__( 'Tasks used: %1$d of %2$d', 'igbz-suite' ),
+						$used,
+						$quota
+					)
+				)
+			);
+			if ( '' !== $expires ) {
+				printf(
+					'<p>%s</p>',
+					esc_html(
+						sprintf(
+							/* translators: %s: expiry date */
+							__( 'Expires: %s UTC', 'igbz-suite' ),
+							$expires
+						)
+					)
+				);
+			}
+			if ( '' !== $reason ) {
+				printf( '<p><strong>%s</strong></p>', esc_html( $reason ) );
+			}
+			echo '</td></tr>';
+		}
+
+		$this->secret_row(
+			'manus_api_key',
+			__( 'Manus API key', 'igbz-suite' ),
+			! empty( $account['manus_api_key'] ),
+			__( 'Sent as the x-manus-api-key header. Only used when the key source is "Own keys".', 'igbz-suite' )
+		);
+		$this->secret_row(
+			'manychat_api_key',
+			__( 'ManyChat API key', 'igbz-suite' ),
+			! empty( $account['manychat_api_key'] ),
+			__( 'ManyChat → Settings → API. The key belongs to one Instagram page.', 'igbz-suite' )
+		);
+
+		if ( $saved ) {
+			$this->webhook_row(
+				__( 'ManyChat webhook URL', 'igbz-suite' ),
+				$credentials->webhook_url( $account, AccountCredentials::SERVICE_MANYCHAT ),
+				__( 'Paste into the External Request action of your ManyChat comment flow. The token identifies this account — do not share it.', 'igbz-suite' )
+			);
+			$this->webhook_row(
+				__( 'Manus webhook URL', 'igbz-suite' ),
+				$credentials->webhook_url( $account, AccountCredentials::SERVICE_MANUS ),
+				__( 'Register in Manus so finished tasks report back without waiting for the polling cron.', 'igbz-suite' )
+			);
+
+			printf(
+				'<tr><th scope="row">%1$s</th><td><a class="button button-small" href="%2$s" onclick="return confirm(\'%3$s\')">%4$s</a></td></tr>',
+				esc_html__( 'Rotate tokens', 'igbz-suite' ),
+				esc_url( wp_nonce_url( Menu::url( self::SLUG, [ 'account' => $account_id, 'rotate' => $account_id ] ), self::NONCE ) ),
+				esc_js( __( 'Rotate both webhook tokens? The old URLs stop working immediately.', 'igbz-suite' ) ),
+				esc_html__( 'Rotate webhook tokens', 'igbz-suite' )
+			);
+		}
+
+		echo '</tbody></table>';
+	}
+
+	private function secret_row( string $name, string $label, bool $has_value, string $help = '' ): void {
+		$id = 'igbz_' . $name;
+		echo '<tr><th scope="row"><label for="' . esc_attr( $id ) . '">' . esc_html( $label ) . '</label></th><td>';
+		printf(
+			'<input type="text" class="regular-text" id="%1$s" name="%2$s" value="%3$s" autocomplete="off" />',
+			esc_attr( $id ),
+			esc_attr( $name ),
+			esc_attr( $has_value ? Crypto::MASK : '' )
+		);
+		if ( '' !== $help ) {
+			printf( '<p class="description">%s</p>', esc_html( $help ) );
+		}
+		if ( $has_value ) {
+			printf(
+				'<p class="description">%s</p>',
+				esc_html__( 'A key is stored. Leave the mask untouched to keep it, or clear the field to remove it.', 'igbz-suite' )
+			);
+		}
+		echo '</td></tr>';
+	}
+
+	private function webhook_row( string $label, string $url, string $help ): void {
+		echo '<tr><th scope="row">' . esc_html( $label ) . '</th><td>';
+		printf(
+			'<input type="text" class="large-text code" value="%s" readonly onfocus="this.select()" />',
+			esc_attr( $url )
+		);
+		printf( '<p class="description">%s</p>', esc_html( $help ) );
+		echo '</td></tr>';
+	}
+
 	private function text_row( string $name, string $label, string $value, string $help = '' ): void {
 		$id = 'igbz_' . $name;
 		echo '<tr><th scope="row"><label for="' . esc_attr( $id ) . '">' . esc_html( $label ) . '</label></th><td>';
@@ -287,6 +450,9 @@ final class AccountsPage {
 			'brand_voice'      => isset( $_POST['brand_voice'] ) ? sanitize_textarea_field( wp_unslash( $_POST['brand_voice'] ) ) : '',
 			'peak_hours'       => isset( $_POST['peak_hours'] ) ? sanitize_text_field( wp_unslash( $_POST['peak_hours'] ) ) : '',
 			'is_active'        => ! empty( $_POST['is_active'] ),
+			'credential_mode'  => isset( $_POST['credential_mode'] ) ? sanitize_key( wp_unslash( $_POST['credential_mode'] ) ) : AccountCredentials::MODE_OWN,
+			'manus_api_key'    => isset( $_POST['manus_api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['manus_api_key'] ) ) : '',
+			'manychat_api_key' => isset( $_POST['manychat_api_key'] ) ? sanitize_text_field( wp_unslash( $_POST['manychat_api_key'] ) ) : '',
 		];
 
 		if ( '' === $data['username'] ) {
@@ -311,6 +477,15 @@ final class AccountsPage {
 			View::notice( __( 'Account deleted.', 'igbz-suite' ) );
 		}
 
+		if ( isset( $_GET['rotate'] ) ) {
+			check_admin_referer( self::NONCE );
+			Capabilities::require( Capabilities::MANAGE_INSTAGRAM );
+			$rotate = (int) $_GET['rotate'];
+			$this->credentials()->rotate_webhook_token( $rotate, AccountCredentials::SERVICE_MANUS );
+			$this->credentials()->rotate_webhook_token( $rotate, AccountCredentials::SERVICE_MANYCHAT );
+			View::notice( __( 'Webhook tokens rotated. Update the URLs in Manus and ManyChat.', 'igbz-suite' ) );
+		}
+
 		if ( isset( $_GET['plan'] ) ) {
 			check_admin_referer( self::NONCE );
 			Capabilities::require( Capabilities::MANAGE_INSTAGRAM );
@@ -329,8 +504,14 @@ final class AccountsPage {
 			View::notice( __( 'Account not found.', 'igbz-suite' ), 'error' );
 			return;
 		}
-		if ( ! $this->manus()->is_configured() ) {
-			View::notice( __( 'Set manus.api_key in the settings first.', 'igbz-suite' ), 'error' );
+		if ( ! $this->manus()->account_is_configured( $account ) ) {
+			$reason = $this->manus()->credentials()->trial_blocked_reason( $account );
+			View::notice(
+				'' !== $reason
+					? $reason
+					: __( 'This account has no Manus API key. Add one on the account, or switch it to the free trial.', 'igbz-suite' ),
+				'error'
+			);
 			return;
 		}
 

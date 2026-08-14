@@ -464,6 +464,14 @@ final class Schema {
 			display_name VARCHAR(191) NOT NULL DEFAULT '',
 			manus_project_id VARCHAR(128) NOT NULL DEFAULT '',
 			manychat_page_id VARCHAR(128) NOT NULL DEFAULT '',
+			manus_api_key TEXT NULL,
+			manychat_api_key TEXT NULL,
+			manus_webhook_token VARCHAR(64) NULL DEFAULT NULL,
+			manychat_webhook_token VARCHAR(64) NULL DEFAULT NULL,
+			credential_mode VARCHAR(16) NOT NULL DEFAULT 'own',
+			trial_started_at DATETIME NULL,
+			trial_expires_at DATETIME NULL,
+			trial_tasks_used INT NOT NULL DEFAULT 0,
 			timezone VARCHAR(64) NOT NULL DEFAULT 'Asia/Tehran',
 			niche VARCHAR(191) NOT NULL DEFAULT '',
 			brand_voice TEXT NULL,
@@ -472,7 +480,9 @@ final class Schema {
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
-			UNIQUE KEY tenant_username (tenant_id,username)
+			UNIQUE KEY tenant_username (tenant_id,username),
+			UNIQUE KEY manychat_webhook_token (manychat_webhook_token),
+			UNIQUE KEY manus_webhook_token (manus_webhook_token)
 		) {$charset};";
 
 		$sql[] = "CREATE TABLE {$p}ig_content (

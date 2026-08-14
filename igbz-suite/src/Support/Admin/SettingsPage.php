@@ -273,7 +273,7 @@ final class SettingsPage {
 
 			case 'manus':
 				return [
-					[ 'key' => 'manus.api_key', 'label' => __( 'Manus API key', 'igbz-suite' ), 'type' => 'password', 'help' => __( 'Sent as the x-manus-api-key header to https://api.manus.ai.', 'igbz-suite' ) ],
+					[ 'key' => 'manus.api_key', 'label' => __( 'Shared Manus API key (free trial)', 'igbz-suite' ), 'type' => 'password', 'help' => __( 'Only used by accounts set to the free trial. Accounts on their own keys never touch it, so tasks are billed to the tenant.', 'igbz-suite' ) ],
 					[
 						'key'     => 'manus.agent_profile',
 						'label'   => __( 'Agent profile', 'igbz-suite' ),
@@ -298,13 +298,16 @@ final class SettingsPage {
 					[ 'key' => 'manus.reel_seconds', 'label' => __( 'Target reel length (seconds)', 'igbz-suite' ), 'type' => 'number', 'min' => 5, 'max' => 90 ],
 					[ 'key' => 'manus.weekly_slots', 'label' => __( 'Posts to plan per week', 'igbz-suite' ), 'type' => 'number', 'min' => 1, 'max' => 42, 'help' => __( 'How many pieces the auto planner queues for each account every week.', 'igbz-suite' ) ],
 					[ 'key' => 'manus.poll_interval', 'label' => __( 'Task poll interval (seconds)', 'igbz-suite' ), 'type' => 'number', 'min' => 60, 'max' => 3600 ],
-					[ 'key' => 'manus.webhook_token', 'label' => __( 'Manus webhook token', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'manus.account_concurrency', 'label' => __( 'Concurrent Manus tasks per account', 'igbz-suite' ), 'type' => 'number', 'min' => 1, 'max' => 20, 'help' => __( 'Caps how many tasks one account may have in flight, so a busy tenant cannot starve the others.', 'igbz-suite' ) ],
+					[ 'key' => 'trial.enabled', 'label' => __( 'Offer the free trial', 'igbz-suite' ), 'type' => 'checkbox', 'help' => __( 'Lets a new account borrow the shared keys above for a limited time.', 'igbz-suite' ) ],
+					[ 'key' => 'trial.days', 'label' => __( 'Trial length (days)', 'igbz-suite' ), 'type' => 'number', 'min' => 1, 'max' => 365 ],
+					[ 'key' => 'trial.task_quota', 'label' => __( 'Trial task quota', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 10000, 'help' => __( 'Manus tasks one trial account may run in total. 0 means unlimited, the expiry date still applies.', 'igbz-suite' ) ],
 				];
 
 			case 'manychat':
 				return [
-					[ 'key' => 'manychat.api_key', 'label' => __( 'ManyChat API key', 'igbz-suite' ), 'type' => 'password', 'help' => __( 'Settings &rarr; API in ManyChat. Requires a Pro account.', 'igbz-suite' ) ],
-					[ 'key' => 'manychat.webhook_token', 'label' => __( 'Webhook token', 'igbz-suite' ), 'type' => 'password', 'help' => __( 'Send it as the X-IGBZ-Token header (or ?token=) from the External Request action.', 'igbz-suite' ) ],
+					[ 'key' => 'manychat.api_key', 'label' => __( 'Shared ManyChat API key (free trial)', 'igbz-suite' ), 'type' => 'password', 'help' => __( 'Settings &rarr; API in ManyChat, Pro required. A ManyChat key drives one page only, so this is the trial page; every other account needs its own key.', 'igbz-suite' ) ],
+					
 					[ 'key' => 'manychat.async_reply', 'label' => __( 'Reply asynchronously', 'igbz-suite' ), 'type' => 'checkbox', 'help' => __( 'ManyChat waits about 10 seconds. With this on the webhook answers instantly and the link is pushed back with setCustomField + sendFlow.', 'igbz-suite' ) ],
 					[ 'key' => 'manychat.link_field_name', 'label' => __( 'Custom field for the link', 'igbz-suite' ), 'placeholder' => 'igbz_link' ],
 					[ 'key' => 'manychat.coupon_field_name', 'label' => __( 'Custom field for the coupon', 'igbz-suite' ), 'placeholder' => 'igbz_coupon' ],

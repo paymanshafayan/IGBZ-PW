@@ -55,6 +55,10 @@ function esc_url_raw( string $url ): string {
 	return $url;
 }
 
+function add_query_arg( string $key, string $value, string $url ): string {
+	return $url . ( str_contains( $url, '?' ) ? '&' : '?' ) . $key . '=' . rawurlencode( $value );
+}
+
 function sanitize_key( string $key ): string {
 	return strtolower( preg_replace( '/[^a-z0-9_\-]/i', '', $key ) );
 }
@@ -194,6 +198,47 @@ class wpdb {
 
 	/** Records the [$data, $formats] of the last write, so tests can assert on the formats. */
 	public array $last_write = [];
+
+	/**
+	 * Rows handed back by get_row()/get_results()/get_var(), newest first.
+	 *
+	 * Tests that exercise read paths push the rows they expect the code under test to see; the
+	 * double does no SQL parsing, so ordering is the test's responsibility.
+	 *
+	 * @var array<int,mixed>
+	 */
+	public array $next_results = [];
+
+	public function get_row( string $sql, $output = null ) {
+		$this->queries[] = $sql;
+		$next            = array_shift( $this->next_results );
+
+		if ( is_array( $next ) && $next && isset( $next[0] ) && is_array( $next[0] ) ) {
+			return $next[0];
+		}
+
+		return is_array( $next ) ? $next : null;
+	}
+
+	public function get_results( string $sql, $output = null ) {
+		$this->queries[] = $sql;
+		$next            = array_shift( $this->next_results );
+
+		return is_array( $next ) ? $next : [];
+	}
+
+	public function get_var( string $sql ) {
+		$this->queries[] = $sql;
+
+		return array_shift( $this->next_results );
+	}
+
+	public function get_col( string $sql ) {
+		$this->queries[] = $sql;
+		$next            = array_shift( $this->next_results );
+
+		return is_array( $next ) ? $next : [];
+	}
 
 	/**
 	 * Mirrors wpdb::insert(), including the name-based format guessing applied when $format is

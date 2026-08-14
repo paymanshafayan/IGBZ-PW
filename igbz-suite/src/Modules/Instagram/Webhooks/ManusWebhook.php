@@ -1,6 +1,7 @@
 <?php
 namespace IGBZ\Suite\Modules\Instagram\Webhooks;
 
+use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
 use IGBZ\Suite\Modules\Instagram\Services\ManusService;
 use IGBZ\Suite\Support\Crypto;
 use IGBZ\Suite\Support\Db;
@@ -11,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Inbound endpoint for Manus task events, so we do not have to wait for the five-minute poll.
  *
- *   POST /wp-json/igbz/v1/manus/task?token=<shared secret>
+ *   POST /wp-json/igbz/v1/manus/task?token=<per-account token>
  *
  * Events: task_created, task_progress, task_stopped. The interesting one is task_stopped, which
  * carries stop_reason and the attachments produced by the agent.
@@ -20,7 +21,15 @@ final class ManusWebhook {
 
 	public const NAMESPACE = 'igbz/v1';
 
-	public function __construct( private Db $db, private ManusService $manus, private Logger $logger ) {}
+	/** Account resolved from the request token, set by authorize(). */
+	private ?array $account = null;
+
+	public function __construct(
+		private Db $db,
+		private ManusService $manus,
+		private Logger $logger,
+		private AccountCredentials $credentials
+	) {}
 
 	public function register(): void {
 		add_action( 'rest_api_init', [ $this, 'register_routes' ] );
@@ -38,23 +47,37 @@ final class ManusWebhook {
 		);
 	}
 
+	/**
+	 * Per-account token auth: the token names the account, which names the tenant. A signature
+	 * header, when Manus sends one, is verified against that same per-account token.
+	 */
 	public function authorize( \WP_REST_Request $request ): bool {
-		$expected = igbz()->settings()->string( 'manus.webhook_token', '' );
-		if ( '' === $expected ) {
-			return false;
-		}
+		$this->account = null;
 
 		$given = (string) $request->get_param( 'token' );
 		if ( '' === $given ) {
 			$given = (string) $request->get_header( 'x_igbz_token' );
 		}
-
-		$signature = (string) $request->get_header( 'x_manus_signature' );
-		if ( '' !== $signature ) {
-			return Crypto::hmac_equals( Crypto::hmac( (string) $request->get_body(), $expected ), $signature );
+		$given = trim( $given );
+		if ( '' === $given ) {
+			return false;
 		}
 
-		return Crypto::hmac_equals( $expected, $given );
+		$account = $this->credentials->account_by_webhook_token( $given, AccountCredentials::SERVICE_MANUS );
+		if ( ! $account ) {
+			$this->logger->warning( 'manus', 'Webhook rejected: unknown token' );
+			return false;
+		}
+
+		$signature = (string) $request->get_header( 'x_manus_signature' );
+		if ( '' !== $signature
+			&& ! Crypto::hmac_equals( Crypto::hmac( (string) $request->get_body(), $given ), $signature ) ) {
+			$this->logger->warning( 'manus', 'Webhook rejected: bad signature', [ 'account_id' => (int) $account['id'] ] );
+			return false;
+		}
+
+		$this->account = $account;
+		return true;
 	}
 
 	public function handle( \WP_REST_Request $request ): \WP_REST_Response {
@@ -80,6 +103,17 @@ final class ManusWebhook {
 			return new \WP_REST_Response( [ 'ok' => true, 'handled' => false ], 200 );
 		}
 
+		// The task must belong to the account that owns the token, otherwise a tenant could drive
+		// another tenant's content row by guessing or replaying its task id.
+		if ( (int) $content['account_id'] !== (int) ( $this->account['id'] ?? 0 ) ) {
+			$this->logger->warning(
+				'manus',
+				'Webhook rejected: task belongs to another account',
+				[ 'task_id' => $task_id, 'account_id' => (int) ( $this->account['id'] ?? 0 ) ]
+			);
+			return new \WP_REST_Response( [ 'ok' => false, 'error' => 'forbidden' ], 403 );
+		}
+
 		$content_id = (int) $content['id'];
 
 		if ( 'task_stopped' !== $event ) {
@@ -99,7 +133,7 @@ final class ManusWebhook {
 		}
 
 		// The webhook body may omit attachments; ask the API for the authoritative state.
-		$state = $this->manus->client()->task_state( $task_id );
+		$state = $this->manus->client_for( $this->account )->task_state( $task_id );
 
 		if ( ManusService::STATUS_PUBLISHING === (string) $content['status'] ) {
 			$output = $this->manus->parse_json_block( $state['text'] );

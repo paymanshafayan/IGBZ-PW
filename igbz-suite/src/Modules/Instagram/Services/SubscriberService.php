@@ -13,7 +13,32 @@ defined( 'ABSPATH' ) || exit;
  */
 final class SubscriberService {
 
-	public function __construct( private Db $db, private ManyChatClient $client, private Logger $logger ) {}
+	public function __construct(
+		private Db $db,
+		private ManyChatClient $client,
+		private Logger $logger,
+		private AccountCredentials $credentials
+	) {}
+
+	/**
+	 * ManyChat client bound to an account's page-scoped key.
+	 *
+	 * Callers usually know only the tenant, so account_id 0 resolves to that tenant's first active
+	 * account. Passing an explicit account is always preferred where one is known.
+	 */
+	private function client_for( int $tenant_id, int $account_id = 0 ): ManyChatClient {
+		$account = $account_id > 0
+			? $this->db->row( 'SELECT * FROM ' . $this->db->table( 'ig_accounts' ) . ' WHERE id = %d', $account_id )
+			: $this->db->row(
+				'SELECT * FROM ' . $this->db->table( 'ig_accounts' ) . '
+				 WHERE tenant_id = %d AND is_active = 1 ORDER BY id LIMIT 1',
+				$tenant_id
+			);
+
+		$key = $account ? $this->credentials->key( $account, AccountCredentials::SERVICE_MANYCHAT ) : '';
+
+		return $this->client->for_key( $key );
+	}
 
 	/** @return array<string,mixed>|null */
 	public function find( string $manychat_subscriber_id ): ?array {
@@ -81,8 +106,8 @@ final class SubscriberService {
 	 *
 	 * @return array<string,mixed>|null
 	 */
-	public function sync_from_api( string $manychat_subscriber_id, int $tenant_id = 0 ): ?array {
-		$result = $this->client->get_info( $manychat_subscriber_id );
+	public function sync_from_api( string $manychat_subscriber_id, int $tenant_id = 0, int $account_id = 0 ): ?array {
+		$result = $this->client_for( $tenant_id, $account_id )->get_info( $manychat_subscriber_id );
 		if ( ! $result['ok'] ) {
 			$this->logger->warning( 'manychat', 'Profile sync failed', [ 'subscriber_id' => $manychat_subscriber_id, 'error' => $result['error'] ] );
 			return null;
@@ -160,8 +185,8 @@ final class SubscriberService {
 	}
 
 	/** Push our own data back into ManyChat custom fields. @param array<string,mixed> $fields */
-	public function push_fields( string $manychat_subscriber_id, array $fields ): bool {
-		return $this->client->set_custom_fields( $manychat_subscriber_id, $fields );
+	public function push_fields( string $manychat_subscriber_id, array $fields, int $tenant_id = 0, int $account_id = 0 ): bool {
+		return $this->client_for( $tenant_id, $account_id )->set_custom_fields( $manychat_subscriber_id, $fields );
 	}
 
 	/**

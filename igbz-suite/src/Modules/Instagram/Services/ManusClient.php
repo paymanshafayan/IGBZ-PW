@@ -33,16 +33,34 @@ final class ManusClient {
 	public const STATUS_WAITING = 'waiting';
 	public const STATUS_ERROR   = 'error';
 
+	/**
+	 * The key this instance authenticates with. Empty means "unconfigured": every call short
+	 * circuits instead of firing an unauthenticated request.
+	 */
+	private string $api_key = '';
+
 	public function __construct( private Http $http, private Logger $logger ) {}
 
+	/**
+	 * A copy of this client bound to one account's key.
+	 *
+	 * Returning a clone rather than mutating $this keeps the container's shared instance stateless,
+	 * so a cron tick that walks several tenants can never leak tenant A's key into tenant B's call.
+	 */
+	public function for_key( string $api_key ): self {
+		$clone          = clone $this;
+		$clone->api_key = trim( $api_key );
+		return $clone;
+	}
+
 	public function is_configured(): bool {
-		return '' !== igbz()->settings()->string( 'manus.api_key' );
+		return '' !== $this->api_key;
 	}
 
 	/** @return array<string,string> */
 	private function headers(): array {
 		return [
-			'x-manus-api-key' => igbz()->settings()->required( 'manus.api_key' ),
+			'x-manus-api-key' => $this->api_key,
 			'Content-Type'    => 'application/json',
 			'Accept'          => 'application/json',
 		];

@@ -2,6 +2,7 @@
 namespace IGBZ\Suite\Modules\Instagram\Services;
 
 use IGBZ\Suite\Modules\Instagram\Gateways\ManyChatClient;
+use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
 use IGBZ\Suite\Modules\MultiTenant\Wallet\WalletService;
 use IGBZ\Suite\Support\Crypto;
 use IGBZ\Suite\Support\Db;
@@ -36,8 +37,45 @@ final class FunnelService {
 		private ManyChatClient $client,
 		private SubscriberService $subscribers,
 		private WalletService $wallet,
-		private Logger $logger
+		private Logger $logger,
+		private AccountCredentials $credentials
 	) {}
+
+	/**
+	 * The ManyChat client for the account that owns a funnel.
+	 *
+	 * ManyChat keys are page-scoped, so the key must follow the funnel's account. A funnel with
+	 * account_id = 0 applies to every account of its tenant; those fall back to the tenant's first
+	 * active account, which is the only page we could sensibly message.
+	 *
+	 * @param array<string,mixed> $funnel
+	 */
+	private function client_for( array $funnel ): ManyChatClient {
+		$account = $this->account_for( $funnel );
+		$key     = $account ? $this->credentials->key( $account, AccountCredentials::SERVICE_MANYCHAT ) : '';
+
+		return $this->client->for_key( $key );
+	}
+
+	/**
+	 * @param array<string,mixed> $funnel
+	 * @return array<string,mixed>|null
+	 */
+	private function account_for( array $funnel ): ?array {
+		$account_id = (int) ( $funnel['account_id'] ?? 0 );
+		if ( $account_id > 0 ) {
+			return $this->db->row(
+				'SELECT * FROM ' . $this->db->table( 'ig_accounts' ) . ' WHERE id = %d',
+				$account_id
+			);
+		}
+
+		return $this->db->row(
+			'SELECT * FROM ' . $this->db->table( 'ig_accounts' ) . '
+			 WHERE tenant_id = %d AND is_active = 1 ORDER BY id LIMIT 1',
+			(int) ( $funnel['tenant_id'] ?? 0 )
+		);
+	}
 
 	// --------------------------------------------------------------- CRUD
 
@@ -403,7 +441,9 @@ final class FunnelService {
 			$this->db->update( 'ig_funnel_hits', [ 'subscriber_id' => $row_id ], [ 'id' => $hit_id ] );
 		}
 
-		$this->client->set_custom_fields(
+		$client = $this->client_for( $funnel );
+
+		$client->set_custom_fields(
 			$manychat_id,
 			[
 				'igbz_funnel' => (string) $funnel['name'],
@@ -412,11 +452,11 @@ final class FunnelService {
 		);
 
 		if ( '' !== (string) $funnel['manychat_tag'] ) {
-			$this->client->add_tag_by_name( $manychat_id, (string) $funnel['manychat_tag'] );
+			$client->add_tag_by_name( $manychat_id, (string) $funnel['manychat_tag'] );
 		}
 
 		if ( '' !== (string) $funnel['manychat_flow_ns'] ) {
-			$this->client->send_flow( $manychat_id, (string) $funnel['manychat_flow_ns'] );
+			$client->send_flow( $manychat_id, (string) $funnel['manychat_flow_ns'] );
 		}
 
 		$this->grant_wallet_credit( $funnel, $row_id, $hit_id );
@@ -479,18 +519,19 @@ final class FunnelService {
 		$error     = '';
 
 		if ( '' !== $manychat_subscriber_id ) {
-			$this->client->set_custom_fields( $manychat_subscriber_id, $fields );
+			$client = $this->client_for( $funnel );
+			$client->set_custom_fields( $manychat_subscriber_id, $fields );
 
 			if ( '' !== (string) $funnel['manychat_tag'] ) {
-				$this->client->add_tag_by_name( $manychat_subscriber_id, (string) $funnel['manychat_tag'] );
+				$client->add_tag_by_name( $manychat_subscriber_id, (string) $funnel['manychat_tag'] );
 			}
 
 			if ( '' !== (string) $funnel['manychat_flow_ns'] ) {
-				$sent      = $this->client->send_flow( $manychat_subscriber_id, (string) $funnel['manychat_flow_ns'] );
+				$sent      = $client->send_flow( $manychat_subscriber_id, (string) $funnel['manychat_flow_ns'] );
 				$delivered = $sent['ok'];
 				$error     = $sent['error'];
 			} else {
-				$sent      = $this->client->send_text( $manychat_subscriber_id, $text, __( 'Open the link', 'igbz-suite' ), $link );
+				$sent      = $client->send_text( $manychat_subscriber_id, $text, __( 'Open the link', 'igbz-suite' ), $link );
 				$delivered = $sent['ok'];
 				$error     = $sent['error'];
 			}

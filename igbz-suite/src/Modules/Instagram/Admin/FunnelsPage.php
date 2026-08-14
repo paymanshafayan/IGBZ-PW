@@ -2,6 +2,7 @@
 namespace IGBZ\Suite\Modules\Instagram\Admin;
 
 use IGBZ\Suite\Modules\Instagram\Gateways\ManyChatClient;
+use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
 use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
 use IGBZ\Suite\Modules\Instagram\Services\ManusService;
 use IGBZ\Suite\Support\Admin\Menu;
@@ -44,6 +45,21 @@ final class FunnelsPage {
 		return igbz()->get( 'ig.manychat' );
 	}
 
+	/** A ManyChat client bound to one account's key, or null when that account has none. */
+	private function client_for_account( int $account_id ): ?ManyChatClient {
+		if ( $account_id <= 0 ) {
+			return null;
+		}
+		$account = $this->manus()->account( $account_id );
+		if ( ! $account ) {
+			return null;
+		}
+		$credentials = $this->manus()->credentials();
+		$key         = $credentials->key( $account, AccountCredentials::SERVICE_MANYCHAT );
+
+		return '' === $key ? null : $this->manychat()->for_key( $key );
+	}
+
 	public function render(): void {
 		if ( 'POST' === ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) {
 			$this->handle_post();
@@ -73,17 +89,25 @@ final class FunnelsPage {
 		View::close();
 	}
 
+	/**
+	 * Webhook URLs are per account, because the token is what tells us which account — and so
+	 * which tenant — an incoming comment belongs to. There is no single URL to show here any more,
+	 * so point the operator at the account that owns each funnel.
+	 */
 	private function render_webhook_hint(): void {
-		$url    = rest_url( 'igbz/v1/manychat/comment' );
-		$token  = (string) igbz()->settings()->get( 'manychat.webhook_token', '' );
-		$masked = '' !== $token ? View::mask() : __( 'not generated yet', 'igbz-suite' );
+		$accounts = $this->manus()->accounts( igbz()->tenancy()->id(), true );
 
 		echo '<div class="notice notice-info inline"><p>';
+		if ( ! $accounts ) {
+			esc_html_e( 'Add an Instagram account first: each account gets its own ManyChat External Request URL.', 'igbz-suite' );
+			echo '</p></div>';
+			return;
+		}
+
 		printf(
-			/* translators: 1: webhook URL, 2: masked token */
-			esc_html__( 'Point a ManyChat External Request action at %1$s and send the token %2$s in the X-IGBZ-Token header.', 'igbz-suite' ),
-			'<code>' . esc_html( $url ) . '</code>',
-			'<code>' . esc_html( $masked ) . '</code>'
+			/* translators: %s: link to the accounts screen */
+			esc_html__( 'Each account has its own ManyChat External Request URL, including a token that identifies it. Copy it from %s.', 'igbz-suite' ),
+			'<a href="' . esc_url( Menu::url( AccountsPage::SLUG ) ) . '">' . esc_html__( 'IG Accounts', 'igbz-suite' ) . '</a>'
 		);
 		echo '</p></div>';
 	}
@@ -233,7 +257,7 @@ final class FunnelsPage {
 		);
 		echo '</td></tr>';
 
-		$this->flow_row( (string) $funnel['manychat_flow_ns'] );
+		$this->flow_row( (string) $funnel['manychat_flow_ns'], (int) $funnel['account_id'] );
 		$this->text_row( 'manychat_tag', __( 'Tag the subscriber', 'igbz-suite' ), (string) $funnel['manychat_tag'], __( 'Optional ManyChat tag applied on every hit.', 'igbz-suite' ) );
 
 		$this->text_row( 'grant_wallet_credit', __( 'Wallet credit', 'igbz-suite' ), (string) $funnel['grant_wallet_credit'], __( 'Credited once the subscriber is linked to a WordPress user. 0 disables it.', 'igbz-suite' ) );
@@ -355,10 +379,16 @@ final class FunnelsPage {
 		echo '</td></tr>';
 	}
 
-	private function flow_row( string $current ): void {
+	/**
+	 * The flow picker has to ask ManyChat, and ManyChat keys are per account, so the list is
+	 * fetched with the key of the account this funnel belongs to. With no account chosen yet there
+	 * is no key to use and the field degrades to a free-text namespace input.
+	 */
+	private function flow_row( string $current, int $account_id ): void {
 		echo '<tr><th scope="row"><label for="igbz_manychat_flow_ns">' . esc_html__( 'ManyChat flow', 'igbz-suite' ) . '</label></th><td>';
 
-		$result = $this->manychat()->is_configured() ? $this->manychat()->flows() : [ 'ok' => false, 'data' => [] ];
+		$client = $this->client_for_account( $account_id );
+		$result = $client && $client->is_configured() ? $client->flows() : [ 'ok' => false, 'data' => [] ];
 		$flows  = ! empty( $result['ok'] ) && is_array( $result['data'] ) ? ( $result['data']['flows'] ?? $result['data'] ) : [];
 		if ( is_array( $flows ) && $flows ) {
 			echo '<select id="igbz_manychat_flow_ns" name="manychat_flow_ns">';
