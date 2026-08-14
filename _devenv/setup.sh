@@ -37,7 +37,7 @@ info "node $(node -v), npm $(npm -v)"
 # ---------------------------------------------------------------------------
 # 1. Locate the zips
 # ---------------------------------------------------------------------------
-# Pick the newest match so wordpress-6.9.zip wins over wordpress-6.5.5.zip if both exist.
+# Pick the newest match so wordpress-7.1.zip wins over wordpress-7.0.4.zip if both exist.
 newest() { ls -1t $1 2>/dev/null | head -1; }
 
 WP_ZIP="$(newest "$DEVENV/wordpress-*.zip" || true)"
@@ -57,25 +57,25 @@ fetch_if_missing() {
 }
 
 if [ -z "$WP_ZIP" ]; then
-	WP_ZIP="$(fetch_if_missing WordPress "$DEVENV/wordpress-6.5.5.zip" \
-		"https://wordpress.org/wordpress-6.5.5.zip")" || die \
+	WP_ZIP="$(fetch_if_missing WordPress "$DEVENV/wordpress-7.0.4.zip" \
+		"https://wordpress.org/wordpress-7.0.4.zip")" || die \
 "No WordPress zip found and it could not be downloaded (wordpress.org is blocked here).
 
 Put the official zip at:
-    _devenv/wordpress-6.5.5.zip
+    _devenv/wordpress-7.0.4.zip
 Get it from:
-    https://wordpress.org/wordpress-6.5.5.zip"
+    https://wordpress.org/latest.zip"
 fi
 
 if [ -z "$WC_ZIP" ]; then
-	WC_ZIP="$(fetch_if_missing WooCommerce "$DEVENV/woocommerce-9.4.2.zip" \
-		"https://downloads.wordpress.org/plugin/woocommerce.9.4.2.zip")" || die \
+	WC_ZIP="$(fetch_if_missing WooCommerce "$DEVENV/woocommerce-11.0.1.zip" \
+		"https://downloads.wordpress.org/plugin/woocommerce.11.0.1.zip")" || die \
 "No WooCommerce zip found and it could not be downloaded (wordpress.org is blocked here).
 
 Put the official zip at:
-    _devenv/woocommerce-9.4.2.zip
+    _devenv/woocommerce-11.0.1.zip
 Get it from:
-    https://downloads.wordpress.org/plugin/woocommerce.9.4.2.zip"
+    https://downloads.wordpress.org/plugin/woocommerce.latest-stable.zip"
 fi
 
 ok "WordPress zip:  $(basename "$WP_ZIP") ($(du -h "$WP_ZIP" | cut -f1))"

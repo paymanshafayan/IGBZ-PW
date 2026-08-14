@@ -55,12 +55,27 @@ final class Activator {
 		}
 	}
 
+	/**
+	 * Whether translations may safely be requested yet.
+	 *
+	 * maybe_upgrade() runs on `plugins_loaded`, i.e. before `init`. Calling __() there forces a
+	 * just-in-time textdomain load, which WordPress 6.7+ reports as a
+	 * `_load_textdomain_just_in_time` doing-it-wrong notice. Both the role labels and the seeded
+	 * defaults below are *persisted* values, so the English original is the correct thing to store
+	 * anyway — WordPress itself stores role names untranslated. When this runs later than `init`
+	 * (the real activation request does) the translated string is used.
+	 */
+	private static function can_translate(): bool {
+		return did_action( 'init' ) > 0;
+	}
+
 	public static function add_roles(): void {
 		$caps = Capabilities::all();
+		$t    = self::can_translate();
 
 		add_role(
 			Capabilities::ROLE_TENANT_OWNER,
-			__( 'IGBZ Tenant Owner', 'igbz-suite' ),
+			$t ? __( 'IGBZ Tenant Owner', 'igbz-suite' ) : 'IGBZ Tenant Owner',
 			array_merge(
 				[ 'read' => true, 'upload_files' => true ],
 				array_fill_keys(
@@ -79,13 +94,13 @@ final class Activator {
 
 		add_role(
 			Capabilities::ROLE_TENANT_STAFF,
-			__( 'IGBZ Tenant Staff', 'igbz-suite' ),
+			$t ? __( 'IGBZ Tenant Staff', 'igbz-suite' ) : 'IGBZ Tenant Staff',
 			[ 'read' => true, 'upload_files' => true, Capabilities::MANAGE_OWN_TENANT => true ]
 		);
 
 		add_role(
 			Capabilities::ROLE_INSTRUCTOR,
-			__( 'IGBZ Instructor', 'igbz-suite' ),
+			$t ? __( 'IGBZ Instructor', 'igbz-suite' ) : 'IGBZ Instructor',
 			[ 'read' => true, 'upload_files' => true, Capabilities::MANAGE_LMS => true ]
 		);
 
@@ -99,6 +114,7 @@ final class Activator {
 
 	public static function seed_defaults(): void {
 		$settings = new Settings();
+		$t        = self::can_translate();
 		$defaults = [
 			'general.default_currency'      => 'IRT',
 			'general.tenant_resolution'     => 'domain',
@@ -148,7 +164,7 @@ final class Activator {
 			'otp.resend_seconds'            => 120,
 			'otp.max_per_hour'              => 5,
 			'otp.sms_provider'              => 'log',
-			'otp.message_template'          => __( 'Your verification code: {code}', 'igbz-suite' ),
+			'otp.message_template'          => $t ? __( 'Your verification code: {code}', 'igbz-suite' ) : 'Your verification code: {code}',
 			'otp.kavenegar.template'        => '',
 			'otp.kavenegar.sender'          => '',
 			'otp.smsir.template_id'         => 0,
@@ -192,8 +208,8 @@ final class Activator {
 			'manychat.async_reply'          => true,
 			'manychat.link_field_name'      => 'igbz_link',
 			'manychat.coupon_field_name'    => 'igbz_coupon',
-			'manychat.button_label'         => __( 'Open the link', 'igbz-suite' ),
-			'manychat.duplicate_message'    => __( 'You have already received this link.', 'igbz-suite' ),
+			'manychat.button_label'         => $t ? __( 'Open the link', 'igbz-suite' ) : 'Open the link',
+			'manychat.duplicate_message'    => $t ? __( 'You have already received this link.', 'igbz-suite' ) : 'You have already received this link.',
 			'hub.enabled'                   => true,
 			'hub.vip_link_ttl'              => 900,
 			'hub.sync_interval'             => 3600,

@@ -5,6 +5,7 @@
  * Description:       IGBZ multi-tenant commerce suite for WordPress + WooCommerce. Four toggleable modules: Multi-Tenant Stores (wallet, plans, BNPL, LMS, affiliate, Iranian gateways), Instagram Automation (Manus + ManyChat), Master Site Hub and Mobile REST API.
  * Version:           1.0.0
  * Requires at least: 6.3
+ * Tested up to:      7.0
  * Requires PHP:      8.1
  * Author:            IGBZ
  * License:           GPL-2.0-or-later
@@ -12,7 +13,7 @@
  * Text Domain:       igbz-suite
  * Domain Path:       /languages
  * WC requires at least: 8.0
- * WC tested up to:   9.4
+ * WC tested up to:   11.0
  */
 
 defined( 'ABSPATH' ) || exit;

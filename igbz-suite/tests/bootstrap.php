@@ -85,7 +85,28 @@ function add_filter( string $hook, $callback, int $priority = 10, int $accepted 
 	return true;
 }
 
+/**
+ * Number of times each action has "fired". Tests set this directly to simulate a point in the
+ * WordPress request lifecycle — see CronScheduleTest, which checks that translation is deferred
+ * until `init`.
+ *
+ * @var array<string,int>
+ */
+$GLOBALS['igbz_test_did_action'] = [];
+
+function did_action( string $hook ): int {
+	return (int) ( $GLOBALS['igbz_test_did_action'][ $hook ] ?? 0 );
+}
+
+/**
+ * Records a call to __() so tests can assert that translation did not happen too early.
+ *
+ * @var array<int,string>
+ */
+$GLOBALS['igbz_test_translated'] = [];
+
 function __( string $text, string $domain = '' ): string {
+	$GLOBALS['igbz_test_translated'][] = $text;
 	return $text;
 }
 

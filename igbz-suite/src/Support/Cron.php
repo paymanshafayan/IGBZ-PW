@@ -49,13 +49,26 @@ final class Cron {
 	 * @return array<string,array{interval:int,display:string}>
 	 */
 	public static function add_schedules( array $schedules ): array {
+		// `cron_schedules` is not an `init`-or-later filter: anything that calls
+		// wp_get_schedules() / wp_schedule_event() during `plugins_loaded` fires it early
+		// (Jetpack's Nonce_Handler does exactly this, and so does our own activation path).
+		// Calling __() there forces a just-in-time textdomain load, which WordPress 6.7+
+		// reports as a `_load_textdomain_just_in_time` doing-it-wrong notice. Falling back
+		// to the English label before `init` costs nothing: the only consumer of `display`
+		// is the cron admin UI, which always runs later.
+		$translate = did_action( 'init' ) > 0;
+
 		$schedules['igbz_five_minutes'] = [
 			'interval' => 300,
-			'display'  => __( 'Every five minutes (IGBZ)', 'igbz-suite' ),
+			'display'  => $translate
+				? __( 'Every five minutes (IGBZ)', 'igbz-suite' )
+				: 'Every five minutes (IGBZ)',
 		];
 		$schedules['igbz_fifteen_minutes'] = [
 			'interval' => 900,
-			'display'  => __( 'Every fifteen minutes (IGBZ)', 'igbz-suite' ),
+			'display'  => $translate
+				? __( 'Every fifteen minutes (IGBZ)', 'igbz-suite' )
+				: 'Every fifteen minutes (IGBZ)',
 		];
 		return $schedules;
 	}

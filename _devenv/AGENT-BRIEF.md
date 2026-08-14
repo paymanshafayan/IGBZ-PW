@@ -172,9 +172,11 @@ tenant scoping uses the meta key `_igbz_tenant_id`.
 
 ## 7. Verified behaviour (regression baseline)
 
-Confirmed live on WP 6.5.5 / WC 9.4.2 / PHP 8.2.32 / SQLite:
+Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **WP 7.0.4 / WC 11.0.1
+/ PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
+zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 391 assertions in 10 test cases; 115 files lint clean.
+- 400 assertions in 11 test cases; 116 files lint clean.
 - 16/16 admin screens return 200 with no notices; 32/32 tables; 3 cron hooks scheduled.
 - All six payment gateways register with WooCommerce and their settings screens render.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
@@ -190,6 +192,14 @@ Confirmed live on WP 6.5.5 / WC 9.4.2 / PHP 8.2.32 / SQLite:
 `text|comment_text|last_input_text`, `subscriber_id|id`, `comment_id`, `post_id|media_id`,
 `tenant_id`, `account_id`, `username|ig_username`. A match requires `tenant_id`/`account_id` to
 match the funnel, or the funnel to have `account_id = 0`.
+
+**Never call `__()` on a code path that can run before `init`.** WordPress 6.7+ answers with a
+`_load_textdomain_just_in_time` doing-it-wrong notice. Two such paths existed and were fixed by
+guarding on `did_action( 'init' )`: `Cron::add_schedules()` (the `cron_schedules` filter fires
+during `plugins_loaded` whenever another plugin — Jetpack's `Nonce_Handler`, for one — schedules an
+event) and `Activator::add_roles()` / `seed_defaults()` (reached from `maybe_upgrade()` on
+`plugins_loaded`). Both persist their strings, so storing the English original is correct anyway.
+`CronScheduleTest` guards the regression.
 
 ---
 

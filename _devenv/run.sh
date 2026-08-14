@@ -34,10 +34,26 @@ die() { printf '\n\033[31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 WP_ZIP_NAME="$(cat "$WORK/.wp-zip-name")"
 [ -f "$WORK/serve/$WP_ZIP_NAME" ] || die "missing $WORK/serve/$WP_ZIP_NAME — run: bash _devenv/setup.sh"
 
+# Is anything bound to this TCP port?
+#
+# This deliberately does NOT use `curl -sf`: a Playground instance that is still booting, or any
+# server answering 3xx/4xx/5xx, makes curl exit non-zero and the port looks free. The result was a
+# second instance dying with EADDRINUSE several minutes into a boot. A raw connect() is the only
+# honest answer. ('fuser'/'ss'/'lsof' are not installed in this sandbox.)
+port_in_use() {
+	python3 - "$1" <<-'PY'
+		import socket, sys
+		s = socket.socket()
+		s.settimeout(1)
+		sys.exit(0 if s.connect_ex(("127.0.0.1", int(sys.argv[1]))) == 0 else 1)
+	PY
+}
+
 # Refuse to start if the WordPress port is already taken, rather than failing confusingly later.
-if curl -sf -o /dev/null --max-time 3 "http://127.0.0.1:$PORT/" 2>/dev/null; then
+if port_in_use "$PORT"; then
 	die "something is already listening on port $PORT.
-Stop the other site first, or pick another port:  bash _devenv/run.sh --port 9401"
+Stop it first (ps aux | grep wp-playground, then kill the pid), or pick another port:
+  bash _devenv/run.sh --port 9401"
 fi
 
 # Serve the WordPress zip locally.
@@ -51,7 +67,7 @@ if curl -sf -o /dev/null --max-time 3 "http://127.0.0.1:$ZIP_PORT/$WP_ZIP_NAME" 
 else
 	# Find a port nobody is listening on.
 	for _ in $(seq 1 20); do
-		if curl -sf -o /dev/null --max-time 1 "http://127.0.0.1:$ZIP_PORT/" 2>/dev/null; then
+		if port_in_use "$ZIP_PORT"; then
 			ZIP_PORT=$(( ZIP_PORT + 1 ))
 		else
 			break

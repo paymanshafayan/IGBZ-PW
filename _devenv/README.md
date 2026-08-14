@@ -12,20 +12,20 @@ Two zip files, committed to git:
 
 | File | What it is | Where to get it |
 | --- | --- | --- |
-| `wordpress-6.5.5.zip` | WordPress core, official zip | <https://wordpress.org/wordpress-6.5.5.zip> |
-| `woocommerce-9.4.2.zip` | WooCommerce plugin, official zip | <https://downloads.wordpress.org/plugin/woocommerce.9.4.2.zip> |
+| `wordpress-7.0.4.zip` | WordPress core | <https://wordpress.org/latest.zip> |
+| `woocommerce-11.0.1.zip` | WooCommerce plugin | <https://downloads.wordpress.org/plugin/woocommerce.latest-stable.zip> |
 
 The exact filenames do not matter. `setup.sh` globs for `wordpress-*.zip` and
-`woocommerce-*.zip` and picks the newest match, so `wordpress-6.5.zip` or
-`woocommerce-9.4.2-fa_IR.zip` work just as well.
+`woocommerce-*.zip` and picks the newest match, so `wordpress-7.1.zip` or
+`woocommerce-11.0.1-fa_IR.zip` work just as well.
 
 ### Zip layout
 
-Both must be the **official wordpress.org zips**, unmodified:
+Prefer the **official wordpress.org zips**, unmodified:
 
-- WordPress: files at the root of the zip (`wp-includes/`, `wp-admin/`, `index.php`, …) —
-  *not* nested inside a `wordpress/` folder. Both layouts are handled, but the official
-  wordpress.org core zip nests everything under `wordpress/`, and `setup.sh` unwraps it.
+- WordPress: `setup.sh` accepts either layout — files at the root of the zip (`wp-includes/`,
+  `wp-admin/`, `index.php`, …) or everything nested inside a `wordpress/` folder, which is what
+  the official core zip does. Validation looks for `wp-includes/version.php` either way.
 - WooCommerce: everything under a single top-level `woocommerce/` folder.
 
 `setup.sh` validates both and fails loudly with a clear message if the layout is wrong, so a
@@ -33,11 +33,13 @@ bad upload is caught immediately instead of producing a confusing boot failure.
 
 ## Why these versions
 
-WooCommerce 9.4.2 declares `Requires at least: 6.5`, which matches WordPress 6.5.5 exactly, and
-the plugin header already declares `WC tested up to: 9.4`.
+These are the current stable releases, and the plugin header declares `Tested up to: 7.0` /
+`WC tested up to: 11.0` to match. WooCommerce 11.x requires WordPress 6.9 or newer, so the two
+must be upgraded together.
 
-Newer WooCommerce (11.x) requires WordPress 6.9. That combination is fine to use — just drop in
-the matching pair of zips and `setup.sh` will use them.
+Upgrading is only ever a matter of dropping in a newer pair of zips and re-running
+`bash _devenv/setup.sh --force`; no plugin code changes are involved. The suite has been verified
+unchanged on both WP 6.5.5 / WC 9.4.2 / PHP 8.2 and WP 7.0.4 / WC 11.0.1 / PHP 8.3.
 
 ## Usage
 
