@@ -1,6 +1,8 @@
 <?php
 namespace IGBZ\Suite\Support;
 
+use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
+
 defined( 'ABSPATH' ) || exit;
 
 /**
@@ -59,6 +61,41 @@ final class Activator {
 		if ( $from > 0 && $from < 6 ) {
 			self::migrate_to_v6();
 		}
+		if ( $from > 0 && $from < 7 ) {
+			self::migrate_to_v7();
+		}
+	}
+
+	/**
+	 * v7: funnel hits record whether the DM was really sent, not whether the webhook ran.
+	 *
+	 * Before v7 the webhook stamped `delivered = 1` the moment it had computed a reply, so rows
+	 * written by an account with no working ManyChat key look successful and are invisible to the
+	 * hourly retry. Those rows cannot be re-sent honestly either — Instagram DMs are not
+	 * idempotent and the subscriber may well have received the reply inline — so they are
+	 * relabelled rather than reset: delivered stays 1 and the row is marked unconfirmed, which is
+	 * exactly what it is. Rows that really were confirmed by the old deliver() path are relabelled
+	 * along with them, because nothing stored on the row tells the two apart — downgrading a
+	 * handful of genuine deliveries to "we cannot prove this" is the honest direction to err in.
+	 *
+	 * Rows that were left undelivered with no error message are the ones that never got as far as
+	 * a send. They become explicitly pending so retry_failed() picks them up.
+	 */
+	private static function migrate_to_v7(): void {
+		$db    = new Db();
+		$table = $db->table( 'ig_funnel_hits' );
+
+		$db->query(
+			"UPDATE {$table} SET delivery_error = %s WHERE delivered = 1 AND delivery_error = %s",
+			FunnelService::DELIVERY_UNCONFIRMED,
+			''
+		);
+
+		$db->query(
+			"UPDATE {$table} SET delivery_error = %s WHERE delivered = 0 AND delivery_error = %s",
+			FunnelService::DELIVERY_PENDING,
+			''
+		);
 	}
 
 	/**

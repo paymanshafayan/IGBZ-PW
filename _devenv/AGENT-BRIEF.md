@@ -182,7 +182,7 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 457 assertions in 13 test cases; 119 files lint clean.
+- 507 assertions in 14 test cases; 121 files lint clean.
 - 16/16 admin screens return 200 with no notices; 32/32 tables; 3 cron hooks scheduled.
 - All six payment gateways register with WooCommerce and their settings screens render.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
@@ -214,6 +214,64 @@ duplicate that has to be deleted by hand. Instead the ambiguity is surfaced in t
 `status = 'published' AND permalink = ''`. **Do not add a flag column for this.** A permalink can be
 filled in later, by hand or by a retried confirmation, and a stored flag would then be a stale lie
 that nobody clears. Held in place by `PublishVerificationTest`.
+
+### "Delivered" means the DM was sent (DB v7)
+
+The same honesty rule as publishing, applied to funnels. The ManyChat External Request action times
+out after ~10 s, so `handle_event_async()` computes the reply, answers immediately, and schedules
+`igbz_ig_funnel_followup` (+5 s) to do the outbound work. The bug that shipped before v7: the
+webhook *also* set `delivered = 1` and incremented `conversions` right there. An account with a
+missing or revoked ManyChat key therefore reported a **100% conversion rate while sending nothing**,
+and because the row looked delivered the hourly retry skipped it forever.
+
+**`followup()` is the single writer of the outcome.** `handle_event_async()` only records an
+attempt. Everything that decides success — `delivered`, `conversions`, the wallet credit, the
+`igbz_ig_funnel_delivered` action — goes through `FunnelService::settle()`, whose UPDATE is
+conditional on `delivered = 0`. A zero row count means another worker settled it first, so a race
+between the scheduled follow-up and the hourly retry cannot double-count a conversion or pay a
+reward twice.
+
+`delivery_error` carries the state (no new column, no migration for the shape):
+
+| delivered | delivery_error | meaning |
+|---|---|---|
+| 0 | `pending` | recorded, nothing attempted yet |
+| 0 | `pending_inline` | reply returned in the webhook response for ManyChat to render; the follow-up must **not** send the text again |
+| 0 | `per_user_limit` | over the per-subscriber cap — not a fault, never retried |
+| 0 | *(message)* | a real failure; retried hourly |
+| 1 | `''` | confirmed by a ManyChat API call that succeeded |
+| 1 | `unconfirmed` | rendered inline, no API call could prove it arrived |
+
+Consequences worth keeping:
+
+- **A blocked hit returns no link.** Returning one made the cap decorative — the caller put it
+  straight in the DM, so the capped person got the URL anyway.
+- **`hits` increments for every recorded attempt**, including blocked ones. It used to skip exactly
+  the events that did not convert, which flattered the rate.
+- **The cap counts in-flight hits too** (`delivered = 1 OR delivery_error IN (pending, pending_inline)`),
+  minus the row being inserted. Counting only settled hits left a five-second window in which one
+  person could claim two links, or two single-use coupons. A *failed* hit deliberately does not
+  count — they received nothing, so commenting again must work.
+- **`retry_failed()` also picks up `pending*` rows older than `FunnelService::FOLLOWUP_GRACE`
+  (300 s)**, because WP-Cron only fires on traffic and the +5 s event can simply never run on a
+  quiet site. The grace period stops it racing a follow-up that is merely late. It calls
+  `followup()`, not `deliver()`, so an inline reply is settled rather than DMed twice.
+- **`Admin/HitStatus::cell()` is the one renderer** for this column; the funnels and subscribers
+  screens both use it. It never prints a raw marker like `per_user_limit` at the operator, and an
+  in-flight hit is WARN "waiting to send", not a red failure.
+- `FunnelService::delivery_backlog()` splits the last 24 h into pending / failed / blocked /
+  unconfirmed and feeds the *Comment funnels* health card, which now warns only on failures and
+  unconfirmed sends.
+
+Migration `Activator::migrate_to_v7()` relabels legacy rows: `delivered = 1, error = ''` becomes
+`unconfirmed` (they cannot be re-sent honestly — the subscriber may already have the reply, and DMs
+are not idempotent), and `delivered = 0, error = ''` becomes `pending` so the retry can see it.
+Held in place by `FunnelDeliveryTest`.
+
+**Trap found while verifying this:** `Http::request()` called `wp_remote_retrieve_headers( $r )->getAll()`.
+That object only exists when WP_Http built the response — any `pre_http_request` short-circuit
+(caching plugins, request mockers, offline harnesses) returns a plain array and core does not
+normalise it, so the call was a fatal error. Use `Http::headers_of()`.
 
 **ManyChat webhook contract**: `POST /?rest_route=/igbz/v1/manychat/comment`, auth via
 `Authorization: Bearer <token>`, `?token=`, or `X-IGBZ-Token`. Body keys:

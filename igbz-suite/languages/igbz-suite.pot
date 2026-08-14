@@ -1880,11 +1880,6 @@ msgid "Comment funnels"
 msgstr ""
 
 #. translators: 1: active funnels, 2: undelivered hits
-#: src/Modules/Instagram/InstagramModule.php:198
-#, php-format
-msgid "%1$d active funnel(s); %2$d undelivered hit(s) in the last 24h."
-msgstr ""
-
 #: src/Modules/Instagram/InstagramModule.php:209
 msgid "Content pipeline"
 msgstr ""
@@ -6044,3 +6039,38 @@ msgid "%d published item returned no post link, so it could not be confirmed on 
 msgid_plural "%d published items returned no post link, so they could not be confirmed on Instagram."
 msgstr[0] ""
 msgstr[1] ""
+
+#: src/Modules/Instagram/Admin/HitStatus.php:32
+msgid "sent, unconfirmed"
+msgstr ""
+
+#: src/Modules/Instagram/Admin/HitStatus.php:40
+msgid "blocked: per-user limit"
+msgstr ""
+
+#: src/Modules/Instagram/Admin/HitStatus.php:46
+msgid "waiting to send"
+msgstr ""
+
+#: src/Modules/Instagram/Admin/HitStatus.php:58
+msgid "no subscriber id in the request"
+msgstr ""
+
+#: src/Modules/Instagram/Admin/HitStatus.php:59
+msgid "no ManyChat API key on this account"
+msgstr ""
+
+#: src/Modules/Instagram/InstagramModule.php:283
+#, php-format
+msgid "%1$d active funnel(s); %2$d failed delivery(ies) in the last 24h."
+msgstr ""
+
+#: src/Modules/Instagram/InstagramModule.php:291
+#, php-format
+msgid "%d hit(s) still waiting to send."
+msgstr ""
+
+#: src/Modules/Instagram/InstagramModule.php:299
+#, php-format
+msgid "%d reply(ies) were handed to ManyChat without a confirmation."
+msgstr ""

@@ -272,19 +272,39 @@ final class InstagramModule implements ModuleInterface {
 		];
 
 		$funnels = (int) $db->scalar( 'SELECT COUNT(*) FROM ' . $db->table( 'ig_funnels' ) . ' WHERE is_active = 1' );
-		$stuck   = (int) $db->scalar(
-			'SELECT COUNT(*) FROM ' . $db->table( 'ig_funnel_hits' ) . ' WHERE delivered = 0 AND created_at >= %s',
-			gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS )
+
+		// "Undelivered" used to lump four very different situations together. A hit blocked by
+		// the per-user cap is the system working; a hit waiting for its follow-up is normal for a
+		// few seconds; only a failed send is a problem worth a warning.
+		$backlog = igbz()->get( 'ig.funnels' )->delivery_backlog();
+
+		$detail = sprintf(
+			/* translators: 1: active funnels, 2: failed hits */
+			__( '%1$d active funnel(s); %2$d failed delivery(ies) in the last 24h.', 'igbz-suite' ),
+			$funnels,
+			$backlog['failed']
 		);
-		$rows[]  = [
+
+		if ( $backlog['pending'] > 0 ) {
+			$detail .= ' ' . sprintf(
+				/* translators: %d: count */
+				__( '%d hit(s) still waiting to send.', 'igbz-suite' ),
+				$backlog['pending']
+			);
+		}
+
+		if ( $backlog['unconfirmed'] > 0 ) {
+			$detail .= ' ' . sprintf(
+				/* translators: %d: count */
+				__( '%d reply(ies) were handed to ManyChat without a confirmation.', 'igbz-suite' ),
+				$backlog['unconfirmed']
+			);
+		}
+
+		$rows[] = [
 			'label'  => __( 'Comment funnels', 'igbz-suite' ),
-			'status' => $stuck > 0 ? 'warn' : 'ok',
-			'detail' => sprintf(
-				/* translators: 1: active funnels, 2: undelivered hits */
-				__( '%1$d active funnel(s); %2$d undelivered hit(s) in the last 24h.', 'igbz-suite' ),
-				$funnels,
-				$stuck
-			),
+			'status' => ( $backlog['failed'] > 0 || $backlog['unconfirmed'] > 0 ) ? 'warn' : 'ok',
+			'detail' => $detail,
 		];
 
 		$failed = (int) $db->scalar(

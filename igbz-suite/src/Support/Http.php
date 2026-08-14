@@ -50,7 +50,7 @@ final class Http {
 				$code = (int) wp_remote_retrieve_response_code( $response );
 				$last = new HttpResponse(
 					$code,
-					wp_remote_retrieve_headers( $response )->getAll(),
+					self::headers_of( $response ),
 					(string) wp_remote_retrieve_body( $response ),
 					$code >= 400 ? sprintf( 'HTTP %d', $code ) : null
 				);
@@ -82,6 +82,31 @@ final class Http {
 	/** @param array<string,mixed> $args */
 	public function post( string $url, array $args = [] ): HttpResponse {
 		return $this->request( 'POST', $url, $args );
+	}
+
+	/**
+	 * Response headers as a plain array.
+	 *
+	 * wp_remote_retrieve_headers() normally hands back a Requests_Utility_CaseInsensitiveDictionary,
+	 * but only because WP_Http built the response. A `pre_http_request` short-circuit — used by
+	 * caching plugins, request mockers and offline test harnesses — returns whatever array the
+	 * filter chose, and core does not normalise it. Calling ->getAll() on that is a fatal error,
+	 * so the shape is checked rather than assumed.
+	 *
+	 * @param array<string,mixed>|mixed $response
+	 * @return array<string,mixed>
+	 */
+	private static function headers_of( $response ): array {
+		$headers = wp_remote_retrieve_headers( $response );
+
+		if ( is_object( $headers ) && method_exists( $headers, 'getAll' ) ) {
+			return (array) $headers->getAll();
+		}
+		if ( is_object( $headers ) && $headers instanceof \Traversable ) {
+			return iterator_to_array( $headers );
+		}
+
+		return is_array( $headers ) ? $headers : [];
 	}
 
 	private static function scrub_url( string $url ): string {

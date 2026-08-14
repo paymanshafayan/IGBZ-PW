@@ -144,6 +144,28 @@ final class ManyChatWebhook {
 
 		$funnel = $result['funnel'] ?? [];
 
+		// Over the per-subscriber cap. The same "you already have this" copy is the right answer,
+		// but no link is attached: the whole point of the cap is that this person does not get
+		// another one.
+		if ( ! empty( $result['blocked'] ) ) {
+			$text = igbz()->settings()->string(
+				'manychat.duplicate_message',
+				__( 'You have already received this link.', 'igbz-suite' )
+			);
+			$text = trim( str_replace( '{link}', '', $text ) );
+
+			return $this->respond(
+				ManyChatClient::dynamic_content( [ [ 'type' => 'text', 'text' => $text ] ] ) + [
+					'matched'     => true,
+					'duplicate'   => true,
+					'blocked'     => true,
+					'igbz_link'   => '',
+					'igbz_funnel' => (string) ( $funnel['name'] ?? '' ),
+					'igbz_hit_id' => $result['hit_id'],
+				]
+			);
+		}
+
 		if ( $result['duplicate'] ) {
 			$text = igbz()->settings()->string(
 				'manychat.duplicate_message',
@@ -205,6 +227,7 @@ final class ManyChatWebhook {
 			[
 				'matched'     => $result['matched'],
 				'duplicate'   => $result['duplicate'],
+				'blocked'     => ! empty( $result['blocked'] ),
 				'igbz_link'   => $result['link'],
 				'igbz_coupon' => $result['coupon'],
 			]

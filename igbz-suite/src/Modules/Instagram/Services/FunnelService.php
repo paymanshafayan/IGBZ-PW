@@ -32,6 +32,44 @@ final class FunnelService {
 	public const TARGET_COUPON  = 'coupon';
 	public const TARGET_FLOW    = 'flow';
 
+	/**
+	 * States a hit can be in, stored in ig_funnel_hits.delivery_error.
+	 *
+	 * The fast path answers ManyChat inside its ~10 second window and only *then* talks to the
+	 * API, so "the webhook ran" and "the subscriber got the DM" are two different facts and the
+	 * row has to be able to say which one it is:
+	 *
+	 *   delivered = 0, error = DELIVERY_PENDING  the hit is recorded, the DM is not settled yet
+	 *   delivered = 0, error = DELIVERY_PENDING_INLINE
+	 *                                            same, but the reply was already handed back in
+	 *                                            the webhook response for ManyChat to render, so
+	 *                                            the follow-up must not send the text a second time
+	 *   delivered = 0, error = DELIVERY_BLOCKED  the subscriber is over the per-user cap
+	 *   delivered = 0, error = <message>         the send really failed; retried hourly
+	 *   delivered = 1, error = ''                confirmed by a ManyChat API call that succeeded
+	 *   delivered = 1, error = DELIVERY_UNCONFIRMED
+	 *                                            the reply was handed back in the webhook response
+	 *                                            for ManyChat to render, and no API call was
+	 *                                            available to prove it arrived
+	 *
+	 * Keeping the in-flight state in this column rather than in a new one is deliberate: it needs
+	 * no migration, and every reader already treats delivery_error as "why this row is not a
+	 * delivery" rather than as free text.
+	 *
+	 * A conversion is counted only on the transition into delivered = 1, so the dashboard can no
+	 * longer report a 100% conversion rate for a funnel whose DMs are all failing.
+	 */
+	public const DELIVERY_PENDING        = 'pending';
+	public const DELIVERY_PENDING_INLINE = 'pending_inline';
+	public const DELIVERY_BLOCKED        = 'per_user_limit';
+	public const DELIVERY_UNCONFIRMED    = 'unconfirmed';
+
+	/** Both in-flight spellings, for the queries that must treat them alike. */
+	public const PENDING_STATES = [ self::DELIVERY_PENDING, self::DELIVERY_PENDING_INLINE ];
+
+	/** Grace period before the hourly retry takes over a hit the scheduled follow-up never settled. */
+	public const FOLLOWUP_GRACE = 300;
+
 	public function __construct(
 		private Db $db,
 		private ManyChatClient $client,
@@ -263,8 +301,12 @@ final class FunnelService {
 			(int) $funnel['id']
 		);
 
-		if ( $this->over_user_limit( $funnel, (string) ( $event['subscriber_id'] ?? '' ) ) ) {
-			$this->db->update( 'ig_funnel_hits', [ 'delivery_error' => 'per_user_limit' ], [ 'id' => $hit_id ] );
+		if ( $this->over_user_limit( $funnel, (string) ( $event['subscriber_id'] ?? '' ), $hit_id ) ) {
+			$this->db->update(
+				'ig_funnel_hits',
+				[ 'delivered' => 0, 'delivery_error' => self::DELIVERY_BLOCKED ],
+				[ 'id' => $hit_id ]
+			);
 			return $this->result( true, false, (int) $funnel['id'], $hit_id, __( 'This subscriber has already claimed this offer.', 'igbz-suite' ) );
 		}
 
@@ -303,6 +345,10 @@ final class FunnelService {
 				'comment_text'           => mb_substr( $comment, 0, 2000 ),
 				'post_id'                => $post_id,
 				'event'                  => (string) ( $event['event'] ?? 'comment' ),
+				// Recorded as explicitly not-yet-settled rather than as an empty string, so an
+				// in-flight hit is distinguishable from one nobody ever tried to deliver.
+				'delivered'              => 0,
+				'delivery_error'         => self::DELIVERY_PENDING,
 				'occurred_at'            => ! empty( $event['timestamp'] )
 					? gmdate( 'Y-m-d H:i:s', (int) $event['timestamp'] )
 					: current_time( 'mysql', true ),
@@ -317,8 +363,14 @@ final class FunnelService {
 	 * wallet credit) is pushed to a background event; the response only contains locally computed
 	 * data so ManyChat can render the DM itself.
 	 *
+	 * What this method must NOT do is claim the delivery happened. Answering the webhook proves
+	 * only that we computed a reply — whether the subscriber received anything is decided later,
+	 * in followup(), which is the single writer of `delivered` and of the conversion counter.
+	 * Marking the hit delivered here made a funnel with a broken ManyChat key report a 100%
+	 * conversion rate while sending nothing at all, and hid the row from the hourly retry.
+	 *
 	 * @param array<string,mixed> $event
-	 * @return array{matched:bool,duplicate:bool,funnel:array<string,mixed>|null,hit_id:int,link:string,coupon:string,text:string}
+	 * @return array{matched:bool,duplicate:bool,blocked:bool,funnel:array<string,mixed>|null,hit_id:int,link:string,coupon:string,text:string}
 	 */
 	public function handle_event_async( array $event ): array {
 		$funnel = $this->match(
@@ -332,6 +384,7 @@ final class FunnelService {
 			return [
 				'matched'   => false,
 				'duplicate' => false,
+				'blocked'   => false,
 				'funnel'    => null,
 				'hit_id'    => 0,
 				'link'      => '',
@@ -342,9 +395,12 @@ final class FunnelService {
 
 		$hit_id = $this->record_hit( $funnel, $event );
 		if ( 0 === $hit_id ) {
+			// A ManyChat retry of a comment we already have. Re-serving the link is the friendly
+			// answer; no counter moves and no coupon is minted.
 			return [
 				'matched'   => true,
 				'duplicate' => true,
+				'blocked'   => false,
 				'funnel'    => $funnel,
 				'hit_id'    => 0,
 				'link'      => $this->resolve_link( $funnel ),
@@ -353,28 +409,40 @@ final class FunnelService {
 			];
 		}
 
+		// Every recorded hit is an attempt, so the hits counter moves here and only here — before
+		// any branch can return. Previously the capped branch returned without incrementing, so
+		// the conversion rate was computed against a denominator that skipped exactly the events
+		// that did not convert.
+		$this->db->query(
+			'UPDATE ' . $this->db->table( 'ig_funnels' ) . ' SET hits = hits + 1 WHERE id = %d',
+			(int) $funnel['id']
+		);
+
 		// The per-subscriber cap has to be enforced here too, not only in handle_event(). This is
 		// the path the ManyChat webhook actually uses, so without it a funnel configured "one per
 		// user" handed out an unlimited number of links — and, for coupon funnels, an unlimited
 		// number of discount codes — to the same person simply by commenting again.
-		if ( $this->over_user_limit( $funnel, (string) ( $event['subscriber_id'] ?? '' ) ) ) {
-			$this->db->update( 'ig_funnel_hits', [ 'delivery_error' => 'per_user_limit' ], [ 'id' => $hit_id ] );
+		if ( $this->over_user_limit( $funnel, (string) ( $event['subscriber_id'] ?? '' ), $hit_id ) ) {
+			$this->db->update(
+				'ig_funnel_hits',
+				[ 'delivered' => 0, 'delivery_error' => self::DELIVERY_BLOCKED ],
+				[ 'id' => $hit_id ]
+			);
 
+			// No link goes out with a blocked hit. Returning one made the cap decorative: the
+			// caller put it straight into the DM, so the person who had used up their allowance
+			// still got the target URL.
 			return [
 				'matched'   => true,
-				'duplicate' => true,
+				'duplicate' => false,
+				'blocked'   => true,
 				'funnel'    => $funnel,
 				'hit_id'    => $hit_id,
-				'link'      => $this->resolve_link( $funnel ),
+				'link'      => '',
 				'coupon'    => '',
 				'text'      => '',
 			];
 		}
-
-		$this->db->query(
-			'UPDATE ' . $this->db->table( 'ig_funnels' ) . ' SET hits = hits + 1, conversions = conversions + 1 WHERE id = %d',
-			(int) $funnel['id']
-		);
 
 		$link   = $this->resolve_link( $funnel );
 		$coupon = self::TARGET_COUPON === (string) $funnel['target_type']
@@ -393,9 +461,10 @@ final class FunnelService {
 			$text = sprintf( /* translators: %s: link */ __( 'Here you go: %s', 'igbz-suite' ), $link );
 		}
 
+		// The coupon is stored now because it has really been minted; delivery has not happened.
 		$this->db->update(
 			'ig_funnel_hits',
-			[ 'delivered' => 1, 'coupon_issued' => $coupon ],
+			[ 'coupon_issued' => $coupon, 'delivered' => 0, 'delivery_error' => self::DELIVERY_PENDING_INLINE ],
 			[ 'id' => $hit_id ]
 		);
 
@@ -408,6 +477,7 @@ final class FunnelService {
 		return [
 			'matched'   => true,
 			'duplicate' => false,
+			'blocked'   => false,
 			'funnel'    => $funnel,
 			'hit_id'    => $hit_id,
 			'link'      => $link,
@@ -417,7 +487,11 @@ final class FunnelService {
 	}
 
 	/**
-	 * Background half of handle_event_async(): profile sync, tagging and wallet credit.
+	 * Background half of handle_event_async(): profile sync, tagging, delivery and wallet credit.
+	 *
+	 * This is where the hit is settled. Whatever ManyChat's API answers here is what the row
+	 * records, so an operator looking at the Delivery column is reading the result of an actual
+	 * send rather than the fact that a webhook once fired.
 	 */
 	public function followup( int $hit_id ): void {
 		$hit = $this->db->row( 'SELECT * FROM ' . $this->db->table( 'ig_funnel_hits' ) . ' WHERE id = %d', $hit_id );
@@ -429,54 +503,195 @@ final class FunnelService {
 			return;
 		}
 
-		$manychat_id = (string) $hit['manychat_subscriber_id'];
-		if ( '' === $manychat_id ) {
+		// Blocked and already-settled hits have nothing to do here. Re-running a settled hit
+		// would be harmless — settle() is conditional — but the API calls would not be.
+		if ( (int) $hit['delivered'] === 1 || self::DELIVERY_BLOCKED === (string) $hit['delivery_error'] ) {
 			return;
 		}
 
-		$subscriber = $this->subscribers->sync_from_api( $manychat_id, (int) $funnel['tenant_id'] );
+		$manychat_id = (string) $hit['manychat_subscriber_id'];
+		if ( '' === $manychat_id ) {
+			// Nothing addressable to send to. Recorded rather than dropped silently: this is a
+			// wiring mistake in the ManyChat flow (the subscriber id was not mapped into the
+			// External Request body) and the operator has to see it to fix it.
+			$this->settle( $funnel, $hit_id, false, 'missing_subscriber_id' );
+			return;
+		}
+
+		$subscriber = $this->subscribers->sync_from_api( $manychat_id, (int) $funnel['tenant_id'], (int) $funnel['account_id'] );
 		$row_id     = (int) ( $subscriber['id'] ?? 0 );
 
-		if ( $row_id > 0 && (int) $hit['subscriber_id'] !== $row_id ) {
+		if ( 0 === $row_id ) {
+			// The profile sync is best effort; a failure there must not cost the subscriber their
+			// DM. Fall back to whatever the webhook already stored.
+			$row_id = (int) $hit['subscriber_id'];
+		} elseif ( (int) $hit['subscriber_id'] !== $row_id ) {
 			$this->db->update( 'ig_funnel_hits', [ 'subscriber_id' => $row_id ], [ 'id' => $hit_id ] );
 		}
 
 		$client = $this->client_for( $funnel );
 
-		$client->set_custom_fields(
-			$manychat_id,
+		if ( ! $client->is_configured() ) {
+			// The single most common cause of a silent funnel: the account has no ManyChat key,
+			// so every send would fail with the same message. Say it once, plainly.
+			$this->settle( $funnel, $hit_id, false, 'manychat_key_missing', $row_id );
+			return;
+		}
+
+		$link = $this->resolve_link( $funnel );
+		if ( '' !== (string) $hit['coupon_issued'] ) {
+			$link = add_query_arg( 'coupon', rawurlencode( (string) $hit['coupon_issued'] ), $link );
+		}
+
+		$text = strtr(
+			(string) $funnel['reply_text'],
 			[
-				'igbz_funnel' => (string) $funnel['name'],
-				'igbz_coupon' => (string) $hit['coupon_issued'],
+				'{link}'    => $link,
+				'{coupon}'  => (string) $hit['coupon_issued'],
+				'{keyword}' => (string) $funnel['keyword'],
 			]
 		);
+		if ( '' === trim( $text ) ) {
+			$text = sprintf( /* translators: %s: link */ __( 'Here you go: %s', 'igbz-suite' ), $link );
+		}
+
+		$fields = [
+			'igbz_link'    => $link,
+			'igbz_coupon'  => (string) $hit['coupon_issued'],
+			'igbz_message' => $text,
+			'igbz_funnel'  => (string) $funnel['name'],
+		];
+
+		$client->set_custom_fields( $manychat_id, $fields );
 
 		if ( '' !== (string) $funnel['manychat_tag'] ) {
 			$client->add_tag_by_name( $manychat_id, (string) $funnel['manychat_tag'] );
 		}
 
 		if ( '' !== (string) $funnel['manychat_flow_ns'] ) {
-			$client->send_flow( $manychat_id, (string) $funnel['manychat_flow_ns'] );
+			// A flow is the authoritative delivery: ManyChat renders the DM from the custom
+			// fields we just wrote, and sendFlow tells us whether it started.
+			$sent = $client->send_flow( $manychat_id, (string) $funnel['manychat_flow_ns'] );
+			$this->settle( $funnel, $hit_id, (bool) $sent['ok'], (bool) $sent['ok'] ? '' : (string) $sent['error'], $row_id, $fields );
+		} elseif ( self::DELIVERY_PENDING_INLINE === (string) $hit['delivery_error'] ) {
+			// No flow configured, and the reply was already returned inline in the webhook
+			// response for ManyChat to render. Sending the same text again over the API would
+			// double-DM the subscriber, so the hit is settled as delivered-but-unconfirmed.
+			$this->settle( $funnel, $hit_id, true, self::DELIVERY_UNCONFIRMED, $row_id, $fields );
+		} else {
+			// Reached from retry_failed(), where nothing was ever handed to ManyChat: send it.
+			$sent = $client->send_text(
+				$manychat_id,
+				$text,
+				igbz()->settings()->string( 'manychat.button_label', __( 'Open the link', 'igbz-suite' ) ),
+				$link
+			);
+			$this->settle( $funnel, $hit_id, (bool) $sent['ok'], (bool) $sent['ok'] ? '' : (string) $sent['error'], $row_id, $fields );
 		}
-
-		$this->grant_wallet_credit( $funnel, $row_id, $hit_id );
 
 		do_action( 'igbz_ig_funnel_followup_done', (int) $funnel['id'], $hit_id );
 	}
 
-	/** @param array<string,mixed> $funnel */
-	private function over_user_limit( array $funnel, string $subscriber_id ): bool {
+	/**
+	 * Has this subscriber already used up the funnel's per-person allowance?
+	 *
+	 * Counts settled deliveries *and* hits still in flight. Counting only delivered = 1 left a
+	 * window the width of the follow-up delay (five seconds) in which the same person could
+	 * comment twice and be handed two links — or two single-use coupons — because neither hit had
+	 * settled yet. $exclude_hit_id keeps the row we just inserted from counting against itself.
+	 *
+	 * A hit that *failed* deliberately does not count. The allowance is "how many times this
+	 * person may receive the offer", and somebody whose DM never arrived has received nothing, so
+	 * commenting again is the obvious thing for them to do and it must work.
+	 *
+	 * @param array<string,mixed> $funnel
+	 */
+	private function over_user_limit( array $funnel, string $subscriber_id, int $exclude_hit_id = 0 ): bool {
 		$limit = (int) $funnel['per_user_limit'];
 		if ( $limit <= 0 || '' === $subscriber_id ) {
 			return false;
 		}
 		$count = (int) $this->db->scalar(
 			'SELECT COUNT(*) FROM ' . $this->db->table( 'ig_funnel_hits' ) . '
-			 WHERE funnel_id = %d AND manychat_subscriber_id = %s AND delivered = 1',
+			 WHERE funnel_id = %d AND manychat_subscriber_id = %s AND id <> %d
+			   AND (delivered = 1 OR delivery_error = %s OR delivery_error = %s)',
 			(int) $funnel['id'],
-			$subscriber_id
+			$subscriber_id,
+			$exclude_hit_id,
+			self::DELIVERY_PENDING,
+			self::DELIVERY_PENDING_INLINE
 		);
 		return $count >= $limit;
+	}
+
+	/**
+	 * Write the outcome of one delivery attempt, exactly once.
+	 *
+	 * The UPDATE is conditional on the row still being unsettled, and the conversion counter,
+	 * the wallet credit and the `igbz_ig_funnel_delivered` action all hang off whether that
+	 * UPDATE actually changed a row. Two writers can therefore race — the scheduled follow-up and
+	 * the hourly retry, say — without the funnel ever counting the same conversion twice or
+	 * paying the same reward twice.
+	 *
+	 * @param array<string,mixed> $funnel
+	 * @param array<string,mixed> $fields Custom-field payload handed to the delivered action.
+	 */
+	private function settle(
+		array $funnel,
+		int $hit_id,
+		bool $delivered,
+		string $error,
+		int $subscriber_row_id = 0,
+		array $fields = []
+	): void {
+		$table = $this->db->table( 'ig_funnel_hits' );
+
+		if ( ! $delivered ) {
+			$this->db->query(
+				'UPDATE ' . $table . ' SET delivered = 0, delivery_error = %s WHERE id = %d AND delivered = 0',
+				mb_substr( $error, 0, 255 ),
+				$hit_id
+			);
+			$this->logger->warning(
+				'manychat',
+				'Funnel delivery failed',
+				[ 'funnel_id' => (int) $funnel['id'], 'hit_id' => $hit_id, 'error' => $error ]
+			);
+			return;
+		}
+
+		// `delivered` always changes value here (0 -> 1), so a zero row count means somebody else
+		// settled this hit first rather than "the write was a no-op".
+		$claimed = $this->db->query(
+			'UPDATE ' . $table . ' SET delivered = 1, delivery_error = %s WHERE id = %d AND delivered = 0',
+			mb_substr( $error, 0, 255 ),
+			$hit_id
+		);
+
+		if ( $claimed < 1 ) {
+			return;
+		}
+
+		$this->db->query(
+			'UPDATE ' . $this->db->table( 'ig_funnels' ) . ' SET conversions = conversions + 1 WHERE id = %d',
+			(int) $funnel['id']
+		);
+
+		$this->grant_wallet_credit( $funnel, $subscriber_row_id, $hit_id );
+
+		if ( self::DELIVERY_UNCONFIRMED === $error ) {
+			// Same honesty rule as an unverified publish: the reply went back to ManyChat in the
+			// webhook response and almost certainly reached the subscriber, but no API call
+			// proved it, so say so instead of reporting a clean delivery.
+			$this->logger->warning(
+				'manychat',
+				'Funnel reply handed to ManyChat but not confirmed by an API call',
+				[ 'funnel_id' => (int) $funnel['id'], 'hit_id' => $hit_id ]
+			);
+			do_action( 'igbz_ig_funnel_delivered_unconfirmed', (int) $funnel['id'], $hit_id );
+		}
+
+		do_action( 'igbz_ig_funnel_delivered', (int) $funnel['id'], $hit_id, $fields );
 	}
 
 	/**
@@ -518,47 +733,44 @@ final class FunnelService {
 		$delivered = false;
 		$error     = '';
 
-		if ( '' !== $manychat_subscriber_id ) {
-			$client = $this->client_for( $funnel );
-			$client->set_custom_fields( $manychat_subscriber_id, $fields );
-
-			if ( '' !== (string) $funnel['manychat_tag'] ) {
-				$client->add_tag_by_name( $manychat_subscriber_id, (string) $funnel['manychat_tag'] );
-			}
-
-			if ( '' !== (string) $funnel['manychat_flow_ns'] ) {
-				$sent      = $client->send_flow( $manychat_subscriber_id, (string) $funnel['manychat_flow_ns'] );
-				$delivered = $sent['ok'];
-				$error     = $sent['error'];
-			} else {
-				$sent      = $client->send_text( $manychat_subscriber_id, $text, __( 'Open the link', 'igbz-suite' ), $link );
-				$delivered = $sent['ok'];
-				$error     = $sent['error'];
-			}
-		} else {
+		if ( '' === $manychat_subscriber_id ) {
 			$error = 'missing_subscriber_id';
-		}
-
-		$this->db->update(
-			'ig_funnel_hits',
-			[
-				'delivered'      => $delivered ? 1 : 0,
-				'delivery_error' => mb_substr( $error, 0, 255 ),
-				'coupon_issued'  => $coupon,
-			],
-			[ 'id' => $hit_id ]
-		);
-
-		if ( $delivered ) {
-			$this->db->query(
-				'UPDATE ' . $this->db->table( 'ig_funnels' ) . ' SET conversions = conversions + 1 WHERE id = %d',
-				(int) $funnel['id']
-			);
-			$this->grant_wallet_credit( $funnel, $subscriber_row_id, $hit_id );
-			do_action( 'igbz_ig_funnel_delivered', (int) $funnel['id'], $hit_id, $fields );
 		} else {
-			$this->logger->warning( 'manychat', 'Funnel delivery failed', [ 'funnel_id' => (int) $funnel['id'], 'error' => $error ] );
+			$client = $this->client_for( $funnel );
+
+			if ( ! $client->is_configured() ) {
+				$error = 'manychat_key_missing';
+			} else {
+				$client->set_custom_fields( $manychat_subscriber_id, $fields );
+
+				if ( '' !== (string) $funnel['manychat_tag'] ) {
+					$client->add_tag_by_name( $manychat_subscriber_id, (string) $funnel['manychat_tag'] );
+				}
+
+				if ( '' !== (string) $funnel['manychat_flow_ns'] ) {
+					$sent      = $client->send_flow( $manychat_subscriber_id, (string) $funnel['manychat_flow_ns'] );
+					$delivered = (bool) $sent['ok'];
+					$error     = (string) $sent['error'];
+				} else {
+					$sent      = $client->send_text(
+						$manychat_subscriber_id,
+						$text,
+						igbz()->settings()->string( 'manychat.button_label', __( 'Open the link', 'igbz-suite' ) ),
+						$link
+					);
+					$delivered = (bool) $sent['ok'];
+					$error     = (string) $sent['error'];
+				}
+			}
 		}
+
+		if ( '' !== $coupon ) {
+			$this->db->update( 'ig_funnel_hits', [ 'coupon_issued' => $coupon ], [ 'id' => $hit_id ] );
+		}
+
+		// settle() owns `delivered`, the conversion counter, the wallet credit and the action, so
+		// this path and followup() can never disagree about what a delivery is.
+		$this->settle( $funnel, $hit_id, $delivered, $delivered ? '' : $error, $subscriber_row_id, $fields );
 
 		return $fields;
 	}
@@ -694,15 +906,34 @@ final class FunnelService {
 		);
 	}
 
-	/** Re-attempt deliveries that failed, from cron. */
+	/**
+	 * Re-attempt undelivered hits, from cron or from the button on the funnel screen.
+	 *
+	 * Two kinds of row qualify. A row with a real error message failed a send and is retried
+	 * outright. A row still marked pending is one whose scheduled follow-up never ran — WP-Cron
+	 * only fires on traffic, so on a quiet site the +5s event can simply be missed — and is
+	 * picked up once it is older than the grace period, which keeps the retry from racing a
+	 * follow-up that is merely a few seconds late.
+	 *
+	 * Excluded: rows blocked by the per-user cap (retrying is exactly what the cap forbids) and
+	 * rows carrying the unconfirmed marker, which are already delivered.
+	 */
 	public function retry_failed( int $limit = 20 ): int {
+		$now  = time();
 		$rows = $this->db->results(
 			'SELECT * FROM ' . $this->db->table( 'ig_funnel_hits' ) . '
-			 WHERE delivered = 0 AND delivery_error <> %s AND delivery_error <> %s AND created_at >= %s
+			 WHERE delivered = 0
+			   AND delivery_error <> %s
+			   AND delivery_error <> %s
+			   AND created_at >= %s
+			   AND ( delivery_error NOT IN ( %s, %s ) OR created_at <= %s )
 			 ORDER BY id DESC LIMIT %d',
 			'',
-			'per_user_limit',
-			gmdate( 'Y-m-d H:i:s', time() - DAY_IN_SECONDS ),
+			self::DELIVERY_BLOCKED,
+			gmdate( 'Y-m-d H:i:s', $now - DAY_IN_SECONDS ),
+			self::DELIVERY_PENDING,
+			self::DELIVERY_PENDING_INLINE,
+			gmdate( 'Y-m-d H:i:s', $now - self::FOLLOWUP_GRACE ),
 			$limit
 		);
 
@@ -712,10 +943,52 @@ final class FunnelService {
 			if ( ! $funnel ) {
 				continue;
 			}
-			$this->deliver( $funnel, (int) $hit['id'], (string) $hit['manychat_subscriber_id'], (int) $hit['subscriber_id'] );
+			// followup() rather than deliver(): it knows about the inline-reply case, so a hit
+			// whose text ManyChat already rendered is settled instead of being DMed twice.
+			$this->followup( (int) $hit['id'] );
 			$done++;
 		}
 
 		return $done;
+	}
+
+	/**
+	 * Undelivered hits, split by why. Feeds the admin health card.
+	 *
+	 * @return array{pending:int,failed:int,blocked:int,unconfirmed:int}
+	 */
+	public function delivery_backlog( int $since_seconds = DAY_IN_SECONDS ): array {
+		$table = $this->db->table( 'ig_funnel_hits' );
+		$since = gmdate( 'Y-m-d H:i:s', time() - $since_seconds );
+
+		$rows = $this->db->results(
+			'SELECT delivered, delivery_error, COUNT(*) AS total FROM ' . $table . '
+			 WHERE created_at >= %s GROUP BY delivered, delivery_error',
+			$since
+		);
+
+		$out = [ 'pending' => 0, 'failed' => 0, 'blocked' => 0, 'unconfirmed' => 0 ];
+
+		foreach ( $rows as $row ) {
+			$total = (int) $row['total'];
+			$error = (string) $row['delivery_error'];
+
+			if ( 1 === (int) $row['delivered'] ) {
+				if ( self::DELIVERY_UNCONFIRMED === $error ) {
+					$out['unconfirmed'] += $total;
+				}
+				continue;
+			}
+
+			if ( self::DELIVERY_BLOCKED === $error ) {
+				$out['blocked'] += $total;
+			} elseif ( in_array( $error, self::PENDING_STATES, true ) ) {
+				$out['pending'] += $total;
+			} else {
+				$out['failed'] += $total;
+			}
+		}
+
+		return $out;
 	}
 }

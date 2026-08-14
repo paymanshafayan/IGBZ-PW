@@ -308,9 +308,7 @@ final class FunnelsPage {
 				'comment'   => esc_html( wp_trim_words( (string) $row['comment_text'], 14 ) ),
 				'post'      => esc_html( (string) $row['post_id'] ?: '—' ),
 				'coupon'    => esc_html( (string) $row['coupon_issued'] ?: '—' ),
-				'delivered' => $row['delivered']
-					? View::status_pill( 'ok' ) . ' ' . esc_html__( 'delivered', 'igbz-suite' )
-					: View::status_pill( 'error' ) . ' ' . esc_html( (string) $row['delivery_error'] ?: __( 'pending', 'igbz-suite' ) ),
+				'delivered' => HitStatus::cell( $row ),
 			];
 		}
 

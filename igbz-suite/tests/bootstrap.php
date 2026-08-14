@@ -55,8 +55,159 @@ function esc_url_raw( string $url ): string {
 	return $url;
 }
 
-function add_query_arg( string $key, string $value, string $url ): string {
-	return $url . ( str_contains( $url, '?' ) ? '&' : '?' ) . $key . '=' . rawurlencode( $value );
+/**
+ * Both core signatures: add_query_arg( $key, $value, $url ) and add_query_arg( array, $url ).
+ */
+function add_query_arg( ...$args ): string {
+	if ( is_array( $args[0] ) ) {
+		$pairs = $args[0];
+		$url   = (string) ( $args[1] ?? '' );
+	} else {
+		$pairs = [ (string) $args[0] => (string) ( $args[1] ?? '' ) ];
+		$url   = (string) ( $args[2] ?? '' );
+	}
+
+	foreach ( $pairs as $key => $value ) {
+		$url .= ( str_contains( $url, '?' ) ? '&' : '?' ) . $key . '=' . rawurlencode( (string) $value );
+	}
+
+	return $url;
+}
+
+function get_permalink( int $post_id = 0 ) {
+	return 0 === $post_id ? false : 'https://shop.test/?p=' . $post_id;
+}
+
+function wp_schedule_single_event( int $timestamp, string $hook, array $args = [] ): bool {
+	$GLOBALS['igbz_test_scheduled'][] = [ 'timestamp' => $timestamp, 'hook' => $hook, 'args' => $args ];
+	return true;
+}
+
+function get_user_by( string $field, $value ) {
+	return $GLOBALS['igbz_test_users'][ $field ][ (string) $value ] ?? false;
+}
+
+function get_users( array $args = [] ): array {
+	return [];
+}
+
+function sanitize_email( string $value ): string {
+	return trim( $value );
+}
+
+function wp_parse_url( string $url, int $component = -1 ) {
+	return parse_url( $url, $component );
+}
+
+// ------------------------------------------------------------------------ HTTP
+
+/**
+ * Outbound HTTP double.
+ *
+ * Http::request() is the only door to the network, so stubbing wp_remote_request() here lets the
+ * gateway clients (and everything layered on them) be exercised for real: the JSON envelope, the
+ * ok/error mapping and the retry rules all run as they do in production.
+ *
+ * Tests push responses onto $GLOBALS['igbz_test_http']. A response carrying a `match` key is
+ * served to the first request whose URL contains that fragment, whenever it arrives; responses
+ * without one are consumed in order. Matching on the endpoint keeps a test from having to know
+ * that, say, writing four custom fields costs four HTTP calls. Anything not queued gets a bland
+ * ManyChat-shaped success, so a test only describes the calls it actually cares about.
+ *
+ * @var array<int,array{status?:int,body?:string,error?:string,match?:string}>
+ */
+$GLOBALS['igbz_test_http']         = [];
+$GLOBALS['igbz_test_http_requests'] = [];
+$GLOBALS['igbz_test_scheduled']    = [];
+$GLOBALS['igbz_test_users']        = [];
+
+/** Queue one response for the next outbound request. */
+function igbz_test_queue_http( array $response ): void {
+	$GLOBALS['igbz_test_http'][] = $response;
+}
+
+/** Queue a ManyChat-style failure, optionally only for requests to a given endpoint. */
+function igbz_test_queue_manychat_error( string $message, int $code = 3011, string $match = '' ): void {
+	$response = [
+		'status' => 200,
+		'body'   => wp_json_encode( [ 'status' => 'error', 'message' => $message, 'code' => $code ] ),
+	];
+	if ( '' !== $match ) {
+		$response['match'] = $match;
+	}
+	igbz_test_queue_http( $response );
+}
+
+class WP_Error {
+	public function __construct( private string $message = '' ) {}
+
+	public function get_error_message(): string {
+		return $this->message;
+	}
+}
+
+function is_wp_error( $thing ): bool {
+	return $thing instanceof WP_Error;
+}
+
+function wp_remote_request( string $url, array $args = [] ) {
+	$GLOBALS['igbz_test_http_requests'][] = [
+		'url'    => $url,
+		'method' => (string) ( $args['method'] ?? 'GET' ),
+		'body'   => (string) ( $args['body'] ?? '' ),
+	];
+
+	$next = null;
+	foreach ( $GLOBALS['igbz_test_http'] as $index => $queued ) {
+		$fragment = (string) ( $queued['match'] ?? '' );
+		if ( '' === $fragment ) {
+			continue;
+		}
+		if ( str_contains( $url, $fragment ) ) {
+			$next = $queued;
+			unset( $GLOBALS['igbz_test_http'][ $index ] );
+			$GLOBALS['igbz_test_http'] = array_values( $GLOBALS['igbz_test_http'] );
+			break;
+		}
+	}
+
+	if ( null === $next ) {
+		// Skip past any endpoint-targeted responses still waiting for their own request.
+		foreach ( $GLOBALS['igbz_test_http'] as $index => $queued ) {
+			if ( '' === (string) ( $queued['match'] ?? '' ) ) {
+				$next = $queued;
+				unset( $GLOBALS['igbz_test_http'][ $index ] );
+				$GLOBALS['igbz_test_http'] = array_values( $GLOBALS['igbz_test_http'] );
+				break;
+			}
+		}
+	}
+
+	if ( is_array( $next ) && isset( $next['error'] ) ) {
+		return new WP_Error( (string) $next['error'] );
+	}
+
+	return [
+		'status' => (int) ( $next['status'] ?? 200 ),
+		'body'   => (string) ( $next['body'] ?? '{"status":"success","data":{}}' ),
+	];
+}
+
+function wp_remote_retrieve_response_code( $response ): int {
+	return (int) ( $response['status'] ?? 0 );
+}
+
+function wp_remote_retrieve_body( $response ): string {
+	return (string) ( $response['body'] ?? '' );
+}
+
+function wp_remote_retrieve_headers( $response ): object {
+	return new class() {
+		/** @return array<string,string> */
+		public function getAll(): array {
+			return [];
+		}
+	};
 }
 
 function sanitize_key( string $key ): string {
@@ -134,6 +285,14 @@ function __( string $text, string $domain = '' ): string {
 
 function esc_html__( string $text, string $domain = '' ): string {
 	return $text;
+}
+
+function esc_html( string $text ): string {
+	return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+}
+
+function esc_attr( string $text ): string {
+	return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
 }
 
 function _n( string $single, string $plural, int $number, string $domain = '' ): string {
@@ -379,7 +538,11 @@ function igbz(): \IGBZ\Suite\Support\Plugin {
  * container (and therefore every service reached through igbz()) will use.
  */
 function igbz_test_reset_settings(): \IGBZ\Suite\Support\Settings {
-	$GLOBALS['igbz_test_options'] = [];
+	$GLOBALS['igbz_test_options']       = [];
+	$GLOBALS['igbz_test_http']          = [];
+	$GLOBALS['igbz_test_http_requests'] = [];
+	$GLOBALS['igbz_test_scheduled']     = [];
+	$GLOBALS['igbz_test_users']         = [];
 	igbz_test_reset_actions();
 	igbz()->bind( 'settings', static fn () => new \IGBZ\Suite\Support\Settings() );
 	igbz()->bind( 'logger', static fn ( $c ) => new \IGBZ\Suite\Support\Logger( $c->get( 'settings' ) ) );
