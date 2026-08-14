@@ -628,7 +628,9 @@ final class ProductIntakeService {
 			$account,
 			[
 				'description' => (string) $row['raw_description'],
-				'sku'         => (string) $row['sku'],
+				// No code here on purpose: this step runs before the product exists, so the
+				// public code has not been minted yet. It is not needed either — the listing
+				// text never quotes the code, only the caption and the overlay do.
 				'category'    => $this->category_names( (string) $row['category_ids'] ),
 				'product'     => (string) ( $quality['detected_product'] ?? '' ),
 				'languages'   => $languages,
@@ -685,6 +687,16 @@ final class ProductIntakeService {
 		);
 
 		do_action( 'igbz_intake_copy_ready', $id, $output, $translations );
+	}
+
+	/**
+	 * Record the shopper-facing code, which only exists once the product does.
+	 *
+	 * Kept separate from mark_product_created() because the publisher needs the code *before*
+	 * it creates the funnel, and the funnel id is not known until after that.
+	 */
+	public function set_public_code( int $id, string $code ): void {
+		$this->update( $id, [ 'public_code' => $code ] );
 	}
 
 	public function mark_product_created( int $id, int $product_id, int $funnel_id ): void {
@@ -762,7 +774,7 @@ final class ProductIntakeService {
 				/* translators: 1: product name, 2: product code */
 				__( "%1\$s\n\nComment %2\$s below and the purchase link is sent straight to your direct messages.", 'igbz-suite' ),
 				(string) ( $copy['title'] ?? '' ),
-				(string) $row['sku']
+				(string) $row['public_code']
 			);
 
 			$this->logger->warning( 'intake', 'The post task returned no caption; using a fallback', [ 'intake_id' => $id ] );
@@ -801,7 +813,9 @@ final class ProductIntakeService {
 		$task_id = $this->manus->produce_product_video(
 			$account,
 			[
-				'sku'     => (string) $row['sku'],
+				// The public code, not the SKU: this is what gets burned onto the video for
+				// viewers to type into a comment.
+				'code'    => (string) $row['public_code'],
 				'title'   => (string) ( $copy['title'] ?? '' ),
 				'summary' => (string) ( $copy['short_description'] ?? '' ),
 				'prompt'  => $prompt,
@@ -894,7 +908,7 @@ final class ProductIntakeService {
 		$task_id = $this->manus->finish_product_post(
 			$account,
 			[
-				'sku'     => (string) $row['sku'],
+				'code'    => (string) $row['public_code'],
 				'title'   => (string) ( $copy['title'] ?? '' ),
 				'summary' => (string) ( $copy['short_description'] ?? '' ),
 				'price'   => $this->formatted_price( $row ),

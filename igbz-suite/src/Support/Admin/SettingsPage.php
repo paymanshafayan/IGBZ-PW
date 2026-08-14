@@ -334,9 +334,17 @@ final class SettingsPage {
 					],
 					[
 						'key'         => 'intake.sku_prefix',
-						'label'       => __( 'Product code prefix', 'igbz-suite' ),
+						'label'       => __( 'SKU prefix', 'igbz-suite' ),
 						'placeholder' => 'IGBZ',
-						'help'        => __( 'Codes look like IGBZ-4F2K. The code is the WooCommerce SKU, it is printed on the post, and it is the word customers comment to get the purchase link — so keep it short.', 'igbz-suite' ),
+						'help'        => __( 'Warehouse SKUs look like IGBZ-4F2K. This is the inventory code on invoices and packing lists — customers never see it.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'intake.code_digits',
+						'label' => __( 'Customer code length', 'igbz-suite' ),
+						'type'  => 'number',
+						'min'   => 4,
+						'max'   => 12,
+						'help'  => __( 'The number customers comment to get the purchase link is the product ID, padded to this many digits — product 47 becomes 0047. Digits are used because they are easy to type on a Persian keyboard. Four is the minimum: shorter codes get typed under posts by accident and would send links to people who never asked.', 'igbz-suite' ),
 					],
 					[
 						'key'   => 'intake.quality_threshold',

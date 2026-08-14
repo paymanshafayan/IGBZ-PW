@@ -95,11 +95,10 @@ final class PromptBuilderTest extends TestCase {
 
 		$copy = $builder->product_copy(
 			$account,
-			[ 'description' => 'hand stitched', 'sku' => 'IGBZ-4F2K', 'category' => 'Bags', 'languages' => [ 'en', 'ar' ] ]
+			[ 'description' => 'hand stitched', 'category' => 'Bags', 'languages' => [ 'en', 'ar' ] ]
 		);
 		$this->assert_contains( 'hand stitched', $copy, 'the seller\'s own words are quoted verbatim' );
 		$this->assert_contains( 'never state, guess or imply a price', $copy, 'the model is forbidden from inventing commerce fields' );
-		$this->assert_contains( 'IGBZ-4F2K', $copy, 'the product code reaches the listing prompt' );
 		$this->assert_contains( 'en, ar', $copy, 'the translation targets are named' );
 		$this->assert_contains( 'Translate, do not re-invent', $copy, 'translations must match the original' );
 
@@ -113,14 +112,17 @@ final class PromptBuilderTest extends TestCase {
 			'no translation slot exists when the store is single-language'
 		);
 
-		$video = $builder->product_video( $account, [ 'sku' => 'IGBZ-4F2K', 'title' => 'Tote', 'prompt' => 'pack it for a trip' ] );
-		$this->assert_contains( 'IGBZ-4F2K', $video, 'the code is burned onto the video' );
+		$video = $builder->product_video( $account, [ 'code' => '0047', 'title' => 'Tote', 'prompt' => 'pack it for a trip' ] );
+		$this->assert_contains( '0047', $video, 'the code is burned onto the video' );
 		$this->assert_contains( 'type it into the comments', $video, 'the video explains why the code has to be legible' );
+		$this->assert_contains( 'leading zeros', $video, 'a padded code loses its meaning if the leading zeros are dropped' );
+		$this->assert_contains( 'never spell it out', $video, 'a spelled-out code cannot be typed into a comment' );
 		$this->assert_contains( 'pack it for a trip', $video, 'the seller\'s brief is passed through verbatim' );
 
-		$post = $builder->product_post( $account, [ 'sku' => 'IGBZ-4F2K', 'title' => 'Tote' ] );
-		$this->assert_contains( 'Overlay the product code IGBZ-4F2K', $post, 'the code is stamped onto the image' );
-		$this->assert_contains( 'comment the exact word "IGBZ-4F2K"', $post, 'the caption asks for the exact code' );
+		$post = $builder->product_post( $account, [ 'code' => '0047', 'title' => 'Tote' ] );
+		$this->assert_contains( 'Overlay the product code 0047', $post, 'the code is stamped onto the image' );
+		$this->assert_contains( 'comment the number "0047"', $post, 'the caption asks for the exact code' );
+		$this->assert_contains( 'not convert it to Persian digits', $post, 'a Persian-digit overlay would not match the typed comment' );
 		$this->assert_contains( 'on its own line', $post, 'the code is isolated so nobody mistypes it' );
 		$this->assert_contains( 'hashtags', $post, 'hashtags are requested' );
 

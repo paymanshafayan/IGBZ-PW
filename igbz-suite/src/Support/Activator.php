@@ -64,6 +64,50 @@ final class Activator {
 		if ( $from > 0 && $from < 7 ) {
 			self::migrate_to_v7();
 		}
+		if ( $from > 0 && $from < 9 ) {
+			self::migrate_to_v9();
+		}
+	}
+
+	/**
+	 * v9: the code a shopper comments is the product id, not the SKU.
+	 *
+	 * Until v9 the funnel keyword was the warehouse SKU (IGBZ-P6R4). It is unreadable off a phone
+	 * screen and needs a Latin keyboard to type, so the shopper-facing code became the padded
+	 * WooCommerce product id instead. Rows that already created a product get the new code
+	 * back-filled; rows that never got that far are left empty on purpose, because the code is
+	 * minted at product creation and there is nothing yet to derive it from.
+	 *
+	 * The existing funnels are deliberately NOT rewritten. A live post out in the world tells
+	 * people to comment the old SKU, and repointing its funnel would silently break every one of
+	 * those posts. Old funnels keep matching the old keyword forever; only products registered
+	 * from here on use numbers.
+	 */
+	private static function migrate_to_v9(): void {
+		$db     = igbz()->db();
+		$intake = $db->table( 'ig_intake' );
+
+		// Padded in PHP rather than with LPAD(): LPAD truncates when the value is longer than the
+		// pad length, so a six-digit product id would silently become a four-digit code pointing
+		// at somebody else's product.
+		$ids = $db->column(
+			"SELECT product_id FROM {$intake}
+			 WHERE product_id > 0 AND ( public_code = '' OR public_code IS NULL )"
+		);
+
+		// Constructed directly rather than pulled from the container: the Instagram module may be
+		// switched off, and a disabled module still has rows that need migrating.
+		$skus = new \IGBZ\Suite\Modules\Instagram\Services\SkuGenerator( $db );
+
+		foreach ( array_unique( array_map( 'intval', (array) $ids ) ) as $product_id ) {
+			$db->update(
+				'ig_intake',
+				[ 'public_code' => $skus->public_code( $product_id ) ],
+				[ 'product_id' => $product_id ],
+				[ '%s' ],
+				[ '%d' ]
+			);
+		}
 	}
 
 	/**
@@ -305,6 +349,7 @@ final class Activator {
 			'trial.task_quota'              => 1,
 			'intake.enabled'                => true,
 			'intake.sku_prefix'             => 'IGBZ',
+			'intake.code_digits'            => 4,
 			'intake.quality_threshold'      => 60,
 			'intake.product_status'         => 'publish',
 			'intake.funnel_per_user_limit'  => 1,

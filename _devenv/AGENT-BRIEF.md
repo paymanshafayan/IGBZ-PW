@@ -195,10 +195,11 @@ zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs bet
   "already received" message).
 - **Product registration, end to end against real WooCommerce**: photo → refusal with reasons →
   accepted photo → prepared image → description with the seller's own price/stock/category →
-  written listing → a real `WC_Product_Simple` carrying the code as its SKU, both specs as
-  attributes, three tags and the chosen category → an exact-match funnel keyed on the code whose
-  `resolve_link()` reaches the product page → a content row carrying **both `product_id` and
-  `funnel_id`** and the keyword in its brief. The last of those is the loop the port had left open.
+  written listing → a real `WC_Product_Simple` carrying the warehouse SKU in its `sku` field, both
+  specs as attributes, three tags and the chosen category → an exact-match funnel keyed on the
+  *customer code* whose `resolve_link()` reaches the product page → a content row carrying **both
+  `product_id` and `funnel_id`** and the keyword in its brief. The last of those is the loop the
+  port had left open.
 - Registration REST surface: anonymous → 401, a capability-less user → 403, an owner → 200; a real
   multipart upload returns 201 with the file in the media library under a public URL (Manus fetches
   assets over HTTP, so a private directory would not work); missing price, missing category,
@@ -207,7 +208,7 @@ zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs bet
 - Translation bridge: with no multilingual plugin nothing is published but the copy is kept in
   `_igbz_translations`; with WPML's hooks satisfied two real translated products are created,
   linked by trid, and each carries the original's price, sale price and stock with a
-  language-suffixed SKU (the SKU is the funnel keyword, so it has to stay unique).
+  language-suffixed SKU (WooCommerce enforces SKU uniqueness, so the suffix is not optional).
 
 ### Publishing is confirmed, not guaranteed
 
@@ -289,7 +290,7 @@ That object only exists when WP_Http built the response — any `pre_http_reques
 (caching plugins, request mockers, offline harnesses) returns a plain array and core does not
 normalise it, so the call was a fatal error. Use `Http::headers_of()`.
 
-### Product registration from the app (DB v8)
+### Product registration from the app (DB v9)
 
 The rule that shapes everything here: **a product is never created through the WooCommerce admin.**
 The app plus the AI pipeline is the only entry point, which means every failure has to degrade into
@@ -317,7 +318,7 @@ uploaded → grading → rejected                    (reasons on the row, seller
 
 **Services.** `ProductIntakeService` owns the row and the transitions. `ProductPublisher` turns an
 approved row into a `WC_Product_Simple`, its funnel and its content row, and `hand_off()` does steps
-12–13. `IntakeWorker` is the cron sweep. `SkuGenerator` mints the code. `TranslationBridge` handles
+12–13. `IntakeWorker` is the cron sweep. `SkuGenerator` mints both codes. `TranslationBridge` handles
 Polylang / WPML / meta. `ManyChatBridge` primes the page before the first comment arrives.
 
 **`ProductIntakeService` depends on `IntakeAgentInterface`, not `ManusService`.** It uses six of that
@@ -339,8 +340,20 @@ without the network. `ManusService` implements it.
   expire; a product image that 404s a fortnight later is worse than no automation.
 - **Uploads go to the media library, not a protected directory.** Manus fetches assets over HTTP and
   cannot read a path on the server's disk.
-- **The funnel keyword is lower-cased** (`FunnelService::canonical()` lower-cases before matching, so
-  an upper-case keyword would never fire) while the code shown to shoppers stays upper case.
+- **Two codes, deliberately.** `sku` (`IGBZ-4F2K`) is the warehouse code in WooCommerce's `sku`
+  field; `public_code` (`0047`) is the padded product id and is the *only* one a shopper ever sees —
+  the overlay, the caption, the funnel keyword and the ManyChat field. Digits, because the shopper
+  types it into a comment on a Persian keyboard and a Latin SKU means switching layouts. The floor
+  of four digits is a safety margin, not cosmetics: a two-digit code gets typed by accident.
+  `FunnelService::canonical()` already folds `۰۰۴۷` to `0047`, so a Persian-digit comment matches.
+- **`public_code` is empty until step 8 and that is correct.** It *is* the product id, so it cannot
+  exist before the product does. Anything reading it earlier — a caption, an overlay, a funnel — is
+  a bug in the caller, and `create_funnel()` refuses to build a funnel from an empty code rather
+  than creating one nobody can trigger. Every consumer runs after `publish()`, which is why the
+  ordering worked out.
+- **Nothing renumbers an existing funnel.** `migrate_to_v9()` back-fills `public_code` on rows that
+  already have a product, but leaves old funnels answering their old SKU keyword forever: a post
+  already out in the world tells people to comment that string.
 - **Match mode is `exact`, not `contains`**: with `contains`, a comment quoting the caption would
   trigger a delivery.
 - **A funnel that fails to save is a warning, not a failure.** The product exists and can be sold;

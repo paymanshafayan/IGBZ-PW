@@ -165,6 +165,7 @@ final class InstagramModule implements ModuleInterface {
 				$c->get( 'ig.manus' ),
 				$c->get( 'ig.translations' ),
 				$c->get( 'ig.manychat_bridge' ),
+				$c->get( 'ig.skus' ),
 				$c->logger()
 			)
 		);

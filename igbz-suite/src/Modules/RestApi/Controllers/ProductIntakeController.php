@@ -138,6 +138,7 @@ final class ProductIntakeController extends BaseController {
 				'categories'        => $categories,
 				'currency'          => function_exists( 'get_woocommerce_currency' ) ? get_woocommerce_currency() : $settings->string( 'general.default_currency', 'IRT' ),
 				'sku_prefix'        => $this->skus->prefix(),
+				'code_digits'       => max( 4, min( 12, $settings->int( 'intake.code_digits', 4 ) ) ),
 				'multilingual'      => $this->translations->is_multilingual(),
 				'languages'         => $this->translations->languages(),
 				'default_language'  => $this->translations->default_language(),
@@ -700,6 +701,9 @@ final class ProductIntakeController extends BaseController {
 			'next'       => $this->next_step( $status, $row ),
 			'waiting'    => $this->is_waiting( $status ),
 			'sku'        => (string) $row['sku'],
+			// What the shopper comments. Empty until the product exists, because it is the
+			// product id — the app should show it from product_created onwards.
+			'code'       => (string) $row['public_code'],
 			'attempt'    => (int) $row['attempt'],
 			'post_kind'  => (string) $row['post_kind'],
 			'created_at' => (string) $row['created_at'],

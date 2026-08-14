@@ -27,12 +27,16 @@ final class ProductPublisher {
 	public const META_INTAKE = '_igbz_intake_id';
 	public const META_SKU    = '_igbz_product_code';
 
+	/** The digits a shopper comments. Stored separately from the SKU because they differ. */
+	public const META_PUBLIC_CODE = '_igbz_public_code';
+
 	public function __construct(
 		private ProductIntakeService $intake,
 		private FunnelService $funnels,
 		private ManusService $manus,
 		private TranslationBridge $translations,
 		private ManyChatBridge $manychat,
+		private SkuGenerator $skus,
 		private Logger $logger
 	) {}
 
@@ -56,6 +60,26 @@ final class ProductPublisher {
 		$product_id = $this->create_product( $row, $copy );
 		if ( 0 === $product_id ) {
 			return $this->error( $intake_id, __( 'The product could not be created.', 'igbz-suite' ) );
+		}
+
+		// The public code is the product id, so it cannot exist until the product does. Every
+		// step that consumes it — the image overlay, the video, the caption, the funnel — runs
+		// after this point, which is why the code could move here without reordering the flow.
+		$public_code = $this->skus->public_code( $product_id );
+
+		update_post_meta( $product_id, self::META_PUBLIC_CODE, $public_code );
+		$this->intake->set_public_code( $intake_id, $public_code );
+		$row['public_code'] = $public_code;
+
+		if ( $this->skus->public_code_conflicts( $public_code ) ) {
+			// Not fatal, and not something we can fix by renumbering: the id is the id. The
+			// store owner needs to retire whichever hand-made funnel is squatting on these
+			// digits, so say so loudly rather than letting two funnels race for one comment.
+			$this->logger->warning(
+				'intake',
+				'Another funnel already answers this product code; comments may reach the wrong one',
+				[ 'intake_id' => $intake_id, 'product_id' => $product_id, 'code' => $public_code ]
+			);
 		}
 
 		// Translations are best-effort on purpose: a store whose Polylang setup is half-configured
@@ -86,7 +110,10 @@ final class ProductPublisher {
 				'intake_id'    => $intake_id,
 				'product_id'   => $product_id,
 				'funnel_id'    => $funnel_id,
+				// Both, because a support question arrives as either one: the shopkeeper quotes
+				// the SKU off an invoice, the shopper quotes the digits they commented.
 				'sku'          => (string) $row['sku'],
+				'code'         => $public_code,
 				'translations' => count( $translated ),
 			]
 		);
@@ -246,23 +273,34 @@ final class ProductPublisher {
 	/**
 	 * The comment-to-DM funnel for this product.
 	 *
-	 * The keyword is the product code, which is the whole point: the caption tells people to
-	 * comment it, the image shows it, and this row is what turns that comment into a direct
-	 * message carrying the purchase link.
+	 * The keyword is the *public* code — the digits — not the SKU. The caption tells people to
+	 * comment those digits, the image shows them, and this row is what turns that comment into a
+	 * direct message carrying the purchase link. Keying this on the SKU instead would produce a
+	 * funnel that silently never fires, because nobody would ever type it.
 	 *
 	 * @param array<string,mixed> $row
 	 * @param array<string,mixed> $copy
 	 */
 	private function create_funnel( array $row, int $product_id, array $copy ): int {
-		$sku     = (string) $row['sku'];
-		$keyword = mb_strtolower( $sku );
+		$code    = (string) ( $row['public_code'] ?? '' );
+		$keyword = $this->skus->keyword( $code );
+
+		if ( '' === $keyword ) {
+			$this->logger->warning(
+				'intake',
+				'No public code was minted, so no comment funnel could be created',
+				[ 'intake_id' => (int) $row['id'], 'product_id' => $product_id ]
+			);
+
+			return 0;
+		}
 
 		$reply = igbz()->settings()->string( 'intake.funnel_reply', '' );
 		if ( '' === trim( $reply ) ) {
 			$reply = sprintf(
 				/* translators: 1: product name, 2: link placeholder */
 				__( "Here is %1\$s 🛍\nBuy it here: %2\$s", 'igbz-suite' ),
-				(string) ( $copy['title'] ?? $sku ),
+				(string) ( $copy['title'] ?? $code ),
 				'{link}'
 			);
 		}
@@ -271,7 +309,7 @@ final class ProductPublisher {
 			[
 				'tenant_id'      => (int) $row['tenant_id'],
 				'account_id'     => (int) $row['account_id'],
-				'name'           => sprintf( /* translators: %s: product code */ __( 'Product %s', 'igbz-suite' ), $sku ),
+				'name'           => sprintf( /* translators: %s: product code */ __( 'Product %s', 'igbz-suite' ), $code ),
 				'keyword'        => $keyword,
 				// Exact matching, because the code is a deliberate token: "contains" would let
 				// a comment that merely quotes the caption trigger a delivery.
@@ -343,12 +381,16 @@ final class ProductPublisher {
 				'kind'       => $kind,
 				'title'      => (string) ( $copy['title'] ?? $row['sku'] ),
 				'brief'      => [
-					'subject'    => (string) ( $copy['title'] ?? '' ),
-					'sku'        => (string) $row['sku'],
-					'intake_id'  => (int) $row['id'],
-					'keyword'    => mb_strtolower( (string) $row['sku'] ),
-					'product_id' => (int) $row['product_id'],
-					'funnel_id'  => (int) $row['funnel_id'],
+					'subject'     => (string) ( $copy['title'] ?? '' ),
+					'sku'         => (string) $row['sku'],
+					'public_code' => (string) $row['public_code'],
+					'intake_id'   => (int) $row['id'],
+					// The keyword is the public code, matching the funnel this content points
+					// at. The SKU never reaches a shopper, so a caption built around it would
+					// invite comments that no funnel answers.
+					'keyword'     => $this->skus->keyword( (string) $row['public_code'] ),
+					'product_id'  => (int) $row['product_id'],
+					'funnel_id'   => (int) $row['funnel_id'],
 				],
 				'caption'    => (string) ( $composed['caption'] ?? '' ),
 				'hashtags'   => array_map( 'strval', (array) ( $composed['hashtags'] ?? [] ) ),
@@ -397,7 +439,9 @@ final class ProductPublisher {
 		$link   = $funnel ? $this->funnels->resolve_link( $funnel ) : (string) get_permalink( (int) $row['product_id'] );
 
 		$copy = $this->intake->copy( $row );
-		$this->manychat->register_product( $account, (string) $row['sku'], $link, (string) ( $copy['title'] ?? '' ) );
+		// ManyChat is told the public code, because that is the string its bot fields are keyed
+		// on and the string that will arrive in a comment.
+		$this->manychat->register_product( $account, (string) $row['public_code'], $link, (string) ( $copy['title'] ?? '' ) );
 
 		// Step 12: hand the finished post to Manus.
 		$content = $this->manus->content( $content_id );
@@ -446,7 +490,7 @@ final class ProductPublisher {
 		$this->logger->info(
 			'intake',
 			$scheduled ? 'Post scheduled through Manus' : 'Post handed to Manus for publishing',
-			[ 'intake_id' => $intake_id, 'content_id' => $content_id, 'sku' => (string) $row['sku'] ]
+			[ 'intake_id' => $intake_id, 'content_id' => $content_id, 'code' => (string) $row['public_code'] ]
 		);
 
 		return [ 'ok' => true, 'scheduled' => $scheduled, 'error' => '' ];

@@ -247,10 +247,16 @@ final class IntakePage {
 
 		switch ( $key ) {
 			case 'sku':
+				// The customer code once it exists, the SKU before that — a registration that
+				// has not reached product creation has no public code yet, and showing an empty
+				// cell would read as a fault rather than as "not that far yet".
+				$code = (string) $row['public_code'];
+
 				return sprintf(
-					'<a href="%1$s"><code>%2$s</code></a>',
+					'<a href="%1$s"><code>%2$s</code></a>%3$s',
 					esc_url( Menu::url( self::SLUG, [ 'intake' => $id ] ) ),
-					esc_html( (string) $row['sku'] )
+					esc_html( '' !== $code ? $code : (string) $row['sku'] ),
+					'' !== $code ? '<br /><small class="description">' . esc_html( (string) $row['sku'] ) . '</small>' : ''
 				);
 
 			case 'photo':
@@ -406,7 +412,17 @@ final class IntakePage {
 		}
 
 		$rows = [
-			[ 'k' => __( 'Product code', 'igbz-suite' ), 'v' => '<code>' . esc_html( (string) $row['sku'] ) . '</code>' ],
+			[
+				'k' => __( 'Customer code', 'igbz-suite' ),
+				'v' => '' !== (string) $row['public_code']
+					? '<code>' . esc_html( (string) $row['public_code'] ) . '</code> <span class="description">'
+						. esc_html__( 'the number shoppers comment', 'igbz-suite' ) . '</span>'
+					: '<span class="description">' . esc_html__( 'assigned when the product is created', 'igbz-suite' ) . '</span>',
+			],
+			[
+				'k' => __( 'Warehouse SKU', 'igbz-suite' ),
+				'v' => '<code>' . esc_html( (string) $row['sku'] ) . '</code>',
+			],
 			[ 'k' => __( 'Stage', 'igbz-suite' ), 'v' => $this->status_cell( $row ) ],
 			[ 'k' => __( 'Photo attempts', 'igbz-suite' ), 'v' => esc_html( (string) $row['attempt'] ) ],
 			[
@@ -449,7 +465,7 @@ final class IntakePage {
 						sprintf(
 							/* translators: %s: keyword */
 							__( 'Comments matching “%s”', 'igbz-suite' ),
-							(string) $row['sku']
+							(string) $row['public_code']
 						)
 					)
 				),

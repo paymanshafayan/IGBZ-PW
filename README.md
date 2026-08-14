@@ -51,10 +51,15 @@ product gets created.
 
 Three things hold it together:
 
-* **The product code** (`IGBZ-4F2K`) is one string doing three jobs: the WooCommerce SKU, the mark
-  burned onto the post, and the keyword the ManyChat funnel matches. Its alphabet excludes every
-  character that is ambiguous in a condensed font, because a shopper has to read it off a photo and
-  type it into a comment on the first try.
+* **There are two codes, and they are not the same string.** The *customer code* (`0047`) is the
+  WooCommerce product id, left-padded to at least four digits. It is what gets burned onto the post,
+  what the caption asks for, and what the ManyChat funnel matches. It is digits-only because the
+  shopper types it into an Instagram comment on a Persian keyboard, where reaching the Latin letters
+  of a SKU means switching layouts mid-comment. Four digits is a floor rather than a format: a
+  one- or two-digit code would be typed under a post by accident and fire the funnel for someone who
+  never asked. The *warehouse SKU* (`IGBZ-4F2K`) stays the WooCommerce `sku` field for invoices and
+  stock control, and a shopper never sees it. `intake.code_digits` widens the customer code; the
+  padding only ever grows, so a store passing 9999 products keeps every code it already printed.
 * **The AI never invents commerce fields.** Price, stock and category are the seller's, and the
   prompt explicitly forbids the model from stating or implying a price. It writes words, not numbers.
 * **Voice input is vendor-neutral.** `SpeechToTextInterface` covers any service that takes a

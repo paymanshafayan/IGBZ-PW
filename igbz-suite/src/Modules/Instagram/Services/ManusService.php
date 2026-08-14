@@ -349,7 +349,7 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		return $this->dispatch(
 			$this->prompts->product_copy( $account, $brief ),
 			$account,
-			sprintf( /* translators: %s: product code */ __( 'Product listing: %s', 'igbz-suite' ), (string) ( $brief['sku'] ?? '' ) ),
+			sprintf( /* translators: %s: product name */ __( 'Product listing: %s', 'igbz-suite' ), (string) ( $brief['product'] ?? '' ) ),
 			[],
 			[
 				'attachments'              => '' !== $image_url ? [ $image_url ] : [],
@@ -368,7 +368,7 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		return $this->dispatch(
 			$this->prompts->product_video( $account, $brief ),
 			$account,
-			sprintf( /* translators: %s: product code */ __( 'Product video: %s', 'igbz-suite' ), (string) ( $brief['sku'] ?? '' ) ),
+			sprintf( /* translators: %s: product code */ __( 'Product video: %s', 'igbz-suite' ), (string) ( $brief['code'] ?? '' ) ),
 			[],
 			[ 'attachments' => '' !== $image_url ? [ $image_url ] : [] ]
 		);
@@ -384,7 +384,7 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		return $this->dispatch(
 			$this->prompts->product_post( $account, $brief ),
 			$account,
-			sprintf( /* translators: %s: product code */ __( 'Instagram post: %s', 'igbz-suite' ), (string) ( $brief['sku'] ?? '' ) ),
+			sprintf( /* translators: %s: product code */ __( 'Instagram post: %s', 'igbz-suite' ), (string) ( $brief['code'] ?? '' ) ),
 			igbz()->settings()->bool( 'manus.use_canva', true ) ? [ 'canva' ] : [],
 			[ 'attachments' => '' !== $image_url ? [ $image_url ] : [] ]
 		);

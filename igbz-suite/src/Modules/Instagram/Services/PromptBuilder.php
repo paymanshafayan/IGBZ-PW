@@ -248,7 +248,6 @@ final class PromptBuilder {
 			. "Task: write the WooCommerce listing for a product the shopkeeper has just registered from their phone.\n"
 			. "What the shopkeeper said about it, verbatim:\n\"\"\"\n" . (string) ( $brief['description'] ?? '' ) . "\n\"\"\"\n"
 			. ( ! empty( $brief['category'] ) ? sprintf( "Category chosen by the shopkeeper: %s\n", (string) $brief['category'] ) : '' )
-			. ( ! empty( $brief['sku'] ) ? sprintf( "Product code: %s\n", (string) $brief['sku'] ) : '' )
 			. "The product photograph is attached; use it to get details the shopkeeper did not mention, such as colour, "
 			. "material and form.\n\n"
 			. "Produce:\n"
@@ -324,7 +323,7 @@ final class PromptBuilder {
 	 */
 	public function product_video( array $account, array $brief ): string {
 		$seconds = (int) ( $brief['duration'] ?? igbz()->settings()->int( 'manus.reel_seconds', 25 ) );
-		$sku     = (string) ( $brief['sku'] ?? '' );
+		$code    = (string) ( $brief['code'] ?? '' );
 
 		$prompt = $this->context( $account ) . "\n\n"
 			. sprintf( "Task: produce a %d second vertical Instagram video (1080x1920, 30fps, MP4) for a product.\n", $seconds )
@@ -334,12 +333,14 @@ final class PromptBuilder {
 			. ( ! empty( $brief['prompt'] ) ? sprintf( "What the shopkeeper asked for, verbatim: \"\"\"\n%s\n\"\"\"\n", (string) $brief['prompt'] ) : '' )
 			. "Include a hook in the first two seconds, three to five scenes, and burned-in subtitles with correct RTL "
 			. "shaping.\n"
-			. ( '' !== $sku
+			. ( '' !== $code
 				? sprintf(
 					"Burn the product code %s onto the video in a clearly legible style, on screen for at least the last "
 						. "four seconds and again near the start. It must be readable at a glance on a phone, because "
-						. "viewers type it into the comments to get the purchase link.\n",
-					$sku
+						. "viewers type it into the comments to get the purchase link. The code is digits: render it in "
+						. "Western Arabic numerals (0-9) exactly as written, keeping any leading zeros, and never spell "
+						. "it out in words or convert it to Persian digits.\n",
+					$code
 				)
 				: '' )
 			. "Pick a trending, licence-safe audio track suited to this niche.\n"
@@ -359,7 +360,7 @@ final class PromptBuilder {
 	 * @param array<string,mixed> $brief
 	 */
 	public function product_post( array $account, array $brief ): string {
-		$sku      = (string) ( $brief['sku'] ?? '' );
+		$code     = (string) ( $brief['code'] ?? '' );
 		$language = igbz()->settings()->string( 'manus.content_language', 'Persian (Farsi)' );
 
 		$prompt = $this->context( $account ) . "\n\n"
@@ -368,21 +369,24 @@ final class PromptBuilder {
 			. ( ! empty( $brief['summary'] ) ? sprintf( "About it: %s\n", (string) $brief['summary'] ) : '' )
 			. ( ! empty( $brief['price'] ) ? sprintf( "Price to mention if it fits naturally: %s\n", (string) $brief['price'] ) : '' )
 			. "The product image is attached.\n\n"
-			. ( '' !== $sku
+			. ( '' !== $code
 				? sprintf(
 					"1. Overlay the product code %s onto the image. Place it where it does not cover the product, in a "
-						. "high-contrast, unambiguous style, large enough to read on a phone at a glance. Keep the "
+						. "high-contrast, unambiguous style, large enough to read on a phone at a glance. The code is "
+						. "digits: render it in Western Arabic numerals (0-9) exactly as written, keeping any leading "
+						. "zeros, and do not convert it to Persian digits or spell it out. Keep the "
 						. "1080x1350 px format and attach the result as a PNG.\n",
-					$sku
+					$code
 				)
 				: "1. Keep the attached image as it is and re-attach it as a PNG.\n" )
 			. sprintf(
 				"2. Write the caption in %s. It must open with a hook, give three to five short lines of real value about "
-					. "the product, and end with one unmistakable call to action: comment the exact word \"%s\" under "
-					. "this post and the purchase link is sent straight to their direct messages. Say the code exactly "
-					. "as written, on its own line, so nobody mistypes it.\n",
+					. "the product, and end with one unmistakable call to action: comment the number \"%s\" under "
+					. "this post and the purchase link is sent straight to their direct messages. Write the code exactly "
+					. "as given, in Western Arabic numerals with any leading zeros intact, on its own line, so nobody "
+					. "mistypes it.\n",
 				$language,
-				$sku
+				$code
 			)
 			. "3. Pick 15 to 25 hashtags: a few large, several mid-sized and several niche ones that this account can "
 			. "realistically rank in. No banned or spammy tags.\n"

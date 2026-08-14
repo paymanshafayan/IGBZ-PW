@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: IGBZ Suite 1.0.0\n"
 "Report-Msgid-Bugs-To: https://github.com/paymanshafayan/IGBZ-PW/issues\n"
-"POT-Creation-Date: 2026-08-14 13:57+0000\n"
+"POT-Creation-Date: 2026-08-14 15:25+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -19,132 +19,163 @@ msgstr ""
 msgid "#"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:335
+#. translators: 1: accounts on trial, 2: accounts whose trial ended
+#: src/Modules/Instagram/InstagramModule.php:336
 msgid "%1$d account(s) run on the shared trial key; %2$d have used it up or expired."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:380
+#. translators: 1: active funnels, 2: failed hits
+#: src/Modules/Instagram/InstagramModule.php:381
 msgid "%1$d active funnel(s); %2$d failed delivery(ies) in the last 24h."
 msgstr ""
 
+#. translators: 1: total devices, 2: devices with a push token
 #: src/Modules/RestApi/RestApiModule.php:256
 msgid "%1$d device(s) registered, %2$d with a usable push token."
 msgstr ""
 
+#. translators: 1: pending count, 2: expected CNAME target
 #: src/Modules/Hub/HubModule.php:206
 msgid "%1$d domain(s) waiting on DNS. Expected CNAME target: %2$s"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:320
+#. translators: 1: accounts with a key, 2: total active accounts, 3: extra note
+#: src/Modules/Instagram/InstagramModule.php:321
 msgid "%1$d of %2$d active accounts have a key. %3$s"
 msgstr ""
 
+#. translators: 1: count, 2: per-instalment amount, 3: total
 #: src/Modules/MultiTenant/Bnpl/BnplGateway.php:77
 msgid "%1$d payments - first %2$s, total %3$s"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:465
+#. translators: 1: registrations in progress, 2: failed registrations
+#: src/Modules/Instagram/InstagramModule.php:466
 msgid "%1$d registration(s) in progress, %2$d failed. Products are created from the app; nobody has to open the WooCommerce editor."
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductIntakeService.php:763
-msgid "%1$s\n\nComment %2$s below and the purchase link is sent straight to your direct messages."
+#. translators: 1: product name, 2: product code
+#: src/Modules/Instagram/Services/ProductIntakeService.php:775
+msgid ""
+"%1$s\n"
+"\n"
+"Comment %2$s below and the purchase link is sent straight to your direct messages."
 msgstr ""
 
+#. translators: 1: domain, 2: expected CNAME target
 #: src/Modules/Hub/Services/DomainVerifier.php:93
 msgid "%1$s does not point at %2$s yet, and no _igbz-verify TXT record was found."
 msgstr ""
 
+#. translators: 1: amount, 2: count
 #: src/Modules/MultiTenant/Frontend/ShortCodes.php:373
 msgid "%1$s × %2$d"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:368
+#. translators: %d: count
+#: src/Modules/Instagram/InstagramModule.php:369
 msgid "%d active account"
 msgid_plural "%d active accounts"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Modules/Instagram/InstagramModule.php:359
+#. translators: %d: number of accounts
+#: src/Modules/Instagram/InstagramModule.php:360
 msgid "%d active account(s) have no webhook token; their incoming ManyChat requests are rejected. Re-save the account to mint one."
 msgstr ""
 
+#. translators: %d: number of commissions paid.
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:357
 msgid "%d commissions approved and credited."
 msgstr ""
 
+#. translators: %d: number of deleted rows.
 #: src/Modules/MultiTenant/Admin/PaymentsPage.php:340
 msgid "%d expired codes removed."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:388
+#. translators: %d: count
+#: src/Modules/Instagram/InstagramModule.php:389
 msgid "%d hit(s) still waiting to send."
 msgstr ""
 
+#. translators: %d: number of affected instalments.
 #: src/Modules/MultiTenant/Admin/BnplPage.php:392
 msgid "%d instalments processed."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:418
+#. translators: %d: count
+#: src/Modules/Instagram/InstagramModule.php:419
 msgid "%d item(s) in the failed state."
 msgstr ""
 
+#. translators: %d: minutes
 #: src/Modules/MultiTenant/Frontend/ShortCodes.php:104
 #: src/Modules/MultiTenant/Frontend/ShortCodes.php:178
 msgid "%d min"
 msgstr ""
 
+#. translators: %d: product count
 #: src/Modules/Hub/Frontend/HubShortCodes.php:73
 msgid "%d product"
 msgid_plural "%d products"
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Modules/Instagram/InstagramModule.php:422
+#. translators: %d: count
+#: src/Modules/Instagram/InstagramModule.php:423
 msgid "%d published item returned no post link, so it could not be confirmed on Instagram."
 msgid_plural "%d published items returned no post link, so they could not be confirmed on Instagram."
 msgstr[0] ""
 msgstr[1] ""
 
-#: src/Modules/Instagram/InstagramModule.php:396
+#. translators: %d: count
+#: src/Modules/Instagram/InstagramModule.php:397
 msgid "%d reply(ies) were handed to ManyChat without a confirmation."
 msgstr ""
 
+#. translators: %d: requests per minute
 #: src/Modules/RestApi/RestApiModule.php:241
 msgid "%d requests per minute per client on authentication routes."
 msgstr ""
 
+#. translators: %d: count
 #: src/Modules/MultiTenant/MultiTenantModule.php:277
 msgid "%d tenant configured"
 msgid_plural "%d tenants configured"
 msgstr[0] ""
 msgstr[1] ""
 
+#. translators: %d: number of sessions
 #: src/Modules/RestApi/RestApiModule.php:231
 msgid "%d unexpired session(s) across all devices."
 msgstr ""
 
+#. translators: %d: percentage
 #: src/Modules/MultiTenant/Frontend/AccountEndpoints.php:322
 msgid "%d%% complete"
 msgstr ""
 
+#. translators: %d: days
 #: src/Modules/MultiTenant/Frontend/ShortCodes.php:289
 msgid "%d-day free trial"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:499
+#. translators: %s: engine name
+#: src/Modules/Instagram/InstagramModule.php:500
 msgid "%s is selected but not configured, so voice notes fall back to Manus, which takes minutes rather than seconds."
 msgstr ""
 
+#. translators: %s: amount
 #: src/Modules/RestApi/Push/NotificationService.php:154
 msgid "%s was added to your wallet."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:477
+#: src/Modules/Instagram/Admin/IntakePage.php:493
 msgid "(approved)"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:477
+#: src/Modules/Instagram/Admin/IntakePage.php:493
 msgid "(awaiting approval)"
 msgstr ""
 
@@ -164,7 +195,7 @@ msgstr ""
 msgid "36 character UUID."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:306
+#: src/Modules/Instagram/InstagramModule.php:307
 msgid "A ManyChat Pro plan is required per page."
 msgstr ""
 
@@ -229,7 +260,7 @@ msgstr ""
 msgid "A phone number is required."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:307
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:308
 msgid "A price is required."
 msgstr ""
 
@@ -297,6 +328,7 @@ msgstr ""
 msgid "API credentials"
 msgstr ""
 
+#. translators: %s: settings page URL
 #: src/Modules/MultiTenant/Payments/PspGateway.php:59
 msgid "API credentials for this gateway are stored encrypted in the IGBZ settings screen: %s"
 msgstr ""
@@ -305,15 +337,16 @@ msgstr ""
 msgid "AUTH_KEY / AUTH_SALT are used to derive the encryption key."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:392
+#: src/Support/Admin/SettingsPage.php:400
 msgid "Accept voice input"
 msgstr ""
 
+#. translators: 1: access token lifetime, 2: refresh token lifetime
 #: src/Modules/RestApi/RestApiModule.php:220
 msgid "Access token %1$s, refresh token %2$s. Refresh tokens rotate on use and a replayed one revokes the device."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:453
+#: src/Support/Admin/SettingsPage.php:461
 msgid "Access token TTL (seconds)"
 msgstr ""
 
@@ -332,6 +365,7 @@ msgstr ""
 msgid "Account"
 msgstr ""
 
+#. translators: %d: account id
 #: src/Modules/Instagram/Admin/AccountsPage.php:475
 msgid "Account #%d created."
 msgstr ""
@@ -342,8 +376,8 @@ msgstr ""
 
 #: src/Modules/Instagram/Admin/AccountsPage.php:139
 #: src/Modules/Instagram/Admin/AccountsPage.php:512
-#: src/Modules/Instagram/Admin/InsightsPage.php:69
 #: src/Modules/Instagram/Admin/InsightsPage.php:300
+#: src/Modules/Instagram/Admin/InsightsPage.php:69
 msgid "Account not found."
 msgstr ""
 
@@ -367,8 +401,8 @@ msgstr ""
 #: src/Modules/MultiTenant/Admin/BnplPage.php:253
 #: src/Modules/MultiTenant/Admin/LmsPage.php:121
 #: src/Modules/MultiTenant/Admin/LmsPage.php:251
-#: src/Modules/MultiTenant/Admin/PlansPage.php:90
 #: src/Modules/MultiTenant/Admin/PlansPage.php:212
+#: src/Modules/MultiTenant/Admin/PlansPage.php:90
 #: src/Modules/RestApi/Admin/DevicesPage.php:158
 #: src/Modules/RestApi/Admin/DevicesPage.php:297
 msgid "Actions"
@@ -391,12 +425,13 @@ msgstr ""
 #: src/Modules/Instagram/Admin/FunnelsPage.php:166
 #: src/Modules/Instagram/Admin/FunnelsPage.php:270
 #: src/Modules/MultiTenant/Admin/BnplPage.php:69
-#: src/Modules/MultiTenant/Admin/PlansPage.php:88
 #: src/Modules/MultiTenant/Admin/PlansPage.php:156
+#: src/Modules/MultiTenant/Admin/PlansPage.php:88
 #: src/Modules/MultiTenant/Admin/TenantsPage.php:528
 msgid "Active"
 msgstr ""
 
+#. translators: %s: version
 #: src/Modules/MultiTenant/MultiTenantModule.php:269
 msgid "Active (%s)"
 msgstr ""
@@ -478,6 +513,7 @@ msgstr ""
 msgid "Adjust affiliate"
 msgstr ""
 
+#. translators: %s: new balance.
 #: src/Modules/MultiTenant/Admin/WalletPage.php:254
 msgid "Adjustment posted. New balance: %s"
 msgstr ""
@@ -533,11 +569,12 @@ msgstr ""
 msgid "Agent profile"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:299
+#. translators: %s: agent profile
+#: src/Modules/Instagram/InstagramModule.php:300
 msgid "Agent profile: %s"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:442
+#: src/Support/Admin/SettingsPage.php:450
 msgid "Aggregate refresh interval (seconds)"
 msgstr ""
 
@@ -545,6 +582,7 @@ msgstr ""
 msgid "Aggregates recomputed."
 msgstr ""
 
+#. translators: %d: table count.
 #: src/Support/Admin/StatusPage.php:263
 msgid "All %d tables present."
 msgstr ""
@@ -553,7 +591,7 @@ msgstr ""
 msgid "All accounts"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:348
+#: src/Modules/Instagram/Admin/IntakePage.php:354
 msgid "All registrations"
 msgstr ""
 
@@ -577,7 +615,7 @@ msgstr ""
 msgid "Allowed browser origins"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:388
+#: src/Support/Admin/SettingsPage.php:396
 msgid "Also only needed when no multilingual plugin is installed."
 msgstr ""
 
@@ -609,7 +647,7 @@ msgstr ""
 msgid "Android"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:459
+#: src/Support/Admin/SettingsPage.php:467
 msgid "Android notification channel"
 msgstr ""
 
@@ -617,7 +655,7 @@ msgstr ""
 msgid "Android only"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:464
+#: src/Support/Admin/SettingsPage.php:472
 msgid "Android package name"
 msgstr ""
 
@@ -639,7 +677,7 @@ msgstr ""
 msgid "Approve and pay matured commissions"
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:491
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:492
 msgid "Approve the video before the post is composed."
 msgstr ""
 
@@ -647,7 +685,7 @@ msgstr ""
 msgid "Arabic/Persian letters and digits are normalised, so \"لينك\" and \"لینک\" both match."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:360
+#: src/Modules/Instagram/Admin/IntakePage.php:366
 msgid "As photographed"
 msgstr ""
 
@@ -655,13 +693,13 @@ msgstr ""
 msgid "Attachment URL"
 msgstr ""
 
+#: src/Modules/MultiTenant/Admin/PaymentsPage.php:237
 #: src/Modules/MultiTenant/Admin/PaymentsPage.php:51
 #: src/Modules/MultiTenant/Admin/PaymentsPage.php:75
-#: src/Modules/MultiTenant/Admin/PaymentsPage.php:237
 msgid "Attempts"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:416
+#: src/Support/Admin/SettingsPage.php:424
 msgid "Audio field name"
 msgstr ""
 
@@ -670,7 +708,7 @@ msgstr ""
 msgid "Authentication"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:420
+#: src/Support/Admin/SettingsPage.php:428
 msgid "Authentication header"
 msgstr ""
 
@@ -678,7 +716,7 @@ msgstr ""
 msgid "Authentication is required."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:423
+#: src/Support/Admin/SettingsPage.php:431
 msgid "Authentication scheme"
 msgstr ""
 
@@ -779,6 +817,7 @@ msgstr ""
 msgid "Balance and ledger."
 msgstr ""
 
+#. translators: %s: REST base URL
 #: src/Modules/Hub/HubModule.php:172
 msgid "Base URL: %s"
 msgstr ""
@@ -839,11 +878,11 @@ msgstr ""
 msgid "By domain / subdomain"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:445
+#: src/Support/Admin/SettingsPage.php:453
 msgid "CNAME target for custom domains"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:439
+#: src/Support/Admin/SettingsPage.php:447
 msgid "CORS is restricted to this origin. Empty means same-origin only, never a wildcard."
 msgstr ""
 
@@ -921,6 +960,7 @@ msgstr ""
 msgid "Certificate:"
 msgstr ""
 
+#. translators: %s: user display name
 #: src/Modules/RestApi/Controllers/StoreAdminController.php:429
 msgid "Changed from the mobile app by %s."
 msgstr ""
@@ -947,7 +987,7 @@ msgstr ""
 msgid "Check DNS"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:511
+#: src/Modules/Instagram/Admin/IntakePage.php:527
 msgid "Checking the photo"
 msgstr ""
 
@@ -959,11 +999,11 @@ msgstr ""
 msgid "Choose a store first."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:313
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:314
 msgid "Choose at least one category."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:412
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:413
 msgid "Choose either an image post or a video post."
 msgstr ""
 
@@ -975,9 +1015,9 @@ msgstr ""
 msgid "Choosing \"create a new user\" uses the e-mail and phone below to register the owner account and assign the tenant owner role."
 msgstr ""
 
-#: src/Modules/MultiTenant/Admin/AffiliatePage.php:74
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:123
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:166
+#: src/Modules/MultiTenant/Admin/AffiliatePage.php:74
 #: src/Modules/MultiTenant/Frontend/AccountEndpoints.php:383
 msgid "Clicks"
 msgstr ""
@@ -997,10 +1037,6 @@ msgstr ""
 
 #: src/Support/Admin/SettingsPage.php:253
 msgid "Code lifetime (seconds)"
-msgstr ""
-
-#: src/Support/Admin/SettingsPage.php:339
-msgid "Codes look like IGBZ-4F2K. The code is the WooCommerce SKU, it is printed on the post, and it is the word customers comment to get the purchase link — so keep it short."
 msgstr ""
 
 #: src/Support/Admin/SettingsPage.php:296
@@ -1048,11 +1084,11 @@ msgstr ""
 msgid "Comment contains it"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:444
+#: src/Modules/Instagram/Admin/IntakePage.php:460
 msgid "Comment funnel"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:402
+#: src/Modules/Instagram/InstagramModule.php:403
 msgid "Comment funnels"
 msgstr ""
 
@@ -1064,7 +1100,8 @@ msgstr ""
 msgid "Comments"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:451
+#. translators: %s: keyword
+#: src/Modules/Instagram/Admin/IntakePage.php:467
 msgid "Comments matching “%s”"
 msgstr ""
 
@@ -1093,7 +1130,7 @@ msgstr ""
 msgid "Completing an order containing this product enrolls the buyer."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:524
+#: src/Modules/Instagram/Admin/IntakePage.php:540
 msgid "Composing the post"
 msgstr ""
 
@@ -1122,11 +1159,11 @@ msgstr ""
 msgid "Content not found."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:433
+#: src/Modules/Instagram/InstagramModule.php:434
 msgid "Content pipeline"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:564
+#: src/Support/Admin/SettingsPage.php:572
 msgid "Content research and design through Manus, auto publishing at peak hours, and comment-to-DM funnels through ManyChat."
 msgstr ""
 
@@ -1160,8 +1197,8 @@ msgstr ""
 msgid "Contract not found."
 msgstr ""
 
-#: src/Modules/MultiTenant/Admin/BnplPage.php:68
 #: src/Modules/MultiTenant/Admin/BnplPage.php:147
+#: src/Modules/MultiTenant/Admin/BnplPage.php:68
 msgid "Contracts"
 msgstr ""
 
@@ -1299,7 +1336,7 @@ msgstr ""
 msgid "Cross-store aggregates, the public store directory, landing blocks, self-service store creation, custom domain verification and signed VIP links."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:568
+#: src/Support/Admin/SettingsPage.php:576
 msgid "Cross-store aggregation, store directory, VIP links and hub REST endpoints for the mother site."
 msgstr ""
 
@@ -1312,6 +1349,7 @@ msgstr ""
 msgid "Current balance"
 msgstr ""
 
+#. translators: %s: provider id
 #: src/Modules/MultiTenant/MultiTenantModule.php:305
 msgid "Current provider: %s"
 msgstr ""
@@ -1328,13 +1366,13 @@ msgstr ""
 msgid "Custom domain with automatic verification"
 msgstr ""
 
-#: src/Modules/Hub/Admin/HubPage.php:74
 #: src/Modules/Hub/Admin/HubPage.php:105
+#: src/Modules/Hub/Admin/HubPage.php:74
 #: src/Modules/Hub/HubModule.php:202
 msgid "Custom domains"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:402
+#: src/Support/Admin/SettingsPage.php:410
 msgid "Custom endpoint (Whisper or similar)"
 msgstr ""
 
@@ -1362,10 +1400,19 @@ msgstr ""
 msgid "Customer"
 msgstr ""
 
+#: src/Modules/Instagram/Admin/IntakePage.php:416
+msgid "Customer code"
+msgstr ""
+
+#: src/Support/Admin/SettingsPage.php:343
+msgid "Customer code length"
+msgstr ""
+
 #: src/Modules/RestApi/Controllers/StoreAdminController.php:256
 msgid "Customer not found."
 msgstr ""
 
+#. translators: %s: hostname
 #: src/Modules/Hub/Admin/HubPage.php:176
 msgid "Customers point their domain at %s. Verification is a real DNS lookup — nothing is marked verified on request alone."
 msgstr ""
@@ -1417,7 +1464,7 @@ msgstr ""
 msgid "Deep link"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:462
+#: src/Support/Admin/SettingsPage.php:470
 msgid "Deep link scheme"
 msgstr ""
 
@@ -1472,7 +1519,7 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:489
+#: src/Support/Admin/SettingsPage.php:497
 msgid "Delete all data on uninstall"
 msgstr ""
 
@@ -1516,6 +1563,7 @@ msgstr ""
 msgid "Delivered through FCM HTTP v1. Tokens Google reports as dead are cleared automatically, so the counts below are real deliveries, not attempts."
 msgstr ""
 
+#. translators: 1: delivered, 2: total targeted, 3: dead tokens, 4: failures
 #: src/Modules/RestApi/Admin/DevicesPage.php:242
 msgid "Delivered to %1$d of %2$d device(s). %3$d dead token(s) cleared, %4$d failure(s)."
 msgstr ""
@@ -1524,7 +1572,7 @@ msgstr ""
 msgid "Delivered."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:373
+#: src/Support/Admin/SettingsPage.php:381
 msgid "Deliveries per person per product"
 msgstr ""
 
@@ -1538,15 +1586,15 @@ msgstr ""
 msgid "Delivery"
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:323
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:324
 msgid "Describe the product, either by typing or by recording a voice note."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:418
+#: src/Modules/Instagram/Admin/IntakePage.php:434
 msgid "Described by"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:363
+#: src/Support/Admin/SettingsPage.php:371
 msgid "Describes the background and lighting the assistant places every product on. The product itself is never altered."
 msgstr ""
 
@@ -1559,7 +1607,7 @@ msgstr ""
 msgid "Description"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:517
+#: src/Modules/Instagram/Admin/IntakePage.php:533
 msgid "Description received"
 msgstr ""
 
@@ -1588,11 +1636,11 @@ msgstr ""
 msgid "Devices and app"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:468
+#: src/Support/Admin/SettingsPage.php:476
 msgid "Direct APK download URL"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:367
+#: src/Support/Admin/SettingsPage.php:375
 msgid "Direct message text"
 msgstr ""
 
@@ -1604,11 +1652,11 @@ msgstr ""
 msgid "Disabled: POST /signup answers 403. Turn it on under Settings → General."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:591
+#: src/Support/Admin/SettingsPage.php:599
 msgid "Disabling a module only stops it from running; its data and tables are kept."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:299
+#: src/Modules/Instagram/Admin/IntakePage.php:305
 msgid "Discard"
 msgstr ""
 
@@ -1679,6 +1727,7 @@ msgstr ""
 msgid "Duration (minutes)"
 msgstr ""
 
+#. translators: %s: link to the accounts screen
 #: src/Modules/Instagram/Admin/FunnelsPage.php:109
 msgid "Each account has its own ManyChat External Request URL, including a token that identifies it. Copy it from %s."
 msgstr ""
@@ -1691,12 +1740,12 @@ msgstr ""
 msgid "Each account talks to Manus and ManyChat with its own keys, so tenants never share a quota or a page."
 msgstr ""
 
-#: src/Modules/MultiTenant/Admin/AffiliatePage.php:76
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:125
+#: src/Modules/MultiTenant/Admin/AffiliatePage.php:76
 msgid "Earned"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:435
+#: src/Modules/Instagram/Admin/IntakePage.php:451
 #: src/Modules/MultiTenant/Admin/PlansPage.php:74
 msgid "Edit"
 msgstr ""
@@ -1713,7 +1762,7 @@ msgstr ""
 msgid "Editable marketing blocks."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:362
+#: src/Modules/Instagram/Admin/IntakePage.php:368
 msgid "Edited in the app"
 msgstr ""
 
@@ -1729,6 +1778,7 @@ msgstr ""
 msgid "Emalls feed"
 msgstr ""
 
+#. translators: %s: gateway title
 #: src/Modules/MultiTenant/Payments/PspGateway.php:41
 msgid "Enable %s"
 msgstr ""
@@ -1753,7 +1803,7 @@ msgstr ""
 msgid "Enable instalment payments"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:438
+#: src/Support/Admin/SettingsPage.php:446
 msgid "Enable master site hub"
 msgstr ""
 
@@ -1761,7 +1811,7 @@ msgstr ""
 msgid "Enable product feeds"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:456
+#: src/Support/Admin/SettingsPage.php:464
 msgid "Enable push notifications"
 msgstr ""
 
@@ -1787,7 +1837,7 @@ msgstr ""
 msgid "Enable/Disable"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:586
+#: src/Support/Admin/SettingsPage.php:594
 msgid "Enabled"
 msgstr ""
 
@@ -1799,11 +1849,11 @@ msgstr ""
 msgid "Encryption"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:411
+#: src/Support/Admin/SettingsPage.php:419
 msgid "Endpoint API key"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:408
+#: src/Support/Admin/SettingsPage.php:416
 msgid "Endpoint URL"
 msgstr ""
 
@@ -1849,6 +1899,7 @@ msgstr ""
 msgid "Enrolled courses and progress."
 msgstr ""
 
+#. translators: %s: affiliate code.
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:320
 msgid "Enrolled with code %s."
 msgstr ""
@@ -1873,7 +1924,8 @@ msgstr ""
 msgid "Error"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:354
+#. translators: %s: webhook URL
+#: src/Modules/Instagram/InstagramModule.php:355
 msgid "Every account has its own External Request URL, e.g. %s"
 msgstr ""
 
@@ -1925,6 +1977,7 @@ msgstr ""
 msgid "Expires"
 msgstr ""
 
+#. translators: %s: expiry date
 #: src/Modules/Instagram/Admin/AccountsPage.php:334
 msgid "Expires: %s UTC"
 msgstr ""
@@ -1933,6 +1986,7 @@ msgstr ""
 msgid "External id"
 msgstr ""
 
+#. translators: %s: Firebase project id
 #: src/Modules/RestApi/RestApiModule.php:275
 msgid "FCM HTTP v1 for project %s. Tokens rejected by Google are cleared automatically."
 msgstr ""
@@ -1941,17 +1995,17 @@ msgstr ""
 msgid "FCM accepted none of the tokens."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:457
+#: src/Support/Admin/SettingsPage.php:465
 msgid "FCM project id"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:458
+#: src/Support/Admin/SettingsPage.php:466
 msgid "FCM service account JSON"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/ContentPage.php:521
 #: src/Modules/Instagram/Admin/IntakePage.php:195
-#: src/Modules/Instagram/Admin/IntakePage.php:527
+#: src/Modules/Instagram/Admin/IntakePage.php:543
 msgid "Failed"
 msgstr ""
 
@@ -1975,7 +2029,7 @@ msgstr ""
 msgid "Featured stores"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:443
+#: src/Support/Admin/SettingsPage.php:451
 msgid "Featured stores on the hub"
 msgstr ""
 
@@ -2015,7 +2069,8 @@ msgstr ""
 msgid "Field pushed to ManyChat."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:606
+#. translators: %s: MIME type
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:607
 msgid "Files of type %s are not accepted here."
 msgstr ""
 
@@ -2064,7 +2119,7 @@ msgstr ""
 msgid "Followers"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:468
+#: src/Support/Admin/SettingsPage.php:476
 msgid "For distribution outside Google Play, which is the norm in Iran."
 msgstr ""
 
@@ -2076,7 +2131,7 @@ msgstr ""
 msgid "Forget a device."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:461
+#: src/Support/Admin/SettingsPage.php:469
 msgid "Forget silent devices after (days)"
 msgstr ""
 
@@ -2084,7 +2139,7 @@ msgstr ""
 msgid "Free preview"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:331
+#: src/Modules/Instagram/InstagramModule.php:332
 msgid "Free trial accounts"
 msgstr ""
 
@@ -2101,6 +2156,7 @@ msgstr ""
 msgid "Funnel"
 msgstr ""
 
+#. translators: %d: funnel id
 #: src/Modules/Instagram/Admin/FunnelsPage.php:460
 msgid "Funnel #%d created."
 msgstr ""
@@ -2171,7 +2227,7 @@ msgstr ""
 msgid "Generated media"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:452
+#: src/Support/Admin/SettingsPage.php:460
 msgid "Generated on activation. Rotating it logs every mobile client out."
 msgstr ""
 
@@ -2219,10 +2275,14 @@ msgstr ""
 msgid "Health of every enabled module, its integrations and background jobs."
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductPublisher.php:264
-msgid "Here is %1$s 🛍\nBuy it here: %2$s"
+#. translators: 1: product name, 2: link placeholder
+#: src/Modules/Instagram/Services/ProductPublisher.php:302
+msgid ""
+"Here is %1$s 🛍\n"
+"Buy it here: %2$s"
 msgstr ""
 
+#. translators: %s: link
 #: src/Modules/Instagram/Services/FunnelService.php:461
 #: src/Modules/Instagram/Services/FunnelService.php:555
 #: src/Modules/Instagram/Services/FunnelService.php:723
@@ -2263,11 +2323,11 @@ msgstr ""
 msgid "Hub API base"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:447
+#: src/Support/Admin/SettingsPage.php:455
 msgid "Hub hero description"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:446
+#: src/Support/Admin/SettingsPage.php:454
 msgid "Hub hero title"
 msgstr ""
 
@@ -2332,7 +2392,7 @@ msgstr ""
 msgid "IGBZ Instalments (BNPL)"
 msgstr ""
 
-#: src/Support/Activator.php:197
+#: src/Support/Activator.php:241
 msgid "IGBZ Instructor"
 msgstr ""
 
@@ -2344,7 +2404,7 @@ msgstr ""
 msgid "IGBZ Suite requires WooCommerce to be installed and active."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:509
+#: src/Support/Admin/SettingsPage.php:517
 msgid "IGBZ Suite settings"
 msgstr ""
 
@@ -2352,11 +2412,11 @@ msgstr ""
 msgid "IGBZ Suite status"
 msgstr ""
 
-#: src/Support/Activator.php:172
+#: src/Support/Activator.php:216
 msgid "IGBZ Tenant Owner"
 msgstr ""
 
-#: src/Support/Activator.php:191
+#: src/Support/Activator.php:235
 msgid "IGBZ Tenant Staff"
 msgstr ""
 
@@ -2368,6 +2428,7 @@ msgstr ""
 msgid "IGBZ settings"
 msgstr ""
 
+#. translators: %s: gateway title
 #: src/Modules/MultiTenant/Payments/PspGateway.php:17
 msgid "IGBZ: %s"
 msgstr ""
@@ -2387,11 +2448,11 @@ msgstr ""
 msgid "Image URL"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:521
+#: src/Modules/Instagram/Admin/IntakePage.php:537
 msgid "Image or video?"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:516
+#: src/Modules/Instagram/Admin/IntakePage.php:532
 msgid "Image ready"
 msgstr ""
 
@@ -2416,7 +2477,7 @@ msgid "Instagram"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/AccountsPage.php:56
-#: src/Modules/Instagram/InstagramModule.php:366
+#: src/Modules/Instagram/InstagramModule.php:367
 msgid "Instagram accounts"
 msgstr ""
 
@@ -2428,7 +2489,7 @@ msgstr ""
 msgid "Instagram automation"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:563
+#: src/Support/Admin/SettingsPage.php:571
 msgid "Instagram automation (Manus + ManyChat)"
 msgstr ""
 
@@ -2440,6 +2501,7 @@ msgstr ""
 msgid "Instagram content"
 msgstr ""
 
+#. translators: %s: funnel name
 #: src/Modules/Instagram/Services/FunnelService.php:858
 msgid "Instagram funnel reward: %s"
 msgstr ""
@@ -2448,10 +2510,11 @@ msgstr ""
 msgid "Instagram insights"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:461
+#: src/Modules/Instagram/Admin/IntakePage.php:477
 msgid "Instagram post"
 msgstr ""
 
+#. translators: %s: product code
 #: src/Modules/Instagram/Services/ManusService.php:387
 msgid "Instagram post: %s"
 msgstr ""
@@ -2484,6 +2547,7 @@ msgstr ""
 msgid "Instalment not found."
 msgstr ""
 
+#. translators: 1: amount, 2: due date
 #: src/Modules/RestApi/Push/NotificationService.php:94
 msgid "Instalment of %1$s is due on %2$s."
 msgstr ""
@@ -2515,6 +2579,7 @@ msgstr ""
 msgid "Instalments (BNPL)"
 msgstr ""
 
+#. translators: %s: minimum amount
 #: src/Modules/MultiTenant/Bnpl/BnplService.php:140
 msgid "Instalments require a minimum order of %s."
 msgstr ""
@@ -2573,7 +2638,7 @@ msgstr ""
 msgid "Item"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:572
+#: src/Support/Admin/SettingsPage.php:580
 msgid "JWT authentication with refresh and revocation, catalogue and account endpoints, device registration and FCM push."
 msgstr ""
 
@@ -2582,7 +2647,7 @@ msgid "JWT authentication with refresh tokens, catalogue and account endpoints f
 msgstr ""
 
 #: src/Modules/RestApi/RestApiModule.php:206
-#: src/Support/Admin/SettingsPage.php:452
+#: src/Support/Admin/SettingsPage.php:460
 msgid "JWT signing secret"
 msgstr ""
 
@@ -2658,6 +2723,7 @@ msgstr ""
 msgid "Last interaction"
 msgstr ""
 
+#. translators: %s: timestamp
 #: src/Modules/Hub/Admin/HubPage.php:124
 msgid "Last refreshed %s (UTC). Recomputed automatically on the hub sync interval."
 msgstr ""
@@ -2686,7 +2752,7 @@ msgstr ""
 msgid "Late penalty % per day"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:466
+#: src/Support/Admin/SettingsPage.php:474
 msgid "Latest app version"
 msgstr ""
 
@@ -2694,7 +2760,7 @@ msgstr ""
 msgid "Launch a full online store in minutes"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:425
+#: src/Support/Admin/SettingsPage.php:433
 msgid "Leave empty to send the key on its own, which is what X-API-KEY style headers expect."
 msgstr ""
 
@@ -2749,6 +2815,7 @@ msgstr ""
 msgid "Lifetime"
 msgstr ""
 
+#. translators: 1: credit limit, 2: score
 #: src/Modules/MultiTenant/Frontend/AccountEndpoints.php:218
 msgid "Limit %1$s · score %2$d"
 msgstr ""
@@ -2773,6 +2840,7 @@ msgstr ""
 msgid "Linked products"
 msgstr ""
 
+#. translators: %d: user id
 #: src/Modules/Instagram/Admin/SubscribersPage.php:352
 msgid "Linked to user #%d."
 msgstr ""
@@ -2785,11 +2853,11 @@ msgstr ""
 msgid "List the caller's sessions."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:501
+#: src/Modules/Instagram/Admin/IntakePage.php:517
 msgid "Listing text"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:510
+#: src/Modules/Instagram/InstagramModule.php:511
 msgid "Listing translations"
 msgstr ""
 
@@ -2797,7 +2865,7 @@ msgstr ""
 msgid "Locale"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:476
+#: src/Support/Admin/SettingsPage.php:484
 msgid "Log level"
 msgstr ""
 
@@ -2805,7 +2873,7 @@ msgstr ""
 msgid "Log only (development)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:485
+#: src/Support/Admin/SettingsPage.php:493
 msgid "Log retention (days)"
 msgstr ""
 
@@ -2817,7 +2885,7 @@ msgstr ""
 msgid "Make this the primary domain"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:522
+#: src/Modules/Instagram/Admin/IntakePage.php:538
 msgid "Making the video"
 msgstr ""
 
@@ -2839,11 +2907,11 @@ msgstr ""
 msgid "Manus (asynchronous fallback)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:401
+#: src/Support/Admin/SettingsPage.php:409
 msgid "Manus (no setup, slower)"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:296
+#: src/Modules/Instagram/InstagramModule.php:297
 msgid "Manus API"
 msgstr ""
 
@@ -2871,7 +2939,7 @@ msgstr ""
 msgid "Manus is waiting for a human answer on this task."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:404
+#: src/Support/Admin/SettingsPage.php:412
 msgid "Manus needs no configuration but answers in minutes rather than seconds because it runs as a task. A dedicated endpoint is near-instant. Whichever is chosen, Manus is the fallback if it fails."
 msgstr ""
 
@@ -2923,7 +2991,7 @@ msgstr ""
 msgid "ManyChat"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:305
+#: src/Modules/Instagram/InstagramModule.php:306
 msgid "ManyChat API"
 msgstr ""
 
@@ -2967,7 +3035,7 @@ msgstr ""
 msgid "ManyChat waits about 10 seconds. With this on the webhook answers instantly and the link is pushed back with setCustomField + sendFlow."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:349
+#: src/Modules/Instagram/InstagramModule.php:350
 msgid "ManyChat webhook"
 msgstr ""
 
@@ -3006,7 +3074,7 @@ msgstr ""
 
 #: src/Modules/Hub/Admin/HubPage.php:67
 #: src/Modules/Hub/HubModule.php:45
-#: src/Support/Admin/SettingsPage.php:567
+#: src/Support/Admin/SettingsPage.php:575
 msgid "Master site hub"
 msgstr ""
 
@@ -3090,7 +3158,7 @@ msgstr ""
 msgid "Minimum payout amount"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:343
+#: src/Support/Admin/SettingsPage.php:351
 msgid "Minimum photo score"
 msgstr ""
 
@@ -3098,7 +3166,7 @@ msgstr ""
 msgid "Minimum single top-up"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:467
+#: src/Support/Admin/SettingsPage.php:475
 msgid "Minimum supported app version"
 msgstr ""
 
@@ -3123,6 +3191,7 @@ msgstr ""
 msgid "Missing settings"
 msgstr ""
 
+#. translators: %s: comma separated table names.
 #: src/Support/Admin/StatusPage.php:258
 msgid "Missing tables: %s. Deactivate and reactivate the plugin."
 msgstr ""
@@ -3135,7 +3204,7 @@ msgstr ""
 msgid "Mobile API"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:571
+#: src/Support/Admin/SettingsPage.php:579
 msgid "Mobile REST API"
 msgstr ""
 
@@ -3147,7 +3216,7 @@ msgstr ""
 msgid "Mobile number"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:412
+#: src/Support/Admin/SettingsPage.php:420
 msgid "Model"
 msgstr ""
 
@@ -3160,7 +3229,7 @@ msgstr ""
 msgid "Modules"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:603
+#: src/Support/Admin/SettingsPage.php:611
 msgid "Modules updated. Reload any open admin screen to see the new menus."
 msgstr ""
 
@@ -3172,16 +3241,16 @@ msgstr ""
 msgid "Monthly recurring"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:439
+#: src/Support/Admin/SettingsPage.php:447
 msgid "Mother site origin"
 msgstr ""
 
 #: src/Modules/MultiTenant/MultiTenantModule.php:39
-#: src/Support/Admin/SettingsPage.php:559
+#: src/Support/Admin/SettingsPage.php:567
 msgid "Multi-tenant stores"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:459
+#: src/Support/Admin/SettingsPage.php:467
 msgid "Must match a channel the app creates, otherwise Android silently drops the notification."
 msgstr ""
 
@@ -3211,11 +3280,11 @@ msgstr ""
 msgid "New plan"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:351
+#: src/Support/Admin/SettingsPage.php:359
 msgid "New products are"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:444
+#: src/Support/Admin/SettingsPage.php:452
 msgid "New stores get {slug}.{base}. Leave empty to use path prefixes instead."
 msgstr ""
 
@@ -3239,6 +3308,7 @@ msgstr ""
 msgid "NextPay API key"
 msgstr ""
 
+#. translators: 1: amount confirmed by the gateway, 2: expected amount
 #: src/Modules/MultiTenant/Payments/NextPayGateway.php:122
 msgid "NextPay confirmed %1$s Rial but the payment was for %2$s Rial."
 msgstr ""
@@ -3251,6 +3321,7 @@ msgstr ""
 msgid "NextPay enabled"
 msgstr ""
 
+#. translators: %d: gateway result code
 #: src/Modules/MultiTenant/Payments/NextPayGateway.php:167
 msgid "NextPay rejected the request (code %d)."
 msgstr ""
@@ -3284,15 +3355,15 @@ msgstr ""
 msgid "No account has a usable ManyChat API key — subscriber profiles cannot be refreshed from the API."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:481
+#: src/Modules/Instagram/InstagramModule.php:482
 msgid "No active Instagram account, so the assistant has no API key to work with and registrations will fail at the photo check. Add one under IGBZ → IG Accounts."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:302
+#: src/Modules/Instagram/InstagramModule.php:303
 msgid "No active account has a usable Manus key; content generation and publishing are disabled."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:307
+#: src/Modules/Instagram/InstagramModule.php:308
 msgid "No active account has a usable ManyChat key; subscriber lookups and flow sending are disabled."
 msgstr ""
 
@@ -3352,7 +3423,7 @@ msgstr ""
 msgid "No daily series stored yet."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:589
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:590
 #: src/Modules/RestApi/Controllers/StoreAdminController.php:500
 msgid "No file was uploaded."
 msgstr ""
@@ -3397,7 +3468,8 @@ msgstr ""
 msgid "No movements recorded."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:526
+#. translators: %s: comma separated language codes
+#: src/Modules/Instagram/InstagramModule.php:527
 msgid "No multilingual plugin, so translations into %s are stored on each product and can be turned into real products later."
 msgstr ""
 
@@ -3542,7 +3614,7 @@ msgstr ""
 msgid "Notify N days before renewal"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:460
+#: src/Support/Admin/SettingsPage.php:468
 msgid "Notify on order status changes"
 msgstr ""
 
@@ -3555,7 +3627,7 @@ msgstr ""
 msgid "OTP"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:491
+#: src/Support/Admin/SettingsPage.php:499
 msgid "Off by default. When on, deleting the plugin drops every IGBZ table."
 msgstr ""
 
@@ -3575,7 +3647,7 @@ msgstr ""
 msgid "Offer wallet at checkout"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:467
+#: src/Support/Admin/SettingsPage.php:475
 msgid "Older builds get a forced-update screen from /app/config."
 msgstr ""
 
@@ -3631,7 +3703,7 @@ msgstr ""
 msgid "Only commissions older than the hold period configured in Settings are paid."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:382
+#: src/Support/Admin/SettingsPage.php:390
 msgid "Only needed when no multilingual plugin is installed. With Polylang or WPML active the language list is read from them and real translated products are created. Without one, translations are stored on the product and turned into real products the day you install a plugin."
 msgstr ""
 
@@ -3655,14 +3727,14 @@ msgstr ""
 msgid "Open"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:465
+#: src/Modules/Instagram/Admin/IntakePage.php:481
 msgid "Open in the content queue"
 msgstr ""
 
 #: src/Modules/Instagram/Services/FunnelService.php:586
 #: src/Modules/Instagram/Services/FunnelService.php:758
 #: src/Modules/Instagram/Webhooks/ManyChatWebhook.php:193
-#: src/Support/Activator.php:328
+#: src/Support/Activator.php:373
 msgid "Open the link"
 msgstr ""
 
@@ -3714,10 +3786,12 @@ msgstr ""
 msgid "Order"
 msgstr ""
 
+#. translators: 1: order number, 2: order status
 #: src/Modules/RestApi/Push/NotificationService.php:66
 msgid "Order %1$s is now \"%2$s\"."
 msgstr ""
 
+#. translators: %s: order number
 #: src/Modules/MultiTenant/Payments/PspGateway.php:93
 msgid "Order %s"
 msgstr ""
@@ -3753,16 +3827,16 @@ msgstr ""
 msgid "Orders"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:386
+#: src/Support/Admin/SettingsPage.php:394
 msgid "Original language"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:486
+#: src/Support/Admin/SettingsPage.php:494
 msgid "Outbound HTTP timeout (seconds)"
 msgstr ""
 
-#: src/Modules/MultiTenant/Admin/BnplPage.php:71
 #: src/Modules/MultiTenant/Admin/BnplPage.php:199
+#: src/Modules/MultiTenant/Admin/BnplPage.php:71
 msgid "Outstanding"
 msgstr ""
 
@@ -3812,6 +3886,7 @@ msgstr ""
 msgid "Paid"
 msgstr ""
 
+#. translators: 1: amount, 2: remaining balance
 #: src/Modules/MultiTenant/Wallet/WalletGateway.php:124
 msgid "Paid %1$s from IGBZ wallet. Remaining balance: %2$s"
 msgstr ""
@@ -3830,6 +3905,7 @@ msgstr ""
 msgid "Paid out"
 msgstr ""
 
+#. translators: 1: gateway id, 2: reference id
 #: src/Modules/MultiTenant/Payments/PaymentService.php:257
 msgid "Paid via %1$s. Reference: %2$s"
 msgstr ""
@@ -3860,7 +3936,7 @@ msgstr ""
 msgid "Paste into the External Request action of your ManyChat comment flow. The token identifies this account — do not share it."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:458
+#: src/Support/Admin/SettingsPage.php:466
 msgid "Paste the whole service account JSON. Stored encrypted, never written to disk."
 msgstr ""
 
@@ -3907,6 +3983,7 @@ msgstr ""
 msgid "Pay.ir API key"
 msgstr ""
 
+#. translators: 1: amount confirmed by the gateway, 2: expected amount
 #: src/Modules/MultiTenant/Payments/PayirGateway.php:134
 msgid "Pay.ir confirmed %1$s Rial but the payment was for %2$s Rial."
 msgstr ""
@@ -3927,6 +4004,7 @@ msgstr ""
 msgid "Pay.ir rejected the payment request."
 msgstr ""
 
+#. translators: %s: minimum amount in Rial
 #: src/Modules/MultiTenant/Payments/PayirGateway.php:63
 msgid "Pay.ir requires at least %s Rial."
 msgstr ""
@@ -3951,6 +4029,7 @@ msgstr ""
 msgid "Payment record not found."
 msgstr ""
 
+#. translators: %s: error
 #: src/Modules/MultiTenant/Payments/PspGateway.php:102
 msgid "Payment request failed: %s"
 msgstr ""
@@ -3970,6 +4049,7 @@ msgstr ""
 msgid "Peak hours"
 msgstr ""
 
+#. translators: %s: comma separated hours
 #: src/Modules/Instagram/Admin/InsightsPage.php:316
 msgid "Peak hours saved: %s"
 msgstr ""
@@ -4005,28 +4085,29 @@ msgstr ""
 msgid "Photo"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:513
+#: src/Modules/Instagram/Admin/IntakePage.php:529
 msgid "Photo accepted"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:411
+#: src/Modules/Instagram/Admin/IntakePage.php:427
 msgid "Photo attempts"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:393
+#. translators: %d: score out of 100
+#: src/Modules/Instagram/Admin/IntakePage.php:399
 msgid "Photo notes (scored %d)."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:510
+#: src/Modules/Instagram/Admin/IntakePage.php:526
 msgid "Photo received"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/IntakePage.php:184
-#: src/Modules/Instagram/Admin/IntakePage.php:512
+#: src/Modules/Instagram/Admin/IntakePage.php:528
 msgid "Photo refused"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:347
+#: src/Support/Admin/SettingsPage.php:355
 msgid "Photos scoring below this are sent back with the reasons so the shopkeeper can retake them. Raise it for a stricter catalogue, lower it if too many honest photos are being refused."
 msgstr ""
 
@@ -4055,13 +4136,14 @@ msgstr ""
 msgid "Plain permalinks: webhook URLs fall back to ?rest_route=."
 msgstr ""
 
-#: src/Modules/MultiTenant/Admin/PlansPage.php:84
 #: src/Modules/MultiTenant/Admin/PlansPage.php:206
+#: src/Modules/MultiTenant/Admin/PlansPage.php:84
 #: src/Modules/MultiTenant/Admin/TenantsPage.php:129
 #: src/Modules/MultiTenant/Admin/TenantsPage.php:187
 msgid "Plan"
 msgstr ""
 
+#. translators: 1: contract id, 2: status
 #: src/Modules/MultiTenant/Frontend/AccountEndpoints.php:238
 msgid "Plan #%1$d — %2$s"
 msgstr ""
@@ -4099,11 +4181,13 @@ msgstr ""
 msgid "Please wait before requesting another code."
 msgstr ""
 
+#. translators: 1: domain, 2: CNAME target, 3: verification token
 #: src/Modules/Hub/Services/DomainVerifier.php:125
 msgid "Point %1$s with a CNAME record to %2$s, or add a TXT record on _igbz-verify.%1$s with the value %3$s."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:515
+#. translators: %s: comma separated language codes
+#: src/Modules/Instagram/InstagramModule.php:516
 msgid "Polylang detected. Real translated products are created and linked for: %s"
 msgstr ""
 
@@ -4128,12 +4212,12 @@ msgstr ""
 msgid "Post link"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:525
+#: src/Modules/Instagram/Admin/IntakePage.php:541
 msgid "Post scheduled"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/IntakePage.php:194
-#: src/Modules/Instagram/Admin/IntakePage.php:526
+#: src/Modules/Instagram/Admin/IntakePage.php:542
 msgid "Posted"
 msgstr ""
 
@@ -4141,11 +4225,11 @@ msgstr ""
 msgid "Posts to plan per week"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:361
+#: src/Modules/Instagram/Admin/IntakePage.php:367
 msgid "Prepared"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:514
+#: src/Modules/Instagram/Admin/IntakePage.php:530
 msgid "Preparing the image"
 msgstr ""
 
@@ -4157,9 +4241,9 @@ msgstr ""
 msgid "Preview"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:413
-#: src/Modules/MultiTenant/Admin/PlansPage.php:85
+#: src/Modules/Instagram/Admin/IntakePage.php:429
 #: src/Modules/MultiTenant/Admin/PlansPage.php:110
+#: src/Modules/MultiTenant/Admin/PlansPage.php:85
 msgid "Price"
 msgstr ""
 
@@ -4181,13 +4265,14 @@ msgid "Principal"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/IntakePage.php:231
-#: src/Modules/Instagram/Admin/IntakePage.php:431
+#: src/Modules/Instagram/Admin/IntakePage.php:447
 #: src/Modules/MultiTenant/Admin/LmsPage.php:116
 #: src/Modules/MultiTenant/Admin/PaymentsPage.php:305
 msgid "Product"
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductPublisher.php:274
+#. translators: %s: product code
+#: src/Modules/Instagram/Services/ProductPublisher.php:312
 msgid "Product %s"
 msgstr ""
 
@@ -4196,22 +4281,15 @@ msgstr ""
 msgid "Product ID"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:409
-msgid "Product code"
-msgstr ""
-
-#: src/Support/Admin/SettingsPage.php:337
-msgid "Product code prefix"
-msgstr ""
-
-#: src/Modules/Instagram/Admin/IntakePage.php:520
+#: src/Modules/Instagram/Admin/IntakePage.php:536
 msgid "Product created"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:361
+#: src/Support/Admin/SettingsPage.php:369
 msgid "Product image style"
 msgstr ""
 
+#. translators: %s: product name
 #: src/Modules/Instagram/Services/ManusService.php:334
 msgid "Product image: %s"
 msgstr ""
@@ -4220,6 +4298,7 @@ msgstr ""
 msgid "Product list with filters and paging."
 msgstr ""
 
+#. translators: %s: product name
 #: src/Modules/Instagram/Services/ManusService.php:352
 msgid "Product listing: %s"
 msgstr ""
@@ -4238,7 +4317,7 @@ msgstr ""
 msgid "Product photo check"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:461
+#: src/Modules/Instagram/InstagramModule.php:462
 #: src/Support/Admin/SettingsPage.php:59
 msgid "Product registration"
 msgstr ""
@@ -4247,6 +4326,7 @@ msgstr ""
 msgid "Product registrations"
 msgstr ""
 
+#. translators: %s: product code
 #: src/Modules/Instagram/Services/ManusService.php:371
 msgid "Product video: %s"
 msgstr ""
@@ -4289,6 +4369,7 @@ msgstr ""
 msgid "Provider status"
 msgstr ""
 
+#. translators: %s: error
 #: src/Modules/Instagram/Admin/ContentPage.php:481
 msgid "Publish failed: %s"
 msgstr ""
@@ -4314,7 +4395,7 @@ msgstr ""
 msgid "Published at"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:354
+#: src/Support/Admin/SettingsPage.php:362
 msgid "Published immediately"
 msgstr ""
 
@@ -4389,6 +4470,7 @@ msgstr ""
 msgid "Queue content"
 msgstr ""
 
+#. translators: 1: slots, 2: task id
 #: src/Modules/Instagram/Admin/AccountsPage.php:556
 msgid "Queued %1$d drafts. Manus research task: %2$s"
 msgstr ""
@@ -4530,7 +4612,7 @@ msgstr ""
 msgid "Refresh now"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:454
+#: src/Support/Admin/SettingsPage.php:462
 msgid "Refresh token TTL (seconds)"
 msgstr ""
 
@@ -4559,7 +4641,7 @@ msgstr ""
 msgid "Registration discarded."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:479
+#: src/Modules/Instagram/InstagramModule.php:480
 msgid "Registration prerequisites"
 msgstr ""
 
@@ -4612,11 +4694,11 @@ msgstr ""
 msgid "Reply text"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:433
+#: src/Support/Admin/SettingsPage.php:441
 msgid "Request timeout (seconds)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:455
+#: src/Support/Admin/SettingsPage.php:463
 msgid "Requests per minute per token"
 msgstr ""
 
@@ -4632,6 +4714,7 @@ msgstr ""
 msgid "Resumed at the editor. Continue in the app."
 msgstr ""
 
+#. translators: %d: number of hits
 #: src/Modules/Instagram/Admin/FunnelsPage.php:498
 msgid "Retried %d undelivered hits."
 msgstr ""
@@ -4640,7 +4723,7 @@ msgstr ""
 msgid "Retries"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:292
+#: src/Modules/Instagram/Admin/IntakePage.php:298
 msgid "Retry"
 msgstr ""
 
@@ -4701,6 +4784,10 @@ msgstr ""
 msgid "Run pipeline now"
 msgstr ""
 
+#: src/Support/Admin/SettingsPage.php:337
+msgid "SKU prefix"
+msgstr ""
+
 #: src/Modules/MultiTenant/MultiTenantModule.php:301
 #: src/Support/Admin/SettingsPage.php:244
 msgid "SMS provider"
@@ -4726,7 +4813,7 @@ msgstr ""
 msgid "Save block"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:525
+#: src/Support/Admin/SettingsPage.php:533
 msgid "Save changes"
 msgstr ""
 
@@ -4742,7 +4829,7 @@ msgstr ""
 msgid "Save funnel"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:355
+#: src/Support/Admin/SettingsPage.php:363
 msgid "Saved as drafts for review"
 msgstr ""
 
@@ -4750,7 +4837,7 @@ msgstr ""
 msgid "Saves"
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:446
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:447
 msgid "Say or type what the video should show."
 msgstr ""
 
@@ -4775,6 +4862,7 @@ msgstr ""
 msgid "Scheduled for"
 msgstr ""
 
+#. translators: %s: date
 #: src/Modules/Instagram/Admin/ContentPage.php:497
 msgid "Scheduled for %s."
 msgstr ""
@@ -4792,6 +4880,7 @@ msgstr ""
 msgid "Search courses"
 msgstr ""
 
+#. translators: %d: seconds
 #: src/Modules/Hub/HubModule.php:193
 msgid "Secret present. Tickets expire after %d seconds and are single use."
 msgstr ""
@@ -4835,8 +4924,8 @@ msgstr ""
 msgid "Send a test push to the caller."
 msgstr ""
 
-#: src/Modules/MultiTenant/Frontend/ShortCodes.php:44
 #: src/Modules/MultiTenant/Frontend/ShortCodes.php:425
+#: src/Modules/MultiTenant/Frontend/ShortCodes.php:44
 msgid "Send code"
 msgstr ""
 
@@ -4864,7 +4953,7 @@ msgstr ""
 msgid "Sent to the publisher."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:369
+#: src/Support/Admin/SettingsPage.php:377
 msgid "Sent when somebody comments a product code. Use {link} for the purchase link and {coupon} for a coupon. Leave empty for the default."
 msgstr ""
 
@@ -4900,7 +4989,7 @@ msgstr ""
 msgid "Settings &rarr; API in ManyChat, Pro required. A ManyChat key drives one page only, so this is the trial page; every other account needs its own key."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:634
+#: src/Support/Admin/SettingsPage.php:642
 msgid "Settings saved."
 msgstr ""
 
@@ -4920,7 +5009,7 @@ msgstr ""
 msgid "Shares"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:394
+#: src/Support/Admin/SettingsPage.php:402
 msgid "Shopkeepers can dictate the product description and the video brief instead of typing."
 msgstr ""
 
@@ -4928,7 +5017,7 @@ msgstr ""
 msgid "Shopkeepers photograph a product in the app and the assistant does the rest. No product is ever created through the WooCommerce admin."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:453
+#: src/Support/Admin/SettingsPage.php:461
 msgid "Short lived on purpose; the original issued 30 day tokens with no revocation."
 msgstr ""
 
@@ -4936,7 +5025,7 @@ msgstr ""
 msgid "Show"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:445
+#: src/Support/Admin/SettingsPage.php:453
 msgid "Shown to store owners and checked during domain verification."
 msgstr ""
 
@@ -4976,14 +5065,14 @@ msgstr ""
 msgid "Signed video links"
 msgstr ""
 
-#: src/Modules/MultiTenant/Admin/AffiliatePage.php:75
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:124
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:167
+#: src/Modules/MultiTenant/Admin/AffiliatePage.php:75
 #: src/Modules/MultiTenant/Frontend/AccountEndpoints.php:384
 msgid "Signups"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:529
+#: src/Modules/Instagram/InstagramModule.php:530
 msgid "Single language store; listings are written once."
 msgstr ""
 
@@ -5023,7 +5112,7 @@ msgstr ""
 msgid "Space separated. The # is added automatically when missing."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:398
+#: src/Support/Admin/SettingsPage.php:406
 msgid "Speech-to-text engine"
 msgstr ""
 
@@ -5035,7 +5124,7 @@ msgstr ""
 msgid "Split your order into equal payments."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:413
+#: src/Support/Admin/SettingsPage.php:421
 msgid "Spoken language"
 msgstr ""
 
@@ -5048,7 +5137,7 @@ msgid "Staff members"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/IntakePage.php:232
-#: src/Modules/Instagram/Admin/IntakePage.php:410
+#: src/Modules/Instagram/Admin/IntakePage.php:426
 msgid "Stage"
 msgstr ""
 
@@ -5096,11 +5185,12 @@ msgstr ""
 msgid "Status"
 msgstr ""
 
+#. translators: %s: error
 #: src/Modules/Instagram/Admin/IntakePage.php:109
 msgid "Still failing: %s"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:416
+#: src/Modules/Instagram/Admin/IntakePage.php:432
 msgid "Stock"
 msgstr ""
 
@@ -5158,7 +5248,7 @@ msgstr ""
 msgid "Students"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:444
+#: src/Support/Admin/SettingsPage.php:452
 msgid "Sub-domain base"
 msgstr ""
 
@@ -5170,7 +5260,7 @@ msgstr ""
 msgid "Subject to credit approval at checkout."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:356
+#: src/Support/Admin/SettingsPage.php:364
 msgid "Submitted for review"
 msgstr ""
 
@@ -5239,7 +5329,7 @@ msgstr ""
 msgid "Suspended"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:494
+#: src/Modules/Instagram/InstagramModule.php:495
 msgid "Switched off. Shopkeepers must type the product description."
 msgstr ""
 
@@ -5248,6 +5338,7 @@ msgstr ""
 msgid "Sync"
 msgstr ""
 
+#. translators: %s: status
 #: src/Modules/Instagram/Admin/ContentPage.php:472
 msgid "Sync finished with status: %s"
 msgstr ""
@@ -5284,10 +5375,12 @@ msgstr ""
 msgid "Task poll interval (seconds)"
 msgstr ""
 
+#. translators: 1: tasks used, 2: task quota
 #: src/Modules/Instagram/Admin/AccountsPage.php:322
 msgid "Tasks used: %1$d of %2$d"
 msgstr ""
 
+#. translators: %d: number of tasks already used
 #: src/Modules/Instagram/Admin/AccountsPage.php:312
 msgid "Tasks used: %d (no task limit, the expiry date applies)"
 msgstr ""
@@ -5310,8 +5403,8 @@ msgstr ""
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:283
 #: src/Modules/MultiTenant/Admin/BnplPage.php:321
 #: src/Modules/MultiTenant/Admin/LmsPage.php:151
-#: src/Modules/MultiTenant/Admin/WalletPage.php:77
 #: src/Modules/MultiTenant/Admin/WalletPage.php:106
+#: src/Modules/MultiTenant/Admin/WalletPage.php:77
 msgid "Tenant id"
 msgstr ""
 
@@ -5339,7 +5432,7 @@ msgstr ""
 msgid "Tenants"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:560
+#: src/Support/Admin/SettingsPage.php:568
 msgid "Tenants, wallet, subscription plans, BNPL, affiliate, LMS, payment gateways, OTP and marketplace feeds."
 msgstr ""
 
@@ -5376,12 +5469,12 @@ msgstr ""
 msgid "That plan still has active subscriptions; deactivate it instead."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:672
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:673
 msgid "That registration belongs to another store."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:341
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:667
+#: src/Modules/Instagram/Admin/IntakePage.php:347
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:668
 msgid "That registration does not exist."
 msgstr ""
 
@@ -5492,7 +5585,7 @@ msgstr ""
 msgid "The assistant did not accept the image preparation task."
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductIntakeService.php:640
+#: src/Modules/Instagram/Services/ProductIntakeService.php:642
 msgid "The assistant did not accept the listing task."
 msgstr ""
 
@@ -5500,15 +5593,15 @@ msgstr ""
 msgid "The assistant did not accept the photo check."
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductIntakeService.php:906
+#: src/Modules/Instagram/Services/ProductIntakeService.php:920
 msgid "The assistant did not accept the post composition task."
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductIntakeService.php:813
+#: src/Modules/Instagram/Services/ProductIntakeService.php:827
 msgid "The assistant did not accept the video task."
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductIntakeService.php:669
+#: src/Modules/Instagram/Services/ProductIntakeService.php:671
 msgid "The assistant did not return a usable listing."
 msgstr ""
 
@@ -5520,6 +5613,7 @@ msgstr ""
 msgid "The assistant is waiting for an answer it cannot get automatically."
 msgstr ""
 
+#. translators: %s: reason the task stopped
 #: src/Modules/Instagram/Webhooks/ManusWebhook.php:195
 msgid "The assistant stopped: %s"
 msgstr ""
@@ -5557,11 +5651,12 @@ msgstr ""
 msgid "The code is incorrect."
 msgstr ""
 
+#. translators: %s: course title
 #: src/Modules/RestApi/Push/NotificationService.php:179
 msgid "The course \"%s\" is now available in your library."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:392
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:393
 msgid "The description has not been saved yet."
 msgstr ""
 
@@ -5593,16 +5688,21 @@ msgstr ""
 msgid "The listing is being written again."
 msgstr ""
 
+#. translators: %s: minimum amount
 #: src/Modules/RestApi/Controllers/AccountController.php:253
 msgid "The minimum top-up is %s."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:418
+#: src/Support/Admin/SettingsPage.php:426
 msgid "The multipart field the service expects the recording under. Whisper uses \"file\"; some services use \"audio\"."
 msgstr ""
 
 #: src/Modules/RestApi/Admin/DevicesPage.php:448
 msgid "The notification could not be sent."
+msgstr ""
+
+#: src/Support/Admin/SettingsPage.php:347
+msgid "The number customers comment to get the purchase link is the product ID, padded to this many digits — product 47 becomes 0047. Digits are used because they are easy to type on a Persian keyboard. Four is the minimum: shorter codes get typed under posts by accident and would send links to people who never asked."
 msgstr ""
 
 #: src/Modules/Instagram/Admin/ContentPage.php:489
@@ -5634,7 +5734,7 @@ msgstr ""
 msgid "The phone number is not valid."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:202
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:203
 msgid "The photo could not be registered."
 msgstr ""
 
@@ -5646,7 +5746,8 @@ msgstr ""
 msgid "The photo is not clear enough to build a product listing on. Shoot it again in better light, with the whole product in frame against a plain background."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:388
+#. translators: %d: score out of 100
+#: src/Modules/Instagram/Admin/IntakePage.php:394
 msgid "The photo was refused (scored %d)."
 msgstr ""
 
@@ -5654,15 +5755,15 @@ msgstr ""
 msgid "The plan needs a name."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:517
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:518
 msgid "The post has not been composed yet."
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductPublisher.php:58
+#: src/Modules/Instagram/Services/ProductPublisher.php:62
 msgid "The product could not be created."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:483
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:484
 msgid "The product has to exist before its post can be composed."
 msgstr ""
 
@@ -5702,6 +5803,7 @@ msgstr ""
 msgid "The single free request has been used. Switch to your own API keys to keep going."
 msgstr ""
 
+#. translators: %d: HTTP status
 #: src/Modules/Instagram/Speech/HttpSpeechToText.php:113
 msgid "The speech-to-text service answered HTTP %d."
 msgstr ""
@@ -5738,7 +5840,7 @@ msgstr ""
 msgid "The transaction was sent to the bank and is awaiting the customer."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:613
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:614
 #: src/Modules/RestApi/Controllers/StoreAdminController.php:512
 msgid "The upload failed."
 msgstr ""
@@ -5751,7 +5853,7 @@ msgstr ""
 msgid "The username or password is incorrect."
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductIntakeService.php:848
+#: src/Modules/Instagram/Services/ProductIntakeService.php:862
 msgid "The video task finished without producing a video file."
 msgstr ""
 
@@ -5783,11 +5885,11 @@ msgstr ""
 msgid "There is no description to build the listing from."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:464
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:465
 msgid "There is no finished video waiting for approval."
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductPublisher.php:50
+#: src/Modules/Instagram/Services/ProductPublisher.php:54
 msgid "There is no listing text to create the product from."
 msgstr ""
 
@@ -5835,11 +5937,11 @@ msgstr ""
 msgid "This product belongs to another store."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:173
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:174
 msgid "This registration already created a product, so it cannot be discarded."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:228
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:229
 msgid "This registration already created a product; start a new one instead."
 msgstr ""
 
@@ -5858,8 +5960,8 @@ msgstr ""
 #: src/Modules/Instagram/Services/ProductIntakeService.php:260
 #: src/Modules/Instagram/Services/ProductIntakeService.php:363
 #: src/Modules/Instagram/Services/ProductIntakeService.php:616
-#: src/Modules/Instagram/Services/ProductIntakeService.php:795
-#: src/Modules/Instagram/Services/ProductIntakeService.php:888
+#: src/Modules/Instagram/Services/ProductIntakeService.php:807
+#: src/Modules/Instagram/Services/ProductIntakeService.php:902
 msgid "This store has no Instagram account configured, so the assistant cannot be reached."
 msgstr ""
 
@@ -5969,6 +6071,7 @@ msgstr ""
 msgid "Total"
 msgstr ""
 
+#. translators: 1: total, 2: outstanding
 #: src/Modules/MultiTenant/Frontend/AccountEndpoints.php:246
 msgid "Total %1$s · outstanding %2$s"
 msgstr ""
@@ -5990,11 +6093,11 @@ msgstr ""
 msgid "Total payable"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:518
+#: src/Modules/Instagram/Admin/IntakePage.php:534
 msgid "Transcribing the voice note"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:429
+#: src/Support/Admin/SettingsPage.php:437
 msgid "Transcript field"
 msgstr ""
 
@@ -6002,11 +6105,11 @@ msgstr ""
 msgid "Transcription through Manus needs an Instagram account for its API key."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:380
+#: src/Support/Admin/SettingsPage.php:388
 msgid "Translate listings into"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:485
+#: src/Modules/Instagram/Admin/IntakePage.php:501
 msgid "Translations"
 msgstr ""
 
@@ -6018,8 +6121,8 @@ msgstr ""
 msgid "Trial"
 msgstr ""
 
-#: src/Modules/MultiTenant/Admin/PlansPage.php:86
 #: src/Modules/MultiTenant/Admin/PlansPage.php:131
+#: src/Modules/MultiTenant/Admin/PlansPage.php:86
 msgid "Trial days"
 msgstr ""
 
@@ -6051,7 +6154,7 @@ msgstr ""
 msgid "Type-ahead suggestions."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:421
+#: src/Modules/Instagram/Admin/IntakePage.php:437
 msgid "Typing"
 msgstr ""
 
@@ -6059,7 +6162,7 @@ msgstr ""
 msgid "UTC, format YYYY-MM-DD HH:MM:SS. Leave empty for no trial."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:463
+#: src/Support/Admin/SettingsPage.php:471
 msgid "Universal / App Link base URL"
 msgstr ""
 
@@ -6141,11 +6244,12 @@ msgstr ""
 msgid "Uses the store account credentials."
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:496
+#. translators: %s: engine name
+#: src/Modules/Instagram/InstagramModule.php:497
 msgid "Using %s."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:440
+#: src/Support/Admin/SettingsPage.php:448
 msgid "VIP link TTL (seconds)"
 msgstr ""
 
@@ -6153,7 +6257,7 @@ msgstr ""
 msgid "VIP link signing"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:441
+#: src/Support/Admin/SettingsPage.php:449
 msgid "VIP link signing secret"
 msgstr ""
 
@@ -6161,6 +6265,7 @@ msgstr ""
 msgid "VIP links"
 msgstr ""
 
+#. translators: %d: seconds
 #: src/Modules/Hub/Admin/HubPage.php:368
 msgid "Valid for %d seconds and single use."
 msgstr ""
@@ -6186,11 +6291,11 @@ msgstr ""
 msgid "Verifying…"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:472
+#: src/Modules/Instagram/Admin/IntakePage.php:488
 msgid "Video"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:523
+#: src/Modules/Instagram/Admin/IntakePage.php:539
 msgid "Video awaiting approval"
 msgstr ""
 
@@ -6204,7 +6309,7 @@ msgid "Video signing secret"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/ContentPage.php:208
-#: src/Modules/Instagram/Admin/IntakePage.php:437
+#: src/Modules/Instagram/Admin/IntakePage.php:453
 msgid "View"
 msgstr ""
 
@@ -6216,15 +6321,15 @@ msgstr ""
 msgid "Visible without enrollment"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:420
+#: src/Modules/Instagram/Admin/IntakePage.php:436
 msgid "Voice"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:491
+#: src/Modules/Instagram/InstagramModule.php:492
 msgid "Voice input"
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/ProductIntakeController.php:540
+#: src/Modules/RestApi/Controllers/ProductIntakeController.php:541
 msgid "Voice input is switched off for this store."
 msgstr ""
 
@@ -6236,11 +6341,12 @@ msgstr ""
 msgid "Volume"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:520
+#. translators: %s: comma separated language codes
+#: src/Modules/Instagram/InstagramModule.php:521
 msgid "WPML detected. Real translated products are created and linked for: %s"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:515
+#: src/Modules/Instagram/Admin/IntakePage.php:531
 msgid "Waiting in the editor"
 msgstr ""
 
@@ -6285,7 +6391,15 @@ msgstr ""
 msgid "Wallet, cashback and instalment payments"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:476
+#: src/Modules/Instagram/Admin/IntakePage.php:423
+msgid "Warehouse SKU"
+msgstr ""
+
+#: src/Support/Admin/SettingsPage.php:339
+msgid "Warehouse SKUs look like IGBZ-4F2K. This is the inventory code on invoices and packing lists — customers never see it."
+msgstr ""
+
+#: src/Modules/Instagram/Admin/IntakePage.php:492
 msgid "Watch"
 msgstr ""
 
@@ -6305,6 +6419,7 @@ msgstr ""
 msgid "Website clicks"
 msgstr ""
 
+#. translators: 1: niche, 2: slot number
 #: src/Modules/Instagram/Admin/AccountsPage.php:542
 msgid "Weekly plan for %1$s — slot %2$d"
 msgstr ""
@@ -6317,7 +6432,7 @@ msgstr ""
 msgid "What the piece is about."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:424
+#: src/Modules/Instagram/Admin/IntakePage.php:440
 msgid "What the shopkeeper said"
 msgstr ""
 
@@ -6326,7 +6441,7 @@ msgstr ""
 msgid "When"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:431
+#: src/Support/Admin/SettingsPage.php:439
 msgid "Where the transcript sits in the reply, dotted for nested values. Leave empty and the usual field names are tried."
 msgstr ""
 
@@ -6334,7 +6449,7 @@ msgstr ""
 msgid "Which sign-in methods this store offers."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:462
+#: src/Support/Admin/SettingsPage.php:470
 msgid "Without \"://\". Used to build igbz://products/42 style links."
 msgstr ""
 
@@ -6347,7 +6462,7 @@ msgstr ""
 msgid "WooCommerce"
 msgstr ""
 
-#: src/Modules/Instagram/Services/ProductPublisher.php:53
+#: src/Modules/Instagram/Services/ProductPublisher.php:57
 msgid "WooCommerce is not active, so no product can be created."
 msgstr ""
 
@@ -6373,7 +6488,7 @@ msgstr ""
 msgid "Write the learned hours onto the account"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:519
+#: src/Modules/Instagram/Admin/IntakePage.php:535
 msgid "Writing the listing"
 msgstr ""
 
@@ -6403,7 +6518,7 @@ msgstr ""
 
 #: src/Modules/Instagram/Webhooks/ManyChatWebhook.php:153
 #: src/Modules/Instagram/Webhooks/ManyChatWebhook.php:172
-#: src/Support/Activator.php:329
+#: src/Support/Activator.php:374
 msgid "You have already received this link."
 msgstr ""
 
@@ -6443,6 +6558,7 @@ msgstr ""
 msgid "You will be redirected to the payment gateway to complete your purchase."
 msgstr ""
 
+#. translators: %s: available credit
 #: src/Modules/MultiTenant/Bnpl/BnplService.php:169
 msgid "Your available instalment credit is %s."
 msgstr ""
@@ -6479,6 +6595,7 @@ msgstr ""
 msgid "Your own domain, your own theme, wallet, instalments and Iranian payment gateways out of the box."
 msgstr ""
 
+#. translators: %s: amount
 #: src/Modules/RestApi/Push/NotificationService.php:215
 msgid "Your payment of %s was confirmed."
 msgstr ""
@@ -6488,7 +6605,7 @@ msgid "Your referral link"
 msgstr ""
 
 #: src/Modules/MultiTenant/Otp/OtpService.php:208
-#: src/Support/Activator.php:261
+#: src/Support/Activator.php:305
 msgid "Your verification code: {code}"
 msgstr ""
 
@@ -6556,6 +6673,10 @@ msgstr ""
 msgid "all accounts"
 msgstr ""
 
+#: src/Modules/Instagram/Admin/IntakePage.php:420
+msgid "assigned when the product is created"
+msgstr ""
+
 #: src/Modules/MultiTenant/Admin/WalletPage.php:120
 msgid "auto"
 msgstr ""
@@ -6611,11 +6732,11 @@ msgstr ""
 msgid "iOS"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:465
+#: src/Support/Admin/SettingsPage.php:473
 msgid "iOS bundle id"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:469
+#: src/Support/Admin/SettingsPage.php:477
 msgid "iOS download URL"
 msgstr ""
 
@@ -6623,6 +6744,7 @@ msgstr ""
 msgid "iOS only"
 msgstr ""
 
+#. translators: %s: human readable time difference.
 #: src/Support/Admin/StatusPage.php:206
 msgid "in %s"
 msgstr ""
@@ -6647,8 +6769,8 @@ msgstr ""
 msgid "no ManyChat API key on this account"
 msgstr ""
 
-#: src/Modules/Instagram/InstagramModule.php:516
-#: src/Modules/Instagram/InstagramModule.php:521
+#: src/Modules/Instagram/InstagramModule.php:517
+#: src/Modules/Instagram/InstagramModule.php:522
 msgid "no extra languages configured"
 msgstr ""
 
@@ -6681,7 +6803,7 @@ msgstr ""
 msgid "not signed in"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/IntakePage.php:277
+#: src/Modules/Instagram/Admin/IntakePage.php:283
 msgid "not written yet"
 msgstr ""
 
@@ -6697,6 +6819,7 @@ msgstr ""
 msgid "pending"
 msgstr ""
 
+#. translators: 1: product quota, 2: order quota, 3: staff quota. 0 means unlimited.
 #: src/Modules/MultiTenant/Admin/PlansPage.php:63
 msgid "products %1$s / orders %2$s / staff %3$s"
 msgstr ""
@@ -6711,6 +6834,10 @@ msgstr ""
 
 #: src/Modules/MultiTenant/Admin/TenantsPage.php:333
 msgid "shop.example.com"
+msgstr ""
+
+#: src/Modules/Instagram/Admin/IntakePage.php:419
+msgid "the number shoppers comment"
 msgstr ""
 
 #: src/Modules/MultiTenant/Admin/PaymentsPage.php:219
@@ -6756,4 +6883,3 @@ msgstr ""
 #: src/Modules/MultiTenant/Admin/TenantsPage.php:188
 msgid "— none —"
 msgstr ""
-

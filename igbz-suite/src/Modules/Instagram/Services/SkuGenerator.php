@@ -6,17 +6,25 @@ use IGBZ\Suite\Support\Db;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Mints the short product code that ties the whole flow together.
+ * Mints the two codes a registration needs, which are deliberately not the same string.
  *
- * One string does three jobs: it is the WooCommerce SKU, it is burned onto the Instagram image or
- * video, and it is the keyword the ManyChat funnel matches when somebody comments it. That makes
- * its shape a user-interface decision, not an implementation detail — a shopper has to read it off
- * a phone screen and type it into a comment box, on a Persian keyboard, without a second try.
+ * The *public code* is what a shopper reads off the post and types into a comment. It is the
+ * WooCommerce product id, zero-padded to at least four digits — digits only, because the audience
+ * is on a Persian keyboard and an alphanumeric token like IGBZ-P6R4 means switching layouts,
+ * hunting for letters and usually mistyping at least once. Digits are the one character class that
+ * is trivial to type in every layout, and FunnelService::canonical() folds Persian and Arabic
+ * digits to ASCII, so a shopper who comments ۰۰۴۷ matches a funnel stored as 0047.
  *
- * Hence the alphabet: digits and uppercase letters minus everything that is ambiguous in a
- * condensed font (0/O, 1/I/L, 5/S, 8/B, 2/Z). Four characters over that 26-symbol alphabet is
- * ~457k combinations, which is far more than any single store will register and short enough to
- * stay legible when overlaid on a photo.
+ * The padding is not cosmetic. WooCommerce ids start low, and a bare "12" under a post is
+ * something people type by accident — a reply, a quantity, half a phone number — which would fire
+ * the funnel and DM a purchase link to somebody who never asked. Four digits makes an accidental
+ * match implausible while staying comfortable to type.
+ *
+ * The *SKU* stays the alphanumeric IGBZ-P6R4 form. It is an inventory identifier: it appears on
+ * invoices and packing lists, it has to be unique across a catalogue that also contains
+ * hand-entered products, and it must not be confusable with an order number or a quantity. Its
+ * alphabet drops everything ambiguous in a condensed font (0/O, 1/I/L, 5/S, 8/B, 2/Z), which is
+ * still the right call for something a warehouse reads aloud.
  *
  * Uniqueness is checked against both the intake table and the WooCommerce SKU index, because a
  * code could have been typed by hand into a product created before this flow existed.
@@ -27,6 +35,14 @@ final class SkuGenerator {
 	private const ALPHABET = '34679ACDEFGHJKMNPQRTUVWXY';
 
 	private const LENGTH = 4;
+
+	/**
+	 * Shortest public code we will show a shopper.
+	 *
+	 * Below four digits the code stops being a deliberate token: "12" or "470" get typed under a
+	 * post for a dozen innocent reasons and each one would trigger a DM.
+	 */
+	public const PUBLIC_MIN_DIGITS = 4;
 
 	/** Give up after this many collisions and lengthen the code instead of looping forever. */
 	private const MAX_TRIES = 12;
@@ -73,24 +89,62 @@ final class SkuGenerator {
 			return false;
 		}
 
-		// A funnel keyword must be unique too, otherwise two products answer the same comment.
-		$keyword = (int) $this->db->scalar(
-			'SELECT COUNT(*) FROM ' . $this->db->table( 'ig_funnels' ) . ' WHERE keyword = %s',
-			$this->keyword( $code )
-		);
-		if ( $keyword > 0 ) {
-			return false;
-		}
-
 		return ! ( function_exists( 'wc_get_product_id_by_sku' ) && wc_get_product_id_by_sku( $code ) > 0 );
 	}
 
 	/**
-	 * The comment keyword for a code.
+	 * Whether some other funnel already answers this public code.
 	 *
-	 * FunnelService canonicalises keywords to lower case before matching, so the keyword stored
-	 * on the funnel has to be lower case as well or the funnel would never fire. The code shown
-	 * to the shopper stays upper case; matching is case-insensitive on both sides.
+	 * The product id cannot collide with another *registration*, but it can collide with a
+	 * funnel somebody built by hand — a store that made a "1247" keyword campaign last year and
+	 * then registers product 1247 would have two funnels racing for the same comment. This is
+	 * rare enough to report rather than design around, and the caller logs it.
+	 */
+	public function public_code_conflicts( string $code, int $ignore_funnel_id = 0 ): bool {
+		if ( '' === $code ) {
+			return false;
+		}
+
+		$sql  = 'SELECT COUNT(*) FROM ' . $this->db->table( 'ig_funnels' ) . ' WHERE keyword = %s';
+		$args = [ $this->keyword( $code ) ];
+
+		if ( $ignore_funnel_id > 0 ) {
+			$sql   .= ' AND id != %d';
+			$args[] = $ignore_funnel_id;
+		}
+
+		return (int) $this->db->scalar( $sql, ...$args ) > 0;
+	}
+
+	/**
+	 * The shopper-facing code for a product: its WooCommerce id, zero-padded.
+	 *
+	 * Uniqueness is free — the id is a primary key — which is the main reason this beats the
+	 * random token it replaced. There is no collision loop, nothing to reserve, and no way for
+	 * two products to end up sharing a code.
+	 *
+	 * The padding only ever grows: product 1247 is "1247", not "01247". Once a store passes
+	 * 9999 products the codes simply get longer, and older four-digit codes stay valid because
+	 * they are still that product's id.
+	 */
+	public function public_code( int $product_id ): string {
+		if ( $product_id <= 0 ) {
+			return '';
+		}
+
+		$digits = (int) igbz()->settings()->int( 'intake.code_digits', self::PUBLIC_MIN_DIGITS );
+		$digits = max( self::PUBLIC_MIN_DIGITS, min( 12, $digits ) );
+
+		return str_pad( (string) $product_id, $digits, '0', STR_PAD_LEFT );
+	}
+
+	/**
+	 * The comment keyword for a public code.
+	 *
+	 * FunnelService::canonical() lower-cases and folds Persian/Arabic digits before matching, so
+	 * an all-digit code is already in canonical form. This stays a named method rather than an
+	 * inlined strtolower because the funnel and the caption must agree on one definition — when
+	 * the code was alphanumeric, disagreeing here silently produced funnels that never fired.
 	 */
 	public function keyword( string $code ): string {
 		return mb_strtolower( trim( $code ) );

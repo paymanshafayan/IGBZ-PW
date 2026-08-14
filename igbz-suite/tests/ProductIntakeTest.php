@@ -293,6 +293,7 @@ final class IntakeDb extends wpdb {
 			'user_id'              => 0,
 			'status'               => ProductIntakeService::STATUS_UPLOADED,
 			'sku'                  => '',
+			'public_code'          => '',
 			'source_attachment_id' => 0,
 			'source_url'           => '',
 			'clean_attachment_id'  => 0,
@@ -449,8 +450,9 @@ final class ProductIntakeTest extends TestCase {
 	}
 
 	public function run(): void {
-		$this->test_a_code_is_minted_and_is_legible();
-		$this->test_a_code_is_never_reused();
+		$this->test_a_warehouse_sku_is_minted_and_is_legible();
+		$this->test_a_warehouse_sku_is_never_reused();
+		$this->test_the_customer_code_is_the_padded_product_id();
 		$this->test_a_refused_photo_carries_reasons_and_stops();
 		$this->test_a_low_score_overrules_a_generous_verdict();
 		$this->test_a_refusal_always_has_at_least_one_reason();
@@ -470,7 +472,7 @@ final class ProductIntakeTest extends TestCase {
 
 	// ------------------------------------------------------------ the code
 
-	private function test_a_code_is_minted_and_is_legible(): void {
+	private function test_a_warehouse_sku_is_minted_and_is_legible(): void {
 		$intake = $this->boot();
 		$id     = $this->register( $intake );
 
@@ -478,7 +480,7 @@ final class ProductIntakeTest extends TestCase {
 
 		$sku = (string) $this->db->intake( $id )['sku'];
 
-		$this->assert_true( (bool) preg_match( '/^IGBZ-[A-Z0-9]{4}$/', $sku ), "the code looks like IGBZ-4F2K (got {$sku})" );
+		$this->assert_true( (bool) preg_match( '/^IGBZ-[A-Z0-9]{4}$/', $sku ), "the SKU looks like IGBZ-4F2K (got {$sku})" );
 
 		// The alphabet exists so a shopper can read the code off a photo and type it into a
 		// comment. Characters that are indistinguishable in a condensed font defeat that.
@@ -491,7 +493,32 @@ final class ProductIntakeTest extends TestCase {
 		}
 	}
 
-	private function test_a_code_is_never_reused(): void {
+	private function test_the_customer_code_is_the_padded_product_id(): void {
+		$this->boot();
+		$skus = new SkuGenerator( new Db() );
+
+		// Digits only, because the shopper types this into an Instagram comment on a Persian
+		// keyboard, where reaching the Latin letters of a SKU means switching layouts.
+		$this->assert_same( '0047', $skus->public_code( 47 ), 'a short id is padded' );
+		$this->assert_same( '0001', $skus->public_code( 1 ), 'the very first product still gets four digits' );
+
+		// Padding is a floor, never a ceiling: truncating a long id would point the funnel at
+		// somebody else's product.
+		$this->assert_same( '123456', $skus->public_code( 123456 ), 'an id longer than the padding is left whole' );
+		$this->assert_same( '', $skus->public_code( 0 ), 'no product means no code' );
+
+		igbz()->settings()->set( 'intake.code_digits', 6 );
+		$this->assert_same( '000047', $skus->public_code( 47 ), 'the shopkeeper can widen the code' );
+
+		// Four is the floor. A one- or two-digit code gets typed under a post by accident and
+		// would fire the funnel for someone who never asked for the link.
+		igbz()->settings()->set( 'intake.code_digits', 1 );
+		$this->assert_same( '0047', $skus->public_code( 47 ), 'a too-narrow setting is clamped back to four digits' );
+
+		igbz_test_reset_settings();
+	}
+
+	private function test_a_warehouse_sku_is_never_reused(): void {
 		$intake = $this->boot();
 
 		$seen = [];
@@ -622,7 +649,7 @@ final class ProductIntakeTest extends TestCase {
 		$row = $this->db->intake( $id );
 
 		$this->assert_same( 2, (int) $row['attempt'], 'the attempt is counted' );
-		$this->assert_same( $sku, (string) $row['sku'], 'the product code survives a retry' );
+		$this->assert_same( $sku, (string) $row['sku'], 'the warehouse SKU survives a retry' );
 		$this->assert_same( 1, count( $this->db->intakes ), 'a retry does not leave an abandoned row behind' );
 	}
 
@@ -768,7 +795,7 @@ final class ProductIntakeTest extends TestCase {
 		$this->assert_contains( 'Hand-stitched tote', (string) $args[1]['description'], "the seller's own words are passed through" );
 		$this->assert_same( 'Bags', (string) $args[1]['category'], 'the chosen category is named, not guessed' );
 		$this->assert_same( [ 'en' ], (array) $args[1]['languages'], 'the translation targets reach the task' );
-		$this->assert_contains( 'IGBZ-', (string) $args[1]['sku'], 'the product code reaches the listing task' );
+		$this->assert_false( isset( $args[1]['sku'] ), 'the listing task is not told a code: the product does not exist yet' );
 
 		$intake->absorb_copy(
 			$id,
@@ -796,18 +823,22 @@ final class ProductIntakeTest extends TestCase {
 		$intake->update(
 			$id,
 			[
-				'clean_url' => 'https://shop.test/clean.jpg',
-				'copy_json' => wp_json_encode( [ 'title' => 'Leather tote', 'short_description' => 'A tote.' ] ),
+				'clean_url'   => 'https://shop.test/clean.jpg',
+				'copy_json'   => wp_json_encode( [ 'title' => 'Leather tote', 'short_description' => 'A tote.' ] ),
+				// Stamped by the publisher in real life: the video step only ever runs on a row
+				// that already has a product, and the code is that product's id.
+				'public_code' => '0047',
 			]
 		);
 
 		$intake->start_video( $id, 'Show it being packed for a trip.' );
 
 		$args = $this->manus->call( 'produce_product_video' );
-		$sku  = (string) $this->db->intake( $id )['sku'];
+		$code = (string) $this->db->intake( $id )['public_code'];
 
 		// The code has to be on the video: it is the only way a viewer can trigger the DM.
-		$this->assert_same( $sku, (string) $args[1]['sku'], 'the product code reaches the video task' );
+		$this->assert_same( $code, (string) $args[1]['code'], 'the customer code reaches the video task' );
+		$this->assert_true( (bool) preg_match( '/^[0-9]{4,}$/', $code ), "the burned-in code is digits (got {$code})" );
 		$this->assert_contains( 'packed for a trip', (string) $args[1]['prompt'], "the seller's brief is passed verbatim" );
 		$this->assert_same( 'https://shop.test/clean.jpg', (string) $args[2], 'the product photo is the hero of the video' );
 
@@ -847,15 +878,15 @@ final class ProductIntakeTest extends TestCase {
 	private function test_a_post_without_a_caption_still_asks_for_the_code(): void {
 		$intake = $this->boot();
 		$id     = $this->register( $intake );
-		$intake->update( $id, [ 'copy_json' => wp_json_encode( [ 'title' => 'Leather tote' ] ) ] );
+		$intake->update( $id, [ 'copy_json' => wp_json_encode( [ 'title' => 'Leather tote' ] ), 'public_code' => '0047' ] );
 
-		$sku = (string) $this->db->intake( $id )['sku'];
+		$code = (string) $this->db->intake( $id )['public_code'];
 
 		// A caption is what tells people to comment the code. Without one the post cannot
 		// convert, so a fallback that still carries the instruction beats an empty caption.
 		$composed = $intake->absorb_post( $id, [ 'attachments' => [], 'text' => 'sorry, no json here', 'status' => 'stopped', 'stop_reason' => 'finish' ] );
 
-		$this->assert_contains( $sku, (string) $composed['caption'], 'the fallback caption still names the product code' );
+		$this->assert_contains( $code, (string) $composed['caption'], 'the fallback caption still names the customer code' );
 		$this->assert_true( '' !== trim( (string) $composed['caption'] ), 'a post is never composed with an empty caption' );
 	}
 
