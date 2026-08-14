@@ -170,13 +170,19 @@ tenant scoping uses the meta key `_igbz_tenant_id`.
 
 ---
 
+`tests/bootstrap.php`'s `do_action()` really dispatches now (callbacks registered via `add_action()`
+run in registration order, all args passed, priority not modelled), and the wpdb double records
+every write in `$wpdb->writes`, not just `$wpdb->last_write`. Asserting on `last_write` is unsafe
+whenever the code under test also logs, because the logger's own insert lands last — search
+`writes` for the table you care about.
+
 ## 7. Verified behaviour (regression baseline)
 
 Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **WP 7.0.4 / WC 11.0.1
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 400 assertions in 11 test cases; 116 files lint clean.
+- 457 assertions in 13 test cases; 119 files lint clean.
 - 16/16 admin screens return 200 with no notices; 32/32 tables; 3 cron hooks scheduled.
 - All six payment gateways register with WooCommerce and their settings screens render.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
@@ -186,6 +192,28 @@ zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs bet
 - ManyChat funnel, end to end: wrong/missing token → 401; valid token → 200 with the v2 envelope;
   idempotent per `comment_id`; `per_user_limit` enforced (a capped user receives only the
   "already received" message).
+
+### Publishing is confirmed, not guaranteed
+
+The Graph API answered a publish call synchronously with a media id: the post either existed or it
+did not. Manus publishes through an async task, and a task can stop with status `finished` while
+never handing back the post URL. That leaves a row saying `published` with nothing to link to, and
+nothing on our side can prove whether the post is live.
+
+The rule: **such a row stays `published`.** Demoting it to `failed` would offer the operator a retry
+button on a post that is probably already live, and republishing an Instagram post creates a
+duplicate that has to be deleted by hand. Instead the ambiguity is surfaced in three places:
+
+- `ManusService::mark_published()` logs a `warning` on the `manus` channel and fires
+  `igbz_ig_content_published_unverified` with the content id.
+- The content list renders "No link returned — unverified" under the publish time, and the detail
+  screen shows a warning notice telling the operator to check the account before republishing.
+- The dashboard's *Content pipeline* card turns WARN and counts the affected rows.
+
+`ManusService::unverified_publish_count( int $account_id = 0 )` derives the count from
+`status = 'published' AND permalink = ''`. **Do not add a flag column for this.** A permalink can be
+filled in later, by hand or by a retried confirmation, and a stored flag would then be a stale lie
+that nobody clears. Held in place by `PublishVerificationTest`.
 
 **ManyChat webhook contract**: `POST /?rest_route=/igbz/v1/manychat/comment`, auth via
 `Authorization: Bearer <token>`, `?token=`, or `X-IGBZ-Token`. Body keys:

@@ -25,6 +25,7 @@ $cases = [
 	'UpsertTest',
 	'CronScheduleTest',
 	'AccountCredentialsTest',
+	'PublishVerificationTest',
 ];
 
 foreach ( $cases as $case ) {

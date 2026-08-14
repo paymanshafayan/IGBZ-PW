@@ -167,9 +167,7 @@ final class ContentPage {
 				'status'    => View::status_pill( $this->status_tone( (string) $row['status'] ) ) . ' '
 					. esc_html( $this->statuses()[ (string) $row['status'] ] ?? (string) $row['status'] ),
 				'scheduled' => esc_html( $this->local_time( $row['scheduled_for'] ?? null ) ),
-				'published' => $row['permalink']
-					? sprintf( '<a href="%1$s" target="_blank" rel="noopener">%2$s</a>', esc_url( (string) $row['permalink'] ), esc_html__( 'View', 'igbz-suite' ) )
-					: esc_html( $this->local_time( $row['published_at'] ?? null ) ),
+				'published' => $this->published_cell( $row ),
 				'actions'   => $this->row_actions( $row ),
 			];
 		}
@@ -189,6 +187,40 @@ final class ContentPage {
 		);
 
 		View::pagination( $total, self::PER_PAGE, $paged, self::SLUG, [ 'account_id' => $account_id, 'status' => $status ] );
+	}
+
+	/**
+	 * The "Published" cell.
+	 *
+	 * A published row with no permalink is the one ambiguous state in the pipeline: Manus finished
+	 * the task but never handed back a post URL, so we cannot prove the post exists. It is shown as
+	 * unverified rather than as a bare timestamp, which reads like everything went fine.
+	 *
+	 * @param array<string,mixed> $row
+	 */
+	private function published_cell( array $row ): string {
+		$permalink = (string) ( $row['permalink'] ?? '' );
+
+		if ( '' !== $permalink ) {
+			return sprintf(
+				'<a href="%1$s" target="_blank" rel="noopener">%2$s</a>',
+				esc_url( $permalink ),
+				esc_html__( 'View', 'igbz-suite' )
+			);
+		}
+
+		$published_at = $this->local_time( $row['published_at'] ?? null );
+
+		if ( ManusService::STATUS_PUBLISHED !== (string) ( $row['status'] ?? '' ) ) {
+			return esc_html( $published_at );
+		}
+
+		return sprintf(
+			'%1$s<br /><span class="description" title="%2$s">%3$s</span>',
+			esc_html( $published_at ),
+			esc_attr__( 'The publishing task finished but returned no post URL, so this could not be confirmed on Instagram. Check the account before republishing.', 'igbz-suite' ),
+			esc_html__( 'No link returned — unverified', 'igbz-suite' )
+		);
 	}
 
 	/** @param array<string,mixed> $row */
@@ -259,11 +291,27 @@ final class ContentPage {
 		$this->detail_row( __( 'Provider status', 'igbz-suite' ), (string) $content['provider_status'] ?: '—' );
 		$this->detail_row( __( 'Scheduled for', 'igbz-suite' ), $this->local_time( $content['scheduled_for'] ?? null ) );
 		$this->detail_row( __( 'Published at', 'igbz-suite' ), $this->local_time( $content['published_at'] ?? null ) );
+		$this->detail_row(
+			__( 'Post link', 'igbz-suite' ),
+			(string) $content['permalink'] ?: (
+				ManusService::STATUS_PUBLISHED === (string) $content['status']
+					? __( 'Not returned by the publishing task — unverified.', 'igbz-suite' )
+					: '—'
+			)
+		);
 		$this->detail_row( __( 'Retries', 'igbz-suite' ), (string) $content['retry_count'] );
 		if ( (string) $content['last_error'] ) {
 			$this->detail_row( __( 'Last error', 'igbz-suite' ), (string) $content['last_error'] );
 		}
 		echo '</tbody></table>';
+
+		if ( ManusService::STATUS_PUBLISHED === (string) $content['status'] && '' === (string) $content['permalink'] ) {
+			printf(
+				'<div class="notice notice-warning inline"><p><strong>%1$s</strong> %2$s</p></div>',
+				esc_html__( 'Published, but not confirmed.', 'igbz-suite' ),
+				esc_html__( 'The Manus task finished without returning a post URL, so this item could not be verified on Instagram. Open the account and check whether the post is live before publishing it again — republishing may create a duplicate.', 'igbz-suite' )
+			);
+		}
 
 		if ( $media ) {
 			echo '<h2>' . esc_html__( 'Generated media', 'igbz-suite' ) . '</h2><div class="igbz-media-grid">';

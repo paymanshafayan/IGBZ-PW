@@ -6013,3 +6013,34 @@ msgstr ""
 #: src/Support/Plugin.php:102
 msgid "IGBZ Suite requires WooCommerce to be installed and active."
 msgstr ""
+
+#: src/Modules/Instagram/Admin/ContentPage.php:221
+msgid "The publishing task finished but returned no post URL, so this could not be confirmed on Instagram. Check the account before republishing."
+msgstr ""
+
+#: src/Modules/Instagram/Admin/ContentPage.php:222
+msgid "No link returned — unverified"
+msgstr ""
+
+#: src/Modules/Instagram/Admin/ContentPage.php:295
+msgid "Post link"
+msgstr ""
+
+#: src/Modules/Instagram/Admin/ContentPage.php:298
+msgid "Not returned by the publishing task — unverified."
+msgstr ""
+
+#: src/Modules/Instagram/Admin/ContentPage.php:311
+msgid "Published, but not confirmed."
+msgstr ""
+
+#: src/Modules/Instagram/Admin/ContentPage.php:312
+msgid "The Manus task finished without returning a post URL, so this item could not be verified on Instagram. Open the account and check whether the post is live before publishing it again — republishing may create a duplicate."
+msgstr ""
+
+#: src/Modules/Instagram/InstagramModule.php:306
+#, php-format
+msgid "%d published item returned no post link, so it could not be confirmed on Instagram."
+msgid_plural "%d published items returned no post link, so they could not be confirmed on Instagram."
+msgstr[0] ""
+msgstr[1] ""

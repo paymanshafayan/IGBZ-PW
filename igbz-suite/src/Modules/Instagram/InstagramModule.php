@@ -291,10 +291,31 @@ final class InstagramModule implements ModuleInterface {
 			'SELECT COUNT(*) FROM ' . $db->table( 'ig_content' ) . ' WHERE status = %s',
 			ManusService::STATUS_FAILED
 		);
+		// Publishing goes through a Manus task rather than a Graph API call that returns a media id,
+		// so "finished" and "confirmed" are not the same thing. Count the rows we could not verify.
+		$unverified = (int) $db->scalar(
+			'SELECT COUNT(*) FROM ' . $db->table( 'ig_content' ) . " WHERE status = %s AND permalink = ''",
+			ManusService::STATUS_PUBLISHED
+		);
+
+		$detail = sprintf( /* translators: %d: count */ __( '%d item(s) in the failed state.', 'igbz-suite' ), $failed );
+		if ( $unverified > 0 ) {
+			$detail .= ' ' . sprintf(
+				/* translators: %d: count */
+				_n(
+					'%d published item returned no post link, so it could not be confirmed on Instagram.',
+					'%d published items returned no post link, so they could not be confirmed on Instagram.',
+					$unverified,
+					'igbz-suite'
+				),
+				$unverified
+			);
+		}
+
 		$rows[] = [
 			'label'  => __( 'Content pipeline', 'igbz-suite' ),
-			'status' => $failed > 0 ? 'warn' : 'ok',
-			'detail' => sprintf( /* translators: %d: count */ __( '%d item(s) in the failed state.', 'igbz-suite' ), $failed ),
+			'status' => ( $failed > 0 || $unverified > 0 ) ? 'warn' : 'ok',
+			'detail' => $detail,
 		];
 
 		return $rows;

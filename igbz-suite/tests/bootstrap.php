@@ -79,10 +79,27 @@ function apply_filters( string $hook, $value, ...$rest ) {
 	return $value;
 }
 
-function do_action( string $hook, ...$args ): void {}
+/**
+ * Minimal action dispatch.
+ *
+ * Priority and accepted-arg counts are not modelled: callbacks run in registration order and
+ * receive every argument. That is enough to assert that a hook fired with the right payload, which
+ * is the only thing the suite uses actions for.
+ */
+function do_action( string $hook, ...$args ): void {
+	foreach ( $GLOBALS['igbz_test_actions'][ $hook ] ?? [] as $callback ) {
+		$callback( ...$args );
+	}
+}
 
 function add_action( string $hook, $callback, int $priority = 10, int $accepted = 1 ): bool {
+	$GLOBALS['igbz_test_actions'][ $hook ][] = $callback;
 	return true;
+}
+
+/** Drop every registered callback, so one test's listener cannot fire during the next. */
+function igbz_test_reset_actions(): void {
+	$GLOBALS['igbz_test_actions'] = [];
 }
 
 function add_filter( string $hook, $callback, int $priority = 10, int $accepted = 1 ): bool {
@@ -97,6 +114,7 @@ function add_filter( string $hook, $callback, int $priority = 10, int $accepted 
  * @var array<string,int>
  */
 $GLOBALS['igbz_test_did_action'] = [];
+$GLOBALS['igbz_test_actions']    = [];
 
 function did_action( string $hook ): int {
 	return (int) ( $GLOBALS['igbz_test_did_action'][ $hook ] ?? 0 );
@@ -205,6 +223,9 @@ class wpdb {
 	/** Records the [$data, $formats] of the last write, so tests can assert on the formats. */
 	public array $last_write = [];
 
+	/** @var array<int,array<string,mixed>> Every write in order; last_write is just the tail. */
+	public array $writes = [];
+
 	/**
 	 * Rows handed back by get_row()/get_results()/get_var(), newest first.
 	 *
@@ -260,6 +281,7 @@ class wpdb {
 			'formats' => $format ?? $this->guess_formats( $data ),
 			'guessed' => null === $format,
 		];
+		$this->writes[]   = $this->last_write;
 
 		$this->queries[] = 'INSERT INTO ' . $table;
 		++$this->insert_id;
@@ -274,6 +296,7 @@ class wpdb {
 			'formats' => $format ?? $this->guess_formats( $data ),
 			'guessed' => null === $format,
 		];
+		$this->writes[]   = $this->last_write;
 
 		$this->queries[] = 'UPDATE ' . $table;
 
@@ -287,6 +310,7 @@ class wpdb {
 			'formats' => $where_format ?? $this->guess_formats( $where ),
 			'guessed' => null === $where_format,
 		];
+		$this->writes[]   = $this->last_write;
 
 		$this->queries[] = 'DELETE FROM ' . $table;
 
@@ -356,6 +380,7 @@ function igbz(): \IGBZ\Suite\Support\Plugin {
  */
 function igbz_test_reset_settings(): \IGBZ\Suite\Support\Settings {
 	$GLOBALS['igbz_test_options'] = [];
+	igbz_test_reset_actions();
 	igbz()->bind( 'settings', static fn () => new \IGBZ\Suite\Support\Settings() );
 	igbz()->bind( 'logger', static fn ( $c ) => new \IGBZ\Suite\Support\Logger( $c->get( 'settings' ) ) );
 	return igbz()->settings();

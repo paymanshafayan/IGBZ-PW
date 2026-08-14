@@ -527,17 +527,53 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 	}
 
 	public function mark_published( int $content_id, string $permalink ): void {
+		$permalink = esc_url_raw( $permalink );
+
 		$this->db->update(
 			'ig_content',
 			[
 				'status'       => self::STATUS_PUBLISHED,
-				'permalink'    => esc_url_raw( $permalink ),
+				'permalink'    => $permalink,
 				'published_at' => current_time( 'mysql', true ),
 				'updated_at'   => current_time( 'mysql', true ),
 			],
 			[ 'id' => $content_id ]
 		);
+
+		// The Graph API answered a publish call with the media id, so the post was either created
+		// or it was not. Manus reports through a task instead, and a task can finish successfully
+		// while failing to hand back the post URL. That leaves a row that says "published" with
+		// nothing to link to, and no way to tell from the outside whether the post actually exists
+		// or the task just stopped early. Surface it instead of storing the ambiguity silently --
+		// the row stays published, because it very likely is, but somebody has to eyeball it.
+		if ( '' === $permalink ) {
+			$this->logger->warning(
+				'manus',
+				'Published without a permalink: the task returned no post URL, so the result is unverified',
+				[ 'content_id' => $content_id ]
+			);
+			do_action( 'igbz_ig_content_published_unverified', $content_id );
+		}
+
 		do_action( 'igbz_ig_content_published', $content_id, $permalink );
+	}
+
+	/**
+	 * Rows that were published but came back without a post URL.
+	 *
+	 * Derived rather than flagged on the row: a permalink can be filled in later (by hand, or by a
+	 * retried confirmation), and a stored flag would then be a lie nobody clears.
+	 */
+	public function unverified_publish_count( int $account_id = 0 ): int {
+		$sql  = 'SELECT COUNT(*) FROM ' . $this->db->table( 'ig_content' ) . " WHERE status = %s AND permalink = ''";
+		$args = [ self::STATUS_PUBLISHED ];
+
+		if ( $account_id > 0 ) {
+			$sql   .= ' AND account_id = %d';
+			$args[] = $account_id;
+		}
+
+		return (int) $this->db->scalar( $sql, ...$args );
 	}
 
 	public function fail( int $content_id, string $error ): void {
