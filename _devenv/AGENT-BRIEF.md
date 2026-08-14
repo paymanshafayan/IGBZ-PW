@@ -203,14 +203,37 @@ their coupons and wallet credit.
 
 - `own` — the account's own keys, unlimited. Never falls back to the shared key.
 - `trial` — borrows the operator's `manus.api_key` / `manychat.api_key`, metered by
-  `trial.task_quota` (default 25, `0` = unlimited) and `trial.days` (default 14). A closed trial
+  `trial.task_quota` (**default 1**, `0` = unlimited) and `trial.days` (default 14). A closed trial
   returns an empty key rather than falling through.
 
 This is forced by the products themselves: a ManyChat API key is scoped by ManyChat to a *single
 page*, so one shared key can only ever drive one Instagram account. `AccountCredentials` is the
-only place that resolves a key or counts trial usage, so the quota cannot be bypassed. Fair-share
-scheduling lives in `ContentScheduler::fair_share()` with a per-account cap from
-`manus.account_concurrency` (default 3).
+only place that resolves a key or counts trial usage, so the quota cannot be bypassed.
+
+**The trial is one request.** The quota defaults to a single task: the account sends one thing,
+sees the result, and then must bring its own keys. Three consequences that are easy to break:
+
+1. **Claim before calling, never count after.** With a quota of one, the gap between "is the trial
+   open?" and "spend it" is exactly wide enough for two cron ticks to both pass. Quota is claimed
+   by `AccountCredentials::claim_trial_task()`, whose `WHERE … AND trial_tasks_used < %d` lets the
+   database pick the winner; the loser sees zero affected rows and gets `false`. There is no
+   `consume_trial_task()` any more — do not reintroduce a check-then-increment pair.
+2. **Spending the last task closes the trial immediately**, by stamping `trial_expires_at` with the
+   current time, so every read path agrees without re-deriving "used up". Because of that,
+   `trial_blocked_reason()` checks *exhausted before expired* — otherwise a used-up trial would
+   claim it ran out of time.
+3. **A refused provider call is refunded** via `release_trial_task()`, which decrements and reopens
+   the window; a network error must not cost a tenant their only free request.
+
+Fair-share scheduling lives in `ContentScheduler::fair_share()` — still needed, because `tick()`
+runs once site-wide per cron with a shared `BATCH` ordered by id, so one tenant queueing hundreds
+of drafts would otherwise own every tick regardless of whose API key pays for it.
+
+`ContentScheduler::per_account_cap( $account )` is **per account, not global**. An `own` account
+buys its own Manus capacity, so the operator has no business throttling it: its cap is
+`manus.account_concurrency` only when that is set above 0, otherwise half the batch. A `trial`
+account is capped by what is left of its quota. `manus.account_concurrency` now defaults to `0`
+and the `igbz_ig_account_concurrency` filter receives `$account` as a second argument.
 
 **Never call `__()` on a code path that can run before `init`.** WordPress 6.7+ answers with a
 `_load_textdomain_just_in_time` doing-it-wrong notice. Two such paths existed and were fixed by

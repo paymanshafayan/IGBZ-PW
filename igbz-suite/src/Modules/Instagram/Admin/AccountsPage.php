@@ -306,17 +306,25 @@ final class AccountsPage {
 			$reason  = $credentials->trial_blocked_reason( $account );
 
 			echo '<tr><th scope="row">' . esc_html__( 'Trial status', 'igbz-suite' ) . '</th><td>';
-			printf(
-				'<p>%s</p>',
-				esc_html(
-					sprintf(
-						/* translators: 1: tasks used, 2: task quota */
-						__( 'Tasks used: %1$d of %2$d', 'igbz-suite' ),
-						$used,
-						$quota
-					)
-				)
-			);
+			if ( $quota <= 0 ) {
+				$usage = sprintf(
+					/* translators: %d: number of tasks already used */
+					__( 'Tasks used: %d (no task limit, the expiry date applies)', 'igbz-suite' ),
+					$used
+				);
+			} elseif ( 1 === $quota ) {
+				$usage = $used > 0
+					? __( 'The single free request has been used. Switch to your own API keys to keep going.', 'igbz-suite' )
+					: __( 'One free request available. It is spent on the first task this account sends, and the trial closes straight after.', 'igbz-suite' );
+			} else {
+				$usage = sprintf(
+					/* translators: 1: tasks used, 2: task quota */
+					__( 'Tasks used: %1$d of %2$d', 'igbz-suite' ),
+					$used,
+					$quota
+				);
+			}
+			printf( '<p>%s</p>', esc_html( $usage ) );
 			if ( '' !== $expires ) {
 				printf(
 					'<p>%s</p>',

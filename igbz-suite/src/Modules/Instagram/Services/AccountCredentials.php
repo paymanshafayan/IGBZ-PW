@@ -102,8 +102,17 @@ final class AccountCredentials {
 		return (int) ( $account['trial_tasks_used'] ?? 0 ) >= $quota;
 	}
 
+	/** Tasks left on the trial. Returns PHP_INT_MAX when the quota is unlimited. */
+	public function trial_remaining( array $account ): int {
+		$quota = $this->trial_quota();
+		if ( $quota <= 0 ) {
+			return PHP_INT_MAX;
+		}
+		return max( 0, $quota - (int) ( $account['trial_tasks_used'] ?? 0 ) );
+	}
+
 	public function trial_quota(): int {
-		return (int) igbz()->settings()->int( 'trial.task_quota', 25 );
+		return (int) igbz()->settings()->int( 'trial.task_quota', 1 );
 	}
 
 	public function trial_days(): int {
@@ -134,11 +143,14 @@ final class AccountCredentials {
 		if ( ! $this->trial_available() ) {
 			return __( 'No shared trial key is configured on this site.', 'igbz-suite' );
 		}
+		// Quota is checked before expiry: spending the last task also stamps trial_expires_at, so
+		// asking about expiry first would tell every finished trial it "ran out of time" when it
+		// actually ran out of requests.
+		if ( $this->trial_exhausted( $account ) ) {
+			return __( 'The free trial has been used. Add your own API keys to continue.', 'igbz-suite' );
+		}
 		if ( $this->trial_expired( $account ) ) {
 			return __( 'The free trial period has ended. Add your own API keys to continue.', 'igbz-suite' );
-		}
-		if ( $this->trial_exhausted( $account ) ) {
-			return __( 'The free trial task quota is used up. Add your own API keys to continue.', 'igbz-suite' );
 		}
 		return '';
 	}
@@ -169,12 +181,82 @@ final class AccountCredentials {
 	}
 
 	/**
-	 * Count one billable trial task. Called only when the shared key was actually used, so an
-	 * account on its own keys never burns quota.
+	 * Atomically reserve one trial task, returning false when the trial has nothing left.
+	 *
+	 * This must be claimed BEFORE the provider call, not counted after it. The default quota is a
+	 * single task, so the window between "is the trial open?" and "spend it" is exactly wide
+	 * enough for two concurrent cron ticks to both pass the check and both spend it. The guard
+	 * therefore lives in the WHERE clause: the database decides the winner, and a loser sees zero
+	 * affected rows.
+	 *
+	 * An account on its own keys never touches this and always returns true -- it has no quota.
 	 *
 	 * @param array<string,mixed> $account
 	 */
-	public function consume_trial_task( array $account ): void {
+	public function claim_trial_task( array $account ): bool {
+		if ( self::MODE_TRIAL !== $this->mode( $account ) ) {
+			return true;
+		}
+
+		$id = (int) ( $account['id'] ?? 0 );
+		if ( $id <= 0 ) {
+			return false;
+		}
+		if ( ! $this->trial_available() || $this->trial_expired( $account ) ) {
+			return false;
+		}
+
+		$table = $this->db->table( 'ig_accounts' );
+		$quota = $this->trial_quota();
+
+		if ( $quota <= 0 ) {
+			// 0 means "no task ceiling"; the expiry date is still the limit.
+			$this->db->query(
+				$this->db->prepare( "UPDATE {$table} SET trial_tasks_used = trial_tasks_used + 1 WHERE id = %d", $id )
+			);
+			return true;
+		}
+
+		$claimed = $this->db->query(
+			$this->db->prepare(
+				"UPDATE {$table} SET trial_tasks_used = trial_tasks_used + 1
+				 WHERE id = %d AND credential_mode = %s AND trial_tasks_used < %d",
+				$id,
+				self::MODE_TRIAL,
+				$quota
+			)
+		);
+
+		if ( $claimed < 1 ) {
+			return false;
+		}
+
+		// The trial is a taste, not a tier: once the last task is claimed it is over immediately
+		// rather than lingering until trial_expires_at. Stamping the expiry closes it in one place
+		// so every read path (key(), trial_is_open(), the admin screens) agrees without needing to
+		// re-derive "used up" from the counter.
+		$this->db->query(
+			$this->db->prepare(
+				"UPDATE {$table} SET trial_expires_at = %s
+				 WHERE id = %d AND trial_tasks_used >= %d",
+				current_time( 'mysql', true ),
+				$id,
+				$quota
+			)
+		);
+
+		return true;
+	}
+
+	/**
+	 * Hand a claimed trial task back after the provider refused it.
+	 *
+	 * A tenant whose only free request died on a network error would otherwise have burned the
+	 * trial without ever seeing a result.
+	 *
+	 * @param array<string,mixed> $account
+	 */
+	public function release_trial_task( array $account ): void {
 		if ( self::MODE_TRIAL !== $this->mode( $account ) ) {
 			return;
 		}
@@ -182,9 +264,22 @@ final class AccountCredentials {
 		if ( $id <= 0 ) {
 			return;
 		}
+
 		$table = $this->db->table( 'ig_accounts' );
 		$this->db->query(
-			$this->db->prepare( "UPDATE {$table} SET trial_tasks_used = trial_tasks_used + 1 WHERE id = %d", $id )
+			$this->db->prepare(
+				"UPDATE {$table} SET trial_tasks_used = trial_tasks_used - 1 WHERE id = %d AND trial_tasks_used > 0",
+				$id
+			)
+		);
+
+		// Reopen the trial window that claim_trial_task() closed when it took the last task.
+		$this->db->query(
+			$this->db->prepare(
+				"UPDATE {$table} SET trial_expires_at = %s WHERE id = %d",
+				gmdate( 'Y-m-d H:i:s', strtotime( (string) ( $account['trial_started_at'] ?? current_time( 'mysql', true ) ) . ' UTC' ) + ( $this->trial_days() * DAY_IN_SECONDS ) ),
+				$id
+			)
 		);
 	}
 

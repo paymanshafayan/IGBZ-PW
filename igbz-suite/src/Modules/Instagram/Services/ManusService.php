@@ -314,6 +314,18 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			return '';
 		}
 
+		// Claim the trial task BEFORE calling Manus. The quota is a single request by default, so
+		// checking first and counting afterwards would let two concurrent cron ticks spend the
+		// same one. claim_trial_task() settles that in the database and returns false to the loser.
+		if ( ! $this->credentials->claim_trial_task( $account ) ) {
+			$this->logger->warning(
+				'manus',
+				'Task creation skipped: the free trial is used up',
+				[ 'account_id' => (int) ( $account['id'] ?? 0 ) ]
+			);
+			return '';
+		}
+
 		$result = $this->client_for( $account )->create_task(
 			$prompt,
 			[
@@ -324,12 +336,11 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		);
 
 		if ( ! $result['ok'] ) {
+			// Manus never took the job, so the tenant should not lose their one free request.
+			$this->credentials->release_trial_task( $account );
 			$this->logger->error( 'manus', 'Task creation failed', [ 'title' => $title, 'error' => $result['error'] ] );
 			return '';
 		}
-
-		// Only a task that really reached Manus on the shared key costs the tenant trial quota.
-		$this->credentials->consume_trial_task( $account );
 
 		$this->logger->info( 'manus', 'Task created', [ 'task_id' => $result['task_id'], 'title' => $title ] );
 		return $result['task_id'];

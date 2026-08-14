@@ -59,7 +59,12 @@ final class AccountCredentialsTest extends TestCase {
 		$this->test_exhausted_trial_yields_no_key();
 		$this->test_zero_quota_means_unlimited_tasks();
 		$this->test_trial_needs_a_shared_key_to_exist();
-		$this->test_consume_only_counts_trial_accounts();
+		$this->test_claim_is_free_for_own_accounts();
+		$this->test_claim_is_guarded_by_the_quota_in_sql();
+		$this->test_claim_closes_the_trial_when_the_last_task_goes();
+		$this->test_lost_race_returns_false();
+		$this->test_release_hands_a_failed_task_back();
+		$this->test_default_quota_is_a_single_request();
 		$this->test_webhook_token_is_minted_on_first_use();
 		$this->test_webhook_url_carries_the_token();
 	}
@@ -176,18 +181,116 @@ final class AccountCredentialsTest extends TestCase {
 		$this->assert_true( '' !== $credentials->trial_blocked_reason( $account ), 'the missing shared key is explained' );
 	}
 
-	/** An account on its own key must never burn trial quota. */
-	private function test_consume_only_counts_trial_accounts(): void {
+	/**
+	 * @param array<string,mixed> $overrides
+	 * @return array<string,mixed>
+	 */
+	private function open_trial( array $overrides = [] ): array {
+		return $this->account(
+			array_merge(
+				[
+					'credential_mode'  => AccountCredentials::MODE_TRIAL,
+					'trial_started_at' => gmdate( 'Y-m-d H:i:s', time() - HOUR_IN_SECONDS ),
+					'trial_expires_at' => gmdate( 'Y-m-d H:i:s', time() + DAY_IN_SECONDS ),
+					'trial_tasks_used' => 0,
+				],
+				$overrides
+			)
+		);
+	}
+
+	/** An account on its own key has no quota to burn, so claiming must be a free no-op. */
+	private function test_claim_is_free_for_own_accounts(): void {
+		igbz_test_reset_settings();
+		$wpdb          = $GLOBALS['wpdb'];
+		$wpdb->queries = [];
+
+		$this->assert_true( $this->credentials()->claim_trial_task( $this->account() ), 'own-mode account is always allowed' );
+		$this->assert_same( 0, count( $wpdb->queries ), 'own-mode account issues no quota write' );
+	}
+
+	/**
+	 * With a quota of one, "check then increment" is a race: two cron ticks can both read
+	 * trial_tasks_used = 0. The ceiling therefore has to be part of the UPDATE itself.
+	 */
+	private function test_claim_is_guarded_by_the_quota_in_sql(): void {
+		$settings = igbz_test_reset_settings();
+		$settings->set( 'manus.api_key', 'operator-key' );
+
+		$wpdb          = $GLOBALS['wpdb'];
+		$wpdb->queries = [];
+
+		$this->assert_true( $this->credentials()->claim_trial_task( $this->open_trial() ), 'an open trial hands out its task' );
+
+		$claim = $wpdb->queries[0] ?? '';
+		$this->assert_contains( 'trial_tasks_used = trial_tasks_used + 1', $claim, 'the counter moves' );
+		// The quota literal is asserted loosely because the wpdb double quotes %d placeholders.
+		$this->assert_contains( 'trial_tasks_used <', $claim, 'the quota bounds the UPDATE itself' );
+		$this->assert_contains( 'credential_mode =', $claim, 'and only a trial row can be claimed' );
+	}
+
+	/** The trial is one request, so consuming it must close the account, not leave it dangling. */
+	private function test_claim_closes_the_trial_when_the_last_task_goes(): void {
+		$settings = igbz_test_reset_settings();
+		$settings->set( 'manus.api_key', 'operator-key' );
+
+		$wpdb          = $GLOBALS['wpdb'];
+		$wpdb->queries = [];
+
+		$this->credentials()->claim_trial_task( $this->open_trial() );
+
+		$this->assert_same( 2, count( $wpdb->queries ), 'claiming writes the counter and the closure' );
+		$this->assert_contains( 'trial_expires_at', $wpdb->queries[1], 'the expiry is stamped once the quota is gone' );
+		$this->assert_contains( 'trial_tasks_used >=', $wpdb->queries[1], 'only a used-up trial is closed' );
+	}
+
+	/** Zero affected rows is how the database says another worker took the last task. */
+	private function test_lost_race_returns_false(): void {
+		$settings = igbz_test_reset_settings();
+		$settings->set( 'manus.api_key', 'operator-key' );
+
+		$wpdb                 = $GLOBALS['wpdb'];
+		$wpdb->queries        = [];
+		$wpdb->next_affected  = [ 0 ];
+
+		$this->assert_false( $this->credentials()->claim_trial_task( $this->open_trial() ), 'the loser of the race gets nothing' );
+		$this->assert_same( 1, count( $wpdb->queries ), 'a lost claim does not go on to close the trial' );
+
+		$wpdb->next_affected = [];
+	}
+
+	/** A network failure must not cost the tenant their only free request. */
+	private function test_release_hands_a_failed_task_back(): void {
 		igbz_test_reset_settings();
 		$wpdb          = $GLOBALS['wpdb'];
 		$wpdb->queries = [];
 
 		$credentials = $this->credentials();
-		$credentials->consume_trial_task( $this->account() );
-		$this->assert_same( 0, count( $wpdb->queries ), 'own-mode account issues no quota write' );
 
-		$credentials->consume_trial_task( $this->account( [ 'credential_mode' => AccountCredentials::MODE_TRIAL ] ) );
-		$this->assert_contains( 'trial_tasks_used = trial_tasks_used + 1', $wpdb->last_query(), 'trial account increments the counter' );
+		$credentials->release_trial_task( $this->account() );
+		$this->assert_same( 0, count( $wpdb->queries ), 'own-mode account has nothing to give back' );
+
+		$credentials->release_trial_task( $this->open_trial( [ 'trial_tasks_used' => 1 ] ) );
+		$this->assert_contains( 'trial_tasks_used = trial_tasks_used - 1', $wpdb->queries[0] ?? '', 'the counter is rolled back' );
+		$this->assert_contains( 'trial_expires_at', $wpdb->queries[1] ?? '', 'the trial window is reopened' );
+	}
+
+	/** The product decision: the free trial is exactly one request, then it is over. */
+	private function test_default_quota_is_a_single_request(): void {
+		$settings = igbz_test_reset_settings();
+		$settings->set( 'manus.api_key', 'operator-key' );
+
+		$credentials = $this->credentials();
+		$this->assert_same( 1, $credentials->trial_quota(), 'the trial is a single request by default' );
+
+		$fresh = $this->open_trial();
+		$this->assert_same( 1, $credentials->trial_remaining( $fresh ), 'an untouched trial has its one request' );
+		$this->assert_same( 'operator-key', $credentials->key( $fresh, AccountCredentials::SERVICE_MANUS ), 'and it can reach the shared key' );
+
+		$spent = $this->open_trial( [ 'trial_tasks_used' => 1 ] );
+		$this->assert_same( 0, $credentials->trial_remaining( $spent ), 'one task empties it' );
+		$this->assert_true( $credentials->trial_exhausted( $spent ), 'the trial reads as exhausted' );
+		$this->assert_same( '', $credentials->key( $spent, AccountCredentials::SERVICE_MANUS ), 'and the shared key is withdrawn' );
 	}
 
 	/**

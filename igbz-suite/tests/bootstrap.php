@@ -175,6 +175,12 @@ class wpdb {
 			return false;
 		}
 
+		// Affected-row counts matter for conditional UPDATEs, where 0 rows is how the database
+		// reports "somebody else got there first".
+		if ( $this->next_affected ) {
+			return (int) array_shift( $this->next_affected );
+		}
+
 		return 1;
 	}
 
@@ -208,6 +214,9 @@ class wpdb {
 	 * @var array<int,mixed>
 	 */
 	public array $next_results = [];
+
+	/** @var array<int,int> Queued affected-row counts for query(). */
+	public array $next_affected = [];
 
 	public function get_row( string $sql, $output = null ) {
 		$this->queries[] = $sql;

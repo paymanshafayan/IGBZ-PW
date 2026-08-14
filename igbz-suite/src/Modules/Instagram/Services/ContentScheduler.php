@@ -59,14 +59,10 @@ final class ContentScheduler {
 		);
 
 		$running = $this->running_per_account();
-		$cap     = $this->per_account_cap();
 
 		foreach ( $this->fair_share( $rows, self::BATCH ) as $row ) {
 			$account_id = (int) $row['account_id'];
 
-			if ( ( $running[ $account_id ] ?? 0 ) >= $cap ) {
-				continue;
-			}
 			if ( ! $this->should_autogenerate( (int) $row['id'] ) ) {
 				continue;
 			}
@@ -76,6 +72,12 @@ final class ContentScheduler {
 			// configuration problem the tenant can still fix.
 			$account = $this->manus->account( $account_id );
 			if ( ! $account || ! $this->manus->account_is_configured( $account ) ) {
+				continue;
+			}
+
+			// Resolved per account, because a tenant on its own keys is not limited by whatever
+			// the operator picked for the trial.
+			if ( ( $running[ $account_id ] ?? 0 ) >= $this->per_account_cap( $account ) ) {
 				continue;
 			}
 
@@ -136,9 +138,28 @@ final class ContentScheduler {
 		return $counts;
 	}
 
-	private function per_account_cap(): int {
-		$cap = (int) igbz()->settings()->int( 'manus.account_concurrency', 3 );
-		return max( 1, (int) apply_filters( 'igbz_ig_account_concurrency', $cap ) );
+	/**
+	 * How many tasks one account may have in flight.
+	 *
+	 * An account on its own keys buys its own Manus capacity, so the operator has no business
+	 * throttling it to a shared number -- that was the last place where one tenant's settings
+	 * still governed another's throughput. Its only limit is the local batch, halved so a single
+	 * account cannot swallow a whole cron tick and push everyone else to the next one.
+	 *
+	 * Trial accounts are the exception: they are spending the operator's key, and the trial is a
+	 * single sample request by default, so one at a time is the honest cap.
+	 *
+	 * @param array<string,mixed> $account
+	 */
+	private function per_account_cap( array $account ): int {
+		if ( AccountCredentials::MODE_TRIAL === $this->credentials->mode( $account ) ) {
+			$cap = max( 1, $this->credentials->trial_remaining( $account ) );
+		} else {
+			$configured = (int) igbz()->settings()->int( 'manus.account_concurrency', 0 );
+			$cap        = $configured > 0 ? $configured : (int) max( 1, self::BATCH / 2 );
+		}
+
+		return max( 1, (int) apply_filters( 'igbz_ig_account_concurrency', $cap, $account ) );
 	}
 
 	private function should_autogenerate( int $content_id ): bool {
