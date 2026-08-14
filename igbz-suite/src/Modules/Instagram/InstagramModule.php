@@ -16,6 +16,9 @@ use IGBZ\Suite\Modules\Instagram\Services\PromptBuilder;
 use IGBZ\Suite\Modules\Instagram\Services\SkuGenerator;
 use IGBZ\Suite\Modules\Instagram\Services\SubscriberService;
 use IGBZ\Suite\Modules\Instagram\Services\TranslationBridge;
+use IGBZ\Suite\Modules\Instagram\Messaging\ConfigurableDmGateway;
+use IGBZ\Suite\Modules\Instagram\Messaging\DirectMessenger;
+use IGBZ\Suite\Modules\Instagram\Messaging\ManyChatGateway;
 use IGBZ\Suite\Modules\Instagram\Speech\HttpSpeechToText;
 use IGBZ\Suite\Modules\Instagram\Speech\ManusSpeechToText;
 use IGBZ\Suite\Modules\Instagram\Speech\SpeechToText;
@@ -117,6 +120,26 @@ final class InstagramModule implements ModuleInterface {
 			static fn ( Plugin $c ) => new InsightsService( $c->db(), $c->get( 'ig.manus' ), $c->get( 'ig.prompts' ), $c->logger() )
 		);
 		$plugin->bind( 'ig.manychat', static fn ( Plugin $c ) => new ManyChatClient( $c->http(), $c->logger() ) );
+
+		// Direct messaging is routed per capability rather than per vendor: no single provider
+		// covers text, video and native post sharing, and the paid-post feature needs all three.
+		$plugin->bind(
+			'ig.dm_manychat',
+			static fn ( Plugin $c ) => new ManyChatGateway( $c->get( 'ig.manychat' ), $c->get( 'ig.credentials' ), $c->logger() )
+		);
+		$plugin->bind(
+			'ig.dm_custom',
+			static fn ( Plugin $c ) => new ConfigurableDmGateway( $c->http(), $c->settings(), $c->logger() )
+		);
+		$plugin->bind(
+			'ig.dm',
+			static fn ( Plugin $c ) => new DirectMessenger(
+				$c->settings(),
+				$c->logger(),
+				$c->get( 'ig.dm_manychat' ),
+				$c->get( 'ig.dm_custom' )
+			)
+		);
 		$plugin->bind(
 			'ig.subscribers',
 			static fn ( Plugin $c ) => new SubscriberService(

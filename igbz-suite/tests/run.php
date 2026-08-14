@@ -28,6 +28,7 @@ $cases = [
 	'PublishVerificationTest',
 	'FunnelDeliveryTest',
 	'ProductIntakeTest',
+	'DirectMessageTest',
 ];
 
 foreach ( $cases as $case ) {

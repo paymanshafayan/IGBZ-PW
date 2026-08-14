@@ -34,6 +34,7 @@ final class Settings {
 		'hub.vip_link_secret',
 		'canva.api_key',
 		'stt.api_key',
+		'dm.custom.api_key',
 	];
 
 	/** @return array<string,mixed> */

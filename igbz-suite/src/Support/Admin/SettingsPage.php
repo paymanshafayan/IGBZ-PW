@@ -6,6 +6,8 @@ use IGBZ\Suite\Support\Crypto;
 use IGBZ\Suite\Support\Logger;
 use IGBZ\Suite\Support\Modules;
 use IGBZ\Suite\Support\Settings;
+use IGBZ\Suite\Modules\Instagram\Messaging\ConfigurableDmGateway;
+use IGBZ\Suite\Modules\Instagram\Messaging\ManyChatGateway;
 use IGBZ\Suite\Modules\Instagram\Webhooks\ManyChatWebhook;
 
 defined( 'ABSPATH' ) || exit;
@@ -56,6 +58,7 @@ final class SettingsPage {
 		if ( Modules::enabled( Modules::INSTAGRAM ) ) {
 			$tabs['manus']    = __( 'Manus', 'igbz-suite' );
 			$tabs['manychat'] = __( 'ManyChat', 'igbz-suite' );
+			$tabs['dm']       = __( 'Direct messages', 'igbz-suite' );
 			$tabs['intake']   = __( 'Product registration', 'igbz-suite' );
 		}
 		if ( Modules::enabled( Modules::HUB ) ) {
@@ -324,6 +327,89 @@ final class SettingsPage {
 					],
 				];
 
+			case 'dm':
+				return [
+					[
+						'key'     => 'dm.provider',
+						'label'   => __( 'Preferred provider', 'igbz-suite' ),
+						'type'    => 'select',
+						'options' => [
+							ManyChatGateway::ID       => __( 'ManyChat', 'igbz-suite' ),
+							ConfigurableDmGateway::ID => __( 'Custom endpoint', 'igbz-suite' ),
+						],
+						'help'    => __( 'The first choice for every message. When the preferred provider cannot handle a particular kind of message, any other configured provider that can is used instead — so paid video can be delivered elsewhere while funnels stay on ManyChat.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'dm.capabilities_summary',
+						'label' => __( 'What can be delivered now', 'igbz-suite' ),
+						'type'  => 'readonly',
+						'help'  => __( 'ManyChat cannot send video or share a post to Instagram — the channel has no such message type. Paid video therefore needs a custom endpoint below, otherwise those deliveries will be refused rather than attempted.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'dm.custom.title',
+						'label'       => __( 'Custom provider name', 'igbz-suite' ),
+						'placeholder' => __( 'Custom endpoint', 'igbz-suite' ),
+						'help'        => __( 'Shown in logs and on delivery screens so failures name a real vendor.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'dm.custom.endpoint',
+						'label'       => __( 'Endpoint URL', 'igbz-suite' ),
+						'placeholder' => 'https://api.example.com/v1/messages',
+						'help'        => __( 'Leave empty to disable the custom provider. This must be the vendor\'s documented send endpoint, not their website.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'dm.custom.api_key',
+						'label' => __( 'API key', 'igbz-suite' ),
+						'type'  => 'password',
+					],
+					[
+						'key'         => 'dm.custom.auth_header',
+						'label'       => __( 'Auth header', 'igbz-suite' ),
+						'placeholder' => 'Authorization',
+					],
+					[
+						'key'         => 'dm.custom.auth_scheme',
+						'label'       => __( 'Auth scheme', 'igbz-suite' ),
+						'placeholder' => 'Bearer',
+						'help'        => __( 'Prefixed to the key, so it is sent as "Bearer abc123". Clear this when the vendor wants the bare key.', 'igbz-suite' ),
+					],
+					[
+						'key'     => 'dm.custom.method',
+						'label'   => __( 'HTTP method', 'igbz-suite' ),
+						'type'    => 'select',
+						'options' => [
+							'POST' => 'POST',
+							'PUT'  => 'PUT',
+						],
+					],
+					[
+						'key'         => 'dm.custom.capabilities',
+						'label'       => __( 'Supported message kinds', 'igbz-suite' ),
+						'placeholder' => 'text,image,video,media_share,flow',
+						'help'        => __( 'Comma separated, from: text, image, video, media_share, flow. Only claim what the vendor really supports — anything listed here will be sent to them, and anything omitted is routed elsewhere or refused. "media_share" means the vendor can attach one of your own published posts; "flow" means it can run a named automation.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'dm.custom.body_template',
+						'label'       => __( 'Request body template', 'igbz-suite' ),
+						'type'        => 'textarea',
+						'placeholder' => ConfigurableDmGateway::DEFAULT_TEMPLATE,
+						'help'        => __( 'JSON matching the vendor\'s documented request. Placeholders are replaced with real values: {{subscriber_id}}, {{text}}, {{url}}, {{caption}}, {{media_ref}}, {{flow_ref}}, {{capability}}, {{account_id}}, {{ig_user_id}}, {{ig_username}}, {{button_label}}, {{button_url}}. Fields whose placeholder has no value for a given message are removed, so one template can serve every message kind.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'dm.custom.message_id_path',
+						'label'       => __( 'Message ID path in the response', 'igbz-suite' ),
+						'placeholder' => 'data.message_id',
+						'help'        => __( 'Dotted path to the sent message identifier, recorded against the delivery. Optional.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'dm.custom.timeout',
+						'label' => __( 'Timeout (seconds)', 'igbz-suite' ),
+						'type'  => 'number',
+						'min'   => 5,
+						'max'   => 120,
+					],
+				];
+
 			case 'intake':
 				return [
 					[
@@ -542,12 +628,89 @@ final class SettingsPage {
 		return isset( $tabs[ $tab ] ) ? $tab : 'general';
 	}
 
+	/**
+	 * A plain-language answer to "can this install deliver a paid video right now?".
+	 *
+	 * Capability is read from the gateways themselves rather than restated here, so the screen
+	 * cannot drift away from what the code will actually do. ManyChat keys are per-account, so at
+	 * this level we can only report the kinds of message it is able to carry, not whether any one
+	 * account is connected.
+	 */
+	private function dm_capabilities_summary(): string {
+		$labels = [
+			'text'        => __( 'text', 'igbz-suite' ),
+			'image'       => __( 'image', 'igbz-suite' ),
+			'video'       => __( 'video', 'igbz-suite' ),
+			'media_share' => __( 'shared post', 'igbz-suite' ),
+			'flow'        => __( 'automation', 'igbz-suite' ),
+		];
+
+		$lines     = [];
+		$available = [];
+
+		// The gateways are bound by the Instagram module. This tab is only offered while that
+		// module is on, but a status line must never be the thing that takes the screen down.
+		$gateways = [];
+		foreach ( [ 'ig.dm_manychat', 'ig.dm_custom' ] as $service ) {
+			try {
+				$gateways[] = igbz()->get( $service );
+			} catch ( \Throwable $e ) {
+				unset( $e );
+			}
+		}
+
+		if ( ! $gateways ) {
+			return __( 'Messaging providers are unavailable because the Instagram module is not loaded.', 'igbz-suite' );
+		}
+
+		foreach ( $gateways as $gateway ) {
+			// Checked before capabilities are counted: a provider that declares video but has no
+			// endpoint delivers nothing, and must not suppress the warning below.
+			if ( $gateway instanceof ConfigurableDmGateway && ! $gateway->is_configured() ) {
+				$lines[] = sprintf(
+					/* translators: %s: provider name. */
+					__( '%s — no endpoint set, so it is not used.', 'igbz-suite' ),
+					$gateway->title()
+				);
+				continue;
+			}
+
+			$can = [];
+			foreach ( array_keys( $labels ) as $capability ) {
+				if ( $gateway->supports( $capability ) ) {
+					$can[]       = $labels[ $capability ];
+					$available[] = $capability;
+				}
+			}
+
+			$lines[] = sprintf(
+				/* translators: 1: provider name, 2: comma separated list of message kinds. */
+				__( '%1$s — %2$s.', 'igbz-suite' ),
+				$gateway->title(),
+				$can
+					/* translators: separator between items in a list, e.g. "text, image". */
+					? implode( __( ', ', 'igbz-suite' ), $can )
+					: __( 'nothing configured', 'igbz-suite' )
+			);
+		}
+
+		$missing = array_diff( [ 'video', 'media_share' ], $available );
+		if ( $missing ) {
+			$lines[] = __( 'Paid video cannot be delivered yet: no configured provider can send a video or share a post.', 'igbz-suite' );
+		}
+
+		return implode( ' ', $lines );
+	}
+
 	/** @param array<string,mixed> $field */
 	private function display_value( array $field ): mixed {
 		$key = (string) $field['key'];
 
 		if ( 'manychat.webhook_url' === $key ) {
 			return rest_url( ManyChatWebhook::NAMESPACE . '/manychat/comment' );
+		}
+		if ( 'dm.capabilities_summary' === $key ) {
+			return $this->dm_capabilities_summary();
 		}
 		if ( 'purge_on_uninstall' === $key ) {
 			return '1' === get_option( 'igbz_purge_on_uninstall', '0' );
