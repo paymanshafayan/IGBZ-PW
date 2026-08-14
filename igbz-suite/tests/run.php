@@ -27,6 +27,7 @@ $cases = [
 	'AccountCredentialsTest',
 	'PublishVerificationTest',
 	'FunnelDeliveryTest',
+	'ProductIntakeTest',
 ];
 
 foreach ( $cases as $case ) {

@@ -109,18 +109,19 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 **Container ids**
 - core: `settings, logger, db, http, tenancy`
 - multitenant: `tenants, wallet, plans, bnpl.providers, bnpl, affiliate, lms, payments, otp, marketplace`
-- instagram: `ig.prompts, ig.manus_client, ig.manus, ig.scheduler, ig.insights, ig.manychat, ig.subscribers, ig.funnels`
+- instagram: `ig.prompts, ig.credentials, ig.manus_client, ig.manus, ig.scheduler, ig.insights, ig.manychat, ig.subscribers, ig.funnels`,
+  plus the registration flow: `ig.skus, ig.translations, ig.manychat_bridge, ig.intake, ig.publisher, ig.intake_worker, ig.stt, ig.stt_http, ig.stt_manus`
 - hub: `hub.stats, hub.directory, hub.vip, hub.domains, hub.blocks, hub.signup`
 - rest_api: `api.tokens, api.auth, api.devices, api.google_auth, api.push, api.notifications`
 
 **Admin screens** (top-level `igbz`): `igbz`, `igbz-settings`, `igbz-tenants`, `igbz-wallet`,
 `igbz-plans`, `igbz-bnpl`, `igbz-affiliate`, `igbz-courses`, `igbz-payments`, `igbz-ig-accounts`,
-`igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`, `igbz-hub`,
-`igbz-mobile-api`.
+`igbz-ig-intake`, `igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`,
+`igbz-hub`, `igbz-mobile-api`.
 
-**REST**: `igbz/v1` (48 routes) and `igbz-hub/v1` (15 routes).
+**REST**: `igbz/v1` (62 routes, 14 of them `/intake/*`) and `igbz-hub/v1` (15 routes).
 
-**Schema**: 32 tables in `src/Support/Schema.php`. All carry `tenant_id` except `tenants`,
+**Schema**: 33 tables in `src/Support/Schema.php` (DB version 8; `ig_intake` added in v8). All carry `tenant_id` except `tenants`,
 `tenant_domains`, `tenant_members`, `plans`, `logs`, `jobs`, `lesson_progress`. Product/order
 tenant scoping uses the meta key `_igbz_tenant_id`.
 
@@ -182,8 +183,8 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 507 assertions in 14 test cases; 121 files lint clean.
-- 16/16 admin screens return 200 with no notices; 32/32 tables; 3 cron hooks scheduled.
+- 627 assertions in 15 test cases; 136 files lint clean.
+- 17/17 admin screens return 200 with no notices; 33/33 tables; 3 cron hooks scheduled.
 - All six payment gateways register with WooCommerce and their settings screens render.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
   `processing`, sets the transaction id, and credits 2% cashback
@@ -192,6 +193,21 @@ zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs bet
 - ManyChat funnel, end to end: wrong/missing token → 401; valid token → 200 with the v2 envelope;
   idempotent per `comment_id`; `per_user_limit` enforced (a capped user receives only the
   "already received" message).
+- **Product registration, end to end against real WooCommerce**: photo → refusal with reasons →
+  accepted photo → prepared image → description with the seller's own price/stock/category →
+  written listing → a real `WC_Product_Simple` carrying the code as its SKU, both specs as
+  attributes, three tags and the chosen category → an exact-match funnel keyed on the code whose
+  `resolve_link()` reaches the product page → a content row carrying **both `product_id` and
+  `funnel_id`** and the keyword in its brief. The last of those is the loop the port had left open.
+- Registration REST surface: anonymous → 401, a capability-less user → 403, an owner → 200; a real
+  multipart upload returns 201 with the file in the media library under a public URL (Manus fetches
+  assets over HTTP, so a private directory would not work); missing price, missing category,
+  missing description, composing before the product exists, scheduling before composing and an
+  unknown post kind are each refused with their own error code.
+- Translation bridge: with no multilingual plugin nothing is published but the copy is kept in
+  `_igbz_translations`; with WPML's hooks satisfied two real translated products are created,
+  linked by trid, and each carries the original's price, sale price and stock with a
+  language-suffixed SKU (the SKU is the funnel keyword, so it has to stay unique).
 
 ### Publishing is confirmed, not guaranteed
 
@@ -272,6 +288,79 @@ Held in place by `FunnelDeliveryTest`.
 That object only exists when WP_Http built the response — any `pre_http_request` short-circuit
 (caching plugins, request mockers, offline harnesses) returns a plain array and core does not
 normalise it, so the call was a fatal error. Use `Http::headers_of()`.
+
+### Product registration from the app (DB v8)
+
+The rule that shapes everything here: **a product is never created through the WooCommerce admin.**
+The app plus the AI pipeline is the only entry point, which means every failure has to degrade into
+something a shopkeeper can act on rather than a dead end.
+
+**One row per registration**, `ig_intake`, is the state machine. Thirteen steps spread over minutes
+and many REST round-trips cannot live in a call stack, so each REST call and each webhook moves one
+row from one status to the next; a request that dies, an app that is closed or a task that returns
+twenty minutes later all resume from where they stopped.
+
+```
+uploaded → grading → rejected                    (reasons on the row, seller retries)
+                  └→ graded → processing → ready_to_edit → edited
+                                                              │
+                        transcribing ◄──── describing ◄───────┘
+                               └──→ writing → product_created
+                                                    │
+                                  awaiting_kind ◄───┘
+                                        ├─ video → producing_video → video_review ─┐
+                                        └─ image ──────────────────────────────────┤
+                                                                        composing ─┘
+                                                                             │
+                                                            published ◄─ scheduled
+```
+
+**Services.** `ProductIntakeService` owns the row and the transitions. `ProductPublisher` turns an
+approved row into a `WC_Product_Simple`, its funnel and its content row, and `hand_off()` does steps
+12–13. `IntakeWorker` is the cron sweep. `SkuGenerator` mints the code. `TranslationBridge` handles
+Polylang / WPML / meta. `ManyChatBridge` primes the page before the first comment arrives.
+
+**`ProductIntakeService` depends on `IntakeAgentInterface`, not `ManusService`.** It uses six of that
+class's methods; naming the slice keeps the dependency honest and makes the state machine testable
+without the network. `ManusService` implements it.
+
+**Things that will look wrong until you know why:**
+
+- **A refused photo is a success, not an error.** The row goes to `rejected` carrying reasons; only
+  an unreadable grader answer is a fault, and even then the photo is *accepted* — refusing somebody's
+  photograph because our grader malfunctioned is blaming them for our bug.
+- **A score below `intake.quality_threshold` overrules an `accept` verdict.** The setting is the
+  store's contract with itself; if the model could ignore it, it would mean nothing.
+- **The image step falls back to the seller's original photo** and reuses the existing attachment
+  rather than sideloading it again. The photo already passed the quality gate, so the listing is
+  worse-looking, not wrong. The *video* step has no such fallback — a video post with no video is
+  not a degraded result, it is nothing — so that one fails loudly.
+- **Every Manus asset is pulled into the media library immediately.** Attachment URLs are signed and
+  expire; a product image that 404s a fortnight later is worse than no automation.
+- **Uploads go to the media library, not a protected directory.** Manus fetches assets over HTTP and
+  cannot read a path on the server's disk.
+- **The funnel keyword is lower-cased** (`FunnelService::canonical()` lower-cases before matching, so
+  an upper-case keyword would never fire) while the code shown to shoppers stays upper case.
+- **Match mode is `exact`, not `contains`**: with `contains`, a comment quoting the caption would
+  trigger a delivery.
+- **A funnel that fails to save is a warning, not a failure.** The product exists and can be sold;
+  stranding a good listing over the automation would be the wrong trade.
+
+**The loop the port had left open is now closed.** `queue_post()` passes `product_id` and `funnel_id`
+into `save_content()`, which is what makes the previously-dead keyword-injection branch in
+`ManusService::generate()` reachable and lets a comment resolve to the right product.
+
+**Speech to text** is `SpeechToTextInterface`. `HttpSpeechToText` covers any vendor that accepts a
+multipart upload and answers with JSON — endpoint, key, model, file field, auth header/scheme and a
+dotted response path are all settings, so switching provider is configuration. `ManusSpeechToText`
+is the fallback and is *asynchronous*, hence `TranscriptionResult::pending()`: three states, because
+collapsing pending into failure would tell the seller to retype while the transcript was in flight.
+A transcript is **appended** to any typed text, never substituted — a seller who typed the size and
+dictated the rest must not lose either half.
+
+**The webhook is the fast path; the cron sweep is the guarantee.** Both call
+`IntakeWorker::settle()`, so they cannot drift. A row parked over an hour is failed by
+`TASK_TIMEOUT` rather than polling two API calls every five minutes forever.
 
 **ManyChat webhook contract**: `POST /?rest_route=/igbz/v1/manychat/comment`, auth via
 `Authorization: Bearer <token>`, `?token=`, or `X-IGBZ-Token`. Body keys:

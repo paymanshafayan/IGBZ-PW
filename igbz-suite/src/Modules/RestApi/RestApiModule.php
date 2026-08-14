@@ -10,6 +10,7 @@ use IGBZ\Suite\Modules\RestApi\Controllers\AuthController;
 use IGBZ\Suite\Modules\RestApi\Controllers\BaseController;
 use IGBZ\Suite\Modules\RestApi\Controllers\CatalogController;
 use IGBZ\Suite\Modules\RestApi\Controllers\DeviceController;
+use IGBZ\Suite\Modules\RestApi\Controllers\ProductIntakeController;
 use IGBZ\Suite\Modules\RestApi\Controllers\StoreAdminController;
 use IGBZ\Suite\Modules\RestApi\Push\DeviceRepository;
 use IGBZ\Suite\Modules\RestApi\Push\FcmService;
@@ -106,13 +107,27 @@ final class RestApiModule implements ModuleInterface {
 
 	/** @return BaseController[] */
 	private function controllers( Plugin $plugin ): array {
-		return [
+		$controllers = [
 			new AuthController( $plugin->get( 'api.tokens' ), $this->otp( $plugin ), $plugin->logger() ),
 			new CatalogController(),
 			new AccountController(),
 			new DeviceController( $plugin->get( 'api.devices' ), $plugin->get( 'api.notifications' ) ),
 			new StoreAdminController(),
 		];
+
+		// Product registration lives in the Instagram module — it is what owns the assistant, the
+		// funnels and the Manus credentials — so the endpoints only exist when that module is on.
+		if ( \IGBZ\Suite\Support\Modules::enabled( \IGBZ\Suite\Support\Modules::INSTAGRAM ) && $plugin->has( 'ig.intake' ) ) {
+			$controllers[] = new ProductIntakeController(
+				$plugin->get( 'ig.intake' ),
+				$plugin->get( 'ig.publisher' ),
+				$plugin->get( 'ig.stt' ),
+				$plugin->get( 'ig.translations' ),
+				$plugin->get( 'ig.skus' )
+			);
+		}
+
+		return $controllers;
 	}
 
 	/** The API can run with the MultiTenant module switched off, so build a fallback instance. */

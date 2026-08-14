@@ -48,6 +48,7 @@ final class Schema {
 			'ig_funnels',
 			'ig_subscribers',
 			'ig_funnel_hits',
+			'ig_intake',
 			'api_tokens',
 			'devices',
 			'jobs',
@@ -599,6 +600,59 @@ final class Schema {
 			UNIQUE KEY dedupe (funnel_id,comment_id),
 			KEY funnel_id (funnel_id),
 			KEY subscriber (manychat_subscriber_id)
+		) {$charset};";
+
+		// One row per product registered from the phone. This is the state machine behind the
+		// "shoot a photo -> answer a few questions -> the post is live" flow: the app never
+		// touches wp-admin, so every intermediate artefact (the graded photo, the cleaned-up
+		// image, the edited version, the dictated description, the generated video) has to be
+		// stored somewhere durable between REST calls.
+		$sql[] = "CREATE TABLE {$p}ig_intake (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			account_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			status VARCHAR(32) NOT NULL DEFAULT 'uploaded',
+			sku VARCHAR(32) NULL DEFAULT NULL,
+			source_attachment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			source_url VARCHAR(500) NOT NULL DEFAULT '',
+			clean_attachment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			clean_url VARCHAR(500) NOT NULL DEFAULT '',
+			edited_attachment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			edited_url VARCHAR(500) NOT NULL DEFAULT '',
+			quality_score INT NOT NULL DEFAULT 0,
+			quality_verdict VARCHAR(20) NOT NULL DEFAULT '',
+			quality_reasons LONGTEXT NULL,
+			attempt INT NOT NULL DEFAULT 1,
+			raw_description LONGTEXT NULL,
+			input_mode VARCHAR(16) NOT NULL DEFAULT 'text',
+			transcript LONGTEXT NULL,
+			specs LONGTEXT NULL,
+			price DECIMAL(18,4) NOT NULL DEFAULT 0,
+			sale_price DECIMAL(18,4) NOT NULL DEFAULT 0,
+			stock INT NOT NULL DEFAULT 0,
+			category_ids VARCHAR(255) NOT NULL DEFAULT '',
+			copy_json LONGTEXT NULL,
+			translations LONGTEXT NULL,
+			product_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			funnel_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			content_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			post_kind VARCHAR(16) NOT NULL DEFAULT '',
+			video_prompt LONGTEXT NULL,
+			video_url VARCHAR(500) NOT NULL DEFAULT '',
+			video_approved TINYINT(1) NOT NULL DEFAULT 0,
+			provider_task_id VARCHAR(191) NOT NULL DEFAULT '',
+			provider_stage VARCHAR(32) NOT NULL DEFAULT '',
+			last_error VARCHAR(500) NOT NULL DEFAULT '',
+			retry_count INT NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY sku (sku),
+			KEY tenant_status (tenant_id,status),
+			KEY account_id (account_id),
+			KEY provider_task (provider_task_id),
+			KEY product_id (product_id)
 		) {$charset};";
 
 		// ------------------------------------------------------------ API

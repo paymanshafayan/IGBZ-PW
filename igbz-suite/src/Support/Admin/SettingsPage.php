@@ -56,6 +56,7 @@ final class SettingsPage {
 		if ( Modules::enabled( Modules::INSTAGRAM ) ) {
 			$tabs['manus']    = __( 'Manus', 'igbz-suite' );
 			$tabs['manychat'] = __( 'ManyChat', 'igbz-suite' );
+			$tabs['intake']   = __( 'Product registration', 'igbz-suite' );
 		}
 		if ( Modules::enabled( Modules::HUB ) ) {
 			$tabs['hub'] = __( 'Hub', 'igbz-suite' );
@@ -321,6 +322,115 @@ final class SettingsPage {
 						'label' => __( 'Webhook URL', 'igbz-suite' ),
 						'type'  => 'readonly',
 					],
+				];
+
+			case 'intake':
+				return [
+					[
+						'key'   => 'intake.enabled',
+						'label' => __( 'Enable registration from the app', 'igbz-suite' ),
+						'type'  => 'checkbox',
+						'help'  => __( 'Shopkeepers photograph a product in the app and the assistant does the rest. No product is ever created through the WooCommerce admin.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'intake.sku_prefix',
+						'label'       => __( 'Product code prefix', 'igbz-suite' ),
+						'placeholder' => 'IGBZ',
+						'help'        => __( 'Codes look like IGBZ-4F2K. The code is the WooCommerce SKU, it is printed on the post, and it is the word customers comment to get the purchase link — so keep it short.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'intake.quality_threshold',
+						'label' => __( 'Minimum photo score', 'igbz-suite' ),
+						'type'  => 'number',
+						'min'   => 0,
+						'max'   => 100,
+						'help'  => __( 'Photos scoring below this are sent back with the reasons so the shopkeeper can retake them. Raise it for a stricter catalogue, lower it if too many honest photos are being refused.', 'igbz-suite' ),
+					],
+					[
+						'key'     => 'intake.product_status',
+						'label'   => __( 'New products are', 'igbz-suite' ),
+						'type'    => 'select',
+						'options' => [
+							'publish' => __( 'Published immediately', 'igbz-suite' ),
+							'draft'   => __( 'Saved as drafts for review', 'igbz-suite' ),
+							'pending' => __( 'Submitted for review', 'igbz-suite' ),
+						],
+					],
+					[
+						'key'   => 'intake.image_style',
+						'label' => __( 'Product image style', 'igbz-suite' ),
+						'type'  => 'textarea',
+						'help'  => __( 'Describes the background and lighting the assistant places every product on. The product itself is never altered.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'intake.funnel_reply',
+						'label' => __( 'Direct message text', 'igbz-suite' ),
+						'type'  => 'textarea',
+						'help'  => __( 'Sent when somebody comments a product code. Use {link} for the purchase link and {coupon} for a coupon. Leave empty for the default.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'intake.funnel_per_user_limit',
+						'label' => __( 'Deliveries per person per product', 'igbz-suite' ),
+						'type'  => 'number',
+						'min'   => 1,
+						'max'   => 20,
+					],
+					[
+						'key'         => 'intake.languages',
+						'label'       => __( 'Translate listings into', 'igbz-suite' ),
+						'placeholder' => 'en, ar',
+						'help'        => __( 'Only needed when no multilingual plugin is installed. With Polylang or WPML active the language list is read from them and real translated products are created. Without one, translations are stored on the product and turned into real products the day you install a plugin.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'intake.default_language',
+						'label'       => __( 'Original language', 'igbz-suite' ),
+						'placeholder' => 'fa',
+						'help'        => __( 'Also only needed when no multilingual plugin is installed.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'stt.enabled',
+						'label' => __( 'Accept voice input', 'igbz-suite' ),
+						'type'  => 'checkbox',
+						'help'  => __( 'Shopkeepers can dictate the product description and the video brief instead of typing.', 'igbz-suite' ),
+					],
+					[
+						'key'     => 'stt.provider',
+						'label'   => __( 'Speech-to-text engine', 'igbz-suite' ),
+						'type'    => 'select',
+						'options' => [
+							'manus' => __( 'Manus (no setup, slower)', 'igbz-suite' ),
+							'http'  => __( 'Custom endpoint (Whisper or similar)', 'igbz-suite' ),
+						],
+						'help'    => __( 'Manus needs no configuration but answers in minutes rather than seconds because it runs as a task. A dedicated endpoint is near-instant. Whichever is chosen, Manus is the fallback if it fails.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'stt.endpoint',
+						'label'       => __( 'Endpoint URL', 'igbz-suite' ),
+						'placeholder' => 'https://api.openai.com/v1/audio/transcriptions',
+					],
+					[ 'key' => 'stt.api_key', 'label' => __( 'Endpoint API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'stt.model', 'label' => __( 'Model', 'igbz-suite' ), 'placeholder' => 'whisper-1' ],
+					[ 'key' => 'stt.language', 'label' => __( 'Spoken language', 'igbz-suite' ), 'placeholder' => 'fa' ],
+					[
+						'key'         => 'stt.file_field',
+						'label'       => __( 'Audio field name', 'igbz-suite' ),
+						'placeholder' => 'file',
+						'help'        => __( 'The multipart field the service expects the recording under. Whisper uses "file"; some services use "audio".', 'igbz-suite' ),
+					],
+					[ 'key' => 'stt.auth_header', 'label' => __( 'Authentication header', 'igbz-suite' ), 'placeholder' => 'Authorization' ],
+					[
+						'key'         => 'stt.auth_scheme',
+						'label'       => __( 'Authentication scheme', 'igbz-suite' ),
+						'placeholder' => 'Bearer',
+						'help'        => __( 'Leave empty to send the key on its own, which is what X-API-KEY style headers expect.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'stt.response_path',
+						'label'       => __( 'Transcript field', 'igbz-suite' ),
+						'placeholder' => 'text',
+						'help'        => __( 'Where the transcript sits in the reply, dotted for nested values. Leave empty and the usual field names are tried.', 'igbz-suite' ),
+					],
+					[ 'key' => 'stt.timeout', 'label' => __( 'Request timeout (seconds)', 'igbz-suite' ), 'type' => 'number', 'min' => 10, 'max' => 600 ],
 				];
 
 			case 'hub':

@@ -33,6 +33,7 @@ final class Settings {
 		'lms.video_hmac_secret',
 		'hub.vip_link_secret',
 		'canva.api_key',
+		'stt.api_key',
 	];
 
 	/** @return array<string,mixed> */

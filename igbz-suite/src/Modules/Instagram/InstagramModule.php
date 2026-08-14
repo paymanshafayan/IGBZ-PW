@@ -6,10 +6,19 @@ use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
 use IGBZ\Suite\Modules\Instagram\Services\ContentScheduler;
 use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
 use IGBZ\Suite\Modules\Instagram\Services\InsightsService;
+use IGBZ\Suite\Modules\Instagram\Services\IntakeWorker;
 use IGBZ\Suite\Modules\Instagram\Services\ManusClient;
 use IGBZ\Suite\Modules\Instagram\Services\ManusService;
+use IGBZ\Suite\Modules\Instagram\Services\ManyChatBridge;
+use IGBZ\Suite\Modules\Instagram\Services\ProductIntakeService;
+use IGBZ\Suite\Modules\Instagram\Services\ProductPublisher;
 use IGBZ\Suite\Modules\Instagram\Services\PromptBuilder;
+use IGBZ\Suite\Modules\Instagram\Services\SkuGenerator;
 use IGBZ\Suite\Modules\Instagram\Services\SubscriberService;
+use IGBZ\Suite\Modules\Instagram\Services\TranslationBridge;
+use IGBZ\Suite\Modules\Instagram\Speech\HttpSpeechToText;
+use IGBZ\Suite\Modules\Instagram\Speech\ManusSpeechToText;
+use IGBZ\Suite\Modules\Instagram\Speech\SpeechToText;
 use IGBZ\Suite\Modules\Instagram\Webhooks\ManusWebhook;
 use IGBZ\Suite\Modules\Instagram\Webhooks\ManyChatWebhook;
 use IGBZ\Suite\Support\Cron;
@@ -55,7 +64,9 @@ final class InstagramModule implements ModuleInterface {
 			$plugin->db(),
 			$plugin->get( 'ig.manus' ),
 			$plugin->logger(),
-			$plugin->get( 'ig.credentials' )
+			$plugin->get( 'ig.credentials' ),
+			$plugin->get( 'ig.intake' ),
+			$plugin->get( 'ig.intake_worker' )
 		) )->register();
 
 		add_action( Cron::HOOK_FIVE_MINUTES, [ $this, 'run_five_minutes' ] );
@@ -65,8 +76,12 @@ final class InstagramModule implements ModuleInterface {
 		// Products deleted in WooCommerce must not leave funnels pointing at a 404.
 		add_action( 'before_delete_post', [ $this, 'detach_deleted_product' ] );
 
+		// A registration is only finished once its post is actually live.
+		add_action( 'igbz_ig_content_published', [ $this, 'close_intake_for_content' ], 10, 2 );
+
 		if ( is_admin() ) {
 			( new Admin\AccountsPage() )->register();
+			( new Admin\IntakePage() )->register();
 			( new Admin\ContentPage() )->register();
 			( new Admin\FunnelsPage() )->register();
 			( new Admin\SubscribersPage() )->register();
@@ -124,6 +139,57 @@ final class InstagramModule implements ModuleInterface {
 				$c->get( 'ig.credentials' )
 			)
 		);
+
+		// ------------------------------------------- product registration
+
+		$plugin->bind( 'ig.skus', static fn ( Plugin $c ) => new SkuGenerator( $c->db() ) );
+		$plugin->bind( 'ig.translations', static fn ( Plugin $c ) => new TranslationBridge( $c->logger() ) );
+		$plugin->bind(
+			'ig.manychat_bridge',
+			static fn ( Plugin $c ) => new ManyChatBridge( $c->get( 'ig.manychat' ), $c->get( 'ig.credentials' ), $c->logger() )
+		);
+		$plugin->bind(
+			'ig.intake',
+			static fn ( Plugin $c ) => new ProductIntakeService(
+				$c->db(),
+				$c->get( 'ig.manus' ),
+				$c->get( 'ig.skus' ),
+				$c->logger()
+			)
+		);
+		$plugin->bind(
+			'ig.publisher',
+			static fn ( Plugin $c ) => new ProductPublisher(
+				$c->get( 'ig.intake' ),
+				$c->get( 'ig.funnels' ),
+				$c->get( 'ig.manus' ),
+				$c->get( 'ig.translations' ),
+				$c->get( 'ig.manychat_bridge' ),
+				$c->logger()
+			)
+		);
+		$plugin->bind(
+			'ig.intake_worker',
+			static fn ( Plugin $c ) => new IntakeWorker(
+				$c->get( 'ig.intake' ),
+				$c->get( 'ig.publisher' ),
+				$c->get( 'ig.manus' ),
+				$c->logger()
+			)
+		);
+
+		// Speech to text: a pluggable engine with Manus as the always-available fallback.
+		$plugin->bind( 'ig.stt_http', static fn ( Plugin $c ) => new HttpSpeechToText( $c->settings(), $c->logger() ) );
+		$plugin->bind( 'ig.stt_manus', static fn ( Plugin $c ) => new ManusSpeechToText( $c->get( 'ig.manus' ), $c->logger() ) );
+		$plugin->bind(
+			'ig.stt',
+			static fn ( Plugin $c ) => new SpeechToText(
+				$c->settings(),
+				$c->logger(),
+				$c->get( 'ig.stt_http' ),
+				$c->get( 'ig.stt_manus' )
+			)
+		);
 	}
 
 	// ------------------------------------------------------------------ cron
@@ -132,6 +198,12 @@ final class InstagramModule implements ModuleInterface {
 		/** @var ContentScheduler $scheduler */
 		$scheduler = igbz()->get( 'ig.scheduler' );
 		$scheduler->tick();
+
+		// The webhook is the fast path for a finished Manus task; this is the guarantee that a
+		// registration is never stranded by a callback that never arrived.
+		/** @var IntakeWorker $worker */
+		$worker = igbz()->get( 'ig.intake_worker' );
+		$worker->tick();
 	}
 
 	public function run_hourly(): void {
@@ -145,6 +217,31 @@ final class InstagramModule implements ModuleInterface {
 	public function run_daily(): void {
 		if ( igbz()->settings()->bool( 'manus.collect_insights', true ) ) {
 			igbz()->get( 'ig.insights' )->collect_all();
+		}
+	}
+
+	/**
+	 * Close the registration whose post has just gone live.
+	 *
+	 * The registration and the content row are two different things with two different
+	 * lifecycles: the content row is published by the scheduler, and the registration only counts
+	 * as finished when that happens. Listening to the event rather than assuming means a post
+	 * published by hand, by cron or by the webhook all close the loop identically.
+	 *
+	 * @param int    $content_id
+	 * @param string $permalink
+	 */
+	public function close_intake_for_content( $content_id, $permalink = '' ): void {
+		unset( $permalink );
+
+		$db  = igbz()->db();
+		$row = $db->row(
+			'SELECT id FROM ' . $db->table( 'ig_intake' ) . ' WHERE content_id = %d ORDER BY id DESC LIMIT 1',
+			(int) $content_id
+		);
+
+		if ( $row ) {
+			igbz()->get( 'ig.intake' )->mark_published( (int) $row['id'] );
 		}
 	}
 
@@ -336,6 +433,101 @@ final class InstagramModule implements ModuleInterface {
 			'label'  => __( 'Content pipeline', 'igbz-suite' ),
 			'status' => ( $failed > 0 || $unverified > 0 ) ? 'warn' : 'ok',
 			'detail' => $detail,
+		];
+
+		foreach ( $this->intake_health() as $row ) {
+			$rows[] = $row;
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * Health of the phone-to-Instagram registration flow.
+	 *
+	 * @return array<int,array{label:string,status:string,detail:string}>
+	 */
+	private function intake_health(): array {
+		$rows   = [];
+		$intake = igbz()->get( 'ig.intake' );
+		$counts = $intake->counts_by_status();
+
+		$stuck = (int) ( $counts[ ProductIntakeService::STATUS_FAILED ] ?? 0 );
+		$open  = array_sum( $counts ) - $stuck
+			- (int) ( $counts[ ProductIntakeService::STATUS_PUBLISHED ] ?? 0 )
+			- (int) ( $counts[ ProductIntakeService::STATUS_SCHEDULED ] ?? 0 );
+
+		$rows[] = [
+			'label'  => __( 'Product registration', 'igbz-suite' ),
+			'status' => $stuck > 0 ? 'warn' : 'ok',
+			'detail' => sprintf(
+				/* translators: 1: registrations in progress, 2: failed registrations */
+				__( '%1$d registration(s) in progress, %2$d failed. Products are created from the app; nobody has to open the WooCommerce editor.', 'igbz-suite' ),
+				max( 0, $open ),
+				$stuck
+			),
+		];
+
+		// The one dependency the flow cannot work around: an intake needs an account to borrow a
+		// Manus key from, and without one every registration fails at the first step.
+		$accounts = (int) igbz()->db()->scalar(
+			'SELECT COUNT(*) FROM ' . igbz()->db()->table( 'ig_accounts' ) . ' WHERE is_active = 1'
+		);
+
+		if ( 0 === $accounts ) {
+			$rows[] = [
+				'label'  => __( 'Registration prerequisites', 'igbz-suite' ),
+				'status' => 'error',
+				'detail' => __( 'No active Instagram account, so the assistant has no API key to work with and registrations will fail at the photo check. Add one under IGBZ → IG Accounts.', 'igbz-suite' ),
+			];
+		}
+
+		/** @var \IGBZ\Suite\Modules\Instagram\Speech\SpeechToText $speech */
+		$speech    = igbz()->get( 'ig.stt' );
+		$preferred = $speech->preferred();
+		$voice_on  = igbz()->settings()->bool( 'stt.enabled', true );
+
+		$rows[] = [
+			'label'  => __( 'Voice input', 'igbz-suite' ),
+			'status' => ! $voice_on ? 'warn' : 'ok',
+			'detail' => ! $voice_on
+				? __( 'Switched off. Shopkeepers must type the product description.', 'igbz-suite' )
+				: ( $preferred->is_configured()
+					? sprintf( /* translators: %s: engine name */ __( 'Using %s.', 'igbz-suite' ), $preferred->title() )
+					: sprintf(
+						/* translators: %s: engine name */
+						__( '%s is selected but not configured, so voice notes fall back to Manus, which takes minutes rather than seconds.', 'igbz-suite' ),
+						$preferred->title()
+					) ),
+		];
+
+		/** @var \IGBZ\Suite\Modules\Instagram\Services\TranslationBridge $translations */
+		$translations = igbz()->get( 'ig.translations' );
+		$engine       = $translations->engine();
+		$targets      = $translations->target_languages();
+
+		$rows[] = [
+			'label'  => __( 'Listing translations', 'igbz-suite' ),
+			'status' => 'ok',
+			'detail' => match ( $engine ) {
+				\IGBZ\Suite\Modules\Instagram\Services\TranslationBridge::ENGINE_POLYLANG => sprintf(
+					/* translators: %s: comma separated language codes */
+					__( 'Polylang detected. Real translated products are created and linked for: %s', 'igbz-suite' ),
+					$targets ? implode( ', ', $targets ) : __( 'no extra languages configured', 'igbz-suite' )
+				),
+				\IGBZ\Suite\Modules\Instagram\Services\TranslationBridge::ENGINE_WPML     => sprintf(
+					/* translators: %s: comma separated language codes */
+					__( 'WPML detected. Real translated products are created and linked for: %s', 'igbz-suite' ),
+					$targets ? implode( ', ', $targets ) : __( 'no extra languages configured', 'igbz-suite' )
+				),
+				default                                                                   => $targets
+					? sprintf(
+						/* translators: %s: comma separated language codes */
+						__( 'No multilingual plugin, so translations into %s are stored on each product and can be turned into real products later.', 'igbz-suite' ),
+						implode( ', ', $targets )
+					)
+					: __( 'Single language store; listings are written once.', 'igbz-suite' ),
+			},
 		];
 
 		return $rows;

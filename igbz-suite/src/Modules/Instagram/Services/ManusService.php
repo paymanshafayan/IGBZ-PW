@@ -2,6 +2,7 @@
 namespace IGBZ\Suite\Modules\Instagram\Services;
 
 use IGBZ\Suite\Modules\Instagram\Contracts\ContentGeneratorInterface;
+use IGBZ\Suite\Modules\Instagram\Contracts\IntakeAgentInterface;
 use IGBZ\Suite\Modules\Instagram\Contracts\PublishResult;
 use IGBZ\Suite\Modules\Instagram\Contracts\PublisherInterface;
 use IGBZ\Suite\Support\Crypto;
@@ -21,7 +22,7 @@ defined( 'ABSPATH' ) || exit;
  * Every call is asynchronous: we store the returned task id on the content row and a cron worker
  * (ContentScheduler) reconciles the state, or the Manus webhook pushes it to us.
  */
-final class ManusService implements ContentGeneratorInterface, PublisherInterface {
+final class ManusService implements ContentGeneratorInterface, PublisherInterface, IntakeAgentInterface {
 
 	public const KIND_POST     = 'post';
 	public const KIND_CAROUSEL = 'carousel';
@@ -299,11 +300,125 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		);
 	}
 
+	// ------------------------------------------------ product registration
+
+	/**
+	 * Grade a product photograph. Step 3 of the registration flow.
+	 *
+	 * @param array<string,mixed> $account
+	 */
+	public function grade_photo( array $account, string $image_url, string $hint = '' ): string {
+		return $this->dispatch(
+			$this->prompts->photo_quality( $account, $hint ),
+			$account,
+			__( 'Product photo check', 'igbz-suite' ),
+			[],
+			[
+				'attachments'              => [ $image_url ],
+				'structured_output_schema' => $this->prompts->photo_quality_schema(),
+				'hide_in_task_list'        => true,
+			]
+		);
+	}
+
+	/**
+	 * Turn a shop photo into a commercial product image. Step 4.
+	 *
+	 * @param array<string,mixed> $account
+	 * @param array<string,mixed> $brief
+	 */
+	public function prepare_product_image( array $account, string $image_url, array $brief = [] ): string {
+		return $this->dispatch(
+			$this->prompts->product_image( $account, $brief ),
+			$account,
+			sprintf( /* translators: %s: product name */ __( 'Product image: %s', 'igbz-suite' ), (string) ( $brief['product'] ?? '' ) ),
+			igbz()->settings()->bool( 'manus.use_canva', true ) ? [ 'canva' ] : [],
+			[ 'attachments' => [ $image_url ] ]
+		);
+	}
+
+	/**
+	 * Write the listing copy, optionally translated. Step 7.
+	 *
+	 * @param array<string,mixed> $account
+	 * @param array<string,mixed> $brief
+	 */
+	public function write_product_copy( array $account, array $brief, string $image_url = '' ): string {
+		$languages = array_map( 'strval', (array) ( $brief['languages'] ?? [] ) );
+
+		return $this->dispatch(
+			$this->prompts->product_copy( $account, $brief ),
+			$account,
+			sprintf( /* translators: %s: product code */ __( 'Product listing: %s', 'igbz-suite' ), (string) ( $brief['sku'] ?? '' ) ),
+			[],
+			[
+				'attachments'              => '' !== $image_url ? [ $image_url ] : [],
+				'structured_output_schema' => $this->prompts->product_copy_schema( $languages ),
+			]
+		);
+	}
+
+	/**
+	 * Produce the product video. Step 10.
+	 *
+	 * @param array<string,mixed> $account
+	 * @param array<string,mixed> $brief
+	 */
+	public function produce_product_video( array $account, array $brief, string $image_url = '' ): string {
+		return $this->dispatch(
+			$this->prompts->product_video( $account, $brief ),
+			$account,
+			sprintf( /* translators: %s: product code */ __( 'Product video: %s', 'igbz-suite' ), (string) ( $brief['sku'] ?? '' ) ),
+			[],
+			[ 'attachments' => '' !== $image_url ? [ $image_url ] : [] ]
+		);
+	}
+
+	/**
+	 * Stamp the code onto the image and write the comment-to-DM caption. Step 11.
+	 *
+	 * @param array<string,mixed> $account
+	 * @param array<string,mixed> $brief
+	 */
+	public function finish_product_post( array $account, array $brief, string $image_url = '' ): string {
+		return $this->dispatch(
+			$this->prompts->product_post( $account, $brief ),
+			$account,
+			sprintf( /* translators: %s: product code */ __( 'Instagram post: %s', 'igbz-suite' ), (string) ( $brief['sku'] ?? '' ) ),
+			igbz()->settings()->bool( 'manus.use_canva', true ) ? [ 'canva' ] : [],
+			[ 'attachments' => '' !== $image_url ? [ $image_url ] : [] ]
+		);
+	}
+
+	/**
+	 * Transcribe a voice note through Manus. The fallback speech-to-text path.
+	 *
+	 * @param array<string,mixed> $account
+	 */
+	public function transcribe_audio( array $account, string $audio_url, string $language = '' ): string {
+		return $this->dispatch(
+			$this->prompts->transcription( $account, $language ),
+			$account,
+			__( 'Voice note transcription', 'igbz-suite' ),
+			[],
+			[
+				'attachments'              => [ $audio_url ],
+				'structured_output_schema' => [
+					'type'       => 'object',
+					'properties' => [ 'text' => [ 'type' => 'string' ] ],
+					'required'   => [ 'text' ],
+				],
+				'hide_in_task_list'        => true,
+			]
+		);
+	}
+
 	/**
 	 * @param array<string,mixed> $account
 	 * @param array<int,string>   $connectors
+	 * @param array<string,mixed> $options    Extra task options: attachments, structured_output_schema, …
 	 */
-	private function dispatch( string $prompt, array $account, string $title, array $connectors = [] ): string {
+	private function dispatch( string $prompt, array $account, string $title, array $connectors = [], array $options = [] ): string {
 		if ( ! $this->account_is_configured( $account ) ) {
 			$reason = $this->credentials->trial_blocked_reason( $account );
 			$this->logger->error(
@@ -328,11 +443,19 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 
 		$result = $this->client_for( $account )->create_task(
 			$prompt,
-			[
-				'project_id' => (string) ( $account['manus_project_id'] ?? '' ),
-				'title'      => $title,
-				'connectors' => $connectors,
-			]
+			array_filter(
+				array_merge(
+					$options,
+					[
+						'project_id' => (string) ( $account['manus_project_id'] ?? '' ),
+						'title'      => $title,
+						'connectors' => $connectors,
+					]
+				),
+				// array_filter drops empty attachment lists and empty schemas, which
+				// create_task() would otherwise have to special-case one by one.
+				static fn ( $value ): bool => ! ( is_array( $value ) && ! $value ) && '' !== $value
+			)
 		);
 
 		if ( ! $result['ok'] ) {

@@ -222,6 +222,93 @@ function absint( $value ): int {
 	return abs( (int) $value );
 }
 
+function sanitize_textarea_field( string $value ): string {
+	return trim( $value );
+}
+
+function wp_strip_all_tags( string $value ): string {
+	return trim( strip_tags( $value ) );
+}
+
+/** The signed-in user. Tests set $GLOBALS['igbz_test_user_id'] when the identity matters. */
+function get_current_user_id(): int {
+	return (int) ( $GLOBALS['igbz_test_user_id'] ?? 0 );
+}
+
+/**
+ * Product categories, keyed by term id.
+ *
+ * @var array<int,object>
+ */
+$GLOBALS['igbz_test_terms'] = [];
+
+function get_term( int $term_id, string $taxonomy = '' ) {
+	unset( $taxonomy );
+	return $GLOBALS['igbz_test_terms'][ $term_id ] ?? null;
+}
+
+function igbz_test_add_term( int $term_id, string $name ): void {
+	$GLOBALS['igbz_test_terms'][ $term_id ] = (object) [ 'term_id' => $term_id, 'name' => $name ];
+}
+
+// -------------------------------------------------------------------- media
+//
+// The intake pipeline copies every asset Manus produces into the media library, because a Manus
+// attachment URL expires and a product image that 404s a fortnight later is worse than no
+// automation at all. There is no filesystem or HTTP here, so the sideload is doubled: by default
+// it "succeeds" and hands back a local-looking URL. Setting $GLOBALS['igbz_test_sideload_fails']
+// exercises the other branch, where the remote URL is kept rather than the registration failing.
+
+$GLOBALS['igbz_test_sideload_fails'] = false;
+$GLOBALS['igbz_test_attachments']    = [];
+
+function media_handle_sideload( array $file, int $post_id = 0, $desc = null, array $post_data = [] ) {
+	unset( $post_id, $desc, $post_data );
+
+	if ( $GLOBALS['igbz_test_sideload_fails'] ) {
+		return new WP_Error( 'sideload failed' );
+	}
+
+	$id = count( $GLOBALS['igbz_test_attachments'] ) + 900;
+
+	$GLOBALS['igbz_test_attachments'][ $id ] = 'https://shop.test/wp-content/uploads/' . (string) ( $file['name'] ?? 'file' );
+
+	return $id;
+}
+
+function download_url( string $url, int $timeout = 300 ) {
+	unset( $timeout );
+
+	return $GLOBALS['igbz_test_sideload_fails'] ? new WP_Error( 'download failed' ) : '/tmp/igbz-' . md5( $url );
+}
+
+function wp_get_attachment_url( int $attachment_id ) {
+	return $GLOBALS['igbz_test_attachments'][ $attachment_id ] ?? false;
+}
+
+function wp_delete_file( string $path ): void {
+	unset( $path );
+}
+
+function wp_check_filetype( string $filename, $mimes = null ): array {
+	unset( $mimes );
+
+	$extension = strtolower( (string) pathinfo( $filename, PATHINFO_EXTENSION ) );
+	$known     = [
+		'jpg'  => 'image/jpeg',
+		'jpeg' => 'image/jpeg',
+		'png'  => 'image/png',
+		'webp' => 'image/webp',
+		'mp4'  => 'video/mp4',
+		'm4a'  => 'audio/m4a',
+		'mp3'  => 'audio/mpeg',
+		'wav'  => 'audio/wav',
+		'ogg'  => 'audio/ogg',
+	];
+
+	return [ 'ext' => $extension, 'type' => $known[ $extension ] ?? '' ];
+}
+
 function wp_parse_args( $args, array $defaults = [] ): array {
 	return array_merge( $defaults, is_array( $args ) ? $args : [] );
 }
@@ -543,6 +630,10 @@ function igbz_test_reset_settings(): \IGBZ\Suite\Support\Settings {
 	$GLOBALS['igbz_test_http_requests'] = [];
 	$GLOBALS['igbz_test_scheduled']     = [];
 	$GLOBALS['igbz_test_users']         = [];
+	$GLOBALS['igbz_test_terms']          = [];
+	$GLOBALS['igbz_test_user_id']        = 0;
+	$GLOBALS['igbz_test_sideload_fails'] = false;
+	$GLOBALS['igbz_test_attachments']    = [];
 	igbz_test_reset_actions();
 	igbz()->bind( 'settings', static fn () => new \IGBZ\Suite\Support\Settings() );
 	igbz()->bind( 'logger', static fn ( $c ) => new \IGBZ\Suite\Support\Logger( $c->get( 'settings' ) ) );

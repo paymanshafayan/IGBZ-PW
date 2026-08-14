@@ -146,6 +146,276 @@ final class PromptBuilder {
 		return (string) apply_filters( 'igbz_manus_prompt_publish', $prompt, $account, $content, $timestamp );
 	}
 
+	// ------------------------------------------------- product registration
+
+	/**
+	 * Grade a photograph shot in the shop before any money is spent processing it.
+	 *
+	 * This is the gate at step 3 of the registration flow, and its whole value is in the
+	 * rejection path: telling somebody "try again" is useless, so the schema forces a list of
+	 * concrete, fixable reasons ("the product is cut off at the bottom", "the background is a
+	 * patterned rug") rather than a score the app would have to invent an explanation for.
+	 *
+	 * `background_removal_ready` and `video_ready` are asked separately because they fail for
+	 * different reasons: a busy background ruins the cutout but is fine for a video, while
+	 * motion blur ruins both.
+	 *
+	 * @param array<string,mixed> $account
+	 */
+	public function photo_quality( array $account, string $hint = '' ): string {
+		$threshold = igbz()->settings()->int( 'intake.quality_threshold', 60 );
+
+		$prompt = $this->context( $account ) . "\n\n"
+			. "Task: assess the attached product photograph for an e-commerce listing and an Instagram post.\n"
+			. ( '' !== $hint ? "What the seller says this is: {$hint}\n" : '' )
+			. "Judge it on: is the product the clear subject, is it fully in frame, is it in focus, is the lighting even, "
+			. "is the background clean enough for automatic background removal, is the resolution adequate, and is there "
+			. "any distracting clutter, glare, hand, or reflection.\n"
+			. sprintf( "A total score below %d means the photo must be retaken.\n", $threshold )
+			. "If the photo is not usable, every reason must be specific and actionable — say exactly what is wrong and "
+			. "what the seller should do differently, in one short sentence each. Never give a vague reason.\n"
+			. "Write the reasons and the suggestion in " . igbz()->settings()->string( 'manus.content_language', 'Persian (Farsi)' ) . ".\n"
+			. "Answer with JSON only, no prose: "
+			. '{"verdict": "accept" | "reject", "score": 0-100, "background_removal_ready": true|false, '
+			. '"video_ready": true|false, "detected_product": "...", "reasons": ["..."], "suggestion": "..."}';
+
+		return (string) apply_filters( 'igbz_manus_prompt_photo_quality', $prompt, $account, $hint );
+	}
+
+	/** The JSON shape enforced on the photo verdict, so the answer never has to be guessed at. */
+	public function photo_quality_schema(): array {
+		return [
+			'type'       => 'object',
+			'properties' => [
+				'verdict'                  => [ 'type' => 'string', 'enum' => [ 'accept', 'reject' ] ],
+				'score'                    => [ 'type' => 'integer' ],
+				'background_removal_ready' => [ 'type' => 'boolean' ],
+				'video_ready'              => [ 'type' => 'boolean' ],
+				'detected_product'         => [ 'type' => 'string' ],
+				'reasons'                  => [ 'type' => 'array', 'items' => [ 'type' => 'string' ] ],
+				'suggestion'               => [ 'type' => 'string' ],
+			],
+			'required'   => [ 'verdict', 'score', 'reasons' ],
+		];
+	}
+
+	/**
+	 * Turn the shop photo into something that can go on a product page.
+	 *
+	 * Step 4. The output is a catalogue image, not artwork: the instruction is explicit that the
+	 * product itself must not be restyled, because an AI that "improves" a handbag's colour has
+	 * produced a photograph of something the customer will not receive.
+	 *
+	 * @param array<string,mixed> $account
+	 * @param array<string,mixed> $brief
+	 */
+	public function product_image( array $account, array $brief ): string {
+		$style = igbz()->settings()->string( 'intake.image_style', 'clean seamless studio background in a very light neutral tone with a soft natural shadow under the product' );
+
+		$prompt = $this->context( $account ) . "\n\n"
+			. "Task: turn the attached photograph into a commercial product image ready for an online store.\n"
+			. ( ! empty( $brief['product'] ) ? sprintf( "Product: %s\n", (string) $brief['product'] ) : '' )
+			. "Steps: cut the product out of its current background precisely, including thin details and edges; "
+			. sprintf( "place it on a %s; ", $style )
+			. "relight it so the illumination is even and the material reads correctly; correct the white balance; "
+			. "straighten and centre it with comfortable margins.\n"
+			. "Absolute rule: do not alter the product itself. Its shape, colour, texture, pattern, logo and any text on "
+			. "it must stay exactly as photographed. Do not add, remove or invent any part of it. This image will be sold "
+			. "against, so it has to be an honest photograph of the real item.\n"
+			. "Produce a square 1500x1500 px JPEG for the storefront and a 1080x1350 px version for Instagram, and attach "
+			. "both to this task.\n"
+			. "Also attach a result.json containing: {\"main\": \"<file name of the square image>\", \"social\": \"<file name of the vertical image>\", \"notes\": \"...\"}";
+
+		return (string) apply_filters( 'igbz_manus_prompt_product_image', $prompt, $account, $brief );
+	}
+
+	/**
+	 * Write the listing from whatever the seller dictated or typed.
+	 *
+	 * Step 7. The hard constraint here is commercial rather than editorial: the seller owns the
+	 * price, the stock and the category, and the model owns the words. An AI that infers "this
+	 * looks like a 2,000,000 rial bag" would be inventing the one number a shop cannot afford to
+	 * have invented, so the prompt is explicit that no price appears anywhere in the output.
+	 *
+	 * @param array<string,mixed> $account
+	 * @param array<string,mixed> $brief
+	 */
+	public function product_copy( array $account, array $brief ): string {
+		$language  = igbz()->settings()->string( 'manus.content_language', 'Persian (Farsi)' );
+		$languages = (array) ( $brief['languages'] ?? [] );
+
+		$prompt = $this->context( $account ) . "\n\n"
+			. "Task: write the WooCommerce listing for a product the shopkeeper has just registered from their phone.\n"
+			. "What the shopkeeper said about it, verbatim:\n\"\"\"\n" . (string) ( $brief['description'] ?? '' ) . "\n\"\"\"\n"
+			. ( ! empty( $brief['category'] ) ? sprintf( "Category chosen by the shopkeeper: %s\n", (string) $brief['category'] ) : '' )
+			. ( ! empty( $brief['sku'] ) ? sprintf( "Product code: %s\n", (string) $brief['sku'] ) : '' )
+			. "The product photograph is attached; use it to get details the shopkeeper did not mention, such as colour, "
+			. "material and form.\n\n"
+			. "Produce:\n"
+			. "1. title: a short, searchable product name, at most 70 characters. No marketing adjectives stacked up.\n"
+			. "2. short_description: two or three sentences, the reason to buy it.\n"
+			. "3. description: 120 to 220 words of clean HTML using only <p>, <ul>, <li> and <strong>. Describe the item, "
+			. "the material, how it is used and who it suits. Do not invent facts that are neither in the photo nor in "
+			. "what the shopkeeper said.\n"
+			. "4. specs: an object of attribute name to value, only for attributes you can actually see or that were "
+			. "stated — for example colour, material, size, weight, country of origin. Leave it small rather than padding it.\n"
+			. "5. tags: five to ten search terms.\n"
+			. "6. seo_title and seo_description.\n"
+			. "7. alt_text for the photograph.\n\n"
+			. "Hard rules: never state, guess or imply a price, a discount, or a stock quantity — the shopkeeper sets "
+			. "those and any number you write would be wrong. Never promise a delivery time or a warranty. "
+			. sprintf( "Write everything in %s.\n", $language );
+
+		if ( $languages ) {
+			$prompt .= sprintf(
+				"\nThe store is multilingual. Also translate title, short_description, description, specs values, tags, "
+					. "seo_title and seo_description into: %s. Translate, do not re-invent: the meaning must match the "
+					. "original exactly. Return them under a \"translations\" object keyed by the language code.\n",
+				implode( ', ', array_map( 'strval', $languages ) )
+			);
+		}
+
+		$prompt .= "\nAnswer with JSON only, no prose and no commentary.";
+
+		return (string) apply_filters( 'igbz_manus_prompt_product_copy', $prompt, $account, $brief );
+	}
+
+	/** @param array<int,string> $languages */
+	public function product_copy_schema( array $languages = [] ): array {
+		$fields = [
+			'title'             => [ 'type' => 'string' ],
+			'short_description' => [ 'type' => 'string' ],
+			'description'       => [ 'type' => 'string' ],
+			'specs'             => [ 'type' => 'object' ],
+			'tags'              => [ 'type' => 'array', 'items' => [ 'type' => 'string' ] ],
+			'seo_title'         => [ 'type' => 'string' ],
+			'seo_description'   => [ 'type' => 'string' ],
+			'alt_text'          => [ 'type' => 'string' ],
+		];
+
+		$schema = [
+			'type'       => 'object',
+			'properties' => $fields,
+			'required'   => [ 'title', 'description' ],
+		];
+
+		if ( $languages ) {
+			$schema['properties']['translations'] = [
+				'type'       => 'object',
+				'properties' => array_fill_keys(
+					array_map( 'strval', $languages ),
+					[ 'type' => 'object', 'properties' => $fields ]
+				),
+			];
+		}
+
+		return $schema;
+	}
+
+	/**
+	 * Produce the Instagram video for a registered product.
+	 *
+	 * Step 10. Unlike the generic reel prompt this one is anchored to a real product photo and a
+	 * real product code: the code has to be legible on screen for long enough to be typed into a
+	 * comment, which is the entire mechanism by which the post turns into a sale.
+	 *
+	 * @param array<string,mixed> $account
+	 * @param array<string,mixed> $brief
+	 */
+	public function product_video( array $account, array $brief ): string {
+		$seconds = (int) ( $brief['duration'] ?? igbz()->settings()->int( 'manus.reel_seconds', 25 ) );
+		$sku     = (string) ( $brief['sku'] ?? '' );
+
+		$prompt = $this->context( $account ) . "\n\n"
+			. sprintf( "Task: produce a %d second vertical Instagram video (1080x1920, 30fps, MP4) for a product.\n", $seconds )
+			. sprintf( "Product: %s\n", (string) ( $brief['title'] ?? '' ) )
+			. ( ! empty( $brief['summary'] ) ? sprintf( "About it: %s\n", (string) $brief['summary'] ) : '' )
+			. "The product photograph is attached and is the hero of the video; animate around it rather than replacing it.\n"
+			. ( ! empty( $brief['prompt'] ) ? sprintf( "What the shopkeeper asked for, verbatim: \"\"\"\n%s\n\"\"\"\n", (string) $brief['prompt'] ) : '' )
+			. "Include a hook in the first two seconds, three to five scenes, and burned-in subtitles with correct RTL "
+			. "shaping.\n"
+			. ( '' !== $sku
+				? sprintf(
+					"Burn the product code %s onto the video in a clearly legible style, on screen for at least the last "
+						. "four seconds and again near the start. It must be readable at a glance on a phone, because "
+						. "viewers type it into the comments to get the purchase link.\n",
+					$sku
+				)
+				: '' )
+			. "Pick a trending, licence-safe audio track suited to this niche.\n"
+			. "Attach the finished MP4 and a cover.jpg thumbnail.";
+
+		return (string) apply_filters( 'igbz_manus_prompt_product_video', $prompt, $account, $brief );
+	}
+
+	/**
+	 * Stamp the code onto a still image and write the comment-to-DM caption.
+	 *
+	 * Step 11 for image posts. Both halves are one task on purpose: the caption tells people to
+	 * comment the code and the image shows them the code, so a model that produced one without
+	 * the other would ship a post that cannot convert.
+	 *
+	 * @param array<string,mixed> $account
+	 * @param array<string,mixed> $brief
+	 */
+	public function product_post( array $account, array $brief ): string {
+		$sku      = (string) ( $brief['sku'] ?? '' );
+		$language = igbz()->settings()->string( 'manus.content_language', 'Persian (Farsi)' );
+
+		$prompt = $this->context( $account ) . "\n\n"
+			. "Task: finish an Instagram post for a product that has just been listed in the shop.\n"
+			. sprintf( "Product: %s\n", (string) ( $brief['title'] ?? '' ) )
+			. ( ! empty( $brief['summary'] ) ? sprintf( "About it: %s\n", (string) $brief['summary'] ) : '' )
+			. ( ! empty( $brief['price'] ) ? sprintf( "Price to mention if it fits naturally: %s\n", (string) $brief['price'] ) : '' )
+			. "The product image is attached.\n\n"
+			. ( '' !== $sku
+				? sprintf(
+					"1. Overlay the product code %s onto the image. Place it where it does not cover the product, in a "
+						. "high-contrast, unambiguous style, large enough to read on a phone at a glance. Keep the "
+						. "1080x1350 px format and attach the result as a PNG.\n",
+					$sku
+				)
+				: "1. Keep the attached image as it is and re-attach it as a PNG.\n" )
+			. sprintf(
+				"2. Write the caption in %s. It must open with a hook, give three to five short lines of real value about "
+					. "the product, and end with one unmistakable call to action: comment the exact word \"%s\" under "
+					. "this post and the purchase link is sent straight to their direct messages. Say the code exactly "
+					. "as written, on its own line, so nobody mistypes it.\n",
+				$language,
+				$sku
+			)
+			. "3. Pick 15 to 25 hashtags: a few large, several mid-sized and several niche ones that this account can "
+			. "realistically rank in. No banned or spammy tags.\n"
+			. "4. Write alt_text for the image.\n\n"
+			. "Answer with JSON only: {\"caption\": \"...\", \"hashtags\": [\"...\"], \"alt_text\": \"...\", \"first_comment\": \"...\"}";
+
+		return (string) apply_filters( 'igbz_manus_prompt_product_post', $prompt, $account, $brief );
+	}
+
+	/**
+	 * Transcribe a voice note.
+	 *
+	 * The fallback path when no dedicated speech-to-text endpoint is configured. Kept blunt: the
+	 * one failure mode that matters is a model that decides to summarise or tidy up what it heard,
+	 * because the transcript is then fed to the listing writer as if it were the seller's own
+	 * words.
+	 *
+	 * @param array<string,mixed> $account
+	 */
+	public function transcription( array $account, string $language = '' ): string {
+		$language = '' !== $language ? $language : igbz()->settings()->string( 'manus.content_language', 'Persian (Farsi)' );
+
+		$prompt = $this->context( $account ) . "\n\n"
+			. "Task: transcribe the attached audio recording.\n"
+			. sprintf( "The speaker is talking in %s.\n", $language )
+			. "Write down exactly what is said, word for word. Do not summarise it, do not correct the grammar, do not "
+			. "tidy up the phrasing and do not add anything that was not spoken. Keep numbers and product details "
+			. "precisely as spoken.\n"
+			. "Answer with JSON only: {\"text\": \"...\"}";
+
+		return (string) apply_filters( 'igbz_manus_prompt_transcription', $prompt, $account, $language );
+	}
+
 	/** @param array<string,mixed> $account */
 	public function insights( array $account ): string {
 		$prompt = $this->context( $account ) . "\n\n"

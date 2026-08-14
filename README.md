@@ -16,8 +16,8 @@ switch on and off independently:
 
 * **Multi-Tenant Stores** — tenants, wallet, subscription plans, BNPL, affiliate, LMS, OTP login,
   marketplace feeds, and four Iranian payment gateways (Zarinpal, IDPay, NextPay, Pay.ir).
-* **Instagram Automation** — content generation and auto-publishing via **Manus**, comment-to-DM
-  funnels via **ManyChat**.
+* **Instagram Automation** — product registration from the phone, content generation and
+  auto-publishing via **Manus**, comment-to-DM funnels via **ManyChat**.
 * **Master Site Hub** — public store directory, tenant signup, domain verification, VIP links.
 * **Mobile REST API** — JWT auth with rotating refresh tokens, catalog/account/admin endpoints,
   FCM push.
@@ -28,6 +28,46 @@ peak hours) and ManyChat (DM funnels, over both a real-time webhook and the Many
 publisher and generator sit behind interfaces so a Graph adapter can be added back later.
 
 Tenancy is single-site with `tenant_id` columns — not WordPress Multisite.
+
+## Registering a product without opening the admin
+
+A shopkeeper photographs something on the counter and the plugin does everything else. The
+WooCommerce product editor is never involved — the app plus the AI pipeline is the only way a
+product gets created.
+
+| # | Step | Where |
+|---|------|-------|
+| 1–2 | Tap *register image*, shoot live or pick from the gallery | app |
+| 3 | The assistant grades the photo for background removal and video suitability; an unusable photo comes back with **specific, fixable reasons** and the seller retries | `POST /intake/photo` |
+| 4 | The photo is cut out, given a new background and relit into a commercial product image | Manus |
+| 5 | It opens in an Instagram-like editor for optional tweaks | app (the plugin only serves the image and accepts the edit back) |
+| 6 | The seller describes the product **by typing or by voice**, and sets the price, stock and category | `POST /intake/description` |
+| 7 | The assistant writes the listing and creates the WooCommerce product, translating it if the store is multilingual | `POST /intake/publish` |
+| 8 | The product and its code go to the Instagram assistant | automatic |
+| 9 | Image post or video post? | `POST /intake/post-kind` |
+| 10 | For video: the seller's brief (typed or dictated) becomes a video, which they approve | `POST /intake/video` |
+| 11 | The code is stamped onto the media, the caption tells viewers to comment it, hashtags are chosen | `POST /intake/compose` |
+| 12–13 | The post goes to Manus and the purchase link goes to ManyChat | `POST /intake/schedule` |
+
+Three things hold it together:
+
+* **The product code** (`IGBZ-4F2K`) is one string doing three jobs: the WooCommerce SKU, the mark
+  burned onto the post, and the keyword the ManyChat funnel matches. Its alphabet excludes every
+  character that is ambiguous in a condensed font, because a shopper has to read it off a photo and
+  type it into a comment on the first try.
+* **The AI never invents commerce fields.** Price, stock and category are the seller's, and the
+  prompt explicitly forbids the model from stating or implying a price. It writes words, not numbers.
+* **Voice input is vendor-neutral.** `SpeechToTextInterface` covers any service that takes a
+  multipart upload and returns JSON — Whisper, a self-hosted model, an Iranian provider — configured
+  by endpoint and API key. Manus is the always-available fallback, so voice never simply fails.
+
+Multilingual stores get **real translated products, linked** when Polylang or WPML is installed.
+Without one the translations are stored on the product and can be turned into real products later.
+
+Every long step is asynchronous, because Manus is. The app polls `GET /intake/{id}`, which reports
+`status`, `waiting` and the `next` call to make, so the client never reimplements the state machine.
+A webhook settles finished tasks immediately; a five-minute cron sweep is the guarantee for the ones
+whose callback never arrived.
 
 ## Try it in the browser (WordPress Playground)
 

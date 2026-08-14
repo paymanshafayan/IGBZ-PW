@@ -138,6 +138,55 @@ final class ManyChatClient {
 	}
 
 	/**
+	 * Create a subscriber custom field.
+	 *
+	 * ManyChat rejects setCustomFieldByName for a field that does not exist, and it does so at
+	 * the worst possible moment — while a customer is waiting for the DM the funnel promised. So
+	 * the fields are created up front, when a product is registered and nobody is waiting.
+	 *
+	 * @return array{ok:bool,data:array<string,mixed>,error:string,code:int}
+	 */
+	public function create_custom_field( string $caption, string $type = 'text', string $description = '' ): array {
+		return $this->post(
+			'page/createCustomField',
+			array_filter(
+				[
+					'caption'     => $caption,
+					'type'        => $type,
+					'description' => $description,
+				]
+			)
+		);
+	}
+
+	/** @return array{ok:bool,data:array<string,mixed>,error:string,code:int} */
+	public function create_bot_field( string $caption, string $type = 'text', string $description = '' ): array {
+		return $this->post(
+			'page/createBotField',
+			array_filter(
+				[
+					'caption'     => $caption,
+					'type'        => $type,
+					'description' => $description,
+				]
+			)
+		);
+	}
+
+	/**
+	 * Set a page-level bot field by name.
+	 *
+	 * Bot fields are per page rather than per subscriber, which makes them the right place for
+	 * "the newest product's code and link": a store can build one flow in the ManyChat UI that
+	 * references them and never edit it again.
+	 *
+	 * @return array{ok:bool,data:array<string,mixed>,error:string,code:int}
+	 */
+	public function set_bot_field_by_name( string $field_name, mixed $value ): array {
+		return $this->post( 'page/setBotFieldByName', [ 'field_name' => $field_name, 'field_value' => $value ] );
+	}
+
+	/**
 	 * Flow list. Rate limited to 10 RPS, so the result is cached for 10 minutes.
 	 *
 	 * @return array{ok:bool,data:array<string,mixed>,error:string,code:int}

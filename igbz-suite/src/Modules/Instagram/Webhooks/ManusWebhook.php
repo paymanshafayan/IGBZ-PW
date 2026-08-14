@@ -2,7 +2,9 @@
 namespace IGBZ\Suite\Modules\Instagram\Webhooks;
 
 use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
+use IGBZ\Suite\Modules\Instagram\Services\IntakeWorker;
 use IGBZ\Suite\Modules\Instagram\Services\ManusService;
+use IGBZ\Suite\Modules\Instagram\Services\ProductIntakeService;
 use IGBZ\Suite\Support\Crypto;
 use IGBZ\Suite\Support\Db;
 use IGBZ\Suite\Support\Logger;
@@ -28,7 +30,9 @@ final class ManusWebhook {
 		private Db $db,
 		private ManusService $manus,
 		private Logger $logger,
-		private AccountCredentials $credentials
+		private AccountCredentials $credentials,
+		private ProductIntakeService $intake,
+		private IntakeWorker $worker
 	) {}
 
 	public function register(): void {
@@ -93,6 +97,14 @@ final class ManusWebhook {
 
 		$this->logger->debug( 'manus', 'Webhook received', [ 'event' => $event, 'task_id' => $task_id ] );
 
+		// A task id belongs either to a content row or to a product registration. Registrations
+		// are checked first because they are the shorter-lived of the two and a shopkeeper is
+		// usually watching a spinner while one runs.
+		$intake = $this->intake->by_task( $task_id );
+		if ( $intake ) {
+			return $this->handle_intake( $intake, $event, $body );
+		}
+
 		$content = $this->db->row(
 			'SELECT * FROM ' . $this->db->table( 'ig_content' ) . ' WHERE provider_task_id = %s ORDER BY id DESC LIMIT 1',
 			$task_id
@@ -141,6 +153,53 @@ final class ManusWebhook {
 		} else {
 			$this->manus->absorb_result( $content_id, $state );
 		}
+
+		return new \WP_REST_Response( [ 'ok' => true, 'handled' => true ], 200 );
+	}
+
+	/**
+	 * A task belonging to a product registration.
+	 *
+	 * Every step of the registration flow is one Manus task, so this is the fast path for all of
+	 * them: it hands the finished state to the same IntakeWorker the cron sweep uses, which means
+	 * webhook and poll cannot drift apart in behaviour.
+	 *
+	 * @param array<string,mixed> $intake
+	 * @param array<string,mixed> $body
+	 */
+	private function handle_intake( array $intake, string $event, array $body ): \WP_REST_Response {
+		$intake_id = (int) $intake['id'];
+
+		// Same tenancy check as the content path: a token names one account, and a task claimed
+		// by that token must belong to it.
+		$account = $this->intake->account_for( $intake );
+		if ( ! $account || (int) $account['id'] !== (int) ( $this->account['id'] ?? 0 ) ) {
+			$this->logger->warning(
+				'manus',
+				'Webhook rejected: the registration belongs to another account',
+				[ 'intake_id' => $intake_id, 'account_id' => (int) ( $this->account['id'] ?? 0 ) ]
+			);
+			return new \WP_REST_Response( [ 'ok' => false, 'error' => 'forbidden' ], 403 );
+		}
+
+		if ( 'task_stopped' !== $event ) {
+			// Progress events carry nothing to absorb; the row already knows it is waiting.
+			return new \WP_REST_Response( [ 'ok' => true, 'handled' => true ], 200 );
+		}
+
+		$stop_reason = (string) ( $body['stop_reason'] ?? $body['data']['stop_reason'] ?? 'finish' );
+
+		if ( 'finish' !== $stop_reason ) {
+			$this->intake->fail(
+				$intake_id,
+				sprintf( /* translators: %s: reason the task stopped */ __( 'The assistant stopped: %s', 'igbz-suite' ), $stop_reason )
+			);
+			return new \WP_REST_Response( [ 'ok' => true, 'handled' => true ], 200 );
+		}
+
+		$state = $this->manus->client_for( $account )->task_state( (string) $intake['provider_task_id'] );
+
+		$this->worker->settle( $intake, $state );
 
 		return new \WP_REST_Response( [ 'ok' => true, 'handled' => true ], 200 );
 	}
