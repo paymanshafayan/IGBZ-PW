@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * This is the replacement for the Instagram Graph API integration of the nopCommerce original.
  * Manus performs the whole workflow as an autonomous agent:
- *   research -> design (Canva) / reel production -> caption + hashtags -> schedule -> publish.
+ *   research -> design / reel production -> caption + hashtags -> schedule -> publish.
  * No asset is ever downloaded and re-uploaded manually.
  *
  * Every call is asynchronous: we store the returned task id on the content row and a cron worker
@@ -280,7 +280,7 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			$this->prompts->graphic_design( $account, $brief ),
 			$account,
 			sprintf( 'Design: %s', (string) ( $brief['subject'] ?? '' ) ),
-			igbz()->settings()->bool( 'manus.use_canva', true ) ? [ 'canva' ] : []
+			[]
 		);
 	}
 
@@ -332,7 +332,7 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			$this->prompts->product_image( $account, $brief ),
 			$account,
 			sprintf( /* translators: %s: product name */ __( 'Product image: %s', 'igbz-suite' ), (string) ( $brief['product'] ?? '' ) ),
-			igbz()->settings()->bool( 'manus.use_canva', true ) ? [ 'canva' ] : [],
+			[],
 			[ 'attachments' => [ $image_url ] ]
 		);
 	}
@@ -385,7 +385,7 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			$this->prompts->product_post( $account, $brief ),
 			$account,
 			sprintf( /* translators: %s: product code */ __( 'Instagram post: %s', 'igbz-suite' ), (string) ( $brief['code'] ?? '' ) ),
-			igbz()->settings()->bool( 'manus.use_canva', true ) ? [ 'canva' ] : [],
+			[],
 			[ 'attachments' => '' !== $image_url ? [ $image_url ] : [] ]
 		);
 	}

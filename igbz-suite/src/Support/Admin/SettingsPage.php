@@ -302,8 +302,6 @@ final class SettingsPage {
 					[ 'key' => 'manus.auto_generate', 'label' => __( 'Generate content automatically', 'igbz-suite' ), 'type' => 'checkbox', 'help' => __( 'Niche research, graphics and reels are produced by Manus without manual briefs.', 'igbz-suite' ) ],
 					[ 'key' => 'manus.auto_schedule', 'label' => __( 'Auto schedule at peak hours', 'igbz-suite' ), 'type' => 'checkbox' ],
 					[ 'key' => 'instagram.autopublish', 'label' => __( 'Publish without manual approval', 'igbz-suite' ), 'type' => 'checkbox', 'help' => __( 'Off means each piece waits in the queue until someone approves it.', 'igbz-suite' ) ],
-					[ 'key' => 'manus.use_canva', 'label' => __( 'Use the Canva connector for graphics', 'igbz-suite' ), 'type' => 'checkbox' ],
-					[ 'key' => 'canva.api_key', 'label' => __( 'Canva API key', 'igbz-suite' ), 'type' => 'password', 'help' => __( 'Optional: passed to Manus so designs are produced straight into your Canva workspace.', 'igbz-suite' ) ],
 					[ 'key' => 'manus.collect_insights', 'label' => __( 'Collect engagement insights', 'igbz-suite' ), 'type' => 'checkbox' ],
 					[ 'key' => 'manus.default_peak_hours', 'label' => __( 'Fallback peak hours', 'igbz-suite' ), 'help' => __( 'Comma separated HH:MM values, used until enough insights exist.', 'igbz-suite' ) ],
 					[ 'key' => 'manus.min_gap_minutes', 'label' => __( 'Minimum gap between posts (minutes)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 1440 ],

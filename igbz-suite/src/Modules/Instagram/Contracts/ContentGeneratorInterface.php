@@ -4,7 +4,7 @@ namespace IGBZ\Suite\Modules\Instagram\Contracts;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Creative side of the Instagram workflow: niche/trend research, graphic design (Canva),
+ * Creative side of the Instagram workflow: niche/trend research, graphic design,
  * reel production, caption + hashtag writing.
  */
 interface ContentGeneratorInterface {
@@ -20,7 +20,7 @@ interface ContentGeneratorInterface {
 	public function research_trends( array $account, string $topic = '' ): string;
 
 	/**
-	 * Start a design task (static image or carousel), optionally through Canva.
+	 * Start a design task (static image or carousel).
 	 *
 	 * @param array<string,mixed> $account
 	 * @param array<string,mixed> $brief

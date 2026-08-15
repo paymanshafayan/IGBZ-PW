@@ -571,7 +571,6 @@ final class Activator {
 			'manus.locale'                  => 'fa-IR',
 			'manus.content_language'        => 'Persian (Farsi)',
 			'manus.poll_interval'           => 300,
-			'manus.use_canva'               => true,
 			'manus.auto_generate'           => true,
 			'manus.auto_schedule'           => true,
 			'manus.collect_insights'        => true,

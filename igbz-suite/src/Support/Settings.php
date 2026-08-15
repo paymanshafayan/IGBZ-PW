@@ -32,7 +32,6 @@ final class Settings {
 		'otp.smsir.api_key',
 		'lms.video_hmac_secret',
 		'hub.vip_link_secret',
-		'canva.api_key',
 		'stt.api_key',
 		'dm.custom.api_key',
 	];

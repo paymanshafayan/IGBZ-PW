@@ -19,7 +19,7 @@ of the IGBZ product from nopCommerce to WordPress + WooCommerce.
 The one intentional functional difference from the nopCommerce original: the **Instagram Graph API
 is not used**. It is replaced by two services:
 
-- **Manus** — automated Instagram workflow: niche/trend research, graphic design (incl. Canva),
+- **Manus** — automated Instagram workflow: niche/trend research, graphic design,
   reels and short video, caption writing, hashtag selection, and auto-publishing/scheduling of
   posts, stories and reels at peak-engagement hours.
 - **ManyChat** — DM funnels of the "comment X and I'll DM you the link" kind. Two integration

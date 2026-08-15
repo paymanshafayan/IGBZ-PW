@@ -16,7 +16,7 @@ four toggleable modules**, so an operator installs once and turns on only what t
 
 The Instagram **Graph API** integration has been removed and replaced by two services:
 
-* **Manus** — niche research and trend discovery, graphic design (including Canva), reels and short
+* **Manus** — niche research and trend discovery, graphic design, reels and short
   video, caption writing, hashtag selection, and auto-publishing/scheduling of posts, stories and
   reels at the page's peak-engagement hours. No manual download/upload step.
 * **ManyChat** — DM funnels ("comment the word X and I'll DM you the link"), supported over both a
@@ -206,13 +206,11 @@ every field is documented inline on the settings screen. Highlights:
 | `manus.project_id` | Optional; groups tasks in one Manus project. |
 | `manus.agent_profile` | `manus-1.6` (default), `manus-1.6-lite` or `manus-1.6-max`. |
 | `manus.locale` / `manus.content_language` | `fa-IR` and `Persian (Farsi)` by default. |
-| `manus.use_canva` | Requests the Canva connector for graphic tasks. |
 | `manus.auto_generate` / `manus.auto_schedule` / `manus.collect_insights` | Cron-driven automation switches. |
 | `manus.default_peak_hours` | `12:00,18:30,21:00`. Used until real insights exist. |
 | `manus.min_gap_minutes` | `90`. Minimum spacing between two scheduled posts. |
 | `manus.poll_interval` | `300` seconds. Only used when webhooks are not configured. |
 | `manus.webhook_token` | Shared secret for the Manus callback (see below). |
-| `canva.api_key` | Optional, only if you want Canva driven directly rather than through Manus. |
 
 Manus tasks are **asynchronous**. The plugin will poll `task.detail` on the five-minute cron, but a
 webhook is much better:

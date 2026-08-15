@@ -1092,10 +1092,6 @@ msgstr ""
 msgid "Cancelling"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:306
-msgid "Canva API key"
-msgstr ""
-
 #: src/Modules/Instagram/Admin/ContentPage.php:350
 #: src/Modules/Instagram/Admin/VipPage.php:309
 msgid "Caption"
@@ -3379,7 +3375,7 @@ msgid "Manus API key is not configured."
 msgstr ""
 
 #: src/Modules/Instagram/InstagramModule.php:60
-msgid "Manus content studio (research, Canva graphics, reels, captions, auto-publishing at peak hours) plus ManyChat comment-to-DM funnels."
+msgid "Manus content studio (research, graphics, reels, captions, auto-publishing at peak hours) plus ManyChat comment-to-DM funnels."
 msgstr ""
 
 #: src/Modules/Instagram/Admin/AccountsPage.php:528
@@ -4381,10 +4377,6 @@ msgstr ""
 
 #: src/Modules/Instagram/Admin/AccountsPage.php:202
 msgid "Optional. Used to route incoming funnel events to the right account."
-msgstr ""
-
-#: src/Support/Admin/SettingsPage.php:306
-msgid "Optional: passed to Manus so designs are produced straight into your Canva workspace."
 msgstr ""
 
 #: src/Modules/Hub/Admin/HubPage.php:283
@@ -7098,7 +7090,7 @@ msgid "Translations"
 msgstr ""
 
 #: src/Modules/Hub/Services/ContentBlockService.php:148
-msgid "Trend research and Canva graphics"
+msgid "Trend research and graphics"
 msgstr ""
 
 #: src/Modules/MultiTenant/Admin/TenantsPage.php:527
@@ -7200,10 +7192,6 @@ msgstr ""
 
 #: src/Modules/MultiTenant/Admin/WalletPage.php:219
 msgid "Updated"
-msgstr ""
-
-#: src/Support/Admin/SettingsPage.php:305
-msgid "Use the Canva connector for graphics"
 msgstr ""
 
 #: src/Support/Admin/SettingsPage.php:268

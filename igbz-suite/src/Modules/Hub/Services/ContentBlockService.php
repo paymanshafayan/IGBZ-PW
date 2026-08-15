@@ -145,7 +145,7 @@ final class ContentBlockService {
 					'title'      => __( 'Content and DM funnels on autopilot', 'igbz-suite' ),
 					'summary'    => __( 'Manus researches your niche, designs the graphics and reels, writes the caption and publishes at your peak hours. ManyChat turns every comment into a direct message with the link.', 'igbz-suite' ),
 					'bullets'    => [
-						__( 'Trend research and Canva graphics', 'igbz-suite' ),
+						__( 'Trend research and graphics', 'igbz-suite' ),
 						__( 'Reels with captions and hashtags', 'igbz-suite' ),
 						__( 'Comment a keyword, get the link in your DMs', 'igbz-suite' ),
 					],

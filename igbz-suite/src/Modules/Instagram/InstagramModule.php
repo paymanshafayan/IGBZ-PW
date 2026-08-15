@@ -57,7 +57,7 @@ final class InstagramModule implements ModuleInterface {
 	}
 
 	public function description(): string {
-		return __( 'Manus content studio (research, Canva graphics, reels, captions, auto-publishing at peak hours) plus ManyChat comment-to-DM funnels.', 'igbz-suite' );
+		return __( 'Manus content studio (research, graphics, reels, captions, auto-publishing at peak hours) plus ManyChat comment-to-DM funnels.', 'igbz-suite' );
 	}
 
 	public function register( Plugin $plugin ): void {
