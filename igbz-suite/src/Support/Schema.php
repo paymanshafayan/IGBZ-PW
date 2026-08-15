@@ -49,6 +49,15 @@ final class Schema {
 			'ig_subscribers',
 			'ig_funnel_hits',
 			'ig_intake',
+			'vip_plans',
+			'vip_memberships',
+			'vip_posts',
+			'vip_post_likes',
+			'vip_post_comments',
+			'vip_post_views',
+			'vip_entitlements',
+			'vip_threads',
+			'vip_messages',
 			'api_tokens',
 			'devices',
 			'jobs',
@@ -708,6 +717,177 @@ final class Schema {
 			created_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
 			KEY dispatch (queue,completed_at,available_at)
+		) {$charset};";
+
+		// The VIP channel: a private Instagram-shaped feed inside our own app.
+		//
+		// Deliberately NOT reusing plans/subscriptions above. Those are keyed on tenant_id and model
+		// a *shop owner's* SaaS plan with us. A VIP membership is a *shopper's* subscription to one
+		// shop's private feed. Overloading one table would make "the shop's plan lapsed" and "the
+		// customer's membership lapsed" indistinguishable, and they need opposite handling.
+		$sql[] = "CREATE TABLE {$p}vip_plans (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			slug VARCHAR(64) NOT NULL,
+			name VARCHAR(191) NOT NULL,
+			description TEXT NULL,
+			price DECIMAL(18,4) NOT NULL DEFAULT 0,
+			currency VARCHAR(8) NOT NULL DEFAULT 'IRT',
+			duration_days INT NOT NULL DEFAULT 30,
+			is_active TINYINT(1) NOT NULL DEFAULT 1,
+			sort_order INT NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY tenant_slug (tenant_id,slug),
+			KEY active (tenant_id,is_active,sort_order)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}vip_memberships (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL,
+			plan_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			starts_at DATETIME NULL,
+			ends_at DATETIME NULL,
+			payment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			auto_renew TINYINT(1) NOT NULL DEFAULT 0,
+			price_paid DECIMAL(18,4) NOT NULL DEFAULT 0,
+			cancelled_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY user_active (user_id,status,ends_at),
+			KEY tenant_status (tenant_id,status)
+		) {$charset};";
+
+		// media is a JSON array of {type,url,thumb,width,height,duration} so one row can be a single
+		// image, a carousel or a video without a child table -- the feed is always read whole.
+		$sql[] = "CREATE TABLE {$p}vip_posts (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			account_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			author_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			shortcode VARCHAR(24) NOT NULL DEFAULT '',
+			kind VARCHAR(20) NOT NULL DEFAULT 'image',
+			caption LONGTEXT NULL,
+			media LONGTEXT NULL,
+			teaser_content_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			product_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			access VARCHAR(20) NOT NULL DEFAULT 'members',
+			price DECIMAL(18,4) NOT NULL DEFAULT 0,
+			status VARCHAR(20) NOT NULL DEFAULT 'draft',
+			comments_enabled TINYINT(1) NOT NULL DEFAULT 1,
+			publish_at DATETIME NULL,
+			published_at DATETIME NULL,
+			expires_at DATETIME NULL,
+			expiry_action VARCHAR(20) NOT NULL DEFAULT 'hide',
+			expired_at DATETIME NULL,
+			likes_count INT NOT NULL DEFAULT 0,
+			comments_count INT NOT NULL DEFAULT 0,
+			views_count INT NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY shortcode (shortcode),
+			KEY feed (tenant_id,status,published_at),
+			KEY expiry (status,expires_at),
+			KEY schedule (status,publish_at)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}vip_post_likes (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			post_id BIGINT UNSIGNED NOT NULL,
+			user_id BIGINT UNSIGNED NOT NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY post_user (post_id,user_id),
+			KEY user_likes (user_id,id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}vip_post_comments (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			post_id BIGINT UNSIGNED NOT NULL,
+			user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			parent_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			is_admin TINYINT(1) NOT NULL DEFAULT 0,
+			body TEXT NULL,
+			status VARCHAR(20) NOT NULL DEFAULT 'visible',
+			is_pinned TINYINT(1) NOT NULL DEFAULT 0,
+			likes_count INT NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY post_visible (post_id,status,is_pinned,id),
+			KEY thread (parent_id,id),
+			KEY moderation (tenant_id,status,id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}vip_post_views (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			post_id BIGINT UNSIGNED NOT NULL,
+			user_id BIGINT UNSIGNED NOT NULL,
+			seconds_watched INT NOT NULL DEFAULT 0,
+			view_count INT NOT NULL DEFAULT 1,
+			first_viewed_at DATETIME NOT NULL,
+			viewed_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY post_user (post_id,user_id)
+		) {$charset};";
+
+		// A per-post purchase outlives the membership that might also have granted access, which is
+		// why this is a separate table and not a flag on vip_memberships.
+		$sql[] = "CREATE TABLE {$p}vip_entitlements (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL,
+			post_id BIGINT UNSIGNED NOT NULL,
+			source VARCHAR(20) NOT NULL DEFAULT 'purchase',
+			payment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			price_paid DECIMAL(18,4) NOT NULL DEFAULT 0,
+			expires_at DATETIME NULL,
+			revoked_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY user_post (user_id,post_id),
+			KEY post (post_id)
+		) {$charset};";
+
+		// In-app direct messages. Unlike Instagram DM there is no 24-hour window here: the shop can
+		// message a member whenever it likes, because the transport is ours.
+		$sql[] = "CREATE TABLE {$p}vip_threads (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL,
+			subject VARCHAR(191) NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'open',
+			last_message_at DATETIME NULL,
+			last_message_preview VARCHAR(255) NOT NULL DEFAULT '',
+			unread_admin INT NOT NULL DEFAULT 0,
+			unread_user INT NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY inbox (tenant_id,status,last_message_at),
+			KEY user_threads (user_id,last_message_at)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}vip_messages (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			thread_id BIGINT UNSIGNED NOT NULL,
+			sender_type VARCHAR(10) NOT NULL DEFAULT 'user',
+			sender_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			body TEXT NULL,
+			attachment LONGTEXT NULL,
+			post_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			read_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY thread_stream (thread_id,id)
 		) {$charset};";
 
 		$sql[] = "CREATE TABLE {$p}logs (

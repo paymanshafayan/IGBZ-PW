@@ -50,8 +50,21 @@ final class SchemaTest extends TestCase {
 		$this->assert_no_unsafe_core_column_names( $statements );
 
 		// Tenant scoping is the backbone of the suite: nearly every table must carry the column.
-		// lesson_progress inherits its tenant through enrollment_id, so it deliberately has none.
-		$unscoped = [ 'plans', 'logs', 'jobs', 'tenant_domains', 'tenant_members', 'tenants', 'lesson_progress' ];
+		// lesson_progress inherits its tenant through enrollment_id, so it deliberately has none;
+		// vip_post_likes and vip_post_views are the same shape — a pure (post, user) join row whose
+		// tenant is whatever the post's is. Copying the column onto them would create a second
+		// place for it to be wrong.
+		$unscoped = [
+			'plans',
+			'logs',
+			'jobs',
+			'tenant_domains',
+			'tenant_members',
+			'tenants',
+			'lesson_progress',
+			'vip_post_likes',
+			'vip_post_views',
+		];
 		foreach ( $statements as $sql ) {
 			preg_match( '/CREATE TABLE\s+wp_igbz_(\S+)\s*\(/', $sql, $m );
 			$name = $m[1] ?? '';

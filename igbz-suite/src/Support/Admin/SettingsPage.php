@@ -60,6 +60,7 @@ final class SettingsPage {
 			$tabs['manychat'] = __( 'ManyChat', 'igbz-suite' );
 			$tabs['dm']       = __( 'Direct messages', 'igbz-suite' );
 			$tabs['intake']   = __( 'Product registration', 'igbz-suite' );
+			$tabs['vip']      = __( 'VIP channel', 'igbz-suite' );
 		}
 		if ( Modules::enabled( Modules::HUB ) ) {
 			$tabs['hub'] = __( 'Hub', 'igbz-suite' );
@@ -525,6 +526,98 @@ final class SettingsPage {
 						'help'        => __( 'Where the transcript sits in the reply, dotted for nested values. Leave empty and the usual field names are tried.', 'igbz-suite' ),
 					],
 					[ 'key' => 'stt.timeout', 'label' => __( 'Request timeout (seconds)', 'igbz-suite' ), 'type' => 'number', 'min' => 10, 'max' => 600 ],
+				];
+
+			case 'vip':
+				return [
+					[
+						'key'   => 'vip.enabled',
+						'label' => __( 'Enable the VIP channel', 'igbz-suite' ),
+						'type'  => 'checkbox',
+						'help'  => __( 'A private Instagram-style feed inside the app. The public Instagram post stays a teaser; the real content is only ever served to a paying member.', 'igbz-suite' ),
+					],
+					[ 'key' => 'vip.feed_page_size', 'label' => __( 'Posts per feed page', 'igbz-suite' ), 'type' => 'number', 'min' => 3, 'max' => 50 ],
+					[
+						'key'   => 'vip.default_expiry_days',
+						'label' => __( 'Posts expire after (days)', 'igbz-suite' ),
+						'type'  => 'number',
+						'min'   => 0,
+						'max'   => 3650,
+						'help'  => __( 'Zero keeps posts forever. A window is what makes membership worth renewing: what is inside today is gone next month.', 'igbz-suite' ),
+					],
+					[
+						'key'     => 'vip.default_expiry_action',
+						'label'   => __( 'When a post expires', 'igbz-suite' ),
+						'type'    => 'select',
+						'options' => [
+							'hide'   => __( 'Hide it, keep the likes and comments', 'igbz-suite' ),
+							'delete' => __( 'Remove it completely', 'igbz-suite' ),
+						],
+						'help'    => __( 'Hiding is the safer default: deleting the row takes its comments and view counts with it, so you lose any way to tell how that post performed.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'vip.purge_media_on_expiry',
+						'label' => __( 'Delete the media file on expiry', 'igbz-suite' ),
+						'type'  => 'checkbox',
+						'help'  => __( 'The file is what costs disk, so it is removed either way unless you turn this off. Only files inside the uploads folder are ever touched.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'vip.media_link_ttl',
+						'label' => __( 'Media link lifetime (seconds)', 'igbz-suite' ),
+						'type'  => 'number',
+						'min'   => 60,
+						'max'   => 86400,
+						'help'  => __( 'Each media link is signed for one member and expires. Short enough that a copied link is useless, long enough to watch a video through.', 'igbz-suite' ),
+					],
+					[ 'key' => 'vip.comments_enabled', 'label' => __( 'Comments on new posts', 'igbz-suite' ), 'type' => 'checkbox' ],
+					[ 'key' => 'vip.comment_max_length', 'label' => __( 'Comment length limit', 'igbz-suite' ), 'type' => 'number', 'min' => 100, 'max' => 5000 ],
+					[
+						'key'   => 'vip.comment_rate_seconds',
+						'label' => __( 'Seconds between comments', 'igbz-suite' ),
+						'type'  => 'number',
+						'min'   => 0,
+						'max'   => 600,
+						'help'  => __( 'Per member. Stops one person flooding a post.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'vip.messages_enabled',
+						'label' => __( 'Let members message you from a post', 'igbz-suite' ),
+						'type'  => 'checkbox',
+						'help'  => __( 'The in-app equivalent of an Instagram DM. Replies are written from the VIP inbox, not from Instagram.', 'igbz-suite' ),
+					],
+					[
+						'key'   => 'vip.tips_enabled',
+						'label' => __( 'Accept tips on public posts', 'igbz-suite' ),
+						'type'  => 'checkbox',
+						'help'  => __( 'Shown on the share page of a free post, so a passer-by can support the shop without buying anything.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'vip.tip_presets',
+						'label'       => __( 'Suggested tip amounts', 'igbz-suite' ),
+						'placeholder' => '50000,100000,200000,500000',
+						'help'        => __( 'Comma separated, in the store currency.', 'igbz-suite' ),
+					],
+					[ 'key' => 'vip.tip_min', 'label' => __( 'Smallest tip', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 999999999 ],
+					[
+						'key'         => 'vip.landing_slug',
+						'label'       => __( 'Share page prefix', 'igbz-suite' ),
+						'placeholder' => 'vip',
+						'help'        => __( 'Share links look like /vip/p/AbC123. Change it and re-save your permalinks so the new address starts working.', 'igbz-suite' ),
+					],
+					[
+						'key'         => 'vip.deep_link_scheme',
+						'label'       => __( 'App deep-link scheme', 'igbz-suite' ),
+						'placeholder' => 'igbz',
+						'help'        => __( 'Used to open a shared post straight in the app: scheme://vip/p/AbC123. It must match the scheme registered in the mobile build.', 'igbz-suite' ),
+					],
+					[ 'key' => 'vip.app_android_url', 'label' => __( 'Android store link', 'igbz-suite' ), 'placeholder' => 'https://cafebazaar.ir/app/...' ],
+					[ 'key' => 'vip.app_ios_url', 'label' => __( 'iOS store link', 'igbz-suite' ), 'placeholder' => 'https://apps.apple.com/app/...' ],
+					[
+						'key'         => 'vip.app_direct_apk_url',
+						'label'       => __( 'Direct APK link', 'igbz-suite' ),
+						'placeholder' => 'https://example.com/igbz.apk',
+						'help'        => __( 'Offered alongside the stores for people who cannot reach one.', 'igbz-suite' ),
+					],
 				];
 
 			case 'hub':

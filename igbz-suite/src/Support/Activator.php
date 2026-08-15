@@ -19,6 +19,10 @@ final class Activator {
 		self::install_tables();
 		self::add_roles();
 		self::seed_defaults();
+		// A fresh install has to end up in the same state as an upgraded one. The starter VIP plan
+		// used to be written only by the v10 migration, so a brand-new site got a Plans screen with
+		// nothing on it and a share page with nothing to sell.
+		self::seed_starter_vip_plan();
 		update_option( self::VERSION_OPTION, IGBZ_DB_VERSION, true );
 		if ( false === get_option( Modules::OPTION, false ) ) {
 			Modules::save( Modules::defaults() );
@@ -67,6 +71,75 @@ final class Activator {
 		if ( $from > 0 && $from < 9 ) {
 			self::migrate_to_v9();
 		}
+		if ( $from > 0 && $from < 10 ) {
+			self::migrate_to_v10();
+		}
+	}
+
+	/**
+	 * v10: the VIP channel.
+	 *
+	 * dbDelta creates the nine vip_* tables on its own, so there are no columns to back-fill. Two
+	 * things still have to happen by hand.
+	 *
+	 * The share landing page lives at /{vip.landing_slug}/p/{shortcode}, which is a rewrite rule
+	 * added at boot. Rules are cached in an option, and an upgrade — unlike an activation — never
+	 * flushes them, so on an existing site every share link would 404 until somebody happened to
+	 * re-save the permalink settings. The flush is deferred to `init` because rewrite rules are not
+	 * registered yet at the point maybe_upgrade() runs on `plugins_loaded`; flushing here would just
+	 * persist the old set.
+	 *
+	 * The starter plan exists so the paywall has something to sell on day one. It is written only
+	 * when the table is completely empty, which makes re-running the step a no-op and means a shop
+	 * that deleted the sample never gets it back.
+	 */
+	private static function migrate_to_v10(): void {
+		add_action(
+			'init',
+			static function (): void {
+				flush_rewrite_rules( false );
+			},
+			99
+		);
+
+		self::seed_starter_vip_plan();
+	}
+
+	/**
+	 * Write the sample membership plan, once, into an empty table.
+	 *
+	 * Shared by activate() and the v10 migration so a new install and an upgraded one land in the
+	 * same place. Guarding on an empty table makes it a no-op on every re-run and means a shop that
+	 * deliberately deleted the sample never has it come back.
+	 */
+	private static function seed_starter_vip_plan(): void {
+		$db = igbz()->db();
+
+		$existing = (int) $db->scalar( 'SELECT COUNT(*) FROM ' . $db->table( 'vip_plans' ) );
+		if ( $existing > 0 ) {
+			return;
+		}
+
+		$now = current_time( 'mysql', true );
+
+		$db->insert(
+			'vip_plans',
+			[
+				'tenant_id'     => 0,
+				'slug'          => 'monthly',
+				'name'          => 'VIP Monthly',
+				'description'   => '',
+				'price'         => 0,
+				'currency'      => 'IRT',
+				'duration_days' => 30,
+				// Inactive on purpose: a plan priced at zero must never be buyable. The shop owner
+				// sets a real price in the VIP admin screen, which is what activates it.
+				'is_active'     => 0,
+				'sort_order'    => 0,
+				'created_at'    => $now,
+				'updated_at'    => $now,
+			]
+		);
 	}
 
 	/**
@@ -295,6 +368,24 @@ final class Activator {
 			'lms.course_page_id'            => 0,
 			'lms.pass_score'                => 60,
 			'lms.certificate_enabled'       => true,
+			'vip.enabled'                   => true,
+			'vip.feed_page_size'            => 12,
+			'vip.default_expiry_days'       => 0,
+			'vip.default_expiry_action'     => 'hide',
+			'vip.purge_media_on_expiry'     => true,
+			'vip.media_link_ttl'            => 900,
+			'vip.comments_enabled'          => true,
+			'vip.comment_max_length'        => 1000,
+			'vip.comment_rate_seconds'      => 15,
+			'vip.messages_enabled'          => true,
+			'vip.tips_enabled'              => true,
+			'vip.tip_presets'               => '50000,100000,200000,500000',
+			'vip.tip_min'                   => 10000,
+			'vip.landing_slug'              => 'vip',
+			'vip.app_android_url'           => '',
+			'vip.app_ios_url'               => '',
+			'vip.app_direct_apk_url'        => '',
+			'vip.deep_link_scheme'          => 'igbz',
 			'otp.enabled'                   => true,
 			'otp.code_length'               => 6,
 			'otp.ttl_seconds'               => 300,
@@ -417,6 +508,7 @@ final class Activator {
 			'api.jwt_secret',
 			'lms.video_hmac_secret',
 			'hub.vip_link_secret',
+			'vip.media_hmac_secret',
 			'manychat.webhook_token',
 			'manus.webhook_token',
 		];

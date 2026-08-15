@@ -251,6 +251,112 @@ function igbz_test_add_term( int $term_id, string $name ): void {
 	$GLOBALS['igbz_test_terms'][ $term_id ] = (object) [ 'term_id' => $term_id, 'name' => $name ];
 }
 
+// ---------------------------------------------------------------------- VIP
+//
+// The VIP channel needs a handful of core helpers the rest of the suite never touched: an identity
+// for the commenter, a clock the tests can move, and the two-line helpers WordPress provides for
+// uploads and dates. `user_can` is the interesting one — VipAccessService treats anyone who can
+// `manage_woocommerce` as the channel's owner, so a test that forgets to say who is asking would
+// otherwise silently be asking as an administrator and see every locked post unlocked.
+
+/** @var array<int,array<string,mixed>> user id => capabilities and profile */
+$GLOBALS['igbz_test_capabilities'] = [];
+
+function igbz_test_grant( int $user_id, string $capability ): void {
+	$GLOBALS['igbz_test_capabilities'][ $user_id ][ $capability ] = true;
+}
+
+function user_can( $user, string $capability, ...$args ): bool {
+	unset( $args );
+	$user_id = is_object( $user ) ? (int) ( $user->ID ?? 0 ) : (int) $user;
+
+	return ! empty( $GLOBALS['igbz_test_capabilities'][ $user_id ][ $capability ] );
+}
+
+function current_user_can( string $capability, ...$args ): bool {
+	return user_can( get_current_user_id(), $capability, ...$args );
+}
+
+function get_userdata( int $user_id ) {
+	return $user_id > 0
+		? (object) [ 'ID' => $user_id, 'display_name' => 'User ' . $user_id, 'user_email' => 'user' . $user_id . '@shop.test' ]
+		: false;
+}
+
+function get_avatar_url( $id_or_email, array $args = [] ): string {
+	unset( $args );
+	return 'https://shop.test/avatar/' . (string) $id_or_email;
+}
+
+function trailingslashit( string $value ): string {
+	return rtrim( $value, "/\\" ) . '/';
+}
+
+function wp_get_upload_dir(): array {
+	return [ 'basedir' => '/tmp/igbz-uploads', 'baseurl' => 'https://shop.test/wp-content/uploads' ];
+}
+
+function path_is_absolute( string $path ): bool {
+	return str_starts_with( $path, '/' );
+}
+
+function wp_delete_attachment( int $id, bool $force = false ) {
+	unset( $force );
+	unset( $GLOBALS['igbz_test_attachments'][ $id ] );
+	return true;
+}
+
+function wp_delete_file_from_directory( string $file, string $directory ): bool {
+	return str_starts_with( $file, $directory );
+}
+
+function human_time_diff( int $from, int $to = 0 ): string {
+	$diff = abs( ( 0 === $to ? time() : $to ) - $from );
+	return $diff < HOUR_IN_SECONDS
+		? sprintf( '%d mins', max( 1, (int) round( $diff / MINUTE_IN_SECONDS ) ) )
+		: sprintf( '%d days', max( 1, (int) round( $diff / DAY_IN_SECONDS ) ) );
+}
+
+function wp_rand( int $min = 0, int $max = 0 ): int {
+	return random_int( $min, 0 === $max ? PHP_INT_MAX : $max );
+}
+
+/**
+ * Core's URL filter, modelled only as far as the scheme allow-list.
+ *
+ * That list is the whole point here: the share page's "Open in the app" button uses a custom
+ * scheme, and core's esc_url() silently returns an empty string for a scheme it does not know —
+ * which renders as a button that looks fine and goes nowhere.
+ *
+ * @param string[]|null $protocols
+ */
+function esc_url( string $url, ?array $protocols = null, string $context = 'display' ): string {
+	unset( $context );
+	$url       = trim( $url );
+	$protocols = $protocols ?? wp_allowed_protocols();
+
+	if ( '' === $url || str_starts_with( $url, '/' ) || str_starts_with( $url, '#' ) ) {
+		return $url;
+	}
+
+	$scheme = strtolower( (string) parse_url( $url, PHP_URL_SCHEME ) );
+	if ( '' === $scheme ) {
+		return $url;
+	}
+
+	return in_array( $scheme, $protocols, true ) ? $url : '';
+}
+
+/** @return string[] */
+function wp_allowed_protocols(): array {
+	return [ 'http', 'https', 'mailto', 'tel' ];
+}
+
+function sanitize_title( string $title ): string {
+	$slug = strtolower( trim( preg_replace( '/[^A-Za-z0-9\-]+/', '-', $title ) ?? '', '-' ) );
+	return $slug;
+}
+
 // -------------------------------------------------------------------- media
 //
 // The intake pipeline copies every asset Manus produces into the media library, because a Manus
@@ -634,6 +740,7 @@ function igbz_test_reset_settings(): \IGBZ\Suite\Support\Settings {
 	$GLOBALS['igbz_test_user_id']        = 0;
 	$GLOBALS['igbz_test_sideload_fails'] = false;
 	$GLOBALS['igbz_test_attachments']    = [];
+	$GLOBALS['igbz_test_capabilities']   = [];
 	igbz_test_reset_actions();
 	igbz()->bind( 'settings', static fn () => new \IGBZ\Suite\Support\Settings() );
 	igbz()->bind( 'logger', static fn ( $c ) => new \IGBZ\Suite\Support\Logger( $c->get( 'settings' ) ) );

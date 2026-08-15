@@ -12,6 +12,8 @@ use IGBZ\Suite\Modules\RestApi\Controllers\CatalogController;
 use IGBZ\Suite\Modules\RestApi\Controllers\DeviceController;
 use IGBZ\Suite\Modules\RestApi\Controllers\ProductIntakeController;
 use IGBZ\Suite\Modules\RestApi\Controllers\StoreAdminController;
+use IGBZ\Suite\Modules\RestApi\Controllers\VipAdminController;
+use IGBZ\Suite\Modules\RestApi\Controllers\VipController;
 use IGBZ\Suite\Modules\RestApi\Push\DeviceRepository;
 use IGBZ\Suite\Modules\RestApi\Push\FcmService;
 use IGBZ\Suite\Modules\RestApi\Push\GoogleAuth;
@@ -125,6 +127,13 @@ final class RestApiModule implements ModuleInterface {
 				$plugin->get( 'ig.translations' ),
 				$plugin->get( 'ig.skus' )
 			);
+		}
+
+		// Same story for the VIP channel: the posts, the paywall and the member inbox are owned
+		// by the Instagram module, and the app talks to them over this namespace.
+		if ( \IGBZ\Suite\Support\Modules::enabled( \IGBZ\Suite\Support\Modules::INSTAGRAM ) && $plugin->has( 'vip.posts' ) ) {
+			$controllers[] = new VipController();
+			$controllers[] = new VipAdminController();
 		}
 
 		return $controllers;

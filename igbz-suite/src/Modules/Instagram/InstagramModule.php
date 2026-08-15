@@ -22,6 +22,13 @@ use IGBZ\Suite\Modules\Instagram\Messaging\ManyChatGateway;
 use IGBZ\Suite\Modules\Instagram\Speech\HttpSpeechToText;
 use IGBZ\Suite\Modules\Instagram\Speech\ManusSpeechToText;
 use IGBZ\Suite\Modules\Instagram\Speech\SpeechToText;
+use IGBZ\Suite\Modules\Instagram\Vip\VipAccessService;
+use IGBZ\Suite\Modules\Instagram\Vip\VipBillingService;
+use IGBZ\Suite\Modules\Instagram\Vip\VipLandingPage;
+use IGBZ\Suite\Modules\Instagram\Vip\VipMediaService;
+use IGBZ\Suite\Modules\Instagram\Vip\VipMessageService;
+use IGBZ\Suite\Modules\Instagram\Vip\VipPostService;
+use IGBZ\Suite\Modules\Instagram\Vip\VipSocialService;
 use IGBZ\Suite\Modules\Instagram\Webhooks\ManusWebhook;
 use IGBZ\Suite\Modules\Instagram\Webhooks\ManyChatWebhook;
 use IGBZ\Suite\Support\Cron;
@@ -72,6 +79,25 @@ final class InstagramModule implements ModuleInterface {
 			$plugin->get( 'ig.intake_worker' )
 		) )->register();
 
+		// The VIP channel: private media delivery, the public share page and payment settlement.
+		// All three are request-time listeners, so they are registered whether or not the VIP
+		// feature is switched on — each checks `vip.enabled` itself, and a payment that was
+		// already started must still settle if the channel is turned off mid-checkout.
+		/** @var VipMediaService $vip_media */
+		$vip_media = $plugin->get( 'vip.media' );
+		add_action( 'template_redirect', [ $vip_media, 'handle_request' ], 5 );
+
+		( new VipLandingPage(
+			$plugin->get( 'vip.posts' ),
+			$plugin->get( 'vip.access' ),
+			$plugin->get( 'vip.billing' ),
+			$plugin->settings()
+		) )->register();
+
+		/** @var VipBillingService $vip_billing */
+		$vip_billing = $plugin->get( 'vip.billing' );
+		$vip_billing->register();
+
 		add_action( Cron::HOOK_FIVE_MINUTES, [ $this, 'run_five_minutes' ] );
 		add_action( Cron::HOOK_HOURLY, [ $this, 'run_hourly' ] );
 		add_action( Cron::HOOK_DAILY, [ $this, 'run_daily' ] );
@@ -87,6 +113,7 @@ final class InstagramModule implements ModuleInterface {
 			( new Admin\IntakePage() )->register();
 			( new Admin\ContentPage() )->register();
 			( new Admin\FunnelsPage() )->register();
+			( new Admin\VipPage() )->register();
 			( new Admin\SubscribersPage() )->register();
 			( new Admin\InsightsPage() )->register();
 		}
@@ -202,6 +229,38 @@ final class InstagramModule implements ModuleInterface {
 			)
 		);
 
+		// ------------------------------------------------------ VIP channel
+
+		$plugin->bind( 'vip.access', static fn ( Plugin $c ) => new VipAccessService( $c->db() ) );
+		$plugin->bind(
+			'vip.media',
+			static fn ( Plugin $c ) => new VipMediaService( $c->db(), $c->settings(), $c->logger() )
+		);
+		$plugin->bind(
+			'vip.posts',
+			static fn ( Plugin $c ) => new VipPostService(
+				$c->db(),
+				$c->settings(),
+				$c->logger(),
+				$c->get( 'vip.access' ),
+				$c->get( 'vip.media' )
+			)
+		);
+		$plugin->bind(
+			'vip.social',
+			static fn ( Plugin $c ) => new VipSocialService( $c->db(), $c->settings(), $c->get( 'vip.access' ) )
+		);
+		$plugin->bind( 'vip.messages', static fn ( Plugin $c ) => new VipMessageService( $c->db(), $c->settings() ) );
+		$plugin->bind(
+			'vip.billing',
+			static fn ( Plugin $c ) => new VipBillingService(
+				$c->db(),
+				$c->settings(),
+				$c->logger(),
+				$c->get( 'vip.access' )
+			)
+		);
+
 		// Speech to text: a pluggable engine with Manus as the always-available fallback.
 		$plugin->bind( 'ig.stt_http', static fn ( Plugin $c ) => new HttpSpeechToText( $c->settings(), $c->logger() ) );
 		$plugin->bind( 'ig.stt_manus', static fn ( Plugin $c ) => new ManusSpeechToText( $c->get( 'ig.manus' ), $c->logger() ) );
@@ -228,6 +287,14 @@ final class InstagramModule implements ModuleInterface {
 		/** @var IntakeWorker $worker */
 		$worker = igbz()->get( 'ig.intake_worker' );
 		$worker->tick();
+
+		// VIP scheduling and expiry share this tick. Five minutes is the right granularity for
+		// both: a post scheduled for 9:00 that appears at 9:04 is fine, and an expiry window
+		// measured in days does not need to be enforced to the second.
+		/** @var VipPostService $vip_posts */
+		$vip_posts = igbz()->get( 'vip.posts' );
+		$vip_posts->publish_due();
+		$vip_posts->expire_due();
 	}
 
 	public function run_hourly(): void {

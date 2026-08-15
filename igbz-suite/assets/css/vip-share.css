@@ -1,0 +1,247 @@
+/*
+ * IGBZ Suite — VIP share landing page (/{vip.landing_slug}/p/{shortcode}).
+ *
+ * This page renders its own HTML document instead of going through the theme, so everything it
+ * needs lives here: reset, typography, layout. That is deliberate — the page is the first thing a
+ * stranger from the Instagram share sheet sees, and it must look the same whatever theme the shop
+ * happens to be running, on a phone, in dark mode, in RTL.
+ */
+
+:root {
+	--igbz-vip-bg: #fafafa;
+	--igbz-vip-card: #ffffff;
+	--igbz-vip-ink: #16181c;
+	--igbz-vip-muted: #6b7280;
+	--igbz-vip-line: rgba(0, 0, 0, .09);
+	--igbz-vip-brand: #d62976;
+	--igbz-vip-brand-ink: #ffffff;
+	--igbz-vip-radius: 16px;
+}
+
+* { box-sizing: border-box; }
+
+body.igbz-vip-share {
+	margin: 0;
+	padding: 0 0 48px;
+	background: var(--igbz-vip-bg);
+	color: var(--igbz-vip-ink);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Vazirmatn, IRANSans, Tahoma, Roboto, sans-serif;
+	font-size: 16px;
+	line-height: 1.7;
+	-webkit-font-smoothing: antialiased;
+}
+
+.igbz-vip-wrap {
+	max-width: 520px;
+	margin: 0 auto;
+	padding: 20px 16px;
+}
+
+.igbz-vip-wrap h1 { font-size: 1.25rem; line-height: 1.5; margin: 0 0 8px; }
+.igbz-vip-wrap h2 { font-size: 1.05rem; margin: 0 0 10px; }
+.igbz-vip-wrap h3 { font-size: 1rem; margin: 0 0 4px; }
+.igbz-vip-wrap p { margin: 0 0 10px; }
+
+/* ------------------------------------------------------------------ notices */
+
+.igbz-vip-notice {
+	padding: 12px 14px;
+	border-radius: 12px;
+	margin: 0 0 16px;
+	font-size: .92rem;
+}
+.igbz-vip-error { background: #fdecec; color: #9b1c1c; }
+.igbz-vip-success { background: #e7f6ec; color: #14683a; }
+
+/* --------------------------------------------------------------- the teaser */
+
+.igbz-vip-card {
+	background: var(--igbz-vip-card);
+	border: 1px solid var(--igbz-vip-line);
+	border-radius: var(--igbz-vip-radius);
+	overflow: hidden;
+}
+
+.igbz-vip-cover {
+	position: relative;
+	background: #1c1c1e;
+	line-height: 0;
+}
+.igbz-vip-cover img {
+	width: 100%;
+	height: auto;
+	display: block;
+}
+/* The stored placeholder is already a low-resolution image; the filter is presentation only and
+   is never the thing keeping the real media private. */
+.igbz-vip-cover.is-locked img { filter: blur(14px) saturate(.85); transform: scale(1.06); }
+.igbz-vip-cover-empty {
+	width: 100%;
+	aspect-ratio: 1 / 1;
+	background: linear-gradient(135deg, #3a1c4d, #d62976 70%, #f7a34b);
+}
+.igbz-vip-lock {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 2.6rem;
+	line-height: 1;
+	color: #fff;
+	text-shadow: 0 2px 12px rgba(0, 0, 0, .5);
+}
+
+.igbz-vip-body { padding: 16px; }
+.igbz-vip-caption { color: var(--igbz-vip-muted); font-size: .94rem; }
+
+.igbz-vip-meta {
+	list-style: none;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+	margin: 12px 0 0;
+	padding: 0;
+	font-size: .85rem;
+	color: var(--igbz-vip-muted);
+}
+.igbz-vip-expiry { color: #b45309; }
+
+.igbz-vip-gone {
+	margin-top: 12px;
+	padding: 12px 14px;
+	border-radius: 12px;
+	background: #f3f4f6;
+	font-size: .9rem;
+	color: var(--igbz-vip-muted);
+}
+
+/* --------------------------------------------------------------- the offers */
+
+.igbz-vip-actions,
+.igbz-vip-offers,
+.igbz-vip-tip,
+.igbz-vip-download,
+.igbz-vip-explainer {
+	margin-top: 18px;
+	padding: 16px;
+	background: var(--igbz-vip-card);
+	border: 1px solid var(--igbz-vip-line);
+	border-radius: var(--igbz-vip-radius);
+}
+
+.igbz-vip-offer { margin: 0 0 14px; padding: 0 0 14px; border-bottom: 1px solid var(--igbz-vip-line); }
+.igbz-vip-offer:last-of-type { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+
+.igbz-vip-hint { color: var(--igbz-vip-muted); font-size: .87rem; }
+.igbz-vip-price { font-size: 1.15rem; font-weight: 700; margin: 6px 0 12px; }
+.igbz-vip-owned { font-size: .95rem; }
+
+.igbz-vip-plans { display: grid; gap: 8px; margin: 10px 0 14px; }
+.igbz-vip-plan {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	align-items: center;
+	gap: 4px 10px;
+	padding: 12px 14px;
+	border: 1px solid var(--igbz-vip-line);
+	border-radius: 12px;
+	cursor: pointer;
+}
+.igbz-vip-plan:has(input:checked) { border-color: var(--igbz-vip-brand); box-shadow: 0 0 0 1px var(--igbz-vip-brand) inset; }
+.igbz-vip-plan input { margin: 0; accent-color: var(--igbz-vip-brand); }
+.igbz-vip-plan-name { font-weight: 600; }
+.igbz-vip-plan-price { font-weight: 700; white-space: nowrap; }
+.igbz-vip-plan-term { grid-column: 2 / -1; font-size: .82rem; color: var(--igbz-vip-muted); }
+
+/* --------------------------------------------------------------- controls */
+
+.igbz-vip-btn {
+	display: block;
+	width: 100%;
+	padding: 13px 18px;
+	border: 1px solid var(--igbz-vip-brand);
+	border-radius: 12px;
+	background: transparent;
+	color: var(--igbz-vip-brand);
+	font: inherit;
+	font-weight: 600;
+	text-align: center;
+	text-decoration: none;
+	cursor: pointer;
+}
+.igbz-vip-btn:hover { background: rgba(214, 41, 118, .07); }
+.igbz-vip-primary { background: var(--igbz-vip-brand); color: var(--igbz-vip-brand-ink); }
+.igbz-vip-primary:hover { background: #bc2266; }
+
+.igbz-vip-tip-presets { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.igbz-vip-chip {
+	flex: 1 1 auto;
+	padding: 10px 14px;
+	border: 1px solid var(--igbz-vip-line);
+	border-radius: 999px;
+	background: #fff;
+	font: inherit;
+	font-size: .9rem;
+	cursor: pointer;
+	white-space: nowrap;
+}
+.igbz-vip-chip:hover { border-color: var(--igbz-vip-brand); color: var(--igbz-vip-brand); }
+
+.igbz-vip-tip-custom,
+.igbz-vip-tip-note { display: block; margin: 10px 0; font-size: .87rem; color: var(--igbz-vip-muted); }
+.igbz-vip-tip-custom input,
+.igbz-vip-tip-note textarea {
+	display: block;
+	width: 100%;
+	margin-top: 5px;
+	padding: 11px 12px;
+	border: 1px solid var(--igbz-vip-line);
+	border-radius: 10px;
+	background: #fff;
+	color: var(--igbz-vip-ink);
+	font: inherit;
+	font-size: .95rem;
+}
+.igbz-vip-tip-note textarea { resize: vertical; }
+
+/* -------------------------------------------------------------- the app box */
+
+.igbz-vip-stores { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.igbz-vip-store {
+	flex: 1 1 140px;
+	padding: 12px 14px;
+	border: 1px solid var(--igbz-vip-line);
+	border-radius: 12px;
+	background: #fff;
+	color: inherit;
+	font-size: .9rem;
+	font-weight: 600;
+	text-align: center;
+	text-decoration: none;
+}
+.igbz-vip-store:hover { border-color: var(--igbz-vip-brand); color: var(--igbz-vip-brand); }
+
+.igbz-vip-explainer p { font-size: .9rem; color: var(--igbz-vip-muted); }
+.igbz-vip-explainer p:last-child { margin-bottom: 0; }
+
+/* ------------------------------------------------------------------- themes */
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		--igbz-vip-bg: #0e0e10;
+		--igbz-vip-card: #17171a;
+		--igbz-vip-ink: #f2f2f3;
+		--igbz-vip-muted: #9aa0a6;
+		--igbz-vip-line: rgba(255, 255, 255, .12);
+	}
+	.igbz-vip-gone { background: #1f1f23; }
+	.igbz-vip-chip,
+	.igbz-vip-store,
+	.igbz-vip-tip-custom input,
+	.igbz-vip-tip-note textarea { background: #1f1f23; color: var(--igbz-vip-ink); }
+	.igbz-vip-error { background: #3a1a1a; color: #ffb4b4; }
+	.igbz-vip-success { background: #12301f; color: #8fe0b0; }
+}
+
+[dir="rtl"] .igbz-vip-plan { grid-template-columns: auto 1fr auto; }
