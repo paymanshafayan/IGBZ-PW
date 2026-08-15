@@ -209,24 +209,45 @@ final class FunnelService {
 			return null;
 		}
 
-		$now  = current_time( 'mysql', true );
+		$now = current_time( 'mysql', true );
+
+		// A post can be referred to in more than one way and the two ends of this comparison are
+		// configured by different parties. The funnel's post_id is whatever the operator picked or
+		// pasted -- since the content picker landed, usually the shortcode of one of our published
+		// posts, but older funnels still hold the raw id that ManyChat sends, and a pasted post URL
+		// is a reasonable thing to type. The incoming value is whatever ManyChat put in the comment
+		// event. Match on every spelling that denotes the same post rather than on string equality,
+		// so a funnel does not silently stop firing because the two sides disagree about format.
+		$candidates = array_values(
+			array_unique(
+				array_filter(
+					[ $post_id, PostIdentity::from_permalink( $post_id ) ],
+					static fn ( string $value ): bool => '' !== $value
+				)
+			)
+		);
+
+		// The empty string is the "any post" scope and is always in play. Kept separate from the
+		// candidates so that an unparseable incoming id narrows to global funnels instead of
+		// matching everything.
+		$placeholders = implode( ', ', array_fill( 0, count( $candidates ) + 1, '%s' ) );
+
 		$rows = $this->db->results(
 			'SELECT * FROM ' . $this->db->table( 'ig_funnels' ) . '
 			 WHERE is_active = 1
 			   AND (starts_at IS NULL OR starts_at <= %s)
 			   AND (ends_at IS NULL OR ends_at >= %s)
-			   AND (post_id = %s OR post_id = %s)
+			   AND post_id IN (' . $placeholders . ')
 			   AND (tenant_id = %d OR %d = 0)
 			   AND (account_id = %d OR account_id = 0)
-			 ORDER BY (post_id <> %s) ASC, id DESC',
+			 -- A funnel pinned to this post beats a catch-all funnel that happens to share the
+			 -- keyword: (post_id = "") is 0 for the pinned row and 1 for the catch-all, so ASC
+			 -- puts the pinned one first. Ordering on the negation instead reverses the two and
+			 -- lets one catch-all shadow every per-post funnel on the account.
+			 ORDER BY (post_id = %s) ASC, id DESC',
 			$now,
 			$now,
-			$post_id,
-			'',
-			$tenant_id,
-			$tenant_id,
-			$account_id,
-			''
+			...array_merge( $candidates, [ '' ], [ $tenant_id, $tenant_id, $account_id, '' ] )
 		);
 
 		foreach ( $rows as $row ) {
@@ -835,7 +856,25 @@ final class FunnelService {
 		return $code;
 	}
 
-	/** @param array<string,mixed> $funnel */
+	/**
+	 * Credit the funnel reward.
+	 *
+	 * The reason is REASON_IG_REWARD, not REASON_COMMISSION. They are different kinds of money and
+	 * the customer reads the difference: an affiliate commission is earned by referring a sale and
+	 * is owed to a registered affiliate, while this is a promotional reward for commenting on a
+	 * post. Filing the second under the first put "Affiliate commission" on the statement of
+	 * shoppers who had never joined the affiliate programme, and made the two indistinguishable to
+	 * anyone totalling the ledger by reason.
+	 *
+	 * Changing the reason cannot double-pay an existing reward. The ledger's idempotency key is
+	 * (tenant, user, reason, reference_code), so in principle a row already written as
+	 * `affiliate_commission` + `ig_funnel:<hit>` would no longer collide with the new reason — but
+	 * this method is only ever reached from settle(), which claims the hit with a conditional
+	 * `UPDATE ... WHERE delivered = 0` and returns early when that claim fails. A hit that was
+	 * already paid is never re-settled, so the credit is never re-attempted.
+	 *
+	 * @param array<string,mixed> $funnel
+	 */
 	private function grant_wallet_credit( array $funnel, int $subscriber_row_id, int $hit_id ): void {
 		$amount = (float) $funnel['grant_wallet_credit'];
 		if ( $amount <= 0 || $subscriber_row_id <= 0 ) {
@@ -850,7 +889,7 @@ final class FunnelService {
 		$this->wallet->credit(
 			$user_id,
 			$amount,
-			WalletService::REASON_COMMISSION,
+			WalletService::REASON_IG_REWARD,
 			'ig_funnel:' . $hit_id,
 			[ 'funnel_id' => (int) $funnel['id'] ],
 			(int) $funnel['tenant_id'],

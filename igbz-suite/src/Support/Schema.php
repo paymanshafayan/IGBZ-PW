@@ -514,6 +514,7 @@ final class Schema {
 			scheduled_for DATETIME NULL,
 			published_at DATETIME NULL,
 			permalink VARCHAR(255) NOT NULL DEFAULT '',
+			ig_shortcode VARCHAR(64) NOT NULL DEFAULT '',
 			last_error VARCHAR(500) NOT NULL DEFAULT '',
 			retry_count INT NOT NULL DEFAULT 0,
 			created_at DATETIME NOT NULL,
@@ -521,7 +522,8 @@ final class Schema {
 			PRIMARY KEY  (id),
 			KEY account_status (account_id,status),
 			KEY scheduled_for (scheduled_for),
-			KEY provider_task (provider_task_id)
+			KEY provider_task (provider_task_id),
+			KEY ig_shortcode (ig_shortcode)
 		) {$charset};";
 
 		$sql[] = "CREATE TABLE {$p}ig_insights (

@@ -31,6 +31,7 @@ $cases = [
 	'DirectMessageTest',
 	'VipChannelTest',
 	'LmsTest',
+	'PostIdentityTest',
 ];
 
 foreach ( $cases as $case ) {

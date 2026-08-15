@@ -188,7 +188,53 @@ final class FunnelDb extends wpdb {
 		$this->queries[] = $sql;
 
 		if ( str_contains( $sql, 'igbz_ig_funnels' ) ) {
-			return array_values( $this->funnels );
+			// match() leans on the database for two things beyond the row set: the post_id IN
+			// list, which decides who is eligible, and the ORDER BY, which decides who wins when
+			// a post-specific funnel and a catch-all both qualify. Returning every row in
+			// insertion order hides both, so honour them here.
+			$rows = array_values( $this->funnels );
+
+			if ( ! str_contains( $sql, 'post_id IN (' ) ) {
+				return $rows;
+			}
+
+			preg_match( '/post_id IN \(([^)]*)\)/', $sql, $list );
+			preg_match_all( "/'([^']*)'/", $list[1] ?? '', $found );
+			$scopes = $found[1];
+			$rows   = array_values(
+				array_filter(
+					$rows,
+					static fn ( array $row ): bool => in_array( (string) $row['post_id'], $scopes, true )
+				)
+			);
+
+			// Read the ordering expression out of the SQL rather than assuming the intended one:
+			// hard-coding "pinned first" here would make this double agree with the query no
+			// matter which way round the comparison is written, which is precisely how the
+			// reversed ORDER BY survived unnoticed.
+			$equals = (bool) preg_match( "/ORDER BY \(post_id = '[^']*'\) ASC/", $sql );
+			$not    = (bool) preg_match( "/ORDER BY \(post_id <> '[^']*'\) ASC/", $sql );
+
+			if ( $equals || $not ) {
+				usort(
+					$rows,
+					static function ( array $a, array $b ) use ( $equals ): int {
+						// The sort key is the truth value of the comparison the SQL actually
+						// makes, so an inverted expression sorts inverted here too.
+						$key      = static fn ( array $row ): int => $equals
+							? ( '' === (string) $row['post_id'] ? 1 : 0 )
+							: ( '' !== (string) $row['post_id'] ? 1 : 0 );
+						$a_rank   = $key( $a );
+						$b_rank   = $key( $b );
+
+						return $a_rank === $b_rank
+							? (int) $b['id'] <=> (int) $a['id']
+							: $a_rank <=> $b_rank;
+					}
+				);
+			}
+
+			return $rows;
 		}
 
 		if ( str_contains( $sql, 'igbz_ig_funnel_hits' ) ) {
@@ -413,6 +459,7 @@ final class FunnelDeliveryTest extends TestCase {
 		$this->test_the_retry_picks_up_stale_pending_hits();
 		$this->test_the_backlog_separates_the_states();
 		$this->test_the_admin_cell_names_each_state();
+		$this->test_post_specific_funnel_wins_over_a_catch_all();
 	}
 
 	/**
@@ -727,4 +774,40 @@ final class FunnelDeliveryTest extends TestCase {
 		$this->assert_same( 1, $backlog['unconfirmed'], 'and one is delivered but unproven' );
 		$this->assert_true( $a['hit_id'] > 0, 'the pending hit is the one nothing was done to' );
 	}
+	private function test_post_specific_funnel_wins_over_a_catch_all(): void {
+		// The realistic shape of an account that has been running for a while: one broad funnel
+		// answering the keyword everywhere, plus a funnel pinned to the post currently being
+		// promoted. Both are valid for a comment on that post, and the pinned one has to win --
+		// otherwise the catch-all quietly swallows every campaign on the account.
+		$funnels = $this->boot();
+
+		$this->db->add_funnel(
+			[
+				'name'       => 'Catch all',
+				'keyword'    => 'link',
+				'post_id'    => '',
+				'target_url' => 'https://shop.test/generic',
+			]
+		);
+		$this->db->add_funnel(
+			[
+				'name'       => 'Autumn launch',
+				'keyword'    => 'link',
+				'post_id'    => 'CxAutumn123',
+				'target_url' => 'https://shop.test/autumn',
+			]
+		);
+
+		$pinned = $funnels->match( 'send me the link', 'CxAutumn123', 1, 0 );
+		$this->assert_same( 'Autumn launch', (string) $pinned['name'], 'the funnel pinned to the post answers the comment on that post' );
+
+		// The same comment on a post nobody pinned still has to reach the catch-all.
+		$other = $funnels->match( 'send me the link', 'CxSomethingElse', 1, 0 );
+		$this->assert_same( 'Catch all', (string) $other['name'], 'an unpinned post falls through to the broad funnel' );
+
+		// And a post id spelled as a URL is the same post as the shortcode it contains.
+		$as_url = $funnels->match( 'send me the link', 'https://www.instagram.com/p/CxAutumn123/', 1, 0 );
+		$this->assert_same( 'Autumn launch', (string) $as_url['name'], 'a pasted permalink resolves to the pinned funnel' );
+	}
+
 }

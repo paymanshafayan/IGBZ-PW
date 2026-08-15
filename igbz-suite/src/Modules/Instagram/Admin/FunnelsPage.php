@@ -5,6 +5,7 @@ use IGBZ\Suite\Modules\Instagram\Gateways\ManyChatClient;
 use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
 use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
 use IGBZ\Suite\Modules\Instagram\Services\ManusService;
+use IGBZ\Suite\Modules\Instagram\Services\PostIdentity;
 use IGBZ\Suite\Support\Admin\Menu;
 use IGBZ\Suite\Support\Admin\View;
 use IGBZ\Suite\Support\Capabilities;
@@ -231,7 +232,7 @@ final class FunnelsPage {
 
 		$this->select_row( 'match_mode', __( 'Match mode', 'igbz-suite' ), $this->match_modes(), (string) $funnel['match_mode'] );
 
-		$this->text_row( 'post_id', __( 'Post ID', 'igbz-suite' ), (string) $funnel['post_id'], __( 'Optional. Scope the funnel to a single post — post-scoped funnels win over global ones.', 'igbz-suite' ) );
+		$this->post_row( (string) $funnel['post_id'], (int) $funnel['account_id'] );
 
 		$this->select_row(
 			'target_type',
@@ -378,6 +379,120 @@ final class FunnelsPage {
 	}
 
 	/**
+	 * Scope the funnel to one post.
+	 *
+	 * This used to be a bare text box asking for a "Post ID", with nothing in the product that
+	 * could tell an operator what to put in it. The id is opaque, it is not shown anywhere in the
+	 * Instagram UI, and a typo produces a funnel that looks configured and never fires -- the worst
+	 * kind of failure, because the only symptom is silence.
+	 *
+	 * Now that publishing records each post's shortcode, offer the posts we published as a list.
+	 * The free-text box stays as the fallback for posts this plugin did not publish (older posts,
+	 * or ones posted from the phone), so nothing that used to be configurable stops being
+	 * configurable.
+	 */
+	private function post_row( string $current, int $account_id ): void {
+		$posts = $this->published_posts( $account_id );
+
+		echo '<tr><th scope="row"><label for="igbz_post_id">' . esc_html__( 'Post', 'igbz-suite' ) . '</label></th><td>';
+
+		if ( $posts ) {
+			echo '<select id="igbz_post_id" name="post_id">';
+			printf( '<option value="">%s</option>', esc_html__( 'Any post — the funnel matches the keyword anywhere', 'igbz-suite' ) );
+
+			$known = false;
+
+			foreach ( $posts as $post ) {
+				$shortcode = (string) $post['ig_shortcode'];
+				$known     = $known || $shortcode === $current;
+
+				printf(
+					'<option value="%1$s" %2$s>%3$s</option>',
+					esc_attr( $shortcode ),
+					selected( $shortcode, $current, false ),
+					esc_html( $this->post_label( $post ) )
+				);
+			}
+
+			// A funnel configured before the picker existed, or pointed at a post we did not
+			// publish, holds a value that is in no option. Without this the dropdown would quietly
+			// re-point the funnel at the first post in the list on the next save.
+			if ( '' !== $current && ! $known ) {
+				printf(
+					'<option value="%1$s" selected>%2$s</option>',
+					esc_attr( $current ),
+					/* translators: %s: the post id or shortcode currently saved on the funnel. */
+					esc_html( sprintf( __( 'Currently set: %s', 'igbz-suite' ), $current ) )
+				);
+			}
+
+			echo '</select>';
+			printf(
+				'<p class="description">%s</p>',
+				esc_html__( 'Post-scoped funnels win over global ones. The list holds posts this plugin published.', 'igbz-suite' )
+			);
+		} else {
+			printf(
+				'<input type="text" class="regular-text" id="igbz_post_id" name="post_id" value="%s" placeholder="Cx1YzAbCdEf" />',
+				esc_attr( $current )
+			);
+			printf(
+				'<p class="description">%s</p>',
+				esc_html__( 'Optional. Paste the post URL or its shortcode. Once you publish through this plugin, your posts appear here as a list.', 'igbz-suite' )
+			);
+		}
+
+		echo '</td></tr>';
+	}
+
+	/**
+	 * Published posts that carry a shortcode, newest first.
+	 *
+	 * Rows without one are skipped rather than shown as blank options: a post published before
+	 * this column existed, or one whose Manus task returned no URL, has no id to scope a funnel to,
+	 * and offering it would produce a funnel matching the empty string -- which is the "any post"
+	 * scope, the opposite of what the operator asked for.
+	 *
+	 * @return array<int,array<string,mixed>>
+	 */
+	private function published_posts( int $account_id ): array {
+		$db = igbz()->db();
+
+		return $db->results(
+			'SELECT id, account_id, title, permalink, ig_shortcode, published_at
+			   FROM ' . $db->table( 'ig_content' ) . '
+			  WHERE status = %s
+			    AND ig_shortcode <> %s
+			    AND (tenant_id = %d OR %d = 0)
+			    AND (account_id = %d OR %d = 0)
+			  ORDER BY published_at DESC, id DESC
+			  LIMIT 200',
+			ManusService::STATUS_PUBLISHED,
+			'',
+			igbz()->tenancy()->id(),
+			igbz()->tenancy()->id(),
+			$account_id,
+			$account_id
+		);
+	}
+
+	/** @param array<string,mixed> $post */
+	private function post_label( array $post ): string {
+		$title = trim( (string) $post['title'] );
+		$date  = (string) $post['published_at'];
+
+		if ( '' === $title ) {
+			$title = __( '(untitled)', 'igbz-suite' );
+		}
+
+		if ( '' !== $date ) {
+			$title .= ' — ' . wp_date( 'Y-m-d', (int) strtotime( $date . ' UTC' ) );
+		}
+
+		return $title . ' [' . (string) $post['ig_shortcode'] . ']';
+	}
+
+	/**
 	 * The flow picker has to ask ManyChat, and ManyChat keys are per account, so the list is
 	 * fetched with the key of the account this funnel belongs to. With no account chosen yet there
 	 * is no key to use and the field degrades to a free-text namespace input.
@@ -432,7 +547,7 @@ final class FunnelsPage {
 			'name'                => isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '',
 			'keyword'             => isset( $_POST['keyword'] ) ? sanitize_text_field( wp_unslash( $_POST['keyword'] ) ) : '',
 			'match_mode'          => isset( $_POST['match_mode'] ) ? sanitize_key( wp_unslash( $_POST['match_mode'] ) ) : FunnelService::MATCH_CONTAINS,
-			'post_id'             => isset( $_POST['post_id'] ) ? sanitize_text_field( wp_unslash( $_POST['post_id'] ) ) : '',
+			'post_id'             => $this->post_scope(),
 			'reply_text'          => isset( $_POST['reply_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['reply_text'] ) ) : '',
 			'target_type'         => isset( $_POST['target_type'] ) ? sanitize_key( wp_unslash( $_POST['target_type'] ) ) : FunnelService::TARGET_URL,
 			'target_url'          => isset( $_POST['target_url'] ) ? esc_url_raw( wp_unslash( $_POST['target_url'] ) ) : '',
@@ -459,6 +574,27 @@ final class FunnelsPage {
 				? __( 'Funnel saved.', 'igbz-suite' )
 				: sprintf( /* translators: %d: funnel id */ __( 'Funnel #%d created.', 'igbz-suite' ), $saved )
 		);
+	}
+
+	/**
+	 * The submitted post scope, normalised to a shortcode where possible.
+	 *
+	 * The field can carry a shortcode (picked from the list), a full post URL (pasted into the
+	 * fallback box) or a raw id from an older funnel. Store the shortcode when we can read one, so
+	 * a pasted URL and a picked post end up as the same value and the picker recognises its own
+	 * saved value next time. Anything unparseable is kept verbatim rather than blanked -- blanking
+	 * would silently widen the funnel to every post.
+	 */
+	private function post_scope(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by the caller.
+		$raw = isset( $_POST['post_id'] ) ? sanitize_text_field( wp_unslash( $_POST['post_id'] ) ) : '';
+		$raw = trim( $raw );
+
+		if ( '' === $raw ) {
+			return '';
+		}
+
+		return PostIdentity::from_permalink( $raw ) ?: $raw;
 	}
 
 	private function post_datetime( string $key ): ?string {

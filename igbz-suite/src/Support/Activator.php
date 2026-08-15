@@ -2,7 +2,9 @@
 namespace IGBZ\Suite\Support;
 
 use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
+use IGBZ\Suite\Modules\Instagram\Services\PostIdentity;
 use IGBZ\Suite\Modules\MultiTenant\Lms\LmsService;
+use IGBZ\Suite\Modules\MultiTenant\Wallet\WalletService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -77,6 +79,70 @@ final class Activator {
 		}
 		if ( $from > 0 && $from < 11 ) {
 			self::migrate_to_v11();
+		}
+		if ( $from > 0 && $from < 12 ) {
+			self::migrate_to_v12();
+		}
+	}
+
+	/**
+	 * v12: funnel rewards are labelled correctly, and published posts get an identity.
+	 *
+	 * Two independent back-fills, both cosmetic in the sense that no money and no post changes
+	 * hands -- but both fix rows that currently say something untrue.
+	 *
+	 * The ledger first. A funnel that credits a wallet was filing the credit under
+	 * `affiliate_commission`, the reason reserved for money earned by referring a sale. Customers
+	 * who had never joined the affiliate programme saw "Affiliate commission" on their statement
+	 * for having commented on a post, and the two kinds of money could not be told apart by anyone
+	 * totalling the ledger. The code now writes `instagram_reward`; these are the rows it already
+	 * wrote. They are identifiable with certainty by their reference code, which the funnel owns
+	 * exclusively (`ig_funnel:<hit id>`, versus `commission:<id>` for real commissions), so the
+	 * UPDATE cannot touch a genuine commission.
+	 *
+	 * Rewriting the reason is safe against the ledger's UNIQUE (tenant, user, reason, reference)
+	 * key: the reference code is unique per hit on its own, so moving a row to a different reason
+	 * cannot collide with another row. And it cannot cause a re-payment, because a hit is paid only
+	 * from settle(), which claims the hit row before crediting and never re-settles a claimed one.
+	 *
+	 * Then the posts. dbDelta adds ig_content.ig_shortcode, but existing published rows have it
+	 * empty, which would leave the new funnel post-picker showing nothing on a site that has been
+	 * publishing for months. The shortcode is derived from the permalink already on the row, so the
+	 * back-fill needs no network call -- fitting, since we have no Instagram API to ask.
+	 */
+	private static function migrate_to_v12(): void {
+		$db = new Db();
+
+		$ledger = $db->table( 'wallet_ledger' );
+
+		// A plain UPDATE: no subquery, no join, nothing the SQLite translator on Playground
+		// installs has to reinterpret.
+		$db->query(
+			"UPDATE {$ledger} SET reason = %s WHERE reason = %s AND reference_code LIKE %s",
+			WalletService::REASON_IG_REWARD,
+			WalletService::REASON_COMMISSION,
+			'ig_funnel:%'
+		);
+
+		$content = $db->table( 'ig_content' );
+
+		// Only rows that can yield a shortcode are read, and each is written individually. The set
+		// is bounded by how much a shop has published, and per-row updates keep the parsing rules
+		// in PHP where they are tested, instead of restating them as SQL string surgery.
+		$rows = $db->results(
+			"SELECT id, permalink FROM {$content} WHERE ig_shortcode = %s AND permalink <> %s",
+			'',
+			''
+		);
+
+		foreach ( $rows as $row ) {
+			$shortcode = PostIdentity::from_permalink( (string) $row['permalink'] );
+
+			if ( '' === $shortcode ) {
+				continue;
+			}
+
+			$db->update( 'ig_content', [ 'ig_shortcode' => $shortcode ], [ 'id' => (int) $row['id'] ] );
 		}
 	}
 

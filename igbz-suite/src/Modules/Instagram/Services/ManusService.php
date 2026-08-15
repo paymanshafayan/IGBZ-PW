@@ -652,11 +652,17 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 	public function mark_published( int $content_id, string $permalink ): void {
 		$permalink = esc_url_raw( $permalink );
 
+		// Derive the post's shortcode now, while the URL is in hand. This is the only moment the
+		// system learns the identity of a public post: we never call the Graph API, so no media id
+		// is ever handed to us, and a permalink that arrives later by hand goes through the same
+		// path. Without it a funnel could only be scoped to a post by typing an opaque id from
+		// memory. An unparseable URL stores '' -- unknown, never a wildcard.
 		$this->db->update(
 			'ig_content',
 			[
 				'status'       => self::STATUS_PUBLISHED,
 				'permalink'    => $permalink,
+				'ig_shortcode' => PostIdentity::from_permalink( $permalink ),
 				'published_at' => current_time( 'mysql', true ),
 				'updated_at'   => current_time( 'mysql', true ),
 			],
