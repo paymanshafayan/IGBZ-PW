@@ -68,6 +68,9 @@ final class SettingsPage {
 		if ( Modules::enabled( Modules::REST_API ) ) {
 			$tabs['api'] = __( 'Mobile API', 'igbz-suite' );
 		}
+		if ( Modules::enabled( Modules::FX ) ) {
+			$tabs['fx'] = __( 'FX payments', 'igbz-suite' );
+		}
 
 		$tabs['advanced'] = __( 'Advanced', 'igbz-suite' );
 
@@ -659,6 +662,26 @@ final class SettingsPage {
 					[ 'key' => 'api.min_app_version', 'label' => __( 'Minimum supported app version', 'igbz-suite' ), 'help' => __( 'Older builds get a forced-update screen from /app/config.', 'igbz-suite' ) ],
 					[ 'key' => 'api.apk_url', 'label' => __( 'Direct APK download URL', 'igbz-suite' ), 'help' => __( 'For distribution outside Google Play, which is the norm in Iran.', 'igbz-suite' ) ],
 					[ 'key' => 'api.ios_store_url', 'label' => __( 'iOS download URL', 'igbz-suite' ) ],
+				];
+
+			case 'fx':
+				return [
+					[ 'key' => 'fx.fee_percent', 'label' => __( 'Top-up fee (%)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 100, 'help' => __( 'Added on top of the requested USD amount when charging with Rials. The wallet only receives the requested amount; the fee is the operator\'s.', 'igbz-suite' ) ],
+					[
+						'key'     => 'fx.rate_source',
+						'label'   => __( 'Exchange rate source', 'igbz-suite' ),
+						'type'    => 'select',
+						'options' => [
+							'manual' => __( 'Manual', 'igbz-suite' ),
+							'auto'   => __( 'Automatic (URL)', 'igbz-suite' ),
+						],
+						'help' => __( 'Auto falls back to the manual value when the URL is unreachable.', 'igbz-suite' ),
+					],
+					[ 'key' => 'fx.rate_url', 'label' => __( 'Rate API URL', 'igbz-suite' ), 'help' => __( 'JSON endpoint returning the IRT-per-USD rate.', 'igbz-suite' ) ],
+					[ 'key' => 'fx.rate_json_path', 'label' => __( 'Rate JSON path', 'igbz-suite' ), 'placeholder' => 'data.price', 'help' => __( 'Dotted path into the response; empty looks for price/rate/usdt/price_irt.', 'igbz-suite' ) ],
+					[ 'key' => 'fx.rate_manual', 'label' => __( 'Manual rate (IRT per USD)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'step' => 'any' ],
+					[ 'key' => 'fx.rate_cache_ttl', 'label' => __( 'Rate cache TTL (seconds)', 'igbz-suite' ), 'type' => 'number', 'min' => 60, 'max' => 86400 ],
+					[ 'key' => 'fx.payout_provider', 'label' => __( 'Payout adapter', 'igbz-suite' ), 'help' => __( 'Id of the automatic foreign-currency payout provider. Registered via igbz_register_fx_payout_providers.', 'igbz-suite' ) ],
 				];
 
 			case 'advanced':

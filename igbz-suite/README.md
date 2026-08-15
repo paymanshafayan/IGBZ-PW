@@ -3,7 +3,7 @@
 A faithful port of the IGBZ product from nopCommerce to WordPress and WooCommerce.
 
 The nopCommerce original shipped as four separate plugins. This port ships as **one plugin with
-four toggleable modules**, so an operator installs once and turns on only what the site needs.
+five toggleable modules**, so an operator installs once and turns on only what the site needs.
 
 | Module | Id | Replaces (nop plugin) | What it does |
 | --- | --- | --- | --- |
@@ -80,7 +80,7 @@ real endpoints.
 
 1. Copy the `igbz-suite` directory into `wp-content/plugins/`, or zip it and upload it through
    **Plugins → Add New → Upload Plugin**.
-2. Activate **IGBZ Suite**. On activation the plugin creates its 41 database tables, registers its
+2. Activate **IGBZ Suite**. On activation the plugin creates its 47 database tables, registers its
    roles and capabilities, schedules its cron events and seeds default settings.
 3. Go to **IGBZ → Settings → Modules** and enable the modules you need. Only *Multi-Tenant Stores*
    is on by default.
@@ -511,7 +511,7 @@ singletons; an unknown id throws.
 A module's services only exist while that module is enabled, so guard cross-module calls with
 `igbz()->has( 'wallet' )`.
 
-**Tenancy** is single-site with a `tenant_id` column, not WordPress Multisite. All 41 tables carry
+**Tenancy** is single-site with a `tenant_id` column, not WordPress Multisite. All 47 tables carry
 `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`, `plans`, `logs`, and
 `lesson_progress` (which inherits scope through `enrollment_id`). Products and orders are scoped
 with the `_igbz_tenant_id` meta key, where `0` or absent means platform-shared.
@@ -564,7 +564,7 @@ php igbz-suite/tests/run.php
 ```
 
 `tests/bootstrap.php` provides doubles for the WordPress functions the tested classes touch, plus a
-fake `$wpdb`. **875 assertions across 19 cases**, plus a syntax check over 158 files
+fake `$wpdb`. **931 assertions across 20 cases**, plus a syntax check over 168 files
 (`bash _devenv/test.sh` runs both).
 
 Coverage is deliberately aimed at the code where a bug costs money or leaks data: `Crypto`,

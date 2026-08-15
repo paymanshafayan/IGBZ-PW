@@ -13,7 +13,7 @@ learned the hard way; following it will save hours.
 
 ## 1. What this project is
 
-`igbz-suite/` is a **single WordPress plugin containing four toggleable modules**, a faithful port
+`igbz-suite/` is a **single WordPress plugin containing five toggleable modules**, a faithful port
 of the IGBZ product from nopCommerce to WordPress + WooCommerce.
 
 The one intentional functional difference from the nopCommerce original: the **Instagram Graph API
@@ -40,7 +40,7 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 - **Never modify the `IGBZ-NopCommerce` project.** It was a read-only review, and that review is
   finished (`REVIEW-IGBZ-NopCommerce.md`).
 - Tenancy is **single-site with `tenant_id` columns**. Not WordPress Multisite.
-- One plugin, four modules — **not** four separate plugins.
+- One plugin, five modules — **not** four separate plugins.
 - The deliverable is **complete and installable**, never a skeleton.
 - **Paid content is delivered by our own customer app**, not by a DM vendor and not by Instagram.
   This was settled after a long detour through DM vendors; ManyChat cannot send video to Instagram
@@ -56,7 +56,7 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 ```bash
 bash _devenv/setup.sh     # build (~30s if npm is warm)
 bash _devenv/run.sh       # site on http://127.0.0.1:9400, auto-logged-in as admin
-bash _devenv/test.sh      # 875 assertions + syntax check on 158 files
+bash _devenv/test.sh      # 931 assertions + syntax check on 168 files
 ```
 
 `_devenv/` contains committed WordPress and WooCommerce zips precisely because **`/tmp` is wiped
@@ -139,7 +139,7 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 
 **REST**: 100 routes across `igbz/v1` (incl. 14 `/intake/*`, 29 `/vip/*`) and `igbz-hub/v1`.
 
-**Schema**: 41 tables in `src/Support/Schema.php` (DB version 13; `ig_intake` added in v8, the nine
+**Schema**: 47 tables in `src/Support/Schema.php` (DB version 14; `ig_intake` added in v8, the nine
 `vip_*` tables in v10; v11 adds no tables — it is the LMS quiz/certificate wiring; v12 adds
 `ig_content.ig_shortcode` and relabels funnel rewards; v13 drops the never-used `jobs` queue). All carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`,
 `plans`, `logs`, `lesson_progress`, `vip_post_likes`, `vip_post_views`. Product/order
@@ -203,8 +203,8 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 875 assertions in 19 test cases; 158 files lint clean.
-- 18/18 admin screens return 200 with no notices; 41/41 tables; 3 cron hooks scheduled.
+- 931 assertions in 20 test cases; 168 files lint clean.
+- 18/18 admin screens return 200 with no notices; 47/47 tables; 3 cron hooks scheduled.
 - All six payment gateways register with WooCommerce and their settings screens render.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
   `processing`, sets the transaction id, and credits 2% cashback

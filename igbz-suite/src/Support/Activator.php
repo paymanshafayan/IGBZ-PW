@@ -26,6 +26,7 @@ final class Activator {
 		// used to be written only by the v10 migration, so a brand-new site got a Plans screen with
 		// nothing on it and a share page with nothing to sell.
 		self::seed_starter_vip_plan();
+		self::seed_fx_prices();
 		update_option( self::VERSION_OPTION, IGBZ_DB_VERSION, true );
 		if ( false === get_option( Modules::OPTION, false ) ) {
 			Modules::save( Modules::defaults() );
@@ -85,6 +86,54 @@ final class Activator {
 		}
 		if ( $from > 0 && $from < 13 ) {
 			self::migrate_to_v13();
+		}
+		if ( $from > 0 && $from < 14 ) {
+			self::migrate_to_v14();
+		}
+	}
+
+	/**
+	 * v14: the FX payment gateway tables (created by dbDelta) plus default prices.
+	 *
+	 * The six fx_* tables are plain dbDelta work. What cannot be expressed in DDL is the price
+	 * list the meter and the top-up screen depend on, so an upgrade seeds it exactly like a fresh
+	 * install does. Prices are deliberately conservative defaults; the operator edits them on the
+	 * FX payments screen (or leaves the module off entirely).
+	 */
+	private static function migrate_to_v14(): void {
+		self::seed_fx_prices();
+	}
+
+	/**
+	 * Seed the default per-service USD prices. No-op once anything is priced, so a shop that
+	 * deliberately cleared the list never has it come back.
+	 */
+	private static function seed_fx_prices(): void {
+		$db = igbz()->db();
+
+		$existing = (int) $db->scalar( 'SELECT COUNT(*) FROM ' . $db->table( 'fx_prices' ) );
+		if ( $existing > 0 ) {
+			return;
+		}
+
+		$now = current_time( 'mysql', true );
+		foreach (
+			[
+				'manus_task'      => 0.5,
+				'manus_monthly'   => 25.0,
+				'manychat_monthly' => 30.0,
+			] as $service => $price
+		) {
+			$db->insert(
+				'fx_prices',
+				[
+					'service'    => $service,
+					'price_usd'  => $price,
+					'is_active'  => 1,
+					'created_at' => $now,
+					'updated_at' => $now,
+				]
+			);
 		}
 	}
 
@@ -557,6 +606,14 @@ final class Activator {
 			'payments.currency_multiplier'  => 10,
 			'payments.zarinpal.sandbox'     => false,
 			'payments.idpay.sandbox'        => false,
+			'fx.enabled'                    => true,
+			'fx.fee_percent'                => 10,
+			'fx.rate_source'                => 'manual',
+			'fx.rate_url'                   => '',
+			'fx.rate_json_path'             => '',
+			'fx.rate_manual'                => 0,
+			'fx.rate_cache_ttl'             => 3600,
+			'fx.payout_provider'            => '',
 			'marketplace.enabled'           => true,
 			'marketplace.torob.enabled'     => true,
 			'marketplace.emalls.enabled'    => true,

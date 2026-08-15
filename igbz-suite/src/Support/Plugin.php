@@ -5,6 +5,7 @@ use IGBZ\Suite\Modules\Hub\HubModule;
 use IGBZ\Suite\Modules\Instagram\InstagramModule;
 use IGBZ\Suite\Modules\MultiTenant\MultiTenantModule;
 use IGBZ\Suite\Modules\RestApi\RestApiModule;
+use IGBZ\Suite\Modules\Fx\FxModule;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -85,6 +86,7 @@ final class Plugin {
 			Modules::INSTAGRAM   => InstagramModule::class,
 			Modules::HUB         => HubModule::class,
 			Modules::REST_API    => RestApiModule::class,
+			Modules::FX          => FxModule::class,
 		];
 	}
 

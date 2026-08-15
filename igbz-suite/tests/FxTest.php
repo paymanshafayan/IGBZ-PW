@@ -1,0 +1,449 @@
+<?php
+/**
+ * The FX payment gateway: Rial top-ups with a fee, and a credit meter that
+ * never queues a task.
+ *
+ * The rules this pins down are the ones the client stated while approving the
+ * design:
+ *
+ *   - a Rial top-up adds the operator's fee (default 10%) on top of the
+ *     requested USD amount, and only the requested amount lands in the wallet;
+ *   - a verified top-up credits exactly once, even if the webhook replays;
+ *   - the meter refuses a task on the spot when the tenant's credit is short —
+ *     there is no queue, no debt and no cross-tenant borrowing;
+ *   - a task Manus never accepted is refunded, once, at the exact amount that
+ *     was debited;
+ *   - the rate falls back to the manual value when the auto source fails.
+ */
+
+declare( strict_types=1 );
+
+use IGBZ\Suite\Modules\Fx\FxMath;
+use IGBZ\Suite\Modules\Fx\FxMeter;
+use IGBZ\Suite\Modules\Fx\FxRateService;
+use IGBZ\Suite\Modules\Fx\FxTopupService;
+use IGBZ\Suite\Modules\Fx\FxWalletService;
+use IGBZ\Suite\Modules\MultiTenant\Payments\PaymentService;
+use IGBZ\Suite\Modules\MultiTenant\Wallet\WalletService;
+use IGBZ\Suite\Support\Db;
+use IGBZ\Suite\Support\Http;
+use IGBZ\Suite\Support\Logger;
+
+/**
+ * In-memory stand-in for the five fx tables plus payments. Reads real rows
+ * and derives matches from the WHERE clauses in the SQL, following the same
+ * approach as the VIP double.
+ */
+final class FxDb extends wpdb {
+
+	/** @var array<string,array<int,array<string,mixed>>> table => id => row */
+	public array $tables = [
+		'fx_wallets' => [],
+		'fx_ledger'  => [],
+		'fx_prices'  => [],
+		'fx_rates'   => [],
+		'payments'   => [],
+	];
+
+	private int $next_id = 1;
+
+	/** @param array<string,mixed> $row */
+	public function seed( string $table, array $row ): int {
+		$id                            = (int) ( $row['id'] ?? $this->next_id++ );
+		$row['id']                     = $id;
+		$this->tables[ $table ][ $id ] = $row;
+
+		return $id;
+	}
+
+	public function get_row( string $sql, $output = null ) {
+		$this->queries[] = $sql;
+		$table           = self::which( $sql );
+
+		if ( 'fx_ledger' === $table ) {
+			$rows = $this->matching( $table, $sql, [ 'tenant_id', 'reason', 'reference' ] );
+			return $rows[0] ?? null;
+		}
+
+		if ( 'fx_prices' === $table ) {
+			$rows = $this->matching( $table, $sql, [ 'service' ] );
+			if ( str_contains( $sql, 'is_active = 1' ) ) {
+				$rows = array_values( array_filter( $rows, static fn ( $r ): bool => (int) ( $r['is_active'] ?? 0 ) === 1 ) );
+			}
+			if ( str_contains( $sql, 'ORDER BY id DESC' ) ) {
+				usort( $rows, static fn ( $a, $b ): int => (int) $b['id'] <=> (int) $a['id'] );
+			}
+			return $rows[0] ?? null;
+		}
+
+		if ( 'fx_wallets' === $table ) {
+			$rows = $this->matching( $table, $sql, [ 'tenant_id' ] );
+			return $rows[0] ?? null;
+		}
+
+		if ( 'payments' === $table ) {
+			return $this->tables[ $table ][ self::int_of( 'id', $sql ) ] ?? null;
+		}
+
+		return parent::get_row( $sql, $output );
+	}
+
+	public function get_results( string $sql, $output = null ) {
+		$this->queries[] = $sql;
+		$table           = self::which( $sql );
+
+		if ( 'fx_ledger' === $table ) {
+			$rows = $this->matching( $table, $sql, [ 'tenant_id' ] );
+			if ( str_contains( $sql, 'ORDER BY id DESC' ) ) {
+				usort( $rows, static fn ( $a, $b ): int => (int) $b['id'] <=> (int) $a['id'] );
+			}
+			if ( preg_match( '/LIMIT (\d+)/', $sql, $m ) ) {
+				$rows = array_slice( $rows, 0, (int) $m[1] );
+			}
+			return $rows;
+		}
+
+		if ( 'fx_prices' === $table ) {
+			return array_values( $this->tables[ $table ] );
+		}
+
+		return parent::get_results( $sql, $output );
+	}
+
+	public function get_var( string $sql ) {
+		$this->queries[] = $sql;
+
+		if ( str_contains( $sql, 'COUNT(*)' ) ) {
+			$table = self::which( $sql );
+			return (string) count( $this->matching( $table, $sql, [ 'tenant_id', 'reason', 'reference' ] ) );
+		}
+
+		if ( str_contains( $sql, 'amount_usd' ) && str_contains( $sql, 'igbz_fx_ledger' ) ) {
+			$rows = $this->matching( 'fx_ledger', $sql, [ 'tenant_id', 'reason', 'reference' ] );
+			return $rows ? (string) $rows[0]['amount_usd'] : null;
+		}
+
+		return parent::get_var( $sql );
+	}
+
+	public function insert( string $table, array $data, $format = null ): int|bool {
+		$this->queries[] = 'INSERT INTO ' . $table;
+		$this->last_write = [ 'table' => $table, 'data' => $data, 'formats' => $format ?? [], 'guessed' => null === $format ];
+		$this->writes[]   = $this->last_write;
+
+		$short = self::which( 'igbz_' . str_replace( $this->prefix . 'igbz_', '', $table ) );
+		if ( '' === $short ) {
+			return parent::insert( $table, $data, $format );
+		}
+
+		$this->insert_id = $this->seed( $short, $data );
+
+		return 1;
+	}
+
+	public function update( string $table, array $data, array $where, $format = null, $where_format = null ): int|bool {
+		$this->queries[] = 'UPDATE ' . $table;
+
+		$short   = self::which( 'igbz_' . str_replace( $this->prefix . 'igbz_', '', $table ) );
+		$changed = 0;
+		foreach ( $this->tables[ $short ] ?? [] as $id => $row ) {
+			$hit = true;
+			foreach ( $where as $column => $value ) {
+				if ( (string) ( $row[ $column ] ?? '' ) !== (string) $value ) {
+					$hit = false;
+					break;
+				}
+			}
+			if ( $hit ) {
+				$this->tables[ $short ][ $id ] = array_merge( $row, $data );
+				++$changed;
+			}
+		}
+
+		return $changed;
+	}
+
+	public function query( string $sql ): int|bool {
+		$this->queries[] = $sql;
+
+		if ( str_contains( $sql, 'INSERT INTO' ) && str_contains( $sql, 'ON DUPLICATE KEY UPDATE' ) ) {
+			// VALUES ('7', '10.0000', '2026-...') — tenant, balance, updated_at.
+			if ( preg_match( "/VALUES \('([^']*)', '([^']*)', '([^']*)'\)/", $sql, $m ) ) {
+				$tenant  = (int) $m[1];
+				$balance = (float) $m[2];
+				$updated = $m[3];
+
+				foreach ( $this->tables['fx_wallets'] as $id => $row ) {
+					if ( (int) $row['tenant_id'] === $tenant ) {
+						$this->tables['fx_wallets'][ $id ]['balance_usd'] = $balance;
+						$this->tables['fx_wallets'][ $id ]['updated_at'] = $updated;
+						return 1;
+					}
+				}
+				$this->seed( 'fx_wallets', [ 'tenant_id' => $tenant, 'balance_usd' => $balance, 'updated_at' => $updated ] );
+				return 1;
+			}
+		}
+
+		return parent::query( $sql );
+	}
+
+	private static function which( string $sql ): string {
+		$names = [ 'fx_wallets', 'fx_ledger', 'fx_prices', 'fx_rates', 'payments' ];
+		foreach ( $names as $name ) {
+			if ( str_contains( $sql, 'igbz_' . $name ) ) {
+				return $name;
+			}
+		}
+		return '';
+	}
+
+	private static function value_of( string $column, string $sql ): ?string {
+		return preg_match( '/\b' . preg_quote( $column, '/' ) . " = '([^']*)'/", $sql, $m ) ? $m[1] : null;
+	}
+
+	private static function int_of( string $column, string $sql ): int {
+		return (int) self::value_of( $column, $sql );
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	private function matching( string $table, string $sql, array $columns ): array {
+		$out = [];
+		foreach ( $this->tables[ $table ] ?? [] as $row ) {
+			foreach ( $columns as $column ) {
+				$wanted = self::value_of( $column, $sql );
+				if ( null !== $wanted && (string) ( $row[ $column ] ?? '' ) !== $wanted ) {
+					continue 2;
+				}
+			}
+			$out[] = $row;
+		}
+		return $out;
+	}
+
+	private static function now(): string {
+		return gmdate( 'Y-m-d H:i:s' );
+	}
+}
+
+/** A rate source that answers from a canned value without the network. */
+final class CannedRateService extends FxRateService {
+	private float $canned;
+
+	public function __construct( Db $db, \IGBZ\Suite\Support\Settings $settings, float $canned ) {
+		parent::__construct( $db, $settings, new Http( new Logger( $settings ) ) );
+		$this->canned = $canned;
+	}
+
+	protected function fetch_auto_rate(): float {
+		return $this->canned;
+	}
+}
+
+final class FxTest extends TestCase {
+
+	private FxDb $fxdb;
+	private Db $db;
+
+	private function boot(): void {
+		igbz_test_reset_settings();
+
+		$this->fxdb = new FxDb();
+		$GLOBALS['wpdb'] = $this->fxdb;
+
+		$this->db = new Db();
+		// is_sqlite() = true makes lock()/unlock() no-ops, exactly like the playground runtime.
+		$ref = new ReflectionProperty( Db::class, 'is_sqlite' );
+		$ref->setValue( $this->db, true );
+
+		$settings = igbz()->settings();
+		$settings->set( 'fx.fee_percent', 10 );
+		$settings->set( 'fx.rate_manual', 50000 );
+		$settings->set( 'fx.rate_source', 'manual' );
+	}
+
+	private function wallet(): FxWalletService {
+		return new FxWalletService( $this->db );
+	}
+
+	private function meter(): FxMeter {
+		return new FxMeter( $this->db, $this->wallet(), new Logger( igbz()->settings() ) );
+	}
+
+	private function seed_price( string $service, float $usd ): void {
+		$this->fxdb->seed(
+			'fx_prices',
+			[
+				'service'    => $service,
+				'price_usd'  => $usd,
+				'is_active'  => 1,
+				'created_at' => gmdate( 'Y-m-d H:i:s' ),
+				'updated_at' => gmdate( 'Y-m-d H:i:s' ),
+			]
+		);
+	}
+
+	private function topup(): FxTopupService {
+		$settings = igbz()->settings();
+		$logger   = new Logger( $settings );
+		$payments = new PaymentService( $this->db, new Http( $logger ), new WalletService( $this->db, $logger ), $logger );
+
+		return new FxTopupService( $this->db, $settings, $payments, $this->wallet(), new FxRateService( $this->db, $settings, new Http( $logger ) ), $logger );
+	}
+
+	public function run(): void {
+		$this->test_the_fee_is_added_on_top_of_the_usd_amount();
+		$this->test_quote_rounds_the_rial_amount();
+		$this->test_the_rate_falls_back_to_manual();
+		$this->test_the_auto_rate_wins_when_it_answers();
+		$this->test_a_verified_topup_credits_the_wallet();
+		$this->test_a_replayed_verification_does_not_double_credit();
+		$this->test_start_reports_the_fee_loaded_quote();
+		$this->test_the_meter_spends_and_refunds_once();
+		$this->test_the_meter_refuses_on_the_spot_when_credit_is_short();
+		$this->test_an_unpriced_service_is_refused();
+	}
+
+	public function test_the_fee_is_added_on_top_of_the_usd_amount(): void {
+		$q = FxMath::quote( 10, 10, 50000 );
+
+		$this->assert_same( 11.0, $q['gross_usd'], '10 USD at 10% fee charges 11 USD' );
+		$this->assert_same( 1.0, $q['fee_usd'], 'the fee is the difference' );
+		$this->assert_same( 10.0, $q['net_usd'], 'the wallet receives only the requested amount' );
+	}
+
+	public function test_quote_rounds_the_rial_amount(): void {
+		$q = FxMath::quote( 10.005, 10, 50000 );
+
+		$this->assert_same( 550275.0, $q['amount_irt'], 'the Rial charge is rounded to a whole unit' );
+	}
+
+	public function test_the_rate_falls_back_to_manual(): void {
+		$this->boot();
+		$settings = igbz()->settings();
+		$settings->set( 'fx.rate_source', 'auto' );
+		$settings->set( 'fx.rate_url', '' );
+
+		$rates = new FxRateService( $this->db, $settings, new Http( new Logger( $settings ) ) );
+
+		$this->assert_same( 50000.0, $rates->current(), 'an unreachable auto source falls back to the manual rate' );
+	}
+
+	public function test_the_auto_rate_wins_when_it_answers(): void {
+		$this->boot();
+		$settings = igbz()->settings();
+		$settings->set( 'fx.rate_source', 'auto' );
+
+		$rates = new CannedRateService( $this->db, $settings, 92000 );
+
+		$this->assert_same( 92000.0, $rates->current(), 'a live auto rate overrides the manual fallback' );
+	}
+
+	public function test_a_verified_topup_credits_the_wallet(): void {
+		$this->boot();
+		$this->fxdb->seed(
+			'payments',
+			[
+				'tenant_id' => 7,
+				'user_id'   => 3,
+				'purpose'   => FxTopupService::PURPOSE,
+				'amount'    => 550000,
+				'gateway'   => 'zarinpal',
+				'status'    => 'paid',
+				'meta'      => wp_json_encode(
+					[
+						'fx_net_usd'   => 10,
+						'fx_gross_usd' => 11,
+						'fx_fee_usd'   => 1,
+						'fx_rate_id'   => 5,
+					]
+				),
+			]
+		);
+
+		$this->topup()->on_payment_verified( 1 );
+
+		$this->assert_same( 10.0, $this->wallet()->balance( 7 )['balance_usd'], 'the wallet receives the net USD amount' );
+		$this->assert_same( 1, count( $this->fxdb->tables['fx_ledger'] ), 'exactly one ledger row for the top-up' );
+	}
+
+	public function test_a_replayed_verification_does_not_double_credit(): void {
+		$this->boot();
+		$this->fxdb->seed(
+			'payments',
+			[
+				'tenant_id' => 7,
+				'user_id'   => 3,
+				'purpose'   => FxTopupService::PURPOSE,
+				'amount'    => 550000,
+				'gateway'   => 'zarinpal',
+				'status'    => 'paid',
+				'meta'      => wp_json_encode( [ 'fx_net_usd' => 10, 'fx_gross_usd' => 11, 'fx_fee_usd' => 1, 'fx_rate_id' => 5 ] ),
+			]
+		);
+		$topup = $this->topup();
+
+		$topup->on_payment_verified( 1 );
+		$topup->on_payment_verified( 1 );
+
+		$this->assert_same( 10.0, $this->wallet()->balance( 7 )['balance_usd'], 'a replayed webhook credits once' );
+		$this->assert_same( 1, count( $this->fxdb->tables['fx_ledger'] ), 'the ledger holds one row' );
+	}
+
+	public function test_start_reports_the_fee_loaded_quote(): void {
+		$this->boot();
+
+		// No gateway is configured in the harness, so start() fails — but the quote is computed
+		// before the gateway lookup and must come back with the fee already loaded.
+		$result = $this->topup()->start( 7, 3, 10 );
+
+		$this->assert_false( $result['ok'], 'no gateway means no redirect' );
+		$this->assert_same( 550000.0, $result['amount_irt'], 'the Rial amount includes the fee' );
+		$this->assert_same( 11.0, $result['gross_usd'], 'the gross USD includes the fee' );
+		$this->assert_same( 10.0, $result['net_usd'], 'the net USD is what the wallet gets' );
+	}
+
+	public function test_the_meter_spends_and_refunds_once(): void {
+		$this->boot();
+		$this->seed_price( 'manus_task', 0.5 );
+		$this->wallet()->credit( 7, 1.0, FxWalletService::REASON_TOPUP, 'payment:1' );
+		$meter = $this->meter();
+
+		$first = $meter->consume( 7, 'manus_task', 'manus-task:aaa' );
+		$this->assert_true( $first['ok'], 'the first task is allowed' );
+		$this->assert_same( 0.5, $first['balance'], 'half a dollar left' );
+
+		$second = $meter->consume( 7, 'manus_task', 'manus-task:bbb' );
+		$this->assert_true( $second['ok'], 'the second task is allowed' );
+		$this->assert_same( 0.0, $second['balance'], 'the wallet is empty' );
+
+		$third = $meter->consume( 7, 'manus_task', 'manus-task:ccc' );
+		$this->assert_false( $third['ok'], 'the third task is refused on the spot' );
+		$this->assert_same( 'insufficient', $third['error'], 'the refusal names the reason' );
+
+		$meter->release( 7, 'manus_task', 'manus-task:bbb' );
+		$this->assert_same( 0.5, $this->wallet()->balance( 7 )['balance_usd'], 'a failed task is refunded' );
+
+		$meter->release( 7, 'manus_task', 'manus-task:bbb' );
+		$this->assert_same( 0.5, $this->wallet()->balance( 7 )['balance_usd'], 'a double release refunds once' );
+	}
+
+	public function test_the_meter_refuses_on_the_spot_when_credit_is_short(): void {
+		$this->boot();
+		$this->seed_price( 'manus_task', 0.5 );
+
+		$result = $this->meter()->consume( 7, 'manus_task', 'manus-task:aaa' );
+
+		$this->assert_false( $result['ok'], 'an empty wallet refuses immediately' );
+		$this->assert_same( 'insufficient', $result['error'], 'no queue, no debt — just the reason' );
+	}
+
+	public function test_an_unpriced_service_is_refused(): void {
+		$this->boot();
+
+		$result = $this->meter()->consume( 7, 'manus_task', 'manus-task:aaa' );
+
+		$this->assert_false( $result['ok'], 'a service with no price cannot be consumed' );
+		$this->assert_same( 'unpriced', $result['error'], 'the operator must set prices first' );
+	}
+}

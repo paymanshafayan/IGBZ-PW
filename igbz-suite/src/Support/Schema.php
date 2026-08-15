@@ -60,6 +60,12 @@ final class Schema {
 			'vip_messages',
 			'api_tokens',
 			'devices',
+			'fx_wallets',
+			'fx_ledger',
+			'fx_rates',
+			'fx_prices',
+			'fx_accounts',
+			'fx_bills',
 			'logs',
 		];
 	}
@@ -872,6 +878,81 @@ final class Schema {
 			created_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
 			KEY thread_stream (thread_id,id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}fx_wallets (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			balance_usd DECIMAL(18,4) NOT NULL DEFAULT 0,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY tenant (tenant_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}fx_ledger (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			reason VARCHAR(32) NOT NULL DEFAULT '',
+			reference VARCHAR(191) NOT NULL DEFAULT '',
+			amount_usd DECIMAL(18,4) NOT NULL DEFAULT 0,
+			amount_irt DECIMAL(18,4) NOT NULL DEFAULT 0,
+			rate_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			meta LONGTEXT NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY dedupe (tenant_id,reason,reference),
+			KEY tenant_stream (tenant_id,id),
+			KEY created_at (created_at)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}fx_rates (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			rate_irt_per_usd DECIMAL(18,4) NOT NULL DEFAULT 0,
+			source VARCHAR(16) NOT NULL DEFAULT 'manual',
+			captured_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY captured_at (captured_at)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}fx_prices (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			service VARCHAR(32) NOT NULL DEFAULT '',
+			price_usd DECIMAL(18,4) NOT NULL DEFAULT 0,
+			is_active TINYINT(1) NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY service_active (service,is_active)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}fx_accounts (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			provider VARCHAR(16) NOT NULL DEFAULT '',
+			provider_account_id VARCHAR(191) NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'active',
+			billing_day TINYINT UNSIGNED NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant_provider (tenant_id,provider)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}fx_bills (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			fx_account_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			period_start DATE NULL,
+			period_end DATE NULL,
+			amount_usd DECIMAL(18,4) NOT NULL DEFAULT 0,
+			status VARCHAR(20) NOT NULL DEFAULT 'due',
+			paid_at DATETIME NULL,
+			payout_ref VARCHAR(191) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant_status (tenant_id,status),
+			KEY account_period (fx_account_id,period_start)
 		) {$charset};";
 
 		$sql[] = "CREATE TABLE {$p}logs (
