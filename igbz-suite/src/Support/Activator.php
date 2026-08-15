@@ -90,6 +90,9 @@ final class Activator {
 		if ( $from > 0 && $from < 14 ) {
 			self::migrate_to_v14();
 		}
+		if ( $from > 0 && $from < 15 ) {
+			self::migrate_to_v15();
+		}
 	}
 
 	/**
@@ -153,6 +156,35 @@ final class Activator {
 	 * something needs to enqueue, and nothing does. If a future subsystem wants one, it will want
 	 * columns chosen for that job anyway, and this DDL is in the history.
 	 */
+	private static function migrate_to_v15(): void {
+		// Phase 6-14 tables are plain dbDelta work; nothing to back-fill.
+		self::seed_phase_defaults();
+	}
+
+	/**
+	 * Defaults for the phase 6-14 features. Guarded so a deliberate removal
+	 * is not resurrected on the next upgrade.
+	 */
+	private static function seed_phase_defaults(): void {
+		$db   = igbz()->db();
+		$have = (int) $db->scalar( 'SELECT COUNT(*) FROM ' . $db->table( 'ig_category_mapping' ) );
+		if ( $have > 0 ) {
+			return;
+		}
+
+		$now = current_time( 'mysql', true );
+		$db->insert(
+			'ig_category_mapping',
+			[
+				'tenant_id'        => 0,
+				'marketplace'      => 'digikala',
+				'local_category'   => 'default',
+				'remote_category'  => '',
+				'created_at'       => $now,
+			]
+		);
+	}
+
 	private static function migrate_to_v13(): void {
 		$db = new Db();
 
@@ -603,6 +635,23 @@ final class Activator {
 			'payments.nextpay.enabled'      => false,
 			'payments.payir.enabled'        => false,
 			'payments.payir.sandbox'        => false,
+			'payments.httppsp.enabled'      => false,
+			'payments.httppsp.api_key'      => '',
+			'payments.httppsp.send_url'     => '',
+			'payments.httppsp.verify_url'   => '',
+			'payments.httppsp.redirect_base' => '',
+			'payments.httppsp.auth_scheme'  => 'Bearer',
+			'payments.httppsp.field_token'  => '',
+			'payments.httppsp.field_redirect_url' => '',
+			'payments.httppsp.field_status' => '',
+			'payments.httppsp.field_amount' => '',
+			'payments.httppsp.field_ref_id' => '',
+			'bnpl.snapppay_api_key'         => '',
+			'bnpl.snapppay_base_url'        => 'https://api.snapppay.ir',
+			'bnpl.snapppay_auth_scheme'     => 'Bearer',
+			'bnpl.tara_api_key'             => '',
+			'bnpl.tara_base_url'            => 'https://api.tara.ir',
+			'bnpl.tara_auth_scheme'         => 'Bearer',
 			'payments.currency_multiplier'  => 10,
 			'payments.zarinpal.sandbox'     => false,
 			'payments.idpay.sandbox'        => false,
@@ -633,6 +682,66 @@ final class Activator {
 			'fx.ramp_min_card_balance'      => 50,
 			'fx.ramp_max_irt_per_run'       => 0,
 			'fx.ramp_manual_irt'            => 0,
+			'logistics.enabled'             => true,
+			'logistics.delivery_pin_digits' => 4,
+			'logistics.weight_threshold_kg' => 30,
+			'logistics.express_cities'      => 'تهران',
+			'logistics.express_cost_irt'    => 65000,
+			'logistics.national_cost_irt'   => 45000,
+			'logistics.heavy_cost_irt'      => 150000,
+			'logistics.tapin_api_key'       => '',
+			'logistics.tapin_base_url'      => 'https://api.tapin.ir',
+			'logistics.postex_api_key'      => '',
+			'logistics.postex_base_url'     => 'https://api.postex.ir',
+			'ai_studio.enabled'             => true,
+			'ai_studio.provider'            => '',
+			'ai_studio.base_url'            => '',
+			'ai_studio.api_key'             => '',
+			'ai_studio.auth_scheme'         => 'Bearer',
+			'ai_studio.image_path'          => '/v1/enhance',
+			'ai_studio.background_path'     => '/v1/remove-background',
+			'ai_studio.video_path'          => '/v1/story',
+			'ai_studio.tts_path'            => '/v1/synthesize',
+			'ai_studio.model_image_path'    => '/v1/generate-model',
+			'ai_studio.result_json_path'    => 'result_url',
+			'marketplace.digikala_api_key'  => '',
+			'marketplace.digikala_base_url' => 'https://openapi.digikala.com',
+			'marketplace.divar_token'       => '',
+			'marketplace.divar_base_url'    => 'https://api.divar.ir',
+			'marketplace.sync_retries'      => 3,
+			'seo.enabled'                   => true,
+			'seo.use_ai'                    => false,
+			'seo.feed_page_size'            => 500,
+			'seo.triboon_api_key'           => '',
+			'seo.triboon_base_url'          => 'https://api.triboon.ir',
+			'gamification.enabled'          => true,
+			'gamification.spin_cooldown_hours' => 24,
+			'gamification.spin_rewards'     => '5,10,20',
+			'gamification.spin_coupon_prefix' => 'SPIN',
+			'abandoned_cart.enabled'        => true,
+			'abandoned_cart.remind_after_hours' => 6,
+			'abandoned_cart.discount_percent' => 30,
+			'abandoned_cart.coupon_prefix'  => 'CART',
+			'nowpayments.enabled'           => true,
+			'nowpayments.api_key'           => '',
+			'nowpayments.pay_currency'      => 'usdttrc20',
+			'nowpayments.price_currency'    => 'usd',
+			'nowpayments.usd_rate_irt'      => 0,
+			'translation.provider'          => '',
+			'translation.base_url'          => '',
+			'translation.api_key'           => '',
+			'translation.auth_scheme'       => 'Bearer',
+			'translation.path'              => '/v1/translate',
+			'translation.result_json_path'  => 'translatedFields',
+			'lms.vod_enabled'               => false,
+			'lms.vod_secure_key'            => '',
+			'lms.vod_base_url'              => '',
+			'lms.vod_ttl_seconds'           => 7200,
+			'lms.vod_bind_ip'               => true,
+			'ai_credits.enabled'            => true,
+			'ai_credits.purchase_percent'   => 2.0,
+			'ai_credits.min_topup'          => 10000,
+			'giveaway.enabled'              => true,
 			'marketplace.enabled'           => true,
 			'marketplace.torob.enabled'     => true,
 			'marketplace.emalls.enabled'    => true,

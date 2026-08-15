@@ -66,6 +66,12 @@ final class Schema {
 			'fx_prices',
 			'fx_accounts',
 			'fx_bills',
+			'ig_shipments',
+			'ig_marketplace_sync',
+			'ig_category_mapping',
+			'ig_abandoned_carts',
+			'ig_ai_credit_ledger',
+			'ig_giveaways',
 			'logs',
 		];
 	}
@@ -953,6 +959,101 @@ final class Schema {
 			PRIMARY KEY  (id),
 			KEY tenant_status (tenant_id,status),
 			KEY account_period (fx_account_id,period_start)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_shipments (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			order_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			carrier VARCHAR(64) NOT NULL DEFAULT '',
+			tracking_code VARCHAR(191) NOT NULL DEFAULT '',
+			delivery_pin VARCHAR(8) NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'draft',
+			route_type VARCHAR(32) NOT NULL DEFAULT '',
+			cost_irt DECIMAL(18,4) NOT NULL DEFAULT 0,
+			is_cod TINYINT(1) NOT NULL DEFAULT 0,
+			recipient_name VARCHAR(191) NOT NULL DEFAULT '',
+			recipient_phone VARCHAR(32) NOT NULL DEFAULT '',
+			recipient_address TEXT NULL,
+			meta LONGTEXT NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant_status (tenant_id,status),
+			KEY order_id (order_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_marketplace_sync (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			product_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			marketplace VARCHAR(32) NOT NULL DEFAULT '',
+			action VARCHAR(16) NOT NULL DEFAULT 'upsert',
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			attempts INT NOT NULL DEFAULT 0,
+			last_error VARCHAR(255) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant_status (tenant_id,status),
+			KEY product_market (product_id,marketplace)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_category_mapping (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			marketplace VARCHAR(32) NOT NULL DEFAULT '',
+			local_category VARCHAR(191) NOT NULL DEFAULT '',
+			remote_category VARCHAR(191) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant_market (tenant_id,marketplace)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_abandoned_carts (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			session_key VARCHAR(191) NOT NULL DEFAULT '',
+			cart_total DECIMAL(18,4) NOT NULL DEFAULT 0,
+			reminder_sent_at DATETIME NULL,
+			coupon_code VARCHAR(64) NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'open',
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant_status (tenant_id,status),
+			KEY session (session_key)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_ai_credit_ledger (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			delta DECIMAL(12,4) NOT NULL DEFAULT 0,
+			reason VARCHAR(32) NOT NULL DEFAULT '',
+			reference VARCHAR(191) NOT NULL DEFAULT '',
+			meta LONGTEXT NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY dedupe (user_id,reason,reference),
+			KEY tenant_user (tenant_id,user_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_giveaways (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			account_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			ig_post_id VARCHAR(64) NOT NULL DEFAULT '',
+			title VARCHAR(191) NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'open',
+			winner_subscriber VARCHAR(191) NOT NULL DEFAULT '',
+			winner_user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			entries_count INT NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant_status (tenant_id,status)
 		) {$charset};";
 
 		$sql[] = "CREATE TABLE {$p}logs (

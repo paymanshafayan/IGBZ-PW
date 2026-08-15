@@ -33,6 +33,7 @@ $cases = [
 	'LmsTest',
 	'PostIdentityTest',
 	'FxTest',
+	'PhasesTest',
 ];
 
 foreach ( $cases as $case ) {

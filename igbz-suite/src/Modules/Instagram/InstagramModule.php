@@ -116,6 +116,8 @@ final class InstagramModule implements ModuleInterface {
 			( new Admin\VipPage() )->register();
 			( new Admin\SubscribersPage() )->register();
 			( new Admin\InsightsPage() )->register();
+			( new Admin\AiStudioPage() )->register();
+			( new Admin\GiveawayPage() )->register();
 		}
 	}
 
@@ -232,6 +234,8 @@ final class InstagramModule implements ModuleInterface {
 		// ------------------------------------------------------ VIP channel
 
 		$plugin->bind( 'vip.access', static fn ( Plugin $c ) => new VipAccessService( $c->db() ) );
+		$plugin->bind( 'giveaways', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\Instagram\AiStudio\GiveawayService( $c->get( 'db' ), $c->logger() ) );
+		$plugin->bind( 'ai.studio', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\Instagram\AiStudio\AiStudioService( new \IGBZ\Suite\Modules\Instagram\AiStudio\HttpAiStudioProvider( $c->get( 'http' ) ), $c->logger() ) );
 		$plugin->bind(
 			'vip.media',
 			static fn ( Plugin $c ) => new VipMediaService( $c->db(), $c->settings(), $c->logger() )

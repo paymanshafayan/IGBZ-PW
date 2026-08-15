@@ -54,6 +54,20 @@ final class Money {
 	}
 
 	/** True when the store prices in Toman and amounts must be multiplied before they are sent. */
+	/**
+	 * Convert store currency to USD for crypto checkout.
+	 *
+	 * The operator sets nowpayments.usd_rate_irt (Rial per USD); the invoice
+	 * price is rounded to cents. Falls back to a division by zero guard.
+	 */
+	public static function to_usd( float $amount ): float {
+		$rate = (float) igbz()->settings()->float( 'nowpayments.usd_rate_irt', 0 );
+		if ( $rate <= 0 ) {
+			return 0.0;
+		}
+		return round( self::to_rial( $amount ) / $rate, 2 );
+	}
+
 	public static function store_is_toman(): bool {
 		$currency = strtoupper( igbz()->settings()->string( 'general.default_currency', 'IRT' ) );
 		return in_array( $currency, self::TOMAN_CODES, true );

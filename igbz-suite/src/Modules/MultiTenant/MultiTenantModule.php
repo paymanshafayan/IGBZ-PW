@@ -4,6 +4,7 @@ namespace IGBZ\Suite\Modules\MultiTenant;
 use IGBZ\Suite\Modules\MultiTenant\Affiliate\AffiliateService;
 use IGBZ\Suite\Modules\MultiTenant\Bnpl\BnplGateway;
 use IGBZ\Suite\Modules\MultiTenant\Bnpl\BnplService;
+use IGBZ\Suite\Modules\MultiTenant\Bnpl\HttpBnplProvider;
 use IGBZ\Suite\Modules\MultiTenant\Bnpl\ProviderRegistry;
 use IGBZ\Suite\Modules\MultiTenant\Lms\LmsService;
 use IGBZ\Suite\Modules\MultiTenant\Marketplace\MarketplaceService;
@@ -77,6 +78,18 @@ final class MultiTenantModule implements ModuleInterface {
 			( new Admin\AffiliatePage() )->register();
 			( new Admin\LmsPage() )->register();
 			( new Admin\PaymentsPage() )->register();
+			( new Admin\LogisticsPage() )->register();
+			( new Admin\MarketplacePage() )->register();
+			( new Admin\SeoPage() )->register();
+			( new Admin\GamificationPage() )->register();
+			( new Admin\TranslatorPage() )->register();
+
+		add_action( 'woocommerce_product_saved', [ $this, 'on_product_saved' ], 10, 2 );
+		add_action( Cron::HOOK_FIVE_MINUTES, [ $this, 'marketplace_tick' ] );
+		add_action( 'woocommerce_add_to_cart', [ $this, 'watch_cart' ], 10, 6 );
+		add_action( Cron::HOOK_HOURLY, [ $this, 'abandoned_cart_tick' ] );
+		add_action( 'woocommerce_order_status_completed', [ $this, 'grant_ai_credits' ], 10, 2 );
+		add_action( 'woocommerce_order_status_processing', [ $this, 'grant_ai_credits' ], 10, 2 );
 		}
 
 		( new Frontend\AccountEndpoints() )->register();
@@ -89,7 +102,24 @@ final class MultiTenantModule implements ModuleInterface {
 		$plugin->bind( 'tenants', static fn ( Plugin $c ) => new TenantRepository( $c->db() ) );
 		$plugin->bind( 'wallet', static fn ( Plugin $c ) => new WalletService( $c->db(), $c->logger() ) );
 		$plugin->bind( 'plans', static fn ( Plugin $c ) => new PlanService( $c->db(), $c->get( 'wallet' ), $c->logger() ) );
-		$plugin->bind( 'bnpl.providers', static fn () => new ProviderRegistry() );
+		$plugin->bind( 'logistics', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Logistics\LogisticsService( $c->db(), $c->settings(), $c->logger() ) );
+		$plugin->bind( 'marketplace.sync', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Marketplace\MarketplaceSyncService( $c->db(), $c->logger() ) );
+		$plugin->bind( 'marketplace.mappings', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Marketplace\CategoryMappingService( $c->db() ) );
+		$plugin->bind( 'gamification', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Gamification\GamificationService( $c->db(), $c->logger() ) );
+		$plugin->bind( 'gamification.carts', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Gamification\AbandonedCartService( $c->db(), $c->logger() ) );
+		$plugin->bind( 'translation.adapter', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Translation\HttpTranslationAdapter( $c->get( 'http' ) ) );
+		$plugin->bind( 'translation', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Translation\TranslationService( $c->get( 'translation.adapter' ), $c->logger() ) );
+		$plugin->bind( 'ai.credits', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Gamification\AiCreditsService( $c->db(), $c->logger() ) );
+		$plugin->bind( 'lms.vod', static fn () => new \IGBZ\Suite\Modules\MultiTenant\Lms\LmsVodService() );
+		$plugin->bind(
+			'bnpl.providers',
+			static function ( Plugin $c ) {
+				$registry = new ProviderRegistry();
+				$registry->add( new HttpBnplProvider( 'snapppay', __( 'SnappPay', 'igbz-suite' ), 'bnpl.snapppay', $c->get( 'http' ) ) );
+				$registry->add( new HttpBnplProvider( 'tara', __( 'Tara', 'igbz-suite' ), 'bnpl.tara', $c->get( 'http' ) ) );
+				return $registry;
+			}
+		);
 		$plugin->bind(
 			'bnpl',
 			static fn ( Plugin $c ) => new BnplService( $c->db(), $c->get( 'wallet' ), $c->logger(), $c->get( 'bnpl.providers' ) )
@@ -399,5 +429,62 @@ final class MultiTenantModule implements ModuleInterface {
 		];
 
 		return $rows;
+	}
+
+	/** Enqueue marketplace sync rows when a product is saved. */
+	public function on_product_saved( int $product_id, $product = null ): void {
+		if ( ! igbz()->settings()->bool( 'marketplace.enabled', true ) ) {
+			return;
+		}
+		$sync = igbz()->get( 'marketplace.sync' );
+		$sync->enqueue( $product_id, 'digikala' );
+		$sync->enqueue( $product_id, 'divar' );
+	}
+
+	/** Drain the marketplace queue on the five-minute cron. */
+	public function marketplace_tick(): void {
+		if ( ! igbz()->settings()->bool( 'marketplace.enabled', true ) ) {
+			return;
+		}
+		igbz()->get( 'marketplace.sync' )->process_pending();
+	}
+
+	/** Track a cart for abandoned-cart recovery. */
+	public function watch_cart( $cart_item_key = '', $product_id = 0, $quantity = 1, $variation_id = 0, $variation = null, $cart_item_data = null ): void {
+		if ( ! igbz()->settings()->bool( 'abandoned_cart.enabled', true ) || ! function_exists( 'WC' ) || null === WC()->session ) {
+			return;
+		}
+		$total = (float) WC()->cart->get_total( 'edit' );
+		$this->carts()->watch( get_current_user_id(), (string) WC()->session->get_customer_id(), $total );
+	}
+
+	/** Sweep abandoned carts hourly. */
+	public function abandoned_cart_tick(): void {
+		if ( ! igbz()->settings()->bool( 'abandoned_cart.enabled', true ) ) {
+			return;
+		}
+		$this->carts()->sweep();
+	}
+
+	private function carts(): \IGBZ\Suite\Modules\MultiTenant\Gamification\AbandonedCartService {
+		return igbz()->get( 'gamification.carts' );
+	}
+
+	/** Grant AI-studio credits to the buyer when an order is paid. */
+	public function grant_ai_credits( int $order_id, $order = null ): void {
+		if ( ! igbz()->settings()->bool( 'ai_credits.enabled', true ) || ! igbz()->has( 'ai.credits' ) ) {
+			return;
+		}
+		if ( null === $order ) {
+			$order = wc_get_order( $order_id );
+		}
+		if ( ! $order ) {
+			return;
+		}
+		$user_id = (int) $order->get_user_id();
+		if ( $user_id <= 0 ) {
+			return;
+		}
+		igbz()->get( 'ai.credits' )->grant_from_order( $order_id, $user_id, (float) $order->get_total() );
 	}
 }

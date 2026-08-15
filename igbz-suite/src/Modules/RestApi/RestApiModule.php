@@ -141,6 +141,9 @@ final class RestApiModule implements ModuleInterface {
 		// the rates and the top-up service, which only the FX module binds).
 		if ( \IGBZ\Suite\Support\Modules::enabled( \IGBZ\Suite\Support\Modules::FX ) && $plugin->has( 'fx.wallet' ) ) {
 			$controllers[] = new FxController();
+		if ( \IGBZ\Suite\Support\Modules::enabled( \IGBZ\Suite\Support\Modules::INSTAGRAM ) && $plugin->has( 'ai.studio' ) ) {
+			$controllers[] = new \IGBZ\Suite\Modules\RestApi\Controllers\AiStudioController();
+		}
 		}
 
 		return $controllers;

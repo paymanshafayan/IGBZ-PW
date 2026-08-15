@@ -242,6 +242,10 @@ function wp_strip_all_tags( string $value ): string {
 }
 
 /** The signed-in user. Tests set $GLOBALS['igbz_test_user_id'] when the identity matters. */
+function is_user_logged_in(): bool {
+	return (int) ( $GLOBALS['igbz_test_user_id'] ?? 0 ) > 0;
+}
+
 function get_current_user_id(): int {
 	return (int) ( $GLOBALS['igbz_test_user_id'] ?? 0 );
 }

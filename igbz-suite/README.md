@@ -564,7 +564,7 @@ php igbz-suite/tests/run.php
 ```
 
 `tests/bootstrap.php` provides doubles for the WordPress functions the tested classes touch, plus a
-fake `$wpdb`. **963 assertions across 20 cases**, plus a syntax check over 171 files
+fake `$wpdb`. **1044 assertions across 21 cases**, plus a syntax check over 171 files
 (`bash _devenv/test.sh` runs both).
 
 Coverage is deliberately aimed at the code where a bug costs money or leaks data: `Crypto`,

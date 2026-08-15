@@ -71,6 +71,12 @@ final class SettingsPage {
 		if ( Modules::enabled( Modules::FX ) ) {
 			$tabs['fx'] = __( 'FX payments', 'igbz-suite' );
 		}
+		if ( Modules::enabled( Modules::MULTITENANT ) ) {
+			$tabs['logistics']   = __( 'Logistics', 'igbz-suite' );
+			$tabs['seo']         = __( 'SEO & ads', 'igbz-suite' );
+			$tabs['gamification'] = __( 'Gamification', 'igbz-suite' );
+			$tabs['translation'] = __( 'Translation', 'igbz-suite' );
+		}
 
 		$tabs['advanced'] = __( 'Advanced', 'igbz-suite' );
 
@@ -222,6 +228,8 @@ final class SettingsPage {
 							'idpay'    => 'IDPay',
 							'nextpay'  => 'NextPay',
 							'payir'    => 'Pay.ir',
+							'httppsp'  => 'HTTP PSP',
+							'nowpayments' => 'Crypto (NOWPayments)',
 						],
 					],
 					[ 'key' => 'payments.zarinpal.enabled', 'label' => __( 'ZarinPal enabled', 'igbz-suite' ), 'type' => 'checkbox' ],
@@ -240,6 +248,14 @@ final class SettingsPage {
 						'type'  => 'checkbox',
 						'help'  => __( 'Sends the literal test key so payments are simulated rather than charged.', 'igbz-suite' ),
 					],
+					[ 'key' => 'payments.httppsp.enabled', 'label' => __( 'HTTP PSP enabled', 'igbz-suite' ), 'type' => 'checkbox', 'help' => __( 'Config-driven gateway for banks not in the fixed set.', 'igbz-suite' ) ],
+					[ 'key' => 'payments.httppsp.api_key', 'label' => __( 'HTTP PSP API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'payments.httppsp.send_url', 'label' => __( 'HTTP PSP send URL', 'igbz-suite' ) ],
+					[ 'key' => 'payments.httppsp.verify_url', 'label' => __( 'HTTP PSP verify URL', 'igbz-suite' ) ],
+					[ 'key' => 'payments.httppsp.redirect_base', 'label' => __( 'HTTP PSP redirect base', 'igbz-suite' ) ],
+					[ 'key' => 'nowpayments.enabled', 'label' => __( 'NOWPayments enabled', 'igbz-suite' ), 'type' => 'checkbox' ],
+					[ 'key' => 'nowpayments.api_key', 'label' => __( 'NOWPayments API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'nowpayments.usd_rate_irt', 'label' => __( 'Crypto USD rate (IRT per USD)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'step' => 'any' ],
 					[
 						'key'   => 'payments.currency_multiplier',
 						'label' => __( 'Toman to Rial multiplier', 'igbz-suite' ),
@@ -278,6 +294,11 @@ final class SettingsPage {
 
 			case 'marketplace':
 				return [
+					[ 'key' => 'marketplace.digikala_api_key', 'label' => __( 'Digikala API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'marketplace.digikala_base_url', 'label' => __( 'Digikala base URL', 'igbz-suite' ), 'placeholder' => 'https://openapi.digikala.com' ],
+					[ 'key' => 'marketplace.divar_token', 'label' => __( 'Divar token', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'marketplace.divar_base_url', 'label' => __( 'Divar base URL', 'igbz-suite' ), 'placeholder' => 'https://api.divar.ir' ],
+					[ 'key' => 'marketplace.sync_retries', 'label' => __( 'Marketplace sync retries', 'igbz-suite' ), 'type' => 'number', 'min' => 1, 'max' => 20 ],
 					[ 'key' => 'marketplace.enabled', 'label' => __( 'Enable product feeds', 'igbz-suite' ), 'type' => 'checkbox' ],
 					[ 'key' => 'marketplace.torob.enabled', 'label' => __( 'Torob feed', 'igbz-suite' ), 'type' => 'checkbox' ],
 					[ 'key' => 'marketplace.emalls.enabled', 'label' => __( 'Emalls feed', 'igbz-suite' ), 'type' => 'checkbox' ],
@@ -701,6 +722,47 @@ final class SettingsPage {
 					[ 'key' => 'fx.ramp_min_card_balance', 'label' => __( 'Minimum card balance (USD)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 100000 ],
 					[ 'key' => 'fx.ramp_max_irt_per_run', 'label' => __( 'Max IRT per auto run (0 = uncapped)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 1000000000000 ],
 					[ 'key' => 'fx.ramp_manual_irt', 'label' => __( 'Manual buy amount (IRT)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 1000000000000, 'help' => __( 'Used by the "Buy USDT now" button on the FX screen, and as the fallback auto amount.', 'igbz-suite' ) ],
+				];
+
+			case 'logistics':
+				return [
+					[ 'key' => 'logistics.delivery_pin_digits', 'label' => __( 'Delivery PIN digits', 'igbz-suite' ), 'type' => 'number', 'min' => 3, 'max' => 8 ],
+					[ 'key' => 'logistics.weight_threshold_kg', 'label' => __( 'Heavy weight threshold (kg)', 'igbz-suite' ), 'type' => 'number', 'min' => 1 ],
+					[ 'key' => 'logistics.express_cities', 'label' => __( 'Express cities (comma)', 'igbz-suite' ) ],
+					[ 'key' => 'logistics.express_cost_irt', 'label' => __( 'Express cost (IRT)', 'igbz-suite' ), 'type' => 'number', 'min' => 0 ],
+					[ 'key' => 'logistics.national_cost_irt', 'label' => __( 'National post cost (IRT)', 'igbz-suite' ), 'type' => 'number', 'min' => 0 ],
+					[ 'key' => 'logistics.heavy_cost_irt', 'label' => __( 'Heavy freight cost (IRT)', 'igbz-suite' ), 'type' => 'number', 'min' => 0 ],
+					[ 'key' => 'logistics.tapin_api_key', 'label' => __( 'Tapin API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'logistics.tapin_base_url', 'label' => __( 'Tapin base URL', 'igbz-suite' ), 'placeholder' => 'https://api.tapin.ir' ],
+					[ 'key' => 'logistics.postex_api_key', 'label' => __( 'Postex API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'logistics.postex_base_url', 'label' => __( 'Postex base URL', 'igbz-suite' ), 'placeholder' => 'https://api.postex.ir' ],
+				];
+
+			case 'seo':
+				return [
+					[ 'key' => 'seo.use_ai', 'label' => __( 'Use the AI provider for meta', 'igbz-suite' ), 'type' => 'checkbox' ],
+					[ 'key' => 'seo.feed_page_size', 'label' => __( 'Feed page size', 'igbz-suite' ), 'type' => 'number', 'min' => 10, 'max' => 10000 ],
+					[ 'key' => 'seo.triboon_api_key', 'label' => __( 'Triboon API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'seo.triboon_base_url', 'label' => __( 'Triboon base URL', 'igbz-suite' ), 'placeholder' => 'https://api.triboon.ir' ],
+				];
+
+			case 'gamification':
+				return [
+					[ 'key' => 'gamification.spin_cooldown_hours', 'label' => __( 'Spin cooldown (hours)', 'igbz-suite' ), 'type' => 'number', 'min' => 1, 'max' => 720 ],
+					[ 'key' => 'gamification.spin_rewards', 'label' => __( 'Spin reward percents (comma)', 'igbz-suite' ) ],
+					[ 'key' => 'gamification.spin_coupon_prefix', 'label' => __( 'Spin coupon prefix', 'igbz-suite' ) ],
+					[ 'key' => 'abandoned_cart.remind_after_hours', 'label' => __( 'Abandoned cart remind after (hours)', 'igbz-suite' ), 'type' => 'number', 'min' => 1, 'max' => 720 ],
+					[ 'key' => 'abandoned_cart.discount_percent', 'label' => __( 'Abandoned cart discount (%)', 'igbz-suite' ), 'type' => 'number', 'min' => 1, 'max' => 100 ],
+					[ 'key' => 'abandoned_cart.coupon_prefix', 'label' => __( 'Abandoned cart coupon prefix', 'igbz-suite' ) ],
+				];
+
+			case 'translation':
+				return [
+					[ 'key' => 'translation.base_url', 'label' => __( 'Translation API base URL', 'igbz-suite' ) ],
+					[ 'key' => 'translation.api_key', 'label' => __( 'Translation API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'translation.auth_scheme', 'label' => __( 'Auth scheme', 'igbz-suite' ), 'placeholder' => 'Bearer' ],
+					[ 'key' => 'translation.path', 'label' => __( 'Translate path', 'igbz-suite' ), 'placeholder' => '/v1/translate' ],
+					[ 'key' => 'translation.result_json_path', 'label' => __( 'Result JSON path', 'igbz-suite' ), 'placeholder' => 'translatedFields' ],
 				];
 
 			case 'advanced':
