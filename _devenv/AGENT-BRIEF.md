@@ -3,6 +3,12 @@
 Hand-off notes for an agent picking this repository up in a fresh session. Everything here was
 learned the hard way; following it will save hours.
 
+> **Start with [`PROJECT-STATE.md`](../PROJECT-STATE.md) in the repository root.** That document is
+> the single source of truth for what is built, what is decided, and what is still waiting on the
+> client. This brief is the deep technical companion to it: subsystem internals, environment
+> quirks, and the traps that cost real time. Where the two disagree, the code wins and both get
+> corrected.
+
 ---
 
 ## 1. What this project is
@@ -45,7 +51,7 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 ```bash
 bash _devenv/setup.sh     # build (~30s if npm is warm)
 bash _devenv/run.sh       # site on http://127.0.0.1:9400, auto-logged-in as admin
-bash _devenv/test.sh      # 843 assertions + syntax check on 156 files
+bash _devenv/test.sh      # 875 assertions + syntax check on 158 files
 ```
 
 `_devenv/` contains committed WordPress and WooCommerce zips precisely because **`/tmp` is wiped
@@ -126,7 +132,7 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 `igbz-ig-intake`, `igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`,
 `igbz-vip`, `igbz-hub`, `igbz-mobile-api`.
 
-**REST**: `igbz/v1` (94 routes — 14 `/intake/*`, 29 `/vip/*`) and `igbz-hub/v1` (14 routes).
+**REST**: 100 routes across `igbz/v1` (incl. 14 `/intake/*`, 29 `/vip/*`) and `igbz-hub/v1`.
 
 **Schema**: 42 tables in `src/Support/Schema.php` (DB version 13; `ig_intake` added in v8, the nine
 `vip_*` tables in v10; v11 adds no tables — it is the LMS quiz/certificate wiring; v12 adds
@@ -192,7 +198,7 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 843 assertions in 18 test cases; 156 files lint clean.
+- 875 assertions in 19 test cases; 158 files lint clean.
 - 18/18 admin screens return 200 with no notices; 42/42 tables; 3 cron hooks scheduled.
 - All six payment gateways register with WooCommerce and their settings screens render.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
@@ -592,6 +598,46 @@ A third live find was pre-existing: `save_course()` read `$data['level']` twice
 satisfied the test and the cast then read a missing key, warning on every save that omitted a
 level. The harness gained a `wp_kses_post()` stand-in to test this — it models the one rule that
 has actually bitten us, that KSES strips form controls.
+
+---
+
+## 7b. Post identity and funnel precedence (DB v12), and the dropped queue (v13)
+
+**The reward reason.** A funnel's wallet reward used to post under `affiliate_commission`, the same
+reason the affiliate programme uses, so the two were indistinguishable in the ledger. There is now
+a dedicated `instagram_reward`. `migrate_to_v12()` relabels only rows whose reference matches
+`ig_funnel:*`; real commissions use `commission:<id>` and are never touched. The rewrite is safe
+against the ledger's `UNIQUE (tenant, user, reason, reference)` key because the reference is unique
+per hit on its own, and it cannot cause a double payment because `settle()` claims the hit row
+before crediting.
+
+**`PostIdentity`.** One post can be written many ways: a bare shortcode, `/p/<code>/`,
+`/reel/<code>/`, with or without the username segment, with or without a tracking query. The
+operator typed one spelling into a free-text box and ManyChat sent another, so a funnel could
+silently stop firing. `PostIdentity::from_permalink()` reduces every spelling to its shortcode;
+`match()` compares on that. `''` means *unknown* and never acts as a wildcard. The funnel form now
+offers a picker of posts published through this plugin, falling back to free text when nothing has
+been published yet — and a pasted URL is normalised on save.
+
+**A pre-existing precedence bug this uncovered.** The ordering read
+`ORDER BY (post_id <> '') ASC`, which sorts catch-all funnels *first*, so one broad funnel shadowed
+every per-post campaign on the account. It is now `(post_id = '') ASC`. This had been wrong for
+months and no test saw it, because the in-memory `FunnelDb` double ignored both the `IN` filter and
+the `ORDER BY` and simply returned every row in insertion order.
+
+> **The lesson worth carrying:** a double that hard-codes the *intended* ordering agrees with the
+> query whichever way round the comparison is written. `FunnelDb` now derives its sort key from the
+> comparison the SQL actually makes, so inverting the expression fails the test. Verify this by
+> mutation, not by reading.
+
+**v13 drops `jobs`.** It was a general-purpose worker queue — handler, payload, attempts,
+max_attempts, available_at, reserved_at. Nothing ever enqueued a row and no runner ever dequeued
+one; the only code touching it was the daily sweep deleting completed rows that could not exist.
+Every background job here is already durable through a queue that models its own work:
+`ig_product_intake` for intake, `ig_content` for generation and publishing, `ig_funnel_hits` for
+delivery — each with its own retry counter and `last_error`, driven by the cron ticks. It was
+removed rather than given a runner: a runner is only worth its failure modes once something needs
+to enqueue. The DDL is in the git history if a future subsystem wants it.
 
 ---
 

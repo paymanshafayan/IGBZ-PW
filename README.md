@@ -6,8 +6,11 @@ The IGBZ product ported from **nopCommerce** to **WordPress + WooCommerce**.
 
 | Path | What it is |
 | --- | --- |
+| [`PROJECT-STATE.md`](PROJECT-STATE.md) | **Start here.** Current state of the project (in Persian): what is built, in which commit and why, the rules that must be followed, and the decisions still waiting on the client. |
 | [`igbz-suite/`](igbz-suite/) | The plugin. One plugin, four toggleable modules. See its [README](igbz-suite/README.md) for installation, configuration and the API reference. |
+| [`DESIGN-VIP.md`](DESIGN-VIP.md) | Design document for the VIP channel (in Persian): tables, endpoints, flows, and the security decision. |
 | [`REVIEW-IGBZ-NopCommerce.md`](REVIEW-IGBZ-NopCommerce.md) | Read-only review of the original nopCommerce repository (in Persian), which this port is based on. |
+| [`_devenv/`](_devenv/) | Offline development environment and the [agent brief](_devenv/AGENT-BRIEF.md) — subsystem internals and hard-won traps. Tooling, not part of the shipped plugin. |
 
 ## The port at a glance
 
@@ -17,7 +20,7 @@ switch on and off independently:
 * **Multi-Tenant Stores** — tenants, wallet, subscription plans, BNPL, affiliate, LMS, OTP login,
   marketplace feeds, and four Iranian payment gateways (Zarinpal, IDPay, NextPay, Pay.ir).
 * **Instagram Automation** — product registration from the phone, content generation and
-  auto-publishing via **Manus**, comment-to-DM funnels via **ManyChat**.
+  auto-publishing via **Manus**, comment-to-DM funnels via **ManyChat**, and the **VIP channel**.
 * **Master Site Hub** — public store directory, tenant signup, domain verification, VIP links.
 * **Mobile REST API** — JWT auth with rotating refresh tokens, catalog/account/admin endpoints,
   FCM push.
@@ -28,6 +31,25 @@ peak hours) and ManyChat (DM funnels, over both a real-time webhook and the Many
 publisher and generator sit behind interfaces so a Graph adapter can be added back later.
 
 Tenancy is single-site with `tenant_id` columns — not WordPress Multisite.
+
+## The VIP channel
+
+A paid private feed that lives **inside our own app**, replacing Instagram Close Friends — which
+cannot be monetised, cannot be re-shared (Instagram disables the share button on it), cannot be
+embedded (oEmbed serves public media only) and has no membership API. The public Instagram post
+becomes the teaser; the real media sits on our storage behind an entitlement check.
+
+A VIP post keeps the Instagram shape — carousel and video, caption, hashtags, likes, threaded
+comments, saves, view counts and a direct-message thread — so a member feels they are looking at an
+Instagram post. Sharing one lands on `/vip/p/{shortcode}`, which offers either the subscription or
+that single post, plus app download links. Public posts also carry a financial-support button.
+
+Its security is deliberately **light** — roughly a Close Friends post: signed short-lived media URLs
+and a server-side entitlement check. The heavy measures (device binding, watermarking,
+screen-capture defence) belong to the **LMS**, not here.
+
+Details in [`DESIGN-VIP.md`](DESIGN-VIP.md); the post-expiry policy is still an open question for
+the client, recorded in [`PROJECT-STATE.md`](PROJECT-STATE.md).
 
 ## Registering a product without opening the admin
 
@@ -102,7 +124,8 @@ WooCommerce 8.0+, PHP 8.1+ with `openssl`. Full instructions, including the requ
 ## Tests
 
 ```bash
-php igbz-suite/tests/run.php
+php igbz-suite/tests/run.php     # 875 assertions in 19 cases
+bash _devenv/test.sh             # the same suite plus a syntax check over 158 files
 ```
 
 No Composer and no PHPUnit — the runner is dependency-free.

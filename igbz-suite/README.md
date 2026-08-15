@@ -8,7 +8,7 @@ four toggleable modules**, so an operator installs once and turns on only what t
 | Module | Id | Replaces (nop plugin) | What it does |
 | --- | --- | --- | --- |
 | Multi-Tenant Stores | `multitenant` | `IGBZ.MultiTenant` | Tenants, wallet, subscription plans, BNPL, affiliate, LMS, OTP login, marketplace feeds, Iranian payment gateways |
-| Instagram Automation | `instagram` | `IGBZ.Instagram` | Content generation and auto-publishing via **Manus**, comment-to-DM funnels via **ManyChat** |
+| Instagram Automation | `instagram` | `IGBZ.Instagram` | Content generation and auto-publishing via **Manus**, comment-to-DM funnels via **ManyChat**, product intake from the phone, and the **VIP channel** (paid private feed) |
 | Master Site Hub | `hub` | `IGBZ.Hub` | Public store directory, tenant signup, domain verification, VIP links, content blocks |
 | Mobile REST API | `rest_api` | `IGBZ.MobileApi` | JWT auth, catalog, account, store-admin endpoints, FCM push, device registry |
 
@@ -80,7 +80,7 @@ real endpoints.
 
 1. Copy the `igbz-suite` directory into `wp-content/plugins/`, or zip it and upload it through
    **Plugins → Add New → Upload Plugin**.
-2. Activate **IGBZ Suite**. On activation the plugin creates its 32 database tables, registers its
+2. Activate **IGBZ Suite**. On activation the plugin creates its 42 database tables, registers its
    roles and capabilities, schedules its cron events and seeds default settings.
 3. Go to **IGBZ → Settings → Modules** and enable the modules you need. Only *Multi-Tenant Stores*
    is on by default.
@@ -186,8 +186,14 @@ every field is documented inline on the settings screen. Highlights:
 * **BNPL** — internal provider plus adapter slots for SnappPay and Tara. `bnpl.fee_percent` is
   applied **only to the financed remainder** (`amount − down payment`), and the instalment schedule
   is rounded so it sums exactly to the total.
-* **LMS** — courses, lessons, enrolments, progress, quizzes, time-limited signed video links
-  (`lms.video_link_ttl`, HMAC-signed with `lms.video_hmac_secret`).
+* **LMS** — courses, lessons, enrolments, progress, quizzes and final exams, certificates, and
+  time-limited signed video links (`lms.video_link_ttl`, HMAC-signed with `lms.video_hmac_secret`).
+  Quizzes reach the client only through `LmsService::questions_for_client()`, which strips the
+  correct answers — never serialise a quiz row straight to a response. A certificate is issued only
+  when the global `lms.certificate_enabled` **and** the course's own `certificate_enabled` agree.
+  Refunding a WooCommerce order revokes the enrolments it paid for, matched on `enrollments.order_id`.
+  This is the **heavy-security** half of the product: device-bound links, watermarking and
+  screen-capture defences belong here, not in the VIP channel.
 * **OTP** — phone login with Kavenegar and SMS.ir providers, plus a `log` provider that writes the
   code to the IGBZ log for development.
 * **Marketplace** — Torob, Emalls and Google Merchant product feeds.
@@ -305,6 +311,58 @@ Tokens carry a `jti` and are revoked on password reset and profile update, and p
 can be listed and revoked. Push uses FCM v1: set `api.fcm_project_id` and paste the service-account
 JSON into `api.fcm_service_account`.
 
+### VIP channel (paid private feed)
+
+The product's answer to Instagram Close Friends, and the reason it exists: Close Friends cannot be
+monetised or re-shared. Instagram disables the share button on Close Friends content, oEmbed serves
+public media only, and list membership has no API — so a paid private feed has to live in **our own
+app**. The public Instagram post is the teaser; the real media sits on our storage behind an
+entitlement check.
+
+**Security level is deliberately light here.** A VIP post is protected to about the same degree as
+a Close Friends post: signed short-lived URLs and a server-side entitlement check, and nothing
+more. No watermarking, no device binding, no screen-capture defence — those belong to the LMS.
+`VipMediaService` carries this note at the top of the file so it does not get "hardened" by mistake.
+
+| Service id | Responsibility |
+| --- | --- |
+| `vip.access` | Entitlement: author, active subscription, single-post purchase, or free post |
+| `vip.posts` | CRUD, scheduling, expiry, shortcodes, feed assembly with locked/unlocked shaping |
+| `vip.media` | HMAC-signed, short-lived media URLs; re-checks entitlement at serve time |
+| `vip.social` | Likes, comments and replies, saves, view counts, pinned comments |
+| `vip.messages` | Per-post direct messages to the admin, threaded |
+| `vip.billing` | Subscriptions, single-post purchases, tips |
+
+**The post keeps the Instagram shape.** Carousel and video media, caption, hashtags, location,
+likes, threaded comments, saves, view counts and a direct-message thread — a member should feel
+they are looking at an Instagram post inside our app.
+
+**Two ways to pay, plus tips.** A recurring subscription, or a one-off purchase of a single post.
+Public posts additionally expose a financial-support button; `vip.tip_min` defaults to 10,000 and
+`vip.tip_presets` to 50/100/200/500k. A successful tip fires `igbz_vip_tip_received`.
+
+**The share landing page.** `/vip/p/{shortcode}` is a public page rendered on `template_redirect`.
+It shows the teaser, then offers *buy the subscription* or *buy just this post*, alongside app
+download links and an explanation of what the VIP channel is. This is where the OS share sheet
+lands when a member picks our app.
+
+**Media URLs** look like `?igbz_vip_media=<post>&i=&u=&e=&s=`: HMAC-signed and expiring, and the
+entitlement is checked again when the bytes are served, not only when the link is minted. A forged
+signature gets 403; an expired one gets 410.
+
+**Expiry.** Posts carry `expires_at`, and a five-minute cron sweep applies either
+`VipPostService::EXPIRY_HIDE` or `EXPIRY_DELETE` per the `vip.default_expiry_action` setting
+(currently `hide`). **The policy itself is not ratified** — default window, hide vs hard delete, and
+whether a single-post buyer keeps access after expiry are open questions for the client. See
+`PROJECT-STATE.md` §2.
+
+**Admin dashboard.** `igbz-vip` has five tabs — Posts, Comments, Inbox, Members, Plans — so the
+channel is run like an Instagram page: publish and schedule, read and reply to comments and DMs,
+and see revenue and membership figures.
+
+Nine `vip_*` tables (DB v10) and 29 `/vip/*` REST routes. `tests/VipChannelTest.php` covers 21
+scenarios.
+
 ---
 
 ## Admin screens
@@ -329,6 +387,8 @@ were reachable only by typing a URL; that is fixed here.)
 | IG Funnels | `igbz-ig-funnels` | instagram |
 | IG Subscribers | `igbz-ig-subscribers` | instagram |
 | IG Insights | `igbz-ig-insights` | instagram |
+| IG Intake | `igbz-ig-intake` | instagram |
+| VIP Channel | `igbz-vip` | instagram |
 | Hub | `igbz-hub` | hub |
 | Mobile API | `igbz-mobile-api` | rest_api |
 
@@ -446,14 +506,14 @@ singletons; an unknown id throws.
 | --- | --- |
 | core | `settings`, `logger`, `db`, `http`, `tenancy` |
 | multitenant | `tenants`, `wallet`, `plans`, `bnpl.providers`, `bnpl`, `affiliate`, `lms`, `payments`, `otp`, `marketplace` |
-| instagram | `ig.prompts`, `ig.manus_client`, `ig.manus`, `ig.scheduler`, `ig.insights`, `ig.manychat`, `ig.subscribers`, `ig.funnels` |
+| instagram | `ig.prompts`, `ig.manus_client`, `ig.manus`, `ig.scheduler`, `ig.insights`, `ig.manychat`, `ig.subscribers`, `ig.funnels`, `ig.intake`, `vip.access`, `vip.media`, `vip.posts`, `vip.social`, `vip.messages`, `vip.billing` |
 | hub | `hub.stats`, `hub.directory`, `hub.vip`, `hub.domains`, `hub.blocks`, `hub.signup` |
 | rest_api | `api.tokens`, `api.auth`, `api.devices`, `api.google_auth`, `api.push`, `api.notifications` |
 
 A module's services only exist while that module is enabled, so guard cross-module calls with
 `igbz()->has( 'wallet' )`.
 
-**Tenancy** is single-site with a `tenant_id` column, not WordPress Multisite. All 32 tables carry
+**Tenancy** is single-site with a `tenant_id` column, not WordPress Multisite. All 42 tables carry
 `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`, `plans`, `logs`, and
 `lesson_progress` (which inherits scope through `enrollment_id`). Products and orders are scoped
 with the `_igbz_tenant_id` meta key, where `0` or absent means platform-shared.
@@ -506,10 +566,25 @@ php igbz-suite/tests/run.php
 ```
 
 `tests/bootstrap.php` provides doubles for the WordPress functions the tested classes touch, plus a
-fake `$wpdb`. Coverage is deliberately aimed at the code where a bug costs money or leaks data:
-`Crypto`, `Settings` (encryption at rest and mask handling), `Schema` (tenant scoping and dbDelta
-formatting), `Jwt`, the BNPL instalment schedule, `Money`, the PSP adapter contracts, the module
-registry and the Manus prompt builder.
+fake `$wpdb`. **875 assertions across 19 cases**, plus a syntax check over 158 files
+(`bash _devenv/test.sh` runs both).
+
+Coverage is deliberately aimed at the code where a bug costs money or leaks data: `Crypto`,
+`Settings` (encryption at rest and mask handling), `Schema` (tenant scoping and dbDelta formatting),
+`Jwt`, the BNPL instalment schedule, `Money`, the PSP adapter contracts, the module registry, the
+Manus prompt builder, cron scheduling, account credentials, publish verification, funnel delivery,
+product intake, direct messages, the VIP channel, the LMS, and post identity.
+
+Two things about this suite are worth knowing before you trust it:
+
+* **There is no auto-discovery.** A case must be listed in `$cases` in `tests/run.php`, *and* each
+  test method must be called from that class's own `run()`. A method you forget to call is silently
+  never executed.
+* **In-memory doubles can agree with a bug.** `FunnelDb` once hard-coded the ordering the query was
+  *supposed* to produce, so an inverted comparison in the real SQL passed anyway. Doubles must
+  derive their behaviour from the statement under test. Prove a new test works by mutating the
+  production code and watching it go red — a suite that is green on its first run has demonstrated
+  nothing.
 
 ---
 
