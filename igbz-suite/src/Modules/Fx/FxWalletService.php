@@ -19,10 +19,11 @@ defined( 'ABSPATH' ) || exit;
  */
 final class FxWalletService {
 
-	public const REASON_TOPUP    = 'topup';
-	public const REASON_FEE      = 'topup_fee';
-	public const REASON_TASK     = 'task';
-	public const REASON_REFUND   = 'task_refund';
+	public const REASON_TOPUP        = 'topup';
+	public const REASON_FEE          = 'topup_fee';
+	public const REASON_TASK         = 'task';
+	public const REASON_REFUND       = 'task_refund';
+	public const REASON_SUBSCRIPTION = 'subscription';
 
 	public function __construct( private Db $db ) {}
 
@@ -150,12 +151,13 @@ final class FxWalletService {
 	}
 
 	/** @return array<int,array<string,mixed>> */
-	public function ledger( int $tenant_id, int $limit = 50 ): array {
+	public function ledger( int $tenant_id, int $limit = 50, int $offset = 0 ): array {
 		return $this->db->results(
 			'SELECT * FROM ' . $this->db->table( 'fx_ledger' ) . '
-			 WHERE tenant_id = %d ORDER BY id DESC LIMIT %d',
+			 WHERE tenant_id = %d ORDER BY id DESC LIMIT %d OFFSET %d',
 			$tenant_id,
-			$limit
+			$limit,
+			$offset
 		);
 	}
 

@@ -67,6 +67,15 @@ final class FxMeter {
 	}
 
 	/**
+	 * Charge for a delivered ManyChat DM. Uses its own (reason, reference)
+	 * pair so it is idempotent per funnel hit: settle() is the single writer
+	 * of a delivery, and this runs once per transition into delivered = 1.
+	 */
+	public function charge_delivery( int $tenant_id, string $reference, string $service = 'manychat_dm' ): array {
+		return $this->consume( $tenant_id, $service, $reference );
+	}
+
+	/**
 	 * Refund a task Manus never accepted. Idempotent: the refund row uses its
 	 * own (reason, reference) pair, so a double release credits once.
 	 */

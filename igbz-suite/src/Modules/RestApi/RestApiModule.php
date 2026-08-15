@@ -10,6 +10,7 @@ use IGBZ\Suite\Modules\RestApi\Controllers\AuthController;
 use IGBZ\Suite\Modules\RestApi\Controllers\BaseController;
 use IGBZ\Suite\Modules\RestApi\Controllers\CatalogController;
 use IGBZ\Suite\Modules\RestApi\Controllers\DeviceController;
+use IGBZ\Suite\Modules\RestApi\Controllers\FxController;
 use IGBZ\Suite\Modules\RestApi\Controllers\ProductIntakeController;
 use IGBZ\Suite\Modules\RestApi\Controllers\StoreAdminController;
 use IGBZ\Suite\Modules\RestApi\Controllers\VipAdminController;
@@ -134,6 +135,12 @@ final class RestApiModule implements ModuleInterface {
 		if ( \IGBZ\Suite\Support\Modules::enabled( \IGBZ\Suite\Support\Modules::INSTAGRAM ) && $plugin->has( 'vip.posts' ) ) {
 			$controllers[] = new VipController();
 			$controllers[] = new VipAdminController();
+		}
+
+		// The FX wallet endpoints exist whenever the FX module is enabled (they need the wallet,
+		// the rates and the top-up service, which only the FX module binds).
+		if ( \IGBZ\Suite\Support\Modules::enabled( \IGBZ\Suite\Support\Modules::FX ) && $plugin->has( 'fx.wallet' ) ) {
+			$controllers[] = new FxController();
 		}
 
 		return $controllers;

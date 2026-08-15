@@ -6,6 +6,7 @@ use IGBZ\Suite\Modules\Fx\FxWalletService;
 use IGBZ\Suite\Support\Admin\Menu;
 use IGBZ\Suite\Support\Admin\View;
 use IGBZ\Suite\Support\Capabilities;
+use IGBZ\Suite\Support\Modules;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -46,6 +47,8 @@ final class FxPage {
 
 		$this->render_topup_form( $rate, $tenant );
 		$this->render_prices();
+		$this->render_accounts( $tenant );
+		$this->render_bills( $tenant );
 		$this->render_ledger( $tenant );
 
 		View::close();
@@ -117,6 +120,61 @@ final class FxPage {
 		echo '</tbody></table>';
 		submit_button( __( 'Save prices', 'igbz-suite' ) );
 		echo '</form>';
+	}
+
+	private function render_accounts( int $tenant ): void {
+		echo '<h2>' . esc_html__( 'Foreign accounts', 'igbz-suite' ) . '</h2>';
+
+		if ( ! Modules::enabled( Modules::INSTAGRAM ) ) {
+			echo '<p>' . esc_html__( 'The Instagram module is off; there is nothing to bill yet.', 'igbz-suite' ) . '</p>';
+			return;
+		}
+
+		$accounts = igbz()->get( 'fx.accounts' )->all( $tenant );
+		if ( ! $accounts ) {
+			echo '<p>' . esc_html__( 'No foreign accounts for this tenant yet. They are created from the Instagram module once accounts are linked.', 'igbz-suite' ) . '</p>';
+			return;
+		}
+
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Provider', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Account', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Billing day', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Status', 'igbz-suite' ) . '</th></tr></thead><tbody>';
+		foreach ( $accounts as $account ) {
+			printf(
+				'<tr><td>%1$s</td><td>%2$s</td><td>%3$s</td><td>%4$s</td></tr>',
+				esc_html( (string) $account['provider'] ),
+				esc_html( (string) $account['provider_account_id'] ),
+				(int) $account['billing_day'],
+				esc_html( (string) $account['status'] )
+			);
+		}
+		echo '</tbody></table>';
+	}
+
+	private function render_bills( int $tenant ): void {
+		echo '<h2>' . esc_html__( 'Bills', 'igbz-suite' ) . '</h2>';
+
+		$db   = igbz()->db();
+		$rows = $db->results(
+			'SELECT * FROM ' . $db->table( 'fx_bills' ) . ' WHERE tenant_id = %d ORDER BY id DESC LIMIT 50',
+			$tenant
+		);
+
+		if ( ! $rows ) {
+			echo '<p>' . esc_html__( 'No bills yet.', 'igbz-suite' ) . '</p>';
+			return;
+		}
+
+		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Period', 'igbz-suite' ) . '</th><th>' . esc_html__( 'USD', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Status', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Paid', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Payout ref', 'igbz-suite' ) . '</th></tr></thead><tbody>';
+		foreach ( $rows as $row ) {
+			printf(
+				'<tr><td>%1$s</td><td>%2$s</td><td>%3$s</td><td>%4$s</td><td>%5$s</td></tr>',
+				esc_html( (string) $row['period_start'] . ' — ' . (string) $row['period_end'] ),
+				esc_html( number_format( (float) $row['amount_usd'], 2 ) ),
+				esc_html( (string) $row['status'] ),
+				esc_html( (string) ( $row['paid_at'] ?? '' ) ),
+				esc_html( (string) $row['payout_ref'] )
+			);
+		}
+		echo '</tbody></table>';
 	}
 
 	private function render_ledger( int $tenant ): void {

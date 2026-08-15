@@ -15,7 +15,7 @@ final class Modules {
 
 	/** @return string[] */
 	public static function all(): array {
-		return [ self::MULTITENANT, self::INSTAGRAM, self::HUB, self::REST_API, self::FX ];
+		return [ self::MULTITENANT, self::INSTAGRAM, self::HUB, self::FX, self::REST_API ];
 	}
 
 	/** @return string[] */

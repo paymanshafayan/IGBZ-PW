@@ -2,9 +2,23 @@
 namespace IGBZ\Suite\Modules\Fx;
 
 use IGBZ\Suite\Modules\Fx\Admin\FxPage;
+use IGBZ\Suite\Support\Cron;
 use IGBZ\Suite\Support\ModuleInterface;
 use IGBZ\Suite\Support\Modules;
 use IGBZ\Suite\Support\Plugin;
+
+/**
+ * FX payment gateway — the foreign-currency intermediary.
+ *
+ * Store admins without a foreign card top up a USD credit wallet with Rials
+ * (existing Iranian gateways, +fx.fee_percent on top of the USD amount, per
+ * the client's rule). The actual Manus/ManyChat bills are paid by the
+ * operator's payout adapter. The module never queues a task: it only gates a
+ * tenant's own credit at dispatch time.
+ *
+ * Off by default; `multitenant` must be enabled for the Rial top-ups, and
+ * `instagram` for the Manus meter.
+ */
 
 defined( 'ABSPATH' ) || exit;
 
@@ -40,6 +54,9 @@ final class FxModule implements ModuleInterface {
 		$topup = $plugin->get( 'fx.topup' );
 		add_action( 'igbz_payment_verified', [ $topup, 'on_payment_verified' ], 10, 2 );
 
+		$billing = $plugin->get( 'fx.billing' );
+		add_action( Cron::HOOK_DAILY, [ $billing, 'run_daily' ] );
+
 		( new FxPage() )->register();
 	}
 
@@ -58,10 +75,24 @@ final class FxModule implements ModuleInterface {
 				$c->logger()
 			)
 		);
+		$plugin->bind( 'fx.accounts', static fn ( Plugin $c ) => new FxAccountsService( $c->get( 'db' ) ) );
 
 		$registry = new FxPayoutRegistry();
 		do_action( 'igbz_register_fx_payout_providers', $registry );
 		$plugin->bind( 'fx.payouts', static fn () => $registry );
+
+		$plugin->bind(
+			'fx.billing',
+			static fn ( Plugin $c ) => new FxBillingService(
+				$c->get( 'db' ),
+				$c->settings(),
+				$c->get( 'fx.wallet' ),
+				$c->get( 'fx.meter' ),
+				$c->get( 'fx.payouts' ),
+				$c->get( 'fx.accounts' ),
+				$c->logger()
+			)
+		);
 	}
 
 	/** @return array<int,array{label:string,status:string,detail:string}> */

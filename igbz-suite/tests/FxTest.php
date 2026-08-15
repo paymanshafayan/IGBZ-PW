@@ -18,8 +18,11 @@
 
 declare( strict_types=1 );
 
+use IGBZ\Suite\Modules\Fx\FxAccountsService;
+use IGBZ\Suite\Modules\Fx\FxBillingService;
 use IGBZ\Suite\Modules\Fx\FxMath;
 use IGBZ\Suite\Modules\Fx\FxMeter;
+use IGBZ\Suite\Modules\Fx\FxPayoutRegistry;
 use IGBZ\Suite\Modules\Fx\FxRateService;
 use IGBZ\Suite\Modules\Fx\FxTopupService;
 use IGBZ\Suite\Modules\Fx\FxWalletService;
@@ -42,6 +45,8 @@ final class FxDb extends wpdb {
 		'fx_ledger'  => [],
 		'fx_prices'  => [],
 		'fx_rates'   => [],
+		'fx_accounts' => [],
+		'fx_bills'   => [],
 		'payments'   => [],
 	];
 
@@ -79,6 +84,10 @@ final class FxDb extends wpdb {
 		if ( 'fx_wallets' === $table ) {
 			$rows = $this->matching( $table, $sql, [ 'tenant_id' ] );
 			return $rows[0] ?? null;
+		}
+
+		if ( 'fx_accounts' === $table ) {
+			return $this->tables[ $table ][ self::int_of( 'id', $sql ) ] ?? null;
 		}
 
 		if ( 'payments' === $table ) {
@@ -189,7 +198,7 @@ final class FxDb extends wpdb {
 	}
 
 	private static function which( string $sql ): string {
-		$names = [ 'fx_wallets', 'fx_ledger', 'fx_prices', 'fx_rates', 'payments' ];
+		$names = [ 'fx_accounts', 'fx_bills', 'fx_wallets', 'fx_ledger', 'fx_prices', 'fx_rates', 'payments' ];
 		foreach ( $names as $name ) {
 			if ( str_contains( $sql, 'igbz_' . $name ) ) {
 				return $name;
@@ -224,6 +233,35 @@ final class FxDb extends wpdb {
 	private static function now(): string {
 		return gmdate( 'Y-m-d H:i:s' );
 	}
+}
+
+/** A payout adapter that always accepts, recording what it was asked to pay. */
+final class StubPayoutAdapter implements \IGBZ\Suite\Modules\Fx\Contracts\FxPayoutAdapterInterface {
+
+	public array $paid = [];
+
+	public function id(): string {
+		return 'stub';
+	}
+
+	public function title(): string {
+		return 'Stub';
+	}
+
+	public function is_configured(): bool {
+		return true;
+	}
+
+	public function pay( array $bill ): array {
+		$this->paid[] = (int) $bill['id'];
+		return [ 'ok' => true, 'reference' => 'stub:' . (int) $bill['id'], 'error' => '' ];
+	}
+
+	public function card_balance(): float {
+		return 100.0;
+	}
+
+	public function webhook( array $payload ): void {}
 }
 
 /** A rate source that answers from a canned value without the network. */
@@ -291,6 +329,27 @@ final class FxTest extends TestCase {
 		return new FxTopupService( $this->db, $settings, $payments, $this->wallet(), new FxRateService( $this->db, $settings, new Http( $logger ) ), $logger );
 	}
 
+	private function billing( ?FxPayoutRegistry $payouts = null ): FxBillingService {
+		$settings = igbz()->settings();
+		$logger   = new Logger( $settings );
+
+		$registry = $payouts ?? new FxPayoutRegistry();
+		if ( $payouts === null ) {
+			$registry->register( new StubPayoutAdapter() );
+			$settings->set( 'fx.payout_provider', 'stub' );
+		}
+
+		return new FxBillingService(
+			$this->db,
+			$settings,
+			$this->wallet(),
+			$this->meter(),
+			$registry,
+			new FxAccountsService( $this->db ),
+			$logger
+		);
+	}
+
 	public function run(): void {
 		$this->test_the_fee_is_added_on_top_of_the_usd_amount();
 		$this->test_quote_rounds_the_rial_amount();
@@ -302,6 +361,9 @@ final class FxTest extends TestCase {
 		$this->test_the_meter_spends_and_refunds_once();
 		$this->test_the_meter_refuses_on_the_spot_when_credit_is_short();
 		$this->test_an_unpriced_service_is_refused();
+		$this->test_a_monthly_bill_is_created_once_and_settled();
+		$this->test_an_unpaid_bill_stays_due_and_refunds_the_wallet();
+		$this->test_manychat_delivery_is_charged_once();
 	}
 
 	public function test_the_fee_is_added_on_top_of_the_usd_amount(): void {
@@ -445,5 +507,61 @@ final class FxTest extends TestCase {
 
 		$this->assert_false( $result['ok'], 'a service with no price cannot be consumed' );
 		$this->assert_same( 'unpriced', $result['error'], 'the operator must set prices first' );
+	}
+
+	public function test_a_monthly_bill_is_created_once_and_settled(): void {
+		$this->boot();
+		$this->seed_price( 'manus_monthly', 25 );
+		$this->wallet()->credit( 7, 30, FxWalletService::REASON_TOPUP, 'payment:1' );
+
+		$accounts = new FxAccountsService( $this->db );
+		$account_id = $accounts->create( 7, 'manus', 'acct-1' );
+
+		$billing = $this->billing();
+		$bill_id = $billing->create_monthly_bill( $accounts->get( $account_id ) );
+
+		$this->assert_true( $bill_id > 0, 'a bill is created for the month' );
+
+		$again = $billing->create_monthly_bill( $accounts->get( $account_id ) );
+		$this->assert_same( 0, $again, 'the same month is not billed twice' );
+
+		$result = $billing->settle_bill( $this->fxdb->tables['fx_bills'][ $bill_id ] );
+
+		$this->assert_true( $result['ok'], 'a funded bill is paid' );
+		$this->assert_same( FxBillingService::STATUS_PAID, $this->fxdb->tables['fx_bills'][ $bill_id ]['status'], 'the bill is marked paid' );
+		$this->assert_same( 5.0, $this->wallet()->balance( 7 )['balance_usd'], 'the wallet is debited the bill amount' );
+	}
+
+	public function test_an_unpaid_bill_stays_due_and_refunds_the_wallet(): void {
+		$this->boot();
+		$this->seed_price( 'manus_monthly', 25 );
+		$this->wallet()->credit( 7, 10, FxWalletService::REASON_TOPUP, 'payment:1' );
+
+		$accounts = new FxAccountsService( $this->db );
+		$account_id = $accounts->create( 7, 'manus', 'acct-1' );
+
+		$billing = $this->billing();
+		$bill_id = $billing->create_monthly_bill( $accounts->get( $account_id ) );
+		$result  = $billing->settle_bill( $this->fxdb->tables['fx_bills'][ $bill_id ] );
+
+		$this->assert_false( $result['ok'], 'a bill beyond the wallet is not paid' );
+		$this->assert_same( 'insufficient', $result['error'], 'the refusal names the reason' );
+		$this->assert_same( FxBillingService::STATUS_UNPAID, $this->fxdb->tables['fx_bills'][ $bill_id ]['status'], 'the bill is marked unpaid' );
+		$this->assert_same( 10.0, $this->wallet()->balance( 7 )['balance_usd'], 'nothing is taken from the wallet' );
+	}
+
+	public function test_manychat_delivery_is_charged_once(): void {
+		$this->boot();
+		$this->seed_price( 'manychat_dm', 0.1 );
+		$this->wallet()->credit( 7, 1, FxWalletService::REASON_TOPUP, 'payment:1' );
+		$meter = $this->meter();
+
+		$first = $meter->charge_delivery( 7, 'funnel-hit:11' );
+		$this->assert_true( $first['ok'], 'the first delivery is charged' );
+		$this->assert_same( 0.9, $first['balance'], 'the delivery price is deducted' );
+
+		$second = $meter->charge_delivery( 7, 'funnel-hit:11' );
+		$this->assert_false( $second['ok'], 'a replayed delivery is not charged twice' );
+		$this->assert_same( 0.9, $this->wallet()->balance( 7 )['balance_usd'], 'the wallet is untouched by the replay' );
 	}
 }

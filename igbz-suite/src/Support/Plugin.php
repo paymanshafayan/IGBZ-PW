@@ -85,8 +85,10 @@ final class Plugin {
 			Modules::MULTITENANT => MultiTenantModule::class,
 			Modules::INSTAGRAM   => InstagramModule::class,
 			Modules::HUB         => HubModule::class,
-			Modules::REST_API    => RestApiModule::class,
+			// FX binds fx.wallet/fx.rates/fx.topup before REST_API asks for them, so the mobile
+			// API can register the /fx/* routes when the FX module is on.
 			Modules::FX          => FxModule::class,
+			Modules::REST_API    => RestApiModule::class,
 		];
 	}
 
