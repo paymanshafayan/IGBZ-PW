@@ -1,0 +1,34 @@
+# Dependencies (the plugin ships its own autoloader; nothing here is required to run it)
+/vendor/
+/node_modules/
+
+# Build output
+/dist/
+/build/
+*.zip
+
+# ...but the offline test environment's WordPress and WooCommerce zips are tracked on purpose.
+# The sandbox this is developed in cannot reach wordpress.org and its /tmp is wiped between
+# sessions, so these are the only way to rebuild a working site. See _devenv/README.md.
+!/_devenv/wordpress-*.zip
+!/_devenv/woocommerce-*.zip
+
+# Everything the test environment builds from those zips is disposable.
+/_devenv/.work/
+
+# Compiled translations — the .pot is tracked, .mo files are generated
+*.mo
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Local tooling
+.phpunit.result.cache
+.php-cs-fixer.cache
+/phpcs.xml
+/.phpcs.xml

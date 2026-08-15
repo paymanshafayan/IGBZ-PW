@@ -1,0 +1,155 @@
+<?php
+namespace IGBZ\Suite\Support;
+
+use IGBZ\Suite\Modules\Hub\HubModule;
+use IGBZ\Suite\Modules\Instagram\InstagramModule;
+use IGBZ\Suite\Modules\MultiTenant\MultiTenantModule;
+use IGBZ\Suite\Modules\RestApi\RestApiModule;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Service container + module registry.
+ *
+ * The suite ships as ONE plugin with four independently toggleable modules, mirroring the four
+ * nopCommerce plugins of the original IGBZ system.
+ */
+final class Plugin {
+
+	private static ?Plugin $instance = null;
+
+	/** @var array<string,callable> */
+	private array $factories = [];
+
+	/** @var array<string,mixed> */
+	private array $resolved = [];
+
+	/** @var array<string,ModuleInterface> */
+	private array $modules = [];
+
+	private bool $booted = false;
+
+	private function __construct() {}
+
+	public static function instance(): Plugin {
+		if ( null === self::$instance ) {
+			self::$instance = new self();
+		}
+		return self::$instance;
+	}
+
+	public function boot(): void {
+		if ( $this->booted ) {
+			return;
+		}
+		$this->booted = true;
+
+		$this->register_core_services();
+
+		add_action( 'plugins_loaded', [ $this, 'on_plugins_loaded' ], 5 );
+		add_action( 'init', [ $this, 'load_textdomain' ], 1 );
+	}
+
+	public function load_textdomain(): void {
+		load_plugin_textdomain( 'igbz-suite', false, dirname( IGBZ_BASENAME ) . '/languages' );
+	}
+
+	public function on_plugins_loaded(): void {
+		if ( ! $this->woocommerce_active() ) {
+			add_action( 'admin_notices', [ $this, 'render_woocommerce_notice' ] );
+			return;
+		}
+
+		Activator::maybe_upgrade();
+
+		foreach ( $this->module_map() as $id => $class ) {
+			/** @var ModuleInterface $module */
+			$module                = new $class();
+			$this->modules[ $id ] = $module;
+			if ( Modules::enabled( $id ) ) {
+				$module->register( $this );
+			}
+		}
+
+		( new \IGBZ\Suite\Support\Admin\SettingsPage() )->register();
+		( new \IGBZ\Suite\Support\Admin\StatusPage() )->register();
+		( new \IGBZ\Suite\Support\Cron() )->register();
+
+		do_action( 'igbz_booted', $this );
+	}
+
+	/** @return array<string,class-string<ModuleInterface>> */
+	public function module_map(): array {
+		return [
+			Modules::MULTITENANT => MultiTenantModule::class,
+			Modules::INSTAGRAM   => InstagramModule::class,
+			Modules::HUB         => HubModule::class,
+			Modules::REST_API    => RestApiModule::class,
+		];
+	}
+
+	/** @return array<string,ModuleInterface> */
+	public function modules(): array {
+		return $this->modules;
+	}
+
+	public function woocommerce_active(): bool {
+		return class_exists( 'WooCommerce' );
+	}
+
+	public function render_woocommerce_notice(): void {
+		echo '<div class="notice notice-error"><p>'
+			. esc_html__( 'IGBZ Suite requires WooCommerce to be installed and active.', 'igbz-suite' )
+			. '</p></div>';
+	}
+
+	// ---------------------------------------------------------------- container
+
+	public function bind( string $id, callable $factory ): void {
+		$this->factories[ $id ] = $factory;
+		unset( $this->resolved[ $id ] );
+	}
+
+	public function has( string $id ): bool {
+		return isset( $this->factories[ $id ] ) || isset( $this->resolved[ $id ] );
+	}
+
+	public function get( string $id ): mixed {
+		if ( array_key_exists( $id, $this->resolved ) ) {
+			return $this->resolved[ $id ];
+		}
+		if ( ! isset( $this->factories[ $id ] ) ) {
+			throw new \RuntimeException( sprintf( 'IGBZ Suite: service "%s" is not registered.', $id ) );
+		}
+		$this->resolved[ $id ] = ( $this->factories[ $id ] )( $this );
+		return $this->resolved[ $id ];
+	}
+
+	private function register_core_services(): void {
+		$this->bind( 'settings', static fn () => new Settings() );
+		$this->bind( 'logger', static fn ( Plugin $c ) => new Logger( $c->get( 'settings' ) ) );
+		$this->bind( 'db', static fn () => new Db() );
+		$this->bind( 'http', static fn ( Plugin $c ) => new Http( $c->get( 'logger' ) ) );
+		$this->bind( 'tenancy', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Repository\TenantContext( $c->get( 'db' ) ) );
+	}
+
+	public function settings(): Settings {
+		return $this->get( 'settings' );
+	}
+
+	public function logger(): Logger {
+		return $this->get( 'logger' );
+	}
+
+	public function db(): Db {
+		return $this->get( 'db' );
+	}
+
+	public function http(): Http {
+		return $this->get( 'http' );
+	}
+
+	public function tenancy(): \IGBZ\Suite\Modules\MultiTenant\Repository\TenantContext {
+		return $this->get( 'tenancy' );
+	}
+}

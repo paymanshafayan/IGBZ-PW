@@ -1,0 +1,678 @@
+<?php
+namespace IGBZ\Suite\Support;
+
+use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
+use IGBZ\Suite\Modules\Instagram\Services\PostIdentity;
+use IGBZ\Suite\Modules\MultiTenant\Lms\LmsService;
+use IGBZ\Suite\Modules\MultiTenant\Wallet\WalletService;
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Installation, incremental upgrades and role/capability setup.
+ *
+ * Unlike the nopCommerce original (three migrations all stamped 2025/01/01 and marked
+ * Installation-only) this uses a numeric IGBZ_DB_VERSION so upgrades really do run.
+ */
+final class Activator {
+
+	public const VERSION_OPTION = 'igbz_db_version';
+
+	public static function activate(): void {
+		self::install_tables();
+		self::add_roles();
+		self::seed_defaults();
+		// A fresh install has to end up in the same state as an upgraded one. The starter VIP plan
+		// used to be written only by the v10 migration, so a brand-new site got a Plans screen with
+		// nothing on it and a share page with nothing to sell.
+		self::seed_starter_vip_plan();
+		update_option( self::VERSION_OPTION, IGBZ_DB_VERSION, true );
+		if ( false === get_option( Modules::OPTION, false ) ) {
+			Modules::save( Modules::defaults() );
+		}
+		self::schedule_events();
+		flush_rewrite_rules();
+	}
+
+	public static function deactivate(): void {
+		foreach ( array_keys( Cron::events() ) as $hook ) {
+			$timestamp = wp_next_scheduled( $hook );
+			while ( $timestamp ) {
+				wp_unschedule_event( $timestamp, $hook );
+				$timestamp = wp_next_scheduled( $hook );
+			}
+		}
+		flush_rewrite_rules();
+	}
+
+	public static function maybe_upgrade(): void {
+		$current = (int) get_option( self::VERSION_OPTION, 0 );
+		if ( $current === IGBZ_DB_VERSION ) {
+			return;
+		}
+		self::install_tables();
+		self::add_roles();
+		self::seed_defaults();
+		self::migrate( $current );
+		self::schedule_events();
+		update_option( self::VERSION_OPTION, IGBZ_DB_VERSION, true );
+	}
+
+	/**
+	 * Data migrations that dbDelta cannot express.
+	 *
+	 * dbDelta adds the new columns, but existing rows still need values, so each step is written
+	 * to be idempotent and safe to re-run.
+	 */
+	private static function migrate( int $from ): void {
+		if ( $from > 0 && $from < 6 ) {
+			self::migrate_to_v6();
+		}
+		if ( $from > 0 && $from < 7 ) {
+			self::migrate_to_v7();
+		}
+		if ( $from > 0 && $from < 9 ) {
+			self::migrate_to_v9();
+		}
+		if ( $from > 0 && $from < 10 ) {
+			self::migrate_to_v10();
+		}
+		if ( $from > 0 && $from < 11 ) {
+			self::migrate_to_v11();
+		}
+		if ( $from > 0 && $from < 12 ) {
+			self::migrate_to_v12();
+		}
+		if ( $from > 0 && $from < 13 ) {
+			self::migrate_to_v13();
+		}
+	}
+
+	/**
+	 * v13: drop the unused generic job queue.
+	 *
+	 * `jobs` was a general-purpose worker queue -- handler, payload, attempts, max_attempts,
+	 * available_at, reserved_at. Nothing ever wrote a row to it and no runner ever read one; the
+	 * only code that touched the table was the daily sweep deleting completed rows that could not
+	 * exist. Every background job in the plugin is already durable through a queue that models
+	 * its own work properly: ig_product_intake for intake, ig_content for generation and
+	 * publishing, ig_funnel_hits for delivery -- each with its own retry counter and last_error,
+	 * driven by the cron ticks. A second, emptier queue alongside them is a table an operator can
+	 * find, wonder about and mistake for a system that is running.
+	 *
+	 * Dropping rather than filling it in: a queue runner is only worth its failure modes once
+	 * something needs to enqueue, and nothing does. If a future subsystem wants one, it will want
+	 * columns chosen for that job anyway, and this DDL is in the history.
+	 */
+	private static function migrate_to_v13(): void {
+		$db = new Db();
+
+		// IF EXISTS keeps this a no-op on installs created after the table stopped being made.
+		$db->query( 'DROP TABLE IF EXISTS ' . $db->table( 'jobs' ) );
+	}
+
+	/**
+	 * v12: funnel rewards are labelled correctly, and published posts get an identity.
+	 *
+	 * Two independent back-fills, both cosmetic in the sense that no money and no post changes
+	 * hands -- but both fix rows that currently say something untrue.
+	 *
+	 * The ledger first. A funnel that credits a wallet was filing the credit under
+	 * `affiliate_commission`, the reason reserved for money earned by referring a sale. Customers
+	 * who had never joined the affiliate programme saw "Affiliate commission" on their statement
+	 * for having commented on a post, and the two kinds of money could not be told apart by anyone
+	 * totalling the ledger. The code now writes `instagram_reward`; these are the rows it already
+	 * wrote. They are identifiable with certainty by their reference code, which the funnel owns
+	 * exclusively (`ig_funnel:<hit id>`, versus `commission:<id>` for real commissions), so the
+	 * UPDATE cannot touch a genuine commission.
+	 *
+	 * Rewriting the reason is safe against the ledger's UNIQUE (tenant, user, reason, reference)
+	 * key: the reference code is unique per hit on its own, so moving a row to a different reason
+	 * cannot collide with another row. And it cannot cause a re-payment, because a hit is paid only
+	 * from settle(), which claims the hit row before crediting and never re-settles a claimed one.
+	 *
+	 * Then the posts. dbDelta adds ig_content.ig_shortcode, but existing published rows have it
+	 * empty, which would leave the new funnel post-picker showing nothing on a site that has been
+	 * publishing for months. The shortcode is derived from the permalink already on the row, so the
+	 * back-fill needs no network call -- fitting, since we have no Instagram API to ask.
+	 */
+	private static function migrate_to_v12(): void {
+		$db = new Db();
+
+		$ledger = $db->table( 'wallet_ledger' );
+
+		// A plain UPDATE: no subquery, no join, nothing the SQLite translator on Playground
+		// installs has to reinterpret.
+		$db->query(
+			"UPDATE {$ledger} SET reason = %s WHERE reason = %s AND reference_code LIKE %s",
+			WalletService::REASON_IG_REWARD,
+			WalletService::REASON_COMMISSION,
+			'ig_funnel:%'
+		);
+
+		$content = $db->table( 'ig_content' );
+
+		// Only rows that can yield a shortcode are read, and each is written individually. The set
+		// is bounded by how much a shop has published, and per-row updates keep the parsing rules
+		// in PHP where they are tested, instead of restating them as SQL string surgery.
+		$rows = $db->results(
+			"SELECT id, permalink FROM {$content} WHERE ig_shortcode = %s AND permalink <> %s",
+			'',
+			''
+		);
+
+		foreach ( $rows as $row ) {
+			$shortcode = PostIdentity::from_permalink( (string) $row['permalink'] );
+
+			if ( '' === $shortcode ) {
+				continue;
+			}
+
+			$db->update( 'ig_content', [ 'ig_shortcode' => $shortcode ], [ 'id' => (int) $row['id'] ] );
+		}
+	}
+
+	/**
+	 * v11: quizzes reach learners, and certificates become verifiable.
+	 *
+	 * No schema change — the six LMS tables already had everything. What is new is a public route,
+	 * /{lms.certificate_slug}/{code}, so the rewrite cache has to be rebuilt for the same reason
+	 * v10 did it, and at the same late point on `init`.
+	 *
+	 * The back-fill is the interesting half. Until now `refresh_progress()` minted a certificate
+	 * the moment the last lesson was ticked, whatever the quizzes said, so sites upgrading may be
+	 * carrying certificates that were never earned. Those are withdrawn — the code is cleared, not
+	 * the completion — and any student who has in fact passed everything gets theirs re-issued on
+	 * their next visit, because `maybe_issue_certificate()` now runs on every refresh. Withdrawing
+	 * is the safe direction: a certificate wrongly issued is a claim we cannot stand behind, while
+	 * one wrongly withheld comes back by itself.
+	 */
+	private static function migrate_to_v11(): void {
+		add_action(
+			'init',
+			static function (): void {
+				flush_rewrite_rules( false );
+			},
+			99
+		);
+
+		$db          = new Db();
+		$enrollments = $db->table( 'enrollments' );
+
+		// Deliberately a read plus per-row updates rather than one UPDATE ... WHERE (correlated
+		// subquery): only certificates that exist need looking at, that set is small, and the
+		// subquery form has to survive the SQLite translator on Playground installs.
+		$rows = $db->results(
+			"SELECT id, course_id, user_id FROM {$enrollments} WHERE certificate_code <> %s",
+			''
+		);
+		if ( ! $rows ) {
+			return;
+		}
+
+		$lms = new LmsService( $db );
+		foreach ( $rows as $row ) {
+			if ( $lms->has_passed_required_quizzes( (int) $row['course_id'], (int) $row['user_id'] ) ) {
+				continue;
+			}
+			$db->update( 'enrollments', [ 'certificate_code' => '' ], [ 'id' => (int) $row['id'] ] );
+		}
+	}
+
+	/**
+	 * v10: the VIP channel.
+	 *
+	 * dbDelta creates the nine vip_* tables on its own, so there are no columns to back-fill. Two
+	 * things still have to happen by hand.
+	 *
+	 * The share landing page lives at /{vip.landing_slug}/p/{shortcode}, which is a rewrite rule
+	 * added at boot. Rules are cached in an option, and an upgrade — unlike an activation — never
+	 * flushes them, so on an existing site every share link would 404 until somebody happened to
+	 * re-save the permalink settings. The flush is deferred to `init` because rewrite rules are not
+	 * registered yet at the point maybe_upgrade() runs on `plugins_loaded`; flushing here would just
+	 * persist the old set.
+	 *
+	 * The starter plan exists so the paywall has something to sell on day one. It is written only
+	 * when the table is completely empty, which makes re-running the step a no-op and means a shop
+	 * that deleted the sample never gets it back.
+	 */
+	private static function migrate_to_v10(): void {
+		add_action(
+			'init',
+			static function (): void {
+				flush_rewrite_rules( false );
+			},
+			99
+		);
+
+		self::seed_starter_vip_plan();
+	}
+
+	/**
+	 * Write the sample membership plan, once, into an empty table.
+	 *
+	 * Shared by activate() and the v10 migration so a new install and an upgraded one land in the
+	 * same place. Guarding on an empty table makes it a no-op on every re-run and means a shop that
+	 * deliberately deleted the sample never has it come back.
+	 */
+	private static function seed_starter_vip_plan(): void {
+		$db = igbz()->db();
+
+		$existing = (int) $db->scalar( 'SELECT COUNT(*) FROM ' . $db->table( 'vip_plans' ) );
+		if ( $existing > 0 ) {
+			return;
+		}
+
+		$now = current_time( 'mysql', true );
+
+		$db->insert(
+			'vip_plans',
+			[
+				'tenant_id'     => 0,
+				'slug'          => 'monthly',
+				'name'          => 'VIP Monthly',
+				'description'   => '',
+				'price'         => 0,
+				'currency'      => 'IRT',
+				'duration_days' => 30,
+				// Inactive on purpose: a plan priced at zero must never be buyable. The shop owner
+				// sets a real price in the VIP admin screen, which is what activates it.
+				'is_active'     => 0,
+				'sort_order'    => 0,
+				'created_at'    => $now,
+				'updated_at'    => $now,
+			]
+		);
+	}
+
+	/**
+	 * v9: the code a shopper comments is the product id, not the SKU.
+	 *
+	 * Until v9 the funnel keyword was the warehouse SKU (IGBZ-P6R4). It is unreadable off a phone
+	 * screen and needs a Latin keyboard to type, so the shopper-facing code became the padded
+	 * WooCommerce product id instead. Rows that already created a product get the new code
+	 * back-filled; rows that never got that far are left empty on purpose, because the code is
+	 * minted at product creation and there is nothing yet to derive it from.
+	 *
+	 * The existing funnels are deliberately NOT rewritten. A live post out in the world tells
+	 * people to comment the old SKU, and repointing its funnel would silently break every one of
+	 * those posts. Old funnels keep matching the old keyword forever; only products registered
+	 * from here on use numbers.
+	 */
+	private static function migrate_to_v9(): void {
+		$db     = igbz()->db();
+		$intake = $db->table( 'ig_intake' );
+
+		// Padded in PHP rather than with LPAD(): LPAD truncates when the value is longer than the
+		// pad length, so a six-digit product id would silently become a four-digit code pointing
+		// at somebody else's product.
+		$ids = $db->column(
+			"SELECT product_id FROM {$intake}
+			 WHERE product_id > 0 AND ( public_code = '' OR public_code IS NULL )"
+		);
+
+		// Constructed directly rather than pulled from the container: the Instagram module may be
+		// switched off, and a disabled module still has rows that need migrating.
+		$skus = new \IGBZ\Suite\Modules\Instagram\Services\SkuGenerator( $db );
+
+		foreach ( array_unique( array_map( 'intval', (array) $ids ) ) as $product_id ) {
+			$db->update(
+				'ig_intake',
+				[ 'public_code' => $skus->public_code( $product_id ) ],
+				[ 'product_id' => $product_id ],
+				[ '%s' ],
+				[ '%d' ]
+			);
+		}
+	}
+
+	/**
+	 * v7: funnel hits record whether the DM was really sent, not whether the webhook ran.
+	 *
+	 * Before v7 the webhook stamped `delivered = 1` the moment it had computed a reply, so rows
+	 * written by an account with no working ManyChat key look successful and are invisible to the
+	 * hourly retry. Those rows cannot be re-sent honestly either — Instagram DMs are not
+	 * idempotent and the subscriber may well have received the reply inline — so they are
+	 * relabelled rather than reset: delivered stays 1 and the row is marked unconfirmed, which is
+	 * exactly what it is. Rows that really were confirmed by the old deliver() path are relabelled
+	 * along with them, because nothing stored on the row tells the two apart — downgrading a
+	 * handful of genuine deliveries to "we cannot prove this" is the honest direction to err in.
+	 *
+	 * Rows that were left undelivered with no error message are the ones that never got as far as
+	 * a send. They become explicitly pending so retry_failed() picks them up.
+	 */
+	private static function migrate_to_v7(): void {
+		$db    = new Db();
+		$table = $db->table( 'ig_funnel_hits' );
+
+		$db->query(
+			"UPDATE {$table} SET delivery_error = %s WHERE delivered = 1 AND delivery_error = %s",
+			FunnelService::DELIVERY_UNCONFIRMED,
+			''
+		);
+
+		$db->query(
+			"UPDATE {$table} SET delivery_error = %s WHERE delivered = 0 AND delivery_error = %s",
+			FunnelService::DELIVERY_PENDING,
+			''
+		);
+	}
+
+	/**
+	 * v6: Manus and ManyChat credentials moved from one global key to per-account keys.
+	 *
+	 * Existing accounts are switched to the trial engine so a live site keeps working on the
+	 * operator's key after the upgrade instead of going dark, and every account is given its own
+	 * webhook tokens. The old global webhook tokens are intentionally left in settings: they no
+	 * longer authenticate anything, but keeping them avoids breaking a rollback.
+	 */
+	private static function migrate_to_v6(): void {
+		$db    = new Db();
+		$table = $db->table( 'ig_accounts' );
+
+		$rows = $db->results( "SELECT id, manus_webhook_token, manychat_webhook_token FROM {$table}" );
+		if ( ! $rows ) {
+			return;
+		}
+
+		$now     = current_time( 'mysql', true );
+		$days    = (int) ( new Settings() )->int( 'trial.days', 14 );
+		$expires = gmdate( 'Y-m-d H:i:s', strtotime( $now . ' UTC' ) + ( $days * DAY_IN_SECONDS ) );
+
+		foreach ( $rows as $row ) {
+			$update = [];
+
+			if ( '' === (string) ( $row['manus_webhook_token'] ?? '' ) ) {
+				$update['manus_webhook_token'] = Crypto::token( 24 );
+			}
+			if ( '' === (string) ( $row['manychat_webhook_token'] ?? '' ) ) {
+				$update['manychat_webhook_token'] = Crypto::token( 24 );
+			}
+			// Rows that predate v6 have no key of their own, so they start on the trial engine.
+			// dbDelta has already stamped them with the 'own' column default, hence the explicit
+			// overwrite rather than a check for an empty mode.
+			$update['credential_mode']  = 'trial';
+			$update['trial_started_at'] = $now;
+			$update['trial_expires_at'] = $expires;
+			$update['trial_tasks_used'] = 0;
+
+			if ( $update ) {
+				$db->update( 'ig_accounts', $update, [ 'id' => (int) $row['id'] ] );
+			}
+		}
+	}
+
+	public static function install_tables(): void {
+		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
+		foreach ( Schema::statements() as $statement ) {
+			dbDelta( $statement );
+		}
+	}
+
+	/**
+	 * Whether translations may safely be requested yet.
+	 *
+	 * maybe_upgrade() runs on `plugins_loaded`, i.e. before `init`. Calling __() there forces a
+	 * just-in-time textdomain load, which WordPress 6.7+ reports as a
+	 * `_load_textdomain_just_in_time` doing-it-wrong notice. Both the role labels and the seeded
+	 * defaults below are *persisted* values, so the English original is the correct thing to store
+	 * anyway — WordPress itself stores role names untranslated. When this runs later than `init`
+	 * (the real activation request does) the translated string is used.
+	 */
+	private static function can_translate(): bool {
+		return did_action( 'init' ) > 0;
+	}
+
+	public static function add_roles(): void {
+		$caps = Capabilities::all();
+		$t    = self::can_translate();
+
+		add_role(
+			Capabilities::ROLE_TENANT_OWNER,
+			$t ? __( 'IGBZ Tenant Owner', 'igbz-suite' ) : 'IGBZ Tenant Owner',
+			array_merge(
+				[ 'read' => true, 'upload_files' => true ],
+				array_fill_keys(
+					[
+						Capabilities::MANAGE_OWN_TENANT,
+						Capabilities::MANAGE_WALLET,
+						Capabilities::MANAGE_INSTAGRAM,
+						Capabilities::MANAGE_LMS,
+						Capabilities::MANAGE_AFFILIATE,
+						Capabilities::MANAGE_BNPL,
+					],
+					true
+				)
+			)
+		);
+
+		add_role(
+			Capabilities::ROLE_TENANT_STAFF,
+			$t ? __( 'IGBZ Tenant Staff', 'igbz-suite' ) : 'IGBZ Tenant Staff',
+			[ 'read' => true, 'upload_files' => true, Capabilities::MANAGE_OWN_TENANT => true ]
+		);
+
+		add_role(
+			Capabilities::ROLE_INSTRUCTOR,
+			$t ? __( 'IGBZ Instructor', 'igbz-suite' ) : 'IGBZ Instructor',
+			[ 'read' => true, 'upload_files' => true, Capabilities::MANAGE_LMS => true ]
+		);
+
+		$admin = get_role( 'administrator' );
+		if ( $admin ) {
+			foreach ( $caps as $cap ) {
+				$admin->add_cap( $cap );
+			}
+		}
+	}
+
+	public static function seed_defaults(): void {
+		$settings = new Settings();
+		$t        = self::can_translate();
+		$defaults = [
+			'general.default_currency'      => 'IRT',
+			'general.tenant_resolution'     => 'domain',
+			'general.tenant_path_base'      => 'store',
+			'general.default_tenant_id'     => 0,
+			'general.allow_self_signup'     => true,
+			'general.auto_approve_tenants'  => false,
+			'log.level'                     => Logger::INFO,
+			'log.retention_days'            => 30,
+			'http.timeout'                  => 20,
+			'purge_on_uninstall'            => false,
+			'wallet.enabled'                => true,
+			'wallet.allow_negative'         => false,
+			'wallet.order_cashback_percent' => 2.0,
+			'wallet.max_topup'              => 50000000,
+			'wallet.min_topup'              => 10000,
+			'wallet.topup_enabled'          => true,
+			'wallet.checkout_enabled'       => true,
+			'bnpl.enabled'                  => true,
+			'bnpl.default_installments'     => 4,
+			'bnpl.interval_days'            => 30,
+			'bnpl.fee_percent'              => 0.0,
+			'bnpl.penalty_percent_per_day'  => 0.1,
+			'bnpl.min_order_total'          => 500000,
+			'bnpl.default_credit_limit'     => 20000000,
+			'bnpl.provider'                 => 'internal',
+			'bnpl.auto_collect'             => true,
+			'bnpl.reminder_days_before'     => 3,
+			'bnpl.default_after_days'       => 14,
+			'affiliate.enabled'             => true,
+			'affiliate.tier1_rate'          => 5.0,
+			'affiliate.tier2_rate'          => 2.0,
+			'affiliate.cookie_days'         => 30,
+			'affiliate.approve_after_days'  => 7,
+			'affiliate.min_payout'          => 1000000,
+			'affiliate.payout_to_wallet'    => true,
+			'lms.enabled'                   => true,
+			'lms.video_link_ttl'            => 7200,
+			'lms.max_quiz_attempts'         => 3,
+			'lms.course_page_id'            => 0,
+			'lms.pass_score'                => 60,
+			'lms.certificate_enabled'       => true,
+			'lms.certificate_slug'          => 'certificate',
+			'lms.revoke_on_refund'          => true,
+			'vip.enabled'                   => true,
+			'vip.feed_page_size'            => 12,
+			'vip.default_expiry_days'       => 0,
+			'vip.default_expiry_action'     => 'hide',
+			'vip.purge_media_on_expiry'     => true,
+			'vip.media_link_ttl'            => 900,
+			'vip.comments_enabled'          => true,
+			'vip.comment_max_length'        => 1000,
+			'vip.comment_rate_seconds'      => 15,
+			'vip.messages_enabled'          => true,
+			'vip.tips_enabled'              => true,
+			'vip.tip_presets'               => '50000,100000,200000,500000',
+			'vip.tip_min'                   => 10000,
+			'vip.landing_slug'              => 'vip',
+			'vip.app_android_url'           => '',
+			'vip.app_ios_url'               => '',
+			'vip.app_direct_apk_url'        => '',
+			'vip.deep_link_scheme'          => 'igbz',
+			'otp.enabled'                   => true,
+			'otp.code_length'               => 6,
+			'otp.ttl_seconds'               => 300,
+			'otp.max_attempts'              => 5,
+			'otp.resend_seconds'            => 120,
+			'otp.max_per_hour'              => 5,
+			'otp.sms_provider'              => 'log',
+			'otp.message_template'          => $t ? __( 'Your verification code: {code}', 'igbz-suite' ) : 'Your verification code: {code}',
+			'otp.kavenegar.template'        => '',
+			'otp.kavenegar.sender'          => '',
+			'otp.smsir.template_id'         => 0,
+			'plans.enabled'                 => true,
+			'plans.grace_days'              => 3,
+			'plans.renewal_retries'         => 3,
+			'plans.notify_days_before'      => 5,
+			'plans.six_month_discount'      => 10.0,
+			'plans.yearly_discount'         => 20.0,
+			'payments.default_gateway'      => 'zarinpal',
+			'payments.zarinpal.enabled'     => true,
+			'payments.idpay.enabled'        => false,
+			'payments.nextpay.enabled'      => false,
+			'payments.payir.enabled'        => false,
+			'payments.payir.sandbox'        => false,
+			'payments.currency_multiplier'  => 10,
+			'payments.zarinpal.sandbox'     => false,
+			'payments.idpay.sandbox'        => false,
+			'marketplace.enabled'           => true,
+			'marketplace.torob.enabled'     => true,
+			'marketplace.emalls.enabled'    => true,
+			'marketplace.google.enabled'    => false,
+			'marketplace.feed_limit'        => 500,
+			'marketplace.cache_ttl'         => 900,
+			'instagram.provider'            => 'manus',
+			'instagram.autopublish'         => true,
+			'instagram.unique_coupons'      => true,
+			'instagram.coupon_ttl_days'     => 7,
+			'manus.agent_profile'           => 'manus-1.6',
+			'manus.locale'                  => 'fa-IR',
+			'manus.content_language'        => 'Persian (Farsi)',
+			'manus.poll_interval'           => 300,
+			'manus.use_canva'               => true,
+			'manus.auto_generate'           => true,
+			'manus.auto_schedule'           => true,
+			'manus.collect_insights'        => true,
+			'manus.default_peak_hours'      => '12:00,18:30,21:00',
+			'manus.min_gap_minutes'         => 90,
+			'manus.reel_seconds'            => 25,
+			'manus.weekly_slots'            => 5,
+			'manus.account_concurrency'     => 0,
+			'trial.enabled'                 => true,
+			'trial.days'                    => 14,
+			'trial.task_quota'              => 1,
+			'intake.enabled'                => true,
+			'intake.sku_prefix'             => 'IGBZ',
+			'intake.code_digits'            => 4,
+			'intake.quality_threshold'      => 60,
+			'intake.product_status'         => 'publish',
+			'intake.funnel_per_user_limit'  => 1,
+			'intake.funnel_reply'           => '',
+			'intake.image_style'            => 'clean seamless studio background in a very light neutral tone with a soft natural shadow under the product',
+			'intake.languages'              => '',
+			'intake.default_language'       => '',
+			'stt.enabled'                   => true,
+			'stt.provider'                  => 'manus',
+			'stt.endpoint'                  => '',
+			'stt.model'                     => '',
+			'stt.language'                  => 'fa',
+			'stt.file_field'                => 'file',
+			'stt.auth_header'               => 'Authorization',
+			'stt.auth_scheme'               => 'Bearer',
+			'stt.response_path'             => '',
+			'stt.timeout'                   => 120,
+			'dm.provider'                   => 'manychat',
+			'dm.custom.title'               => '',
+			'dm.custom.endpoint'            => '',
+			'dm.custom.api_key'             => '',
+			'dm.custom.auth_header'         => 'Authorization',
+			'dm.custom.auth_scheme'         => 'Bearer',
+			'dm.custom.method'              => 'POST',
+			'dm.custom.capabilities'        => 'text',
+			'dm.custom.body_template'       => '',
+			'dm.custom.message_id_path'     => '',
+			'dm.custom.timeout'             => 20,
+			'manychat.async_reply'          => true,
+			'manychat.link_field_name'      => 'igbz_link',
+			'manychat.coupon_field_name'    => 'igbz_coupon',
+			'manychat.button_label'         => $t ? __( 'Open the link', 'igbz-suite' ) : 'Open the link',
+			'manychat.duplicate_message'    => $t ? __( 'You have already received this link.', 'igbz-suite' ) : 'You have already received this link.',
+			'hub.enabled'                   => true,
+			'hub.vip_link_ttl'              => 900,
+			'hub.sync_interval'             => 3600,
+			'hub.featured_limit'            => 12,
+			'hub.subdomain_base'            => '',
+			'hub.cname_target'              => '',
+			'hub.mother_origin'             => '',
+			'api.jwt_ttl'                   => 3600,
+			'api.refresh_ttl'               => 2592000,
+			'api.rate_limit_per_minute'     => 120,
+			'api.push_enabled'              => false,
+			'api.push_channel_id'           => 'igbz_default',
+			'api.push_order_updates'        => true,
+			'api.device_retention_days'     => 180,
+			'api.app_scheme'                => 'igbz',
+			'api.min_app_version'           => '',
+			'api.latest_app_version'        => '',
+			'api.apk_url'                   => '',
+			'api.ios_store_url'             => '',
+			'api.android_package'           => '',
+			'api.ios_bundle_id'             => '',
+			'api.universal_link'            => '',
+		];
+		foreach ( $defaults as $key => $value ) {
+			if ( ! $settings->has( $key ) ) {
+				$settings->set( $key, $value );
+			}
+		}
+
+		// Secrets that must exist for signed URLs / tokens are generated once, never hardcoded.
+		$generated = [
+			'api.jwt_secret',
+			'lms.video_hmac_secret',
+			'hub.vip_link_secret',
+			'vip.media_hmac_secret',
+			'manychat.webhook_token',
+			'manus.webhook_token',
+		];
+		foreach ( $generated as $key ) {
+			if ( ! $settings->has( $key ) ) {
+				$settings->set( $key, Crypto::token( 32 ) );
+			}
+		}
+	}
+
+	public static function schedule_events(): void {
+		// Guarantee the custom recurrences are known even if this runs before the plugin
+		// bootstrap did it (e.g. a direct call from an upgrade routine or WP-CLI).
+		Cron::register_schedules();
+
+		foreach ( Cron::events() as $hook => $recurrence ) {
+			if ( ! wp_next_scheduled( $hook ) ) {
+				wp_schedule_event( time() + 60, $recurrence, $hook );
+			}
+		}
+	}
+}
