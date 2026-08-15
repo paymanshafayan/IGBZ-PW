@@ -35,6 +35,7 @@ final class LmsPage {
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$course_id = isset( $_GET['course'] ) ? (int) $_GET['course'] : 0;
+		$quiz_id   = isset( $_GET['quiz'] ) ? (int) $_GET['quiz'] : 0;
 		$new       = isset( $_GET['new'] );
 		$paged     = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
 		$search    = isset( $_GET['s'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['s'] ) ) : '';
@@ -44,6 +45,12 @@ final class LmsPage {
 			__( 'Courses', 'igbz-suite' ),
 			__( 'A course can be attached to a WooCommerce product: buying that product enrolls the customer automatically. Video keys are served through signed, expiring URLs.', 'igbz-suite' )
 		);
+
+		if ( $quiz_id ) {
+			$this->render_quiz_results( $course_id, $quiz_id );
+			View::close();
+			return;
+		}
 
 		if ( $course_id || $new ) {
 			$this->render_course_editor( $course_id );
@@ -284,17 +291,55 @@ final class LmsPage {
 
 	private function render_quizzes( int $course_id, int $tenant_id ): void {
 		$db   = igbz()->db();
-		$rows = $db->results( 'SELECT * FROM ' . $db->table( 'quizzes' ) . ' WHERE course_id = %d ORDER BY id ASC', $course_id );
+		$lms  = $this->lms();
+		$rows = $lms->quizzes( $course_id );
 
 		$display = [];
 		foreach ( $rows as $quiz ) {
+			$id        = (int) $quiz['id'];
 			$questions = (array) json_decode( (string) $quiz['questions'], true );
+			$taken     = (int) $db->scalar( 'SELECT COUNT(*) FROM ' . $db->table( 'quiz_attempts' ) . ' WHERE quiz_id = %d', $id );
+			$passed    = (int) $db->scalar( 'SELECT COUNT(DISTINCT user_id) FROM ' . $db->table( 'quiz_attempts' ) . ' WHERE quiz_id = %d AND passed = 1', $id );
+			$average   = (float) $db->scalar( 'SELECT AVG(score) FROM ' . $db->table( 'quiz_attempts' ) . ' WHERE quiz_id = %d', $id );
+
+			// The effective figures, not the raw column: the site settings can lower a quiz's
+			// max_attempts and fill in a missing pass score, and the admin should see what
+			// students will actually get.
 			$display[] = [
-				'title'     => esc_html( (string) $quiz['title'] ),
+				'title'     => sprintf(
+					'<strong>%1$s</strong>%2$s',
+					esc_html( (string) $quiz['title'] ),
+					$quiz['lesson_id']
+						? '<br /><small>' . esc_html( sprintf( /* translators: %d: lesson id */ __( 'Lesson #%d', 'igbz-suite' ), (int) $quiz['lesson_id'] ) ) . '</small>'
+						: '<br /><small>' . esc_html__( 'Whole course', 'igbz-suite' ) . '</small>'
+				),
 				'questions' => esc_html( (string) count( $questions ) ),
-				'pass'      => esc_html( (string) $quiz['pass_score'] ),
-				'attempts'  => esc_html( (string) $quiz['max_attempts'] ),
+				'pass'      => esc_html( $lms->pass_score( $quiz ) . '%' ),
+				'attempts'  => esc_html(
+					LmsService::ATTEMPTS_UNLIMITED === $lms->max_attempts( $quiz )
+						? __( 'Unlimited', 'igbz-suite' )
+						: (string) $lms->max_attempts( $quiz )
+				),
 				'limit'     => esc_html( $quiz['time_limit_minutes'] ? (string) $quiz['time_limit_minutes'] : '—' ),
+				'results'   => $taken > 0
+					? esc_html(
+						sprintf(
+							/* translators: 1: attempts, 2: students who passed, 3: average score */
+							__( '%1$d attempts · %2$d passed · avg %3$d%%', 'igbz-suite' ),
+							$taken,
+							$passed,
+							(int) round( $average )
+						)
+					)
+					: '<span class="igbz-empty">' . esc_html__( 'Not attempted yet', 'igbz-suite' ) . '</span>',
+				'actions'   => sprintf(
+					'<a class="button button-small" href="%1$s">%2$s</a> <a class="button button-small" href="%3$s" onclick="return confirm(\'%4$s\')">%5$s</a>',
+					esc_url( Menu::url( self::SLUG, [ 'course' => $course_id, 'quiz' => $id ] ) ),
+					esc_html__( 'Results', 'igbz-suite' ),
+					esc_url( wp_nonce_url( Menu::url( self::SLUG, [ 'course' => $course_id, 'delete_quiz' => $id ] ), 'igbz_lms_action' ) ),
+					esc_js( __( 'Delete this quiz and every attempt at it?', 'igbz-suite' ) ),
+					esc_html__( 'Delete', 'igbz-suite' )
+				),
 			];
 		}
 
@@ -306,6 +351,8 @@ final class LmsPage {
 				'pass'      => __( 'Pass score', 'igbz-suite' ),
 				'attempts'  => __( 'Max attempts', 'igbz-suite' ),
 				'limit'     => __( 'Time limit', 'igbz-suite' ),
+				'results'   => __( 'Results', 'igbz-suite' ),
+				'actions'   => __( 'Actions', 'igbz-suite' ),
 			],
 			$display,
 			static fn ( array $row, string $key ): string => (string) $row[ $key ],
@@ -321,6 +368,16 @@ final class LmsPage {
 		);
 		echo '<table class="form-table" role="presentation"><tbody>';
 		$this->text_row( 'title', __( 'Quiz title', 'igbz-suite' ), '', true );
+
+		echo '<tr><th scope="row">' . esc_html__( 'Attached to', 'igbz-suite' ) . '</th><td><select name="lesson_id">';
+		printf( '<option value="0">%s</option>', esc_html__( '— the whole course —', 'igbz-suite' ) );
+		foreach ( $this->lms()->lessons( $course_id ) as $lesson ) {
+			printf( '<option value="%1$d">%2$s</option>', (int) $lesson['id'], esc_html( (string) $lesson['title'] ) );
+		}
+		echo '</select><p class="description">'
+			. esc_html__( 'A quiz attached to a lesson appears under it; one attached to the course appears at the end as the final assessment.', 'igbz-suite' )
+			. '</p></td></tr>';
+
 		$this->text_row( 'pass_score', __( 'Pass score', 'igbz-suite' ), '60', false, 'number' );
 		$this->text_row( 'max_attempts', __( 'Max attempts', 'igbz-suite' ), '3', false, 'number' );
 		$this->text_row( 'time_limit_minutes', __( 'Time limit (minutes)', 'igbz-suite' ), '0', false, 'number' );
@@ -335,6 +392,125 @@ final class LmsPage {
 		echo '</form>';
 	}
 
+	/**
+	 * Every attempt at one quiz, newest first.
+	 *
+	 * This is the half of the feature that was missing entirely: quizzes could be written and,
+	 * once the learner surfaces existed, taken — but nobody could see the answers. An instructor
+	 * needs the per-question breakdown to tell "the class failed" from "question 4 is wrong".
+	 */
+	private function render_quiz_results( int $course_id, int $quiz_id ): void {
+		$db   = igbz()->db();
+		$lms  = $this->lms();
+		$quiz = $lms->quiz( $quiz_id );
+
+		printf(
+			'<p><a href="%1$s">&larr; %2$s</a></p>',
+			esc_url( Menu::url( self::SLUG, [ 'course' => $course_id ] ) ),
+			esc_html__( 'Back to the course', 'igbz-suite' )
+		);
+
+		if ( ! $quiz ) {
+			View::notice( __( 'Quiz not found.', 'igbz-suite' ), 'error' );
+			return;
+		}
+
+		printf( '<h2>%s</h2>', esc_html( (string) $quiz['title'] ) );
+
+		$questions = $lms->questions_for_client( $quiz );
+		$attempts  = $db->results(
+			'SELECT * FROM ' . $db->table( 'quiz_attempts' ) . ' WHERE quiz_id = %d ORDER BY id DESC LIMIT 200',
+			$quiz_id
+		);
+
+		// Per-question difficulty, computed from the stored answer sheets against the stored key.
+		$key   = (array) json_decode( (string) $quiz['questions'], true );
+		$stats = [];
+		foreach ( $questions as $index => $question ) {
+			$stats[ $question['id'] ] = [ 'label' => $question['question'], 'correct' => 0, 'index' => $index ];
+		}
+
+		$display = [];
+		foreach ( $attempts as $attempt ) {
+			$answers = (array) json_decode( (string) $attempt['answers'], true );
+
+			foreach ( $key as $index => $question ) {
+				$qid = (string) ( $question['id'] ?? $index );
+				if ( ! isset( $stats[ $qid ] ) ) {
+					continue;
+				}
+				$given    = $answers[ $qid ] ?? ( $answers[ $index ] ?? null );
+				$expected = $question['answer'] ?? null;
+
+				if ( is_array( $expected ) ) {
+					$given_set    = array_map( 'strval', (array) $given );
+					$expected_set = array_map( 'strval', $expected );
+					sort( $given_set );
+					sort( $expected_set );
+					$right = $given_set === $expected_set;
+				} else {
+					$right = null !== $given && (string) $given === (string) $expected;
+				}
+
+				if ( $right ) {
+					++$stats[ $qid ]['correct'];
+				}
+			}
+
+			$user      = get_userdata( (int) $attempt['user_id'] );
+			$display[] = [
+				'user'   => esc_html( $user ? $user->display_name : '#' . $attempt['user_id'] ),
+				'score'  => esc_html( $attempt['score'] . '%' ),
+				'passed' => View::status_pill( $attempt['passed'] ? 'ok' : 'warn' ),
+				'when'   => esc_html( (string) ( $attempt['finished_at'] ?: $attempt['started_at'] ) ),
+			];
+		}
+
+		$total = count( $attempts );
+
+		echo '<h3>' . esc_html__( 'Question breakdown', 'igbz-suite' ) . '</h3>';
+		$breakdown = [];
+		foreach ( $stats as $stat ) {
+			$breakdown[] = [
+				'question' => esc_html( sprintf( '%d. %s', (int) $stat['index'] + 1, $stat['label'] ) ),
+				'correct'  => esc_html(
+					$total > 0
+						? sprintf(
+							/* translators: 1: number correct, 2: total attempts, 3: percentage */
+							__( '%1$d of %2$d (%3$d%%)', 'igbz-suite' ),
+							(int) $stat['correct'],
+							$total,
+							(int) round( $stat['correct'] / $total * 100 )
+						)
+						: '—'
+				),
+			];
+		}
+
+		View::table(
+			[
+				'question' => __( 'Question', 'igbz-suite' ),
+				'correct'  => __( 'Answered correctly', 'igbz-suite' ),
+			],
+			$breakdown,
+			static fn ( array $row, string $col ): string => (string) $row[ $col ],
+			__( 'This quiz has no questions.', 'igbz-suite' )
+		);
+
+		echo '<h3>' . esc_html__( 'Attempts', 'igbz-suite' ) . '</h3>';
+		View::table(
+			[
+				'user'   => __( 'Student', 'igbz-suite' ),
+				'score'  => __( 'Score', 'igbz-suite' ),
+				'passed' => __( 'Passed', 'igbz-suite' ),
+				'when'   => __( 'Taken', 'igbz-suite' ),
+			],
+			$display,
+			static fn ( array $row, string $col ): string => (string) $row[ $col ],
+			__( 'Nobody has taken this quiz yet.', 'igbz-suite' )
+		);
+	}
+
 	private function render_enrollments( int $course_id ): void {
 		$db   = igbz()->db();
 		$rows = $db->results(
@@ -342,16 +518,33 @@ final class LmsPage {
 			$course_id
 		);
 
+		$slug = trim( igbz()->settings()->string( 'lms.certificate_slug', 'certificate' ), '/' );
+		$slug = '' !== $slug ? $slug : 'certificate';
+
 		$display = [];
 		foreach ( $rows as $row ) {
-			$user      = get_userdata( (int) $row['user_id'] );
+			$user = get_userdata( (int) $row['user_id'] );
+			$code = (string) $row['certificate_code'];
+
 			$display[] = [
 				'user'        => esc_html( $user ? $user->display_name : '#' . $row['user_id'] ),
 				'progress'    => esc_html( $row['progress_percent'] . '%' ),
 				'completed'   => esc_html( (string) ( $row['completed_at'] ?? '—' ) ),
-				'certificate' => esc_html( (string) ( $row['certificate_code'] ?: '—' ) ),
+				'certificate' => '' !== $code
+					? sprintf(
+						'<a href="%1$s" target="_blank" rel="noreferrer noopener"><code>%2$s</code></a>',
+						esc_url( home_url( '/' . $slug . '/' . rawurlencode( $code ) ) ),
+						esc_html( $code )
+					)
+					: '—',
 				'expires'     => esc_html( (string) ( $row['expires_at'] ?? '—' ) ),
 				'created'     => esc_html( (string) $row['created_at'] ),
+				'actions'     => sprintf(
+					'<a class="button button-small" href="%1$s" onclick="return confirm(\'%2$s\')">%3$s</a>',
+					esc_url( wp_nonce_url( Menu::url( self::SLUG, [ 'course' => $course_id, 'revoke' => (int) $row['id'] ] ), 'igbz_lms_action' ) ),
+					esc_js( __( 'Remove this student\'s access to the course?', 'igbz-suite' ) ),
+					esc_html__( 'Revoke', 'igbz-suite' )
+				),
 			];
 		}
 
@@ -364,6 +557,7 @@ final class LmsPage {
 				'certificate' => __( 'Certificate', 'igbz-suite' ),
 				'expires'     => __( 'Access until', 'igbz-suite' ),
 				'created'     => __( 'Enrolled', 'igbz-suite' ),
+				'actions'     => __( 'Actions', 'igbz-suite' ),
 			],
 			$display,
 			static fn ( array $row, string $key ): string => (string) $row[ $key ],
@@ -477,6 +671,7 @@ final class LmsPage {
 				$this->lms()->save_quiz(
 					[
 						'course_id'          => $int( 'course_id' ),
+						'lesson_id'          => $int( 'lesson_id' ),
 						'tenant_id'          => $int( 'tenant_id' ),
 						'title'              => $text( 'title' ),
 						'questions'          => $questions,
@@ -498,9 +693,18 @@ final class LmsPage {
 
 	private function handle_get_actions(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
-		if ( ! isset( $_GET['delete_course'] ) && ! isset( $_GET['delete_lesson'] ) ) {
+		$actions = [ 'delete_course', 'delete_lesson', 'delete_quiz', 'revoke' ];
+		$present = false;
+		foreach ( $actions as $action ) {
+			if ( isset( $_GET[ $action ] ) ) {
+				$present = true;
+				break;
+			}
+		}
+		if ( ! $present ) {
 			return;
 		}
+
 		check_admin_referer( 'igbz_lms_action' );
 		Capabilities::require( Capabilities::MANAGE_LMS );
 
@@ -511,6 +715,25 @@ final class LmsPage {
 		if ( isset( $_GET['delete_lesson'] ) ) {
 			$this->lms()->delete_lesson( (int) $_GET['delete_lesson'] );
 			View::notice( __( 'Lesson deleted.', 'igbz-suite' ) );
+		}
+		if ( isset( $_GET['delete_quiz'] ) ) {
+			$quiz_id = (int) $_GET['delete_quiz'];
+			$db      = igbz()->db();
+			// The attempts go too. Keeping them would leave scores pointing at a quiz nobody can
+			// read, and they are the one thing a deleted quiz's results screen is built from.
+			$db->delete( 'quiz_attempts', [ 'quiz_id' => $quiz_id ] );
+			$db->delete( 'quizzes', [ 'id' => $quiz_id ] );
+			View::notice( __( 'Quiz deleted.', 'igbz-suite' ) );
+		}
+		if ( isset( $_GET['revoke'] ) ) {
+			$enrollment_id = (int) $_GET['revoke'];
+			$db            = igbz()->db();
+			$row           = $db->row( 'SELECT course_id, user_id FROM ' . $db->table( 'enrollments' ) . ' WHERE id = %d', $enrollment_id );
+			if ( $row && $this->lms()->unenroll( (int) $row['course_id'], (int) $row['user_id'] ) ) {
+				View::notice( __( 'Access revoked.', 'igbz-suite' ) );
+			} else {
+				View::notice( __( 'That enrolment no longer exists.', 'igbz-suite' ), 'error' );
+			}
 		}
 		// phpcs:enable
 	}

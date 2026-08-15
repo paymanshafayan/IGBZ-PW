@@ -37,6 +37,75 @@
 .igbz-course-player .igbz-attachment { font-size: .9em; }
 .igbz-locked .button { margin-inline-start: 8px; }
 
+/* Quizzes ------------------------------------------------------------- */
+
+.igbz-quiz {
+	margin: 12px 0 0;
+	padding: 14px 16px;
+	border: 1px solid #e0e0e4;
+	border-radius: 10px;
+	background: #fafafb;
+}
+
+.igbz-quiz h4 { margin: 0 0 4px; font-size: 1em; }
+.igbz-quiz-rules { margin: 0 0 10px; font-size: .85em; opacity: .7; }
+.igbz-quiz-locked { margin: 8px 0 0; font-size: .9em; font-style: italic; opacity: .6; }
+.igbz-quiz-exhausted { margin: 0; font-size: .9em; opacity: .75; }
+
+.igbz-quiz-result {
+	margin: 0 0 10px;
+	padding: 8px 12px;
+	border-radius: 8px;
+	font-weight: 600;
+	font-size: .92em;
+}
+
+.igbz-quiz-result.igbz-pass { background: #edfaef; color: #00713a; }
+.igbz-quiz-result.igbz-fail { background: #fcf6e6; color: #8a6116; }
+
+.igbz-quiz-error {
+	margin: 0 0 10px;
+	padding: 8px 12px;
+	border-radius: 8px;
+	background: #fcf0f1;
+	color: #a02729;
+	font-size: .92em;
+}
+
+.igbz-quiz-question {
+	margin: 0 0 14px;
+	padding: 0;
+	border: 0;
+}
+
+.igbz-quiz-question legend { padding: 0; font-weight: 600; margin-bottom: 6px; }
+
+.igbz-quiz-question label {
+	display: block;
+	margin: 0 0 4px;
+	padding: 6px 10px;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+.igbz-quiz-question label:hover { background: #f0f0f1; }
+.igbz-quiz-question input { margin-inline-end: 8px; }
+
+.igbz-course-exam { margin-top: 24px; }
+.igbz-course-exam h3 { margin: 0 0 8px; }
+
+.igbz-certificate-panel {
+	margin-top: 26px;
+	padding: 18px 20px;
+	border: 1px solid #c8e6cd;
+	border-radius: 10px;
+	background: #f3fbf5;
+}
+
+.igbz-certificate-panel h3 { margin: 0 0 6px; }
+.igbz-certificate-panel p { margin: 0 0 10px; }
+.igbz-certificate-panel code { background: #fff; padding: 4px 10px; border-radius: 6px; font-size: 1.05em; }
+
 .igbz-plan-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));

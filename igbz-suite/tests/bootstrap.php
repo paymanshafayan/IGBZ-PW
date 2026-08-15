@@ -226,6 +226,17 @@ function sanitize_textarea_field( string $value ): string {
 	return trim( $value );
 }
 
+/**
+ * A deliberately narrow stand-in for wp_kses_post().
+ *
+ * The real one allows post markup and strips everything else — most importantly form controls,
+ * which is how a VIP share page once lost its buttons. Modelling that one rule keeps the double
+ * honest about the thing that actually bit us, without dragging in the KSES tables.
+ */
+function wp_kses_post( string $value ): string {
+	return (string) preg_replace( '#<(/?)(form|input|button|select|option|textarea|fieldset|legend|label)\b[^>]*>#i', '', $value );
+}
+
 function wp_strip_all_tags( string $value ): string {
 	return trim( strip_tags( $value ) );
 }

@@ -45,7 +45,7 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 ```bash
 bash _devenv/setup.sh     # build (~30s if npm is warm)
 bash _devenv/run.sh       # site on http://127.0.0.1:9400, auto-logged-in as admin
-bash _devenv/test.sh      # 391 assertions + syntax check on 115 files
+bash _devenv/test.sh      # 843 assertions + syntax check on 156 files
 ```
 
 `_devenv/` contains committed WordPress and WooCommerce zips precisely because **`/tmp` is wiped
@@ -126,10 +126,10 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 `igbz-ig-intake`, `igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`,
 `igbz-vip`, `igbz-hub`, `igbz-mobile-api`.
 
-**REST**: `igbz/v1` (91 routes — 14 `/intake/*`, 29 `/vip/*`) and `igbz-hub/v1` (14 routes).
+**REST**: `igbz/v1` (94 routes — 14 `/intake/*`, 29 `/vip/*`) and `igbz-hub/v1` (14 routes).
 
-**Schema**: 43 tables in `src/Support/Schema.php` (DB version 10; `ig_intake` added in v8, the nine
-`vip_*` tables in v10). All carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`,
+**Schema**: 43 tables in `src/Support/Schema.php` (DB version 11; `ig_intake` added in v8, the nine
+`vip_*` tables in v10; v11 adds no tables — it is the LMS quiz/certificate wiring). All carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`,
 `plans`, `logs`, `jobs`, `lesson_progress`, `vip_post_likes`, `vip_post_views`. Product/order
 tenant scoping uses the meta key `_igbz_tenant_id`.
 
@@ -191,7 +191,7 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 798 assertions in 17 test cases; 154 files lint clean.
+- 843 assertions in 18 test cases; 156 files lint clean.
 - 18/18 admin screens return 200 with no notices; 42/42 tables; 3 cron hooks scheduled.
 - All six payment gateways register with WooCommerce and their settings screens render.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
@@ -515,6 +515,82 @@ expiry ride the five-minute cron (`publish_due()` / `expire_due()`), with a "Run
 admin screen for when you do not want to wait. `tests/VipChannelTest.php` covers 21 scenarios
 against an in-memory `VipDb` double; as everywhere else in this suite, module container bindings are
 not registered in the harness, so it builds the service graph by hand.
+
+### Quizzes, certificates and refunds (DB v11)
+
+Three things in the LMS were built but never connected. They are connected now, and the
+connections are load-bearing — read this before touching `LmsService`.
+
+**Quizzes had no delivery surface.** `submit_quiz()` existed, graded correctly, and had *no
+caller anywhere*. Quizzes could be authored in the admin and no learner could ever reach one.
+There are now two surfaces, and they share every rule because the rules live in the service:
+
+- `[igbz_course]` renders each quiz under its lesson (`quizzes.lesson_id`), or after the lesson
+  list as the final assessment when `lesson_id = 0`.
+- `GET /account/courses/{id}/quizzes` and `POST /account/quizzes/{id}/submit` for the app.
+
+The one invariant: **`questions_for_client()` is the only sanctioned way to get a quiz out of the
+database and towards a client.** The raw `questions` column contains the answer key, so anything
+that hands the column to a template or a REST response is a leak. It also normalises the two
+question shapes the admin JSON box accepts (`q` or `question`) and flags list answers as
+`multiple` so the form knows to draw checkboxes.
+
+`submit_quiz()` checks enrollment itself rather than trusting its callers — three surfaces
+applying the same rule is a rule applied in two. Attempt limits are a *ceiling*, not a default:
+`lms.max_quiz_attempts` caps whatever the quiz asks for, so a course author cannot type 99 into
+the form and hand themselves unlimited retries. A quiz may be stricter, never more generous.
+`pass_score` falls back quiz → course → `lms.pass_score`, because a quiz saved with an empty box
+stored 0, and `$score >= 0` passed a blank answer sheet.
+
+**`lms.certificate_enabled` did nothing.** It was written by the settings screen and read by no
+code, and `refresh_progress()` minted a certificate the moment progress hit 100% — so a student
+who scrubbed to the end of every video and failed every quiz got one. A certificate now needs all
+of: every lesson done, **every quiz on the course passed**, the course's own box ticked, and the
+site setting on. `maybe_issue_certificate()` runs on every `refresh_progress()` *and* after a
+passing submission, because passing the last quiz is frequently the event that earns it — and it
+returns the existing code when there is one, so re-opening the page cannot mint a second.
+
+Certificates are verifiable at `/{lms.certificate_slug}/{CODE}` (`Lms/CertificatePage.php`), built
+on the same rewrite-rule pattern as `VipLandingPage` — `add_rewrite_rule` on `init`, a `query_vars`
+filter, a `template_redirect` responder and a `?igbz_certificate=` fallback for plain permalinks.
+An unknown code returns **404, not a friendly 200**: a verification tool that answers "no" with a
+success status will eventually be scripted by somebody who only reads the status code.
+
+**A refund left the enrollment behind** — buy, watch, refund, keep, for free. `on_order_reversed()`
+now also calls `revoke_from_order()`, gated on `lms.revoke_on_refund`. Two details matter:
+
+- Revocation matches on `enrollments.order_id`, so refunding one order never touches a manual
+  enrollment or a second purchase of the same course.
+- **Partial refunds do not change the order status**, so the status hooks never fire for one.
+  `woocommerce_order_refunded` is hooked separately and checks
+  `get_qty_refunded_for_item() < 0` per line, so refunding the shipping on an order that also
+  contains a course does not cost the customer the course.
+
+The row is **deleted, not flagged**: `enrollments` has UNIQUE `(course_id, user_id)` and `enroll()`
+returns the existing id when it finds one, so a soft-deleted row would lock the customer out of
+ever buying the course again. `lesson_progress` is deliberately kept.
+
+The **v11 migration** withdraws certificates that the old rule issued but the new one would not —
+the code is cleared, the completion is not — and anyone who has in fact passed everything gets
+theirs back on their next visit. Withdrawing is the safe direction: a certificate wrongly issued
+is a claim we cannot stand behind, one wrongly withheld returns by itself. It is written as a read
+plus per-row updates rather than one correlated `UPDATE`, which has to survive the SQLite
+translator.
+
+`tests/LmsTest.php` covers 17 scenarios against an in-memory `LmsDb` double. Two of them are
+regressions from bugs the unit tests could not have caught and a live click-through did:
+
+- The post/redirect/get after grading used `wp_get_referer()`, which **returns `false` when the
+  referer equals the current URL** — exactly the case for a form that posts to itself. Every
+  submission landed the student on the home page. The destination is now passed in explicitly.
+- `Logger::info()` is `(channel, message, context)`; it was called with an array as the message
+  and fatalled the whole refund path. Nothing in the unit suite exercises the WooCommerce hook.
+
+A third live find was pre-existing: `save_course()` read `$data['level']` twice
+(`in_array( $data['level'] ?? 'beginner', … ) ? (string) $data['level'] : …`), so the coalesce
+satisfied the test and the cast then read a missing key, warning on every save that omitted a
+level. The harness gained a `wp_kses_post()` stand-in to test this — it models the one rule that
+has actually bitten us, that KSES strips form controls.
 
 ---
 

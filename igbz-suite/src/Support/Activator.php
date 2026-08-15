@@ -2,6 +2,7 @@
 namespace IGBZ\Suite\Support;
 
 use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
+use IGBZ\Suite\Modules\MultiTenant\Lms\LmsService;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -73,6 +74,56 @@ final class Activator {
 		}
 		if ( $from > 0 && $from < 10 ) {
 			self::migrate_to_v10();
+		}
+		if ( $from > 0 && $from < 11 ) {
+			self::migrate_to_v11();
+		}
+	}
+
+	/**
+	 * v11: quizzes reach learners, and certificates become verifiable.
+	 *
+	 * No schema change — the six LMS tables already had everything. What is new is a public route,
+	 * /{lms.certificate_slug}/{code}, so the rewrite cache has to be rebuilt for the same reason
+	 * v10 did it, and at the same late point on `init`.
+	 *
+	 * The back-fill is the interesting half. Until now `refresh_progress()` minted a certificate
+	 * the moment the last lesson was ticked, whatever the quizzes said, so sites upgrading may be
+	 * carrying certificates that were never earned. Those are withdrawn — the code is cleared, not
+	 * the completion — and any student who has in fact passed everything gets theirs re-issued on
+	 * their next visit, because `maybe_issue_certificate()` now runs on every refresh. Withdrawing
+	 * is the safe direction: a certificate wrongly issued is a claim we cannot stand behind, while
+	 * one wrongly withheld comes back by itself.
+	 */
+	private static function migrate_to_v11(): void {
+		add_action(
+			'init',
+			static function (): void {
+				flush_rewrite_rules( false );
+			},
+			99
+		);
+
+		$db          = new Db();
+		$enrollments = $db->table( 'enrollments' );
+
+		// Deliberately a read plus per-row updates rather than one UPDATE ... WHERE (correlated
+		// subquery): only certificates that exist need looking at, that set is small, and the
+		// subquery form has to survive the SQLite translator on Playground installs.
+		$rows = $db->results(
+			"SELECT id, course_id, user_id FROM {$enrollments} WHERE certificate_code <> %s",
+			''
+		);
+		if ( ! $rows ) {
+			return;
+		}
+
+		$lms = new LmsService( $db );
+		foreach ( $rows as $row ) {
+			if ( $lms->has_passed_required_quizzes( (int) $row['course_id'], (int) $row['user_id'] ) ) {
+				continue;
+			}
+			$db->update( 'enrollments', [ 'certificate_code' => '' ], [ 'id' => (int) $row['id'] ] );
 		}
 	}
 
@@ -368,6 +419,8 @@ final class Activator {
 			'lms.course_page_id'            => 0,
 			'lms.pass_score'                => 60,
 			'lms.certificate_enabled'       => true,
+			'lms.certificate_slug'          => 'certificate',
+			'lms.revoke_on_refund'          => true,
 			'vip.enabled'                   => true,
 			'vip.feed_page_size'            => 12,
 			'vip.default_expiry_days'       => 0,

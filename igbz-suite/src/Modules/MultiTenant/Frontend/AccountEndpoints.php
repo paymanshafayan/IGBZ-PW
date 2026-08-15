@@ -330,10 +330,12 @@ final class AccountEndpoints {
 				esc_html__( 'Continue', 'igbz-suite' )
 			);
 			if ( ! empty( $enrollment['certificate_code'] ) ) {
+				$code = (string) $enrollment['certificate_code'];
 				printf(
-					'<p class="igbz-certificate">%1$s <code>%2$s</code></p>',
+					'<p class="igbz-certificate">%1$s <a href="%2$s"><code>%3$s</code></a></p>',
 					esc_html__( 'Certificate:', 'igbz-suite' ),
-					esc_html( (string) $enrollment['certificate_code'] )
+					esc_url( $this->certificate_url( $code ) ),
+					esc_html( $code )
 				);
 			}
 			echo '</article>';
@@ -345,6 +347,11 @@ final class AccountEndpoints {
 		$page_id = (int) igbz()->settings()->get( 'lms.course_page_id', 0 );
 		$base    = $page_id > 0 ? get_permalink( $page_id ) : home_url( '/' );
 		return add_query_arg( 'igbz_course', $slug, $base ?: home_url( '/' ) );
+	}
+
+	private function certificate_url( string $code ): string {
+		$slug = trim( igbz()->settings()->string( 'lms.certificate_slug', 'certificate' ), '/' );
+		return home_url( '/' . ( '' !== $slug ? $slug : 'certificate' ) . '/' . rawurlencode( $code ) );
 	}
 
 	// ---------------------------------------------------------------- affiliate

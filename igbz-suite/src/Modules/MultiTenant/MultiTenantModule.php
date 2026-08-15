@@ -57,6 +57,10 @@ final class MultiTenantModule implements ModuleInterface {
 		add_action( 'woocommerce_order_status_processing', [ $this, 'on_order_completed' ] );
 		add_action( 'woocommerce_order_status_refunded', [ $this, 'on_order_reversed' ] );
 		add_action( 'woocommerce_order_status_cancelled', [ $this, 'on_order_reversed' ] );
+		add_action( 'woocommerce_order_status_failed', [ $this, 'on_order_reversed' ] );
+		// A partial refund never changes the order status, so the status hooks above never fire
+		// for one. Refunding a course line item out of a mixed order has to revoke that course.
+		add_action( 'woocommerce_order_refunded', [ $this, 'on_order_partially_refunded' ], 10, 2 );
 		add_action( 'woocommerce_checkout_order_created', [ $this, 'stamp_tenant_on_order' ] );
 		add_action( 'user_register', [ $this, 'on_user_register' ] );
 
@@ -77,6 +81,8 @@ final class MultiTenantModule implements ModuleInterface {
 
 		( new Frontend\AccountEndpoints() )->register();
 		( new Frontend\ShortCodes() )->register();
+
+		( new Lms\CertificatePage( $plugin->get( 'lms' ), $plugin->settings() ) )->register();
 	}
 
 	private function bind_services( Plugin $plugin ): void {
@@ -191,9 +197,94 @@ final class MultiTenantModule implements ModuleInterface {
 		$this->maybe_cashback( $order_id );
 	}
 
-	/** @param int $order_id */
+	/**
+	 * A refunded, cancelled or failed order: take back everything it granted.
+	 *
+	 * The commission was always voided here. Course access was not, so a customer could buy a
+	 * course, watch it, ask for a refund and keep it — the enrollment row outlived the order that
+	 * paid for it and nothing ever looked at it again.
+	 *
+	 * @param int $order_id
+	 */
 	public function on_order_reversed( $order_id ): void {
-		igbz()->get( 'affiliate' )->void_order_commission( (int) $order_id );
+		$order_id = (int) $order_id;
+
+		igbz()->get( 'affiliate' )->void_order_commission( $order_id );
+
+		if ( igbz()->settings()->bool( 'lms.enabled', true ) && igbz()->settings()->bool( 'lms.revoke_on_refund', true ) ) {
+			$revoked = igbz()->get( 'lms' )->revoke_from_order( $order_id );
+			if ( $revoked > 0 ) {
+				igbz()->logger()->info(
+					'lms',
+					sprintf( 'revoked %d enrollment(s) for reversed order %d', $revoked, $order_id ),
+					[ 'order_id' => $order_id, 'count' => $revoked ]
+				);
+			}
+		}
+	}
+
+	/**
+	 * A partial refund: revoke only the courses whose line items were actually refunded.
+	 *
+	 * WooCommerce records a refund as a child order holding negative quantities, so "was this
+	 * line refunded?" is `get_qty_refunded_for_item() < 0`. Refunding the shipping on an order
+	 * that also contains a course must not cost the customer the course.
+	 *
+	 * @param int $order_id
+	 * @param int $refund_id
+	 */
+	public function on_order_partially_refunded( $order_id, $refund_id ): void {
+		$order_id = (int) $order_id;
+
+		if ( ! igbz()->settings()->bool( 'lms.enabled', true ) || ! igbz()->settings()->bool( 'lms.revoke_on_refund', true ) ) {
+			return;
+		}
+
+		$order = wc_get_order( $order_id );
+		if ( ! $order ) {
+			return;
+		}
+
+		// A full refund flips the status too, and that path already revokes everything; letting
+		// both run would double-log the same revocation.
+		if ( $order->has_status( [ 'refunded', 'cancelled', 'failed' ] ) ) {
+			return;
+		}
+
+		$user_id = (int) $order->get_customer_id();
+		if ( $user_id <= 0 ) {
+			return;
+		}
+
+		/** @var LmsService $lms */
+		$lms = igbz()->get( 'lms' );
+
+		foreach ( $order->get_items() as $item_id => $item ) {
+			if ( ! $item instanceof \WC_Order_Item_Product ) {
+				continue;
+			}
+			if ( (float) $order->get_qty_refunded_for_item( (int) $item_id ) >= 0 ) {
+				continue;
+			}
+
+			$course = $lms->course_by_product( $item->get_product_id() );
+			if ( ! $course ) {
+				continue;
+			}
+
+			$enrollment = $lms->enrollment( (int) $course['id'], $user_id );
+			// Only the access this order granted; a second purchase or a manual enrollment stands.
+			if ( ! $enrollment || (int) $enrollment['order_id'] !== $order_id ) {
+				continue;
+			}
+
+			$lms->unenroll( (int) $course['id'], $user_id );
+			igbz()->logger()->info(
+				'lms',
+				sprintf( 'revoked course %d for user %d after a partial refund on order %d', (int) $course['id'], $user_id, $order_id ),
+				[ 'order_id' => $order_id, 'refund_id' => (int) $refund_id, 'course_id' => (int) $course['id'], 'user_id' => $user_id ]
+			);
+		}
 	}
 
 	private function maybe_cashback( int $order_id ): void {

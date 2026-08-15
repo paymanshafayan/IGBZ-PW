@@ -142,6 +142,12 @@ final class ShortCodes {
 		$enrolled = $user_id > 0 && $lms->is_enrolled( (int) $course['id'], $user_id );
 		$lessons  = $lms->lessons( (int) $course['id'] );
 
+		// Grading happens before any output: a submission redirects (post/redirect/get) so a
+		// refresh cannot re-submit the same answers and burn a second attempt.
+		$result = $enrolled
+			? $this->maybe_grade_quiz( $lms, (int) $course['id'], $user_id, $this->course_url( (string) $course['slug'] ) )
+			: null;
+
 		ob_start();
 		echo '<div class="igbz-course-player">';
 		printf( '<h2>%s</h2>', esc_html( (string) $course['title'] ) );
@@ -162,6 +168,13 @@ final class ShortCodes {
 					)
 					: ''
 			);
+		}
+
+		// Grouped by lesson_id up front so the loop below does not run a query per lesson;
+		// lesson_id 0 means the quiz belongs to the course as a whole.
+		$lesson_quizzes = [];
+		foreach ( $lms->quizzes( (int) $course['id'] ) as $quiz ) {
+			$lesson_quizzes[ (int) $quiz['lesson_id'] ][] = $quiz;
 		}
 
 		echo '<ol class="igbz-lesson-list">';
@@ -198,11 +211,313 @@ final class ShortCodes {
 					esc_html__( 'Download attachment', 'igbz-suite' )
 				);
 			}
+			// Gated on enrollment, not on $open: a free-preview lesson is a sample of the teaching,
+			// not of the assessment, and submit_quiz() would refuse the answers anyway.
+			$this->render_quizzes( $lms, $lesson_quizzes[ (int) $lesson['id'] ] ?? [], $user_id, $enrolled, $result );
+
 			echo '</li>';
 		}
-		echo '</ol></div>';
+		echo '</ol>';
+
+		// Quizzes that belong to the course rather than to one lesson — the final exam.
+		if ( ! empty( $lesson_quizzes[0] ) ) {
+			echo '<div class="igbz-course-exam">';
+			printf( '<h3>%s</h3>', esc_html__( 'Course assessment', 'igbz-suite' ) );
+			$this->render_quizzes( $lms, $lesson_quizzes[0], $user_id, $enrolled, $result );
+			echo '</div>';
+		}
+
+		$this->render_certificate( $lms, (int) $course['id'], $user_id, $enrolled );
+
+		echo '</div>';
 
 		return (string) ob_get_clean();
+	}
+
+	// ------------------------------------------------------------- quizzes
+
+	/**
+	 * Grade a submitted quiz, then redirect.
+	 *
+	 * The redirect is the point. Grading on POST and rendering the same request would mean a
+	 * browser refresh re-posts the answers, and since every submission consumes an attempt the
+	 * student would lose one to a stray F5. The outcome is parked in a transient keyed by user
+	 * and quiz, read once on the way back.
+	 *
+	 * @param string $back Where to send the student afterwards. Passed in rather than derived from
+	 *                     wp_get_referer(), which returns false when the referer matches the
+	 *                     current URL — exactly the case for a form that posts to itself, and the
+	 *                     reason the first version of this dropped everybody on the home page.
+	 * @return array{quiz_id:int,score:int,passed:bool,remaining:int,error:string}|null
+	 */
+	private function maybe_grade_quiz( LmsService $lms, int $course_id, int $user_id, string $back ): ?array {
+		$key = 'igbz_quiz_result_' . $user_id;
+
+		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) || ! isset( $_POST['igbz_quiz_id'] ) ) {
+			$stored = get_transient( $key );
+			if ( is_array( $stored ) ) {
+				delete_transient( $key );
+				return $stored;
+			}
+			return null;
+		}
+
+		$quiz_id = (int) $_POST['igbz_quiz_id']; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+
+		$nonce = isset( $_POST['_igbz_quiz_nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['_igbz_quiz_nonce'] ) ) : '';
+		if ( ! wp_verify_nonce( $nonce, 'igbz_submit_quiz_' . $quiz_id ) ) {
+			$this->store_quiz_result( $key, $back, $quiz_id, 0, false, 0, __( 'Your session expired. Please try again.', 'igbz-suite' ) );
+		}
+
+		$quiz = $lms->quiz( $quiz_id );
+		// The quiz must belong to the course being displayed, or a student enrolled on one course
+		// could post an answer sheet for a quiz on another.
+		if ( ! $quiz || (int) $quiz['course_id'] !== $course_id ) {
+			$this->store_quiz_result( $key, $back, $quiz_id, 0, false, 0, __( 'Quiz not found.', 'igbz-suite' ) );
+		}
+
+		$answers = [];
+		if ( isset( $_POST['igbz_answers'] ) && is_array( $_POST['igbz_answers'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+			// Sanitised by hand: an answer is either a scalar or a list of scalars, and
+			// sanitize_text_field() on an array returns an empty string.
+			foreach ( wp_unslash( $_POST['igbz_answers'] ) as $question => $given ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+				$question = sanitize_text_field( (string) $question );
+				$answers[ $question ] = is_array( $given )
+					? array_map( 'sanitize_text_field', array_map( 'strval', $given ) )
+					: sanitize_text_field( (string) $given );
+			}
+		}
+
+		try {
+			$graded = $lms->submit_quiz( $quiz_id, $user_id, $answers );
+		} catch ( \RuntimeException $e ) {
+			$this->store_quiz_result( $key, $back, $quiz_id, 0, false, 0, $e->getMessage() );
+			return null; // Unreachable: store_quiz_result() redirects.
+		}
+
+		$this->store_quiz_result(
+			$key,
+			$back,
+			$quiz_id,
+			(int) $graded['score'],
+			(bool) $graded['passed'],
+			(int) $graded['remaining_attempts'],
+			''
+		);
+
+		return null; // Unreachable.
+	}
+
+	/** Park the outcome and bounce back to the player. Never returns. */
+	private function store_quiz_result( string $key, string $back, int $quiz_id, int $score, bool $passed, int $remaining, string $error ): void {
+		set_transient(
+			$key,
+			[
+				'quiz_id'   => $quiz_id,
+				'score'     => $score,
+				'passed'    => $passed,
+				'remaining' => $remaining,
+				'error'     => $error,
+			],
+			MINUTE_IN_SECONDS
+		);
+
+		wp_safe_redirect( '' !== $back ? $back : home_url( '/' ) );
+		exit;
+	}
+
+	/**
+	 * @param array<int,array<string,mixed>> $quizzes
+	 * @param array{quiz_id:int,score:int,passed:bool,remaining:int,error:string}|null $result
+	 */
+	private function render_quizzes( LmsService $lms, array $quizzes, int $user_id, bool $open, ?array $result ): void {
+		foreach ( $quizzes as $quiz ) {
+			if ( ! $open ) {
+				// A locked lesson still says a quiz is there — it is part of what the course is
+				// selling — but shows none of it.
+				printf(
+					'<p class="igbz-quiz-locked">%s</p>',
+					esc_html(
+						sprintf(
+							/* translators: %s: quiz title */
+							__( 'Quiz: %s (enrol to take it)', 'igbz-suite' ),
+							(string) $quiz['title']
+						)
+					)
+				);
+				continue;
+			}
+
+			$this->render_quiz( $lms->quiz_for_user( $quiz, $user_id ), $result );
+		}
+	}
+
+	/**
+	 * @param array<string,mixed> $quiz
+	 * @param array{quiz_id:int,score:int,passed:bool,remaining:int,error:string}|null $result
+	 */
+	private function render_quiz( array $quiz, ?array $result ): void {
+		$quiz_id = (int) $quiz['id'];
+		$mine    = $result && (int) $result['quiz_id'] === $quiz_id ? $result : null;
+
+		echo '<div class="igbz-quiz">';
+		printf( '<h4>%s</h4>', esc_html( (string) $quiz['title'] ) );
+
+		printf(
+			'<p class="igbz-quiz-rules">%s</p>',
+			esc_html( $this->quiz_rules( $quiz ) )
+		);
+
+		if ( $mine && '' !== $mine['error'] ) {
+			printf( '<p class="igbz-quiz-error">%s</p>', esc_html( (string) $mine['error'] ) );
+		} elseif ( $mine ) {
+			printf(
+				'<p class="igbz-quiz-result %1$s">%2$s</p>',
+				esc_attr( $mine['passed'] ? 'igbz-pass' : 'igbz-fail' ),
+				esc_html(
+					$mine['passed']
+						? sprintf(
+							/* translators: %d: score percentage */
+							__( 'Passed with %d%%.', 'igbz-suite' ),
+							(int) $mine['score']
+						)
+						: sprintf(
+							/* translators: %d: score percentage */
+							__( 'Scored %d%% — not a pass this time.', 'igbz-suite' ),
+							(int) $mine['score']
+						)
+				)
+			);
+		} elseif ( null !== $quiz['best_score'] ) {
+			printf(
+				'<p class="igbz-quiz-result %1$s">%2$s</p>',
+				esc_attr( $quiz['passed'] ? 'igbz-pass' : 'igbz-fail' ),
+				esc_html(
+					sprintf(
+						/* translators: %d: score percentage */
+						$quiz['passed'] ? __( 'Passed — best score %d%%.', 'igbz-suite' ) : __( 'Best score so far: %d%%.', 'igbz-suite' ),
+						(int) $quiz['best_score']
+					)
+				)
+			);
+		}
+
+		// A passed quiz is done; re-taking it can only make the record worse and would spend an
+		// attempt for nothing.
+		if ( $quiz['passed'] ) {
+			echo '</div>';
+			return;
+		}
+
+		if ( ! $quiz['can_attempt'] ) {
+			printf(
+				'<p class="igbz-quiz-exhausted">%s</p>',
+				esc_html__( 'You have used every attempt on this quiz. Contact the instructor if you need another.', 'igbz-suite' )
+			);
+			echo '</div>';
+			return;
+		}
+
+		if ( ! $quiz['questions'] ) {
+			printf( '<p class="igbz-empty">%s</p>', esc_html__( 'This quiz has no questions yet.', 'igbz-suite' ) );
+			echo '</div>';
+			return;
+		}
+
+		echo '<form method="post" class="igbz-quiz-form">';
+		wp_nonce_field( 'igbz_submit_quiz_' . $quiz_id, '_igbz_quiz_nonce' );
+		printf( '<input type="hidden" name="igbz_quiz_id" value="%d" />', $quiz_id );
+
+		foreach ( $quiz['questions'] as $index => $question ) {
+			$name = 'igbz_answers[' . $question['id'] . ']' . ( $question['multiple'] ? '[]' : '' );
+
+			echo '<fieldset class="igbz-quiz-question">';
+			printf( '<legend>%1$d. %2$s</legend>', (int) $index + 1, esc_html( $question['question'] ) );
+
+			foreach ( $question['options'] as $value => $label ) {
+				$field_id = sprintf( 'igbz-q%1$d-%2$s-%3$d', $quiz_id, preg_replace( '/[^A-Za-z0-9_-]/', '', (string) $question['id'] ), (int) $value );
+				printf(
+					'<label for="%1$s"><input type="%2$s" id="%1$s" name="%3$s" value="%4$d" /> %5$s</label>',
+					esc_attr( $field_id ),
+					$question['multiple'] ? 'checkbox' : 'radio',
+					esc_attr( $name ),
+					(int) $value,
+					esc_html( $label )
+				);
+			}
+
+			echo '</fieldset>';
+		}
+
+		printf( '<button type="submit" class="button">%s</button>', esc_html__( 'Submit answers', 'igbz-suite' ) );
+		echo '</form></div>';
+	}
+
+	/** @param array<string,mixed> $quiz */
+	private function quiz_rules( array $quiz ): string {
+		$parts = [
+			sprintf(
+				/* translators: %d: percentage */
+				__( 'Pass mark %d%%', 'igbz-suite' ),
+				(int) $quiz['pass_score']
+			),
+		];
+
+		$parts[] = LmsService::ATTEMPTS_UNLIMITED === $quiz['remaining_attempts']
+			? __( 'unlimited attempts', 'igbz-suite' )
+			: sprintf(
+				/* translators: %d: number of attempts */
+				_n( '%d attempt left', '%d attempts left', (int) $quiz['remaining_attempts'], 'igbz-suite' ),
+				(int) $quiz['remaining_attempts']
+			);
+
+		if ( (int) $quiz['time_limit'] > 0 ) {
+			$parts[] = sprintf(
+				/* translators: %d: minutes */
+				__( '%d minute limit', 'igbz-suite' ),
+				(int) $quiz['time_limit']
+			);
+		}
+
+		return implode( ' · ', $parts );
+	}
+
+	// --------------------------------------------------------- certificate
+
+	private function render_certificate( LmsService $lms, int $course_id, int $user_id, bool $enrolled ): void {
+		if ( ! $enrolled || ! $lms->certificates_enabled() ) {
+			return;
+		}
+
+		$enrollment = $lms->enrollment( $course_id, $user_id );
+		if ( ! $enrollment ) {
+			return;
+		}
+
+		$code = (string) $enrollment['certificate_code'];
+		if ( '' === $code ) {
+			// Re-check: the student may have just passed the last quiz, or finished the lessons
+			// on a site where certificates were switched on after the fact.
+			$code = $lms->maybe_issue_certificate( (int) $enrollment['id'] );
+		}
+
+		if ( '' === $code ) {
+			return;
+		}
+
+		printf(
+			'<div class="igbz-certificate-panel"><h3>%1$s</h3><p>%2$s</p><p><code>%3$s</code></p><p><a class="button" href="%4$s">%5$s</a></p></div>',
+			esc_html__( 'Your certificate', 'igbz-suite' ),
+			esc_html__( 'You have completed this course. Anyone can confirm the certificate at the address below.', 'igbz-suite' ),
+			esc_html( $code ),
+			esc_url( $this->certificate_url( $code ) ),
+			esc_html__( 'View and verify', 'igbz-suite' )
+		);
+	}
+
+	private function certificate_url( string $code ): string {
+		$slug = trim( igbz()->settings()->string( 'lms.certificate_slug', 'certificate' ), '/' );
+		return home_url( '/' . ( '' !== $slug ? $slug : 'certificate' ) . '/' . rawurlencode( $code ) );
 	}
 
 	private function course_url( string $slug ): string {

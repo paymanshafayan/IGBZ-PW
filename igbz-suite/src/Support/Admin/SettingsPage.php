@@ -191,7 +191,14 @@ final class SettingsPage {
 					[ 'key' => 'lms.video_link_ttl', 'label' => __( 'Signed video link TTL (seconds)', 'igbz-suite' ), 'type' => 'number', 'min' => 60, 'max' => 86400 ],
 					[ 'key' => 'lms.max_quiz_attempts', 'label' => __( 'Maximum quiz attempts', 'igbz-suite' ), 'type' => 'number', 'min' => 1, 'max' => 50 ],
 					[ 'key' => 'lms.pass_score', 'label' => __( 'Pass score %', 'igbz-suite' ), 'type' => 'number', 'max' => 100 ],
-					[ 'key' => 'lms.certificate_enabled', 'label' => __( 'Issue certificates on completion', 'igbz-suite' ), 'type' => 'checkbox' ],
+					[ 'key' => 'lms.certificate_enabled', 'label' => __( 'Issue certificates on completion', 'igbz-suite' ), 'type' => 'checkbox', 'help' => __( 'A certificate is issued when every lesson is finished and every quiz on the course has been passed. The course must also have its own certificate box ticked.', 'igbz-suite' ) ],
+					[
+						'key'         => 'lms.certificate_slug',
+						'label'       => __( 'Certificate verification prefix', 'igbz-suite' ),
+						'placeholder' => 'certificate',
+						'help'        => __( 'Anyone can check a certificate at /certificate/IGBZ-XXXX. Change it and re-save your permalinks; codes already printed will stop resolving.', 'igbz-suite' ),
+					],
+					[ 'key' => 'lms.revoke_on_refund', 'label' => __( 'Revoke access when an order is refunded', 'igbz-suite' ), 'type' => 'checkbox', 'help' => __( 'Refunding or cancelling an order removes the enrolments it granted. Manual enrolments and access bought on another order are left alone.', 'igbz-suite' ) ],
 					[ 'key' => 'lms.course_page_id', 'label' => __( 'Course page id', 'igbz-suite' ), 'type' => 'number', 'max' => 99999999, 'help' => __( 'The page holding the [igbz_course] shortcode; used to build course links.', 'igbz-suite' ) ],
 					[
 						'key'   => 'lms.video_hmac_secret',

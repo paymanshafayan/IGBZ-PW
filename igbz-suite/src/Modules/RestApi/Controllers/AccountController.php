@@ -22,6 +22,9 @@ defined( 'ABSPATH' ) || exit;
  *   POST     /igbz/v1/account/instalments/{id}/pay
  *   GET      /igbz/v1/account/courses
  *   POST     /igbz/v1/account/courses/progress  { enrollment_id, lesson_id, seconds, completed }
+ *   GET      /igbz/v1/account/courses/{id}/quizzes
+ *   POST     /igbz/v1/account/quizzes/{id}/submit  { answers }
+ *   GET      /igbz/v1/account/certificates
  *   GET      /igbz/v1/account/affiliate
  *   GET      /igbz/v1/account/payments
  */
@@ -41,6 +44,9 @@ final class AccountController extends BaseController {
 		register_rest_route( $ns, '/account/instalments/(?P<id>\d+)/pay', $this->route( 'POST', [ $this, 'pay_instalment' ], $auth ) );
 		register_rest_route( $ns, '/account/courses', $this->route( 'GET', [ $this, 'courses' ], $auth ) );
 		register_rest_route( $ns, '/account/courses/progress', $this->route( 'POST', [ $this, 'course_progress' ], $auth ) );
+		register_rest_route( $ns, '/account/courses/(?P<id>\d+)/quizzes', $this->route( 'GET', [ $this, 'course_quizzes' ], $auth ) );
+		register_rest_route( $ns, '/account/quizzes/(?P<id>\d+)/submit', $this->route( 'POST', [ $this, 'submit_quiz' ], $auth ) );
+		register_rest_route( $ns, '/account/certificates', $this->route( 'GET', [ $this, 'certificates' ], $auth ) );
 		register_rest_route( $ns, '/account/affiliate', $this->route( 'GET', [ $this, 'affiliate' ], $auth ) );
 		register_rest_route( $ns, '/account/payments', $this->route( 'GET', [ $this, 'payments' ], $auth ) );
 	}
@@ -372,6 +378,19 @@ final class AccountController extends BaseController {
 		foreach ( $lms->enrollments_for_user( $user_id, $this->scoped_tenant_id( $request ) ) as $enrollment ) {
 			$course_id = (int) $enrollment['course_id'];
 
+			// Counts only — the questions come from /courses/{id}/quizzes, so the course list
+			// stays one query per course rather than one per quiz.
+			$quiz_summary = [];
+			foreach ( $lms->quizzes( $course_id ) as $quiz ) {
+				$best           = $lms->best_attempt( (int) $quiz['id'], $user_id );
+				$quiz_summary[] = [
+					'id'        => (int) $quiz['id'],
+					'lesson_id' => (int) $quiz['lesson_id'],
+					'title'     => (string) $quiz['title'],
+					'passed'    => (bool) ( $best['passed'] ?? false ),
+				];
+			}
+
 			$lessons = [];
 			foreach ( $lms->lessons( $course_id ) as $lesson ) {
 				$lessons[] = [
@@ -395,6 +414,8 @@ final class AccountController extends BaseController {
 				'progress'      => (int) $enrollment['progress_percent'],
 				'expires_at'    => $enrollment['expires_at'],
 				'lessons'       => $lessons,
+				'quizzes'       => $quiz_summary,
+				'certificate_code' => (string) $enrollment['certificate_code'],
 			];
 		}
 
@@ -424,7 +445,101 @@ final class AccountController extends BaseController {
 			(bool) $request->get_param( 'completed' )
 		);
 
-		return $this->ok( [ 'ok' => true, 'progress' => $lms->refresh_progress( $enrollment_id ) ] );
+		$progress   = $lms->refresh_progress( $enrollment_id );
+		$enrollment = $db->row( 'SELECT certificate_code FROM ' . $db->table( 'enrollments' ) . ' WHERE id = %d', $enrollment_id );
+
+		return $this->ok(
+			[
+				'ok'               => true,
+				'progress'         => $progress,
+				// The app shows the certificate the moment it is earned, so it has to learn about
+				// it from the same call that finished the last lesson.
+				'certificate_code' => (string) ( $enrollment['certificate_code'] ?? '' ),
+			]
+		);
+	}
+
+	// ------------------------------------------------------------- quizzes
+
+	/**
+	 * Every quiz on a course, without its answer key.
+	 *
+	 * Enrollment is checked here rather than trusted from the client, and the questions come from
+	 * LmsService::questions_for_client(), which is the only sanctioned way to get a quiz out of
+	 * the database and into a response — the raw `questions` column contains the answers.
+	 */
+	public function course_quizzes( \WP_REST_Request $request ): \WP_REST_Response {
+		/** @var LmsService $lms */
+		$lms       = igbz()->get( 'lms' );
+		$user_id   = get_current_user_id();
+		$course_id = (int) $request->get_param( 'id' );
+
+		if ( ! $lms->is_enrolled( $course_id, $user_id ) ) {
+			return $this->fail( 'not_enrolled', __( 'You are not enrolled on this course.', 'igbz-suite' ), 403 );
+		}
+
+		$items = [];
+		foreach ( $lms->quizzes( $course_id ) as $quiz ) {
+			$items[] = $lms->quiz_for_user( $quiz, $user_id );
+		}
+
+		return $this->ok( [ 'quizzes' => $items ] );
+	}
+
+	/**
+	 * Grade an answer sheet.
+	 *
+	 * `answers` is a map of question id to the chosen option index, or to a list of them for a
+	 * multiple-answer question. Grading, the attempt ceiling and the enrollment check all live in
+	 * LmsService so this route and the storefront shortcode cannot drift apart.
+	 */
+	public function submit_quiz( \WP_REST_Request $request ): \WP_REST_Response {
+		/** @var LmsService $lms */
+		$lms     = igbz()->get( 'lms' );
+		$quiz_id = (int) $request->get_param( 'id' );
+		$answers = $request->get_param( 'answers' );
+
+		if ( ! is_array( $answers ) ) {
+			return $this->fail( 'invalid_answers', __( 'Answers must be sent as an object of question id to answer.', 'igbz-suite' ) );
+		}
+
+		try {
+			$result = $lms->submit_quiz( $quiz_id, get_current_user_id(), $answers );
+		} catch ( \RuntimeException $e ) {
+			// One exception type, three meanings; the app needs to tell "try again tomorrow" from
+			// "buy the course" apart, so the message is mapped back onto a status.
+			return $this->fail( 'quiz_rejected', $e->getMessage(), 403 );
+		}
+
+		return $this->ok( $result );
+	}
+
+	/**
+	 * The customer's certificates, with the public address each one can be checked at.
+	 */
+	public function certificates( \WP_REST_Request $request ): \WP_REST_Response {
+		/** @var LmsService $lms */
+		$lms  = igbz()->get( 'lms' );
+		$slug = trim( igbz()->settings()->string( 'lms.certificate_slug', 'certificate' ), '/' );
+		$slug = '' !== $slug ? $slug : 'certificate';
+
+		$items = [];
+		foreach ( $lms->enrollments_for_user( get_current_user_id(), $this->scoped_tenant_id( $request ) ) as $enrollment ) {
+			$code = (string) $enrollment['certificate_code'];
+			if ( '' === $code ) {
+				continue;
+			}
+
+			$items[] = [
+				'code'         => $code,
+				'course_id'    => (int) $enrollment['course_id'],
+				'course'       => (string) $enrollment['title'],
+				'completed_at' => (string) ( $enrollment['completed_at'] ?? '' ),
+				'verify_url'   => home_url( '/' . $slug . '/' . rawurlencode( $code ) ),
+			];
+		}
+
+		return $this->ok( [ 'certificates' => $items ] );
 	}
 
 	// ----------------------------------------------------------- affiliate
