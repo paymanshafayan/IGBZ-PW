@@ -57,7 +57,6 @@ final class SchemaTest extends TestCase {
 		$unscoped = [
 			'plans',
 			'logs',
-			'jobs',
 			'tenant_domains',
 			'tenant_members',
 			'tenants',

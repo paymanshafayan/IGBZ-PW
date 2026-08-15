@@ -128,9 +128,10 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 
 **REST**: `igbz/v1` (94 routes — 14 `/intake/*`, 29 `/vip/*`) and `igbz-hub/v1` (14 routes).
 
-**Schema**: 43 tables in `src/Support/Schema.php` (DB version 11; `ig_intake` added in v8, the nine
-`vip_*` tables in v10; v11 adds no tables — it is the LMS quiz/certificate wiring). All carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`,
-`plans`, `logs`, `jobs`, `lesson_progress`, `vip_post_likes`, `vip_post_views`. Product/order
+**Schema**: 42 tables in `src/Support/Schema.php` (DB version 13; `ig_intake` added in v8, the nine
+`vip_*` tables in v10; v11 adds no tables — it is the LMS quiz/certificate wiring; v12 adds
+`ig_content.ig_shortcode` and relabels funnel rewards; v13 drops the never-used `jobs` queue). All carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`,
+`plans`, `logs`, `lesson_progress`, `vip_post_likes`, `vip_post_views`. Product/order
 tenant scoping uses the meta key `_igbz_tenant_id`.
 
 **Payments**: gateways `igbz_wallet`, `igbz_bnpl`, `igbz_zarinpal`, `igbz_idpay`, `igbz_nextpay`,

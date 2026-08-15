@@ -83,6 +83,32 @@ final class Activator {
 		if ( $from > 0 && $from < 12 ) {
 			self::migrate_to_v12();
 		}
+		if ( $from > 0 && $from < 13 ) {
+			self::migrate_to_v13();
+		}
+	}
+
+	/**
+	 * v13: drop the unused generic job queue.
+	 *
+	 * `jobs` was a general-purpose worker queue -- handler, payload, attempts, max_attempts,
+	 * available_at, reserved_at. Nothing ever wrote a row to it and no runner ever read one; the
+	 * only code that touched the table was the daily sweep deleting completed rows that could not
+	 * exist. Every background job in the plugin is already durable through a queue that models
+	 * its own work properly: ig_product_intake for intake, ig_content for generation and
+	 * publishing, ig_funnel_hits for delivery -- each with its own retry counter and last_error,
+	 * driven by the cron ticks. A second, emptier queue alongside them is a table an operator can
+	 * find, wonder about and mistake for a system that is running.
+	 *
+	 * Dropping rather than filling it in: a queue runner is only worth its failure modes once
+	 * something needs to enqueue, and nothing does. If a future subsystem wants one, it will want
+	 * columns chosen for that job anyway, and this DDL is in the history.
+	 */
+	private static function migrate_to_v13(): void {
+		$db = new Db();
+
+		// IF EXISTS keeps this a no-op on installs created after the table stopped being made.
+		$db->query( 'DROP TABLE IF EXISTS ' . $db->table( 'jobs' ) );
 	}
 
 	/**

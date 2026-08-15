@@ -60,7 +60,6 @@ final class Schema {
 			'vip_messages',
 			'api_tokens',
 			'devices',
-			'jobs',
 			'logs',
 		];
 	}
@@ -702,23 +701,6 @@ final class Schema {
 			UNIQUE KEY device (device_id),
 			KEY user_id (user_id),
 			KEY fcm_token (fcm_token(191))
-		) {$charset};";
-
-		$sql[] = "CREATE TABLE {$p}jobs (
-			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
-			queue VARCHAR(64) NOT NULL DEFAULT 'default',
-			handler VARCHAR(128) NOT NULL,
-			payload LONGTEXT NULL,
-			attempts INT NOT NULL DEFAULT 0,
-			max_attempts INT NOT NULL DEFAULT 5,
-			available_at DATETIME NOT NULL,
-			reserved_at DATETIME NULL,
-			completed_at DATETIME NULL,
-			last_error VARCHAR(500) NOT NULL DEFAULT '',
-			created_at DATETIME NOT NULL,
-			PRIMARY KEY  (id),
-			KEY dispatch (queue,completed_at,available_at)
 		) {$charset};";
 
 		// The VIP channel: a private Instagram-shaped feed inside our own app.

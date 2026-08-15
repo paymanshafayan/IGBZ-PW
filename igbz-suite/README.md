@@ -454,7 +454,7 @@ A module's services only exist while that module is enabled, so guard cross-modu
 `igbz()->has( 'wallet' )`.
 
 **Tenancy** is single-site with a `tenant_id` column, not WordPress Multisite. All 32 tables carry
-`tenant_id` except `tenants`, `tenant_domains`, `tenant_members`, `plans`, `jobs`, `logs`, and
+`tenant_id` except `tenants`, `tenant_domains`, `tenant_members`, `plans`, `logs`, and
 `lesson_progress` (which inherits scope through `enrollment_id`). Products and orders are scoped
 with the `_igbz_tenant_id` meta key, where `0` or absent means platform-shared.
 
