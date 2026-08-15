@@ -59,6 +59,11 @@ final class FxModule implements ModuleInterface {
 		$billing = $plugin->get( 'fx.billing' );
 		add_action( Cron::HOOK_DAILY, [ $billing, 'run_daily' ] );
 
+		// After the billing sweep, keep the payout card funded so the next
+		// sweep can spend it (Rial -> USDT -> card, via the exchange ramp).
+		$ramp = $plugin->get( 'fx.ramp' );
+		add_action( Cron::HOOK_DAILY, [ $ramp, 'ensure_card_funded' ], 20 );
+
 		( new FxPage() )->register();
 	}
 
@@ -97,6 +102,8 @@ final class FxModule implements ModuleInterface {
 				$c->logger()
 			)
 		);
+		$plugin->bind( 'fx.ramp', static fn ( Plugin $c ) => new FxRampService( $c->get( 'db' ), $c->settings(), $c->get( 'fx.payouts' ), $c->logger() ) );
+		$plugin->bind( 'fx.reports', static fn ( Plugin $c ) => new FxReportsService( $c->get( 'db' ) ) );
 	}
 
 	/** @return array<int,array{label:string,status:string,detail:string}> */

@@ -689,6 +689,18 @@ final class SettingsPage {
 					[ 'key' => 'fx.redotpay_api_key', 'label' => __( 'RedotPay API key', 'igbz-suite' ), 'type' => 'password' ],
 					[ 'key' => 'fx.redotpay_card_id', 'label' => __( 'RedotPay card id', 'igbz-suite' ) ],
 					[ 'key' => 'fx.redotpay_base_url', 'label' => __( 'RedotPay API base URL', 'igbz-suite' ), 'placeholder' => 'https://openapi.redotpay.com' ],
+					[ 'key' => 'fx.ramp_enabled', 'label' => __( 'Enable the automatic USDT on-ramp', 'igbz-suite' ), 'type' => 'checkbox', 'help' => __( 'Buys USDT with Rials from the configured Iranian exchange when the payout card runs low, then withdraws it to the card address. Off by default.', 'igbz-suite' ) ],
+					[ 'key' => 'fx.ramp_api_key', 'label' => __( 'Exchange API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'fx.ramp_base_url', 'label' => __( 'Exchange base URL', 'igbz-suite' ), 'placeholder' => 'https://api.nobitex.ir' ],
+					[ 'key' => 'fx.ramp_price_path', 'label' => __( 'Price path', 'igbz-suite' ), 'placeholder' => '/v2/otc/price' ],
+					[ 'key' => 'fx.ramp_price_json_path', 'label' => __( 'Price JSON path', 'igbz-suite' ), 'placeholder' => 'price' ],
+					[ 'key' => 'fx.ramp_buy_path', 'label' => __( 'Buy path', 'igbz-suite' ), 'placeholder' => '/v2/otc/orders/create' ],
+					[ 'key' => 'fx.ramp_withdraw_path', 'label' => __( 'Withdraw path', 'igbz-suite' ), 'placeholder' => '/v2/profile/wallets/withdraw' ],
+					[ 'key' => 'fx.ramp_auth_scheme', 'label' => __( 'Auth scheme', 'igbz-suite' ), 'placeholder' => 'Token' ],
+					[ 'key' => 'fx.ramp_usdt_deposit_address', 'label' => __( 'USDT deposit address (card)', 'igbz-suite' ), 'help' => __( 'TRC20 address of the payout card wallet.', 'igbz-suite' ) ],
+					[ 'key' => 'fx.ramp_min_card_balance', 'label' => __( 'Minimum card balance (USD)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 100000 ],
+					[ 'key' => 'fx.ramp_max_irt_per_run', 'label' => __( 'Max IRT per auto run (0 = uncapped)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 1000000000000 ],
+					[ 'key' => 'fx.ramp_manual_irt', 'label' => __( 'Manual buy amount (IRT)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 1000000000000, 'help' => __( 'Used by the "Buy USDT now" button on the FX screen, and as the fallback auto amount.', 'igbz-suite' ) ],
 				];
 
 			case 'advanced':

@@ -23,7 +23,9 @@ use IGBZ\Suite\Modules\Fx\FxBillingService;
 use IGBZ\Suite\Modules\Fx\FxMath;
 use IGBZ\Suite\Modules\Fx\FxMeter;
 use IGBZ\Suite\Modules\Fx\FxPayoutRegistry;
+use IGBZ\Suite\Modules\Fx\FxRampService;
 use IGBZ\Suite\Modules\Fx\FxRateService;
+use IGBZ\Suite\Modules\Fx\FxReportsService;
 use IGBZ\Suite\Modules\Fx\FxTopupService;
 use IGBZ\Suite\Modules\Fx\FxWalletService;
 use IGBZ\Suite\Modules\MultiTenant\Payments\PaymentService;
@@ -114,6 +116,15 @@ final class FxDb extends wpdb {
 
 		if ( 'fx_prices' === $table ) {
 			return array_values( $this->tables[ $table ] );
+		}
+
+		if ( 'fx_bills' === $table ) {
+			$rows = array_values( $this->tables[ $table ] );
+			if ( str_contains( $sql, 'tenant_id =' ) ) {
+				$tenant = self::int_of( 'tenant_id', $sql );
+				$rows   = array_values( array_filter( $rows, static fn ( $r ): bool => (int) $r['tenant_id'] === $tenant ) );
+			}
+			return $rows;
 		}
 
 		return parent::get_results( $sql, $output );
@@ -367,6 +378,9 @@ final class FxTest extends TestCase {
 		$this->test_the_pstnet_adapter_charges_and_reports_balance();
 		$this->test_the_redotpay_adapter_is_a_valid_pilot();
 		$this->test_manual_settlement_marks_the_bill_paid_and_debits();
+		$this->test_the_ramp_reads_the_price_and_reports_unpriced();
+		$this->test_the_ramp_disabled_returns_no_price();
+		$this->test_operator_report_aggregates_the_ledger();
 	}
 
 	public function test_the_fee_is_added_on_top_of_the_usd_amount(): void {
@@ -618,5 +632,86 @@ final class FxTest extends TestCase {
 		$this->assert_same( FxBillingService::STATUS_PAID, $this->fxdb->tables['fx_bills'][ $bill_id ]['status'], 'the bill is marked paid' );
 		$this->assert_same( 5.0, $this->wallet()->balance( 7 )['balance_usd'], 'the wallet is debited the bill amount' );
 		$this->assert_same( 'manual:99', $this->fxdb->tables['fx_bills'][ $bill_id ]['payout_ref'], 'the payout ref names the operator' );
+	}
+
+	public function test_the_ramp_reads_the_price_and_reports_unpriced(): void {
+		$this->boot();
+		$settings = igbz()->settings();
+		$settings->set( 'fx.ramp_enabled', true );
+		$settings->set( 'fx.ramp_api_key', 'k-test' );
+		$settings->set( 'fx.ramp_base_url', 'https://api.nobitex.ir' );
+
+		igbz_test_queue_http( [ 'status' => 200, 'body' => wp_json_encode( [ 'status' => 'ok', 'price' => 92000 ] ) ] );
+
+		$ramp = new FxRampService( $this->db, $settings, new FxPayoutRegistry(), new Logger( $settings ) );
+
+		$this->assert_same( 92000.0, $ramp->usdt_price(), 'the ramp reads the live USDT price' );
+	}
+
+	public function test_the_ramp_disabled_returns_no_price(): void {
+		$this->boot();
+		$settings = igbz()->settings();
+		$settings->set( 'fx.ramp_enabled', false );
+
+		$ramp = new FxRampService( $this->db, $settings, new FxPayoutRegistry(), new Logger( $settings ) );
+
+		$this->assert_same( 0.0, $ramp->usdt_price(), 'a disabled ramp answers zero' );
+	}
+
+	public function test_operator_report_aggregates_the_ledger(): void {
+		$this->boot();
+
+		$this->fxdb->seed(
+			'fx_ledger',
+			[
+				'tenant_id' => 7, 'reason' => FxWalletService::REASON_TOPUP,
+				'reference' => 'payment:1', 'amount_usd' => 10, 'amount_irt' => 550000,
+				'meta' => wp_json_encode( [ 'fee_usd' => 1 ] ), 'created_at' => gmdate( 'Y-m-d 10:00:00' ),
+			]
+		);
+		$this->fxdb->seed(
+			'fx_ledger',
+			[
+				'tenant_id' => 7, 'reason' => FxWalletService::REASON_TASK,
+				'reference' => 'manus-task:1', 'amount_usd' => -0.5, 'amount_irt' => 0,
+				'meta' => '{}', 'created_at' => gmdate( 'Y-m-d 11:00:00' ),
+			]
+		);
+		$this->fxdb->seed(
+			'fx_ledger',
+			[
+				'tenant_id' => 0, 'reason' => FxRampService::REASON_RAMP,
+				'reference' => 'ramp:1', 'amount_usd' => 5, 'amount_irt' => 460000,
+				'meta' => '{}', 'created_at' => gmdate( 'Y-m-d 12:00:00' ),
+			]
+		);
+		$this->fxdb->seed(
+			'fx_ledger',
+			[
+				'tenant_id' => 7, 'reason' => FxWalletService::REASON_SUBSCRIPTION,
+				'reference' => 'bill:1', 'amount_usd' => -25, 'amount_irt' => 0,
+				'meta' => '{}', 'created_at' => gmdate( 'Y-m-d 13:00:00' ),
+			]
+		);
+		$this->fxdb->seed(
+			'fx_bills',
+			[
+				'tenant_id' => 7, 'fx_account_id' => 1, 'status' => FxBillingService::STATUS_PAID,
+				'amount_usd' => 25, 'period_start' => gmdate( 'Y-m-01' ), 'period_end' => gmdate( 'Y-m-t' ),
+				'created_at' => gmdate( 'Y-m-d 00:00:00' ),
+			]
+		);
+
+		$report = ( new FxReportsService( $this->db ) )->operator_summary();
+
+		$this->assert_same( 1, $report['topup_count'], 'one top-up counted' );
+		$this->assert_same( 10.0, $report['topups_usd'], 'top-up USD summed' );
+		$this->assert_same( 550000.0, $report['topups_irt'], 'top-up IRT summed' );
+		$this->assert_same( 1.0, $report['fees_usd'], 'the fee is read from the meta' );
+		$this->assert_same( 0.5, $report['task_spend_usd'], 'task spend is positive in the report' );
+		$this->assert_same( 25.0, $report['subscriptions_usd'], 'subscriptions summed' );
+		$this->assert_same( 460000.0, $report['ramp_irt'], 'ramp purchases summed' );
+		$this->assert_same( 1, $report['bills_paid'], 'one paid bill' );
+		$this->assert_same( 25.0, $report['bills_paid_usd'], 'paid bill USD summed' );
 	}
 }

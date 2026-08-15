@@ -48,6 +48,8 @@ final class FxPage {
 
 		$this->render_topup_form( $rate, $tenant );
 		$this->render_prices();
+		$this->render_ramp();
+		$this->render_reports();
 		$this->render_accounts( $tenant );
 		$this->render_bills( $tenant );
 		$this->render_ledger( $tenant );
@@ -121,6 +123,65 @@ final class FxPage {
 		echo '</tbody></table>';
 		submit_button( __( 'Save prices', 'igbz-suite' ) );
 		echo '</form>';
+	}
+
+	private function render_ramp(): void {
+		echo '<h2>' . esc_html__( 'USDT on-ramp', 'igbz-suite' ) . '</h2>';
+
+		$ramp    = igbz()->get( 'fx.ramp' );
+		$price   = $ramp->usdt_price();
+		$enabled = igbz()->settings()->bool( 'fx.ramp_enabled', false );
+
+		echo '<div class="igbz-cards">';
+		printf( '<div class="igbz-card"><strong>%1$s</strong><span>%2$s</span></div>', esc_html( $enabled ? __( 'on', 'igbz-suite' ) : __( 'off', 'igbz-suite' ) ), esc_html__( 'On-ramp', 'igbz-suite' ) );
+		printf( '<div class="igbz-card"><strong>%1$s</strong><span>%2$s</span></div>', esc_html( $price > 0 ? number_format( $price, 0 ) : '—' ), esc_html__( 'USDT price (IRT)', 'igbz-suite' ) );
+
+		$card = igbz()->get( 'fx.payouts' )->active();
+		if ( $card && $card->is_configured() ) {
+			printf( '<div class="igbz-card"><strong>%1$s</strong><span>%2$s</span></div>', esc_html( number_format( $card->card_balance(), 2 ) ), esc_html__( 'Card balance (USD)', 'igbz-suite' ) );
+		}
+		echo '</div>';
+
+		echo '<form method="post" style="max-width:420px">';
+		wp_nonce_field( 'igbz_fx_ramp' );
+		printf( '<input type="hidden" name="igbz_fx_action" value="ramp_buy" />' );
+		submit_button( __( 'Buy USDT now', 'igbz-suite' ), 'secondary', '', false );
+		echo '</form>';
+	}
+
+	private function render_reports(): void {
+		echo '<h2>' . esc_html__( 'Operator report', 'igbz-suite' ) . '</h2>';
+
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
+		$from = isset( $_GET['from'] ) ? sanitize_text_field( (string) $_GET['from'] ) : gmdate( 'Y-m-01' );
+		$to   = isset( $_GET['to'] ) ? sanitize_text_field( (string) $_GET['to'] ) : gmdate( 'Y-m-d' );
+		// phpcs:enable
+
+		echo '<form method="get" style="margin:12px 0">';
+		printf( '<input type="hidden" name="page" value="%s" />', esc_attr( self::SLUG ) );
+		printf( '<label>%s <input type="date" name="from" value="%s" /></label> ', esc_html__( 'From', 'igbz-suite' ), esc_attr( $from ) );
+		printf( '<label>%s <input type="date" name="to" value="%s" /></label> ', esc_html__( 'To', 'igbz-suite' ), esc_attr( $to ) );
+		submit_button( __( 'Show', 'igbz-suite' ), 'secondary', '', false );
+		echo '</form>';
+
+		$summary = igbz()->get( 'fx.reports' )->operator_summary( $from, $to );
+
+		echo '<table class="widefat striped"><tbody>';
+		foreach (
+			[
+				__( 'Top-ups (count / IRT / USD)', 'igbz-suite' ) => sprintf( '%d / %s / %s', $summary['topup_count'], number_format( $summary['topups_irt'], 0 ), number_format( $summary['topups_usd'], 2 ) ),
+				__( 'Top-up fees (USD)', 'igbz-suite' )   => number_format( $summary['fees_usd'], 2 ),
+				__( 'Manus task spend (USD)', 'igbz-suite' ) => number_format( $summary['task_spend_usd'], 2 ),
+				__( 'Subscriptions (USD)', 'igbz-suite' ) => number_format( $summary['subscriptions_usd'], 2 ),
+				__( 'Refunds (USD)', 'igbz-suite' )       => number_format( $summary['refunds_usd'], 2 ),
+				__( 'Ramp purchases (IRT)', 'igbz-suite' ) => number_format( $summary['ramp_irt'], 0 ),
+				__( 'Bills paid (count / USD)', 'igbz-suite' ) => sprintf( '%d / %s', $summary['bills_paid'], number_format( $summary['bills_paid_usd'], 2 ) ),
+				__( 'Bills unpaid', 'igbz-suite' )        => (string) $summary['bills_unpaid'],
+			] as $label => $value
+		) {
+			printf( '<tr><th scope="row">%1$s</th><td>%2$s</td></tr>', esc_html( $label ), esc_html( $value ) );
+		}
+		echo '</tbody></table>';
 	}
 
 	private function render_accounts( int $tenant ): void {
@@ -264,6 +325,14 @@ final class FxPage {
 
 			wp_safe_redirect( (string) $result['redirect_url'] );
 			exit;
+		}
+
+		if ( 'ramp_buy' === $action ) {
+			View::check_nonce( 'igbz_fx_ramp' );
+
+			$result = igbz()->get( 'fx.ramp' )->buy_now();
+			View::notice( $result['message'], $result['ok'] ? 'success' : 'error' );
+			return;
 		}
 
 		if ( 'manual_settle' === $action ) {
