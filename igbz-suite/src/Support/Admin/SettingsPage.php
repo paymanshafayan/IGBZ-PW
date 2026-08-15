@@ -681,7 +681,14 @@ final class SettingsPage {
 					[ 'key' => 'fx.rate_json_path', 'label' => __( 'Rate JSON path', 'igbz-suite' ), 'placeholder' => 'data.price', 'help' => __( 'Dotted path into the response; empty looks for price/rate/usdt/price_irt.', 'igbz-suite' ) ],
 					[ 'key' => 'fx.rate_manual', 'label' => __( 'Manual rate (IRT per USD)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'step' => 'any' ],
 					[ 'key' => 'fx.rate_cache_ttl', 'label' => __( 'Rate cache TTL (seconds)', 'igbz-suite' ), 'type' => 'number', 'min' => 60, 'max' => 86400 ],
-					[ 'key' => 'fx.payout_provider', 'label' => __( 'Payout adapter', 'igbz-suite' ), 'help' => __( 'Id of the automatic foreign-currency payout provider. Registered via igbz_register_fx_payout_providers.', 'igbz-suite' ) ],
+					[ 'key' => 'fx.payout_provider', 'label' => __( 'Payout adapter', 'igbz-suite' ), 'help' => __( 'Id of the automatic foreign-currency payout provider. Registered via igbz_register_fx_payout_providers. Options: pstnet, redotpay.', 'igbz-suite' ) ],
+					[ 'key' => 'fx.webhook_token', 'label' => __( 'Payout webhook token', 'igbz-suite' ), 'type' => 'password', 'help' => __( 'Shared secret the payout providers send to /igbz/v1/fx/payout-webhook/{provider}.', 'igbz-suite' ) ],
+					[ 'key' => 'fx.pstnet_api_key', 'label' => __( 'PST.NET API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'fx.pstnet_card_id', 'label' => __( 'PST.NET card id', 'igbz-suite' ) ],
+					[ 'key' => 'fx.pstnet_base_url', 'label' => __( 'PST.NET API base URL', 'igbz-suite' ), 'placeholder' => 'https://api.pst.net' ],
+					[ 'key' => 'fx.redotpay_api_key', 'label' => __( 'RedotPay API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'fx.redotpay_card_id', 'label' => __( 'RedotPay card id', 'igbz-suite' ) ],
+					[ 'key' => 'fx.redotpay_base_url', 'label' => __( 'RedotPay API base URL', 'igbz-suite' ), 'placeholder' => 'https://openapi.redotpay.com' ],
 				];
 
 			case 'advanced':

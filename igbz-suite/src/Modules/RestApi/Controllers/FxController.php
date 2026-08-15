@@ -26,6 +26,14 @@ final class FxController extends BaseController {
 		register_rest_route( $ns, '/fx/ledger', $this->route( 'GET', [ $this, 'ledger' ], $auth ) );
 		register_rest_route( $ns, '/fx/prices', $this->route( 'GET', [ $this, 'prices' ], $auth ) );
 		register_rest_route( $ns, '/fx/bills', $this->route( 'GET', [ $this, 'bills' ], $auth ) );
+
+		// Payout provider webhooks. The shared-secret check is the permission boundary: this
+		// route is reachable without a user session, so it must not use the tenant auth.
+		register_rest_route(
+			$ns,
+			'/fx/payout-webhook/(?P<provider>[a-z]+)',
+			$this->route( 'POST', [ $this, 'payout_webhook' ], [ $this, 'check_webhook_token' ] )
+		);
 	}
 
 	private function wallet(): FxWalletService {
@@ -112,5 +120,46 @@ final class FxController extends BaseController {
 		);
 
 		return $this->ok( [ 'items' => $rows ] );
+	}
+
+	/**
+	 * Verify the shared secret for payout webhooks. The token is
+	 * `fx.webhook_token` (a secret the operator generates), sent as
+	 * `?token=`, an `X-IGBZ-Token` header, or `Authorization: Bearer`.
+	 */
+	public function check_webhook_token( \WP_REST_Request $request ): bool|\WP_Error {
+		$token = trim( (string) $request->get_param( 'token' ) );
+		if ( '' === $token ) {
+			$token = trim( (string) $request->get_header( 'X-IGBZ-Token' ) );
+		}
+		if ( '' === $token ) {
+			$auth = trim( (string) $request->get_header( 'Authorization' ) );
+			if ( str_starts_with( $auth, 'Bearer ' ) ) {
+				$token = trim( substr( $auth, 7 ) );
+			}
+		}
+
+		$expected = (string) igbz()->settings()->string( 'fx.webhook_token', '' );
+		if ( '' === $expected || ! hash_equals( $expected, $token ) ) {
+			return new \WP_Error( 'igbz_fx_bad_token', __( 'Invalid webhook token.', 'igbz-suite' ), [ 'status' => 401 ] );
+		}
+
+		return true;
+	}
+
+	public function payout_webhook( \WP_REST_Request $request ): \WP_REST_Response {
+		$provider = sanitize_key( (string) $request->get_param( 'provider' ) );
+
+		/** @var \IGBZ\Suite\Modules\Fx\FxPayoutRegistry $payouts */
+		$payouts = igbz()->get( 'fx.payouts' );
+		$adapter = $payouts->get( $provider );
+		if ( ! $adapter ) {
+			return $this->fail( 'unknown_provider', __( 'Unknown payout provider.', 'igbz-suite' ), 404 );
+		}
+
+		$payload = $request->get_json_params();
+		$adapter->webhook( is_array( $payload ) ? $payload : [] );
+
+		return $this->ok( [ 'ok' => true ] );
 	}
 }

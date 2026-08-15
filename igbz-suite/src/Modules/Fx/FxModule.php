@@ -2,6 +2,8 @@
 namespace IGBZ\Suite\Modules\Fx;
 
 use IGBZ\Suite\Modules\Fx\Admin\FxPage;
+use IGBZ\Suite\Modules\Fx\Providers\PstNetPayoutAdapter;
+use IGBZ\Suite\Modules\Fx\Providers\RedotPayPayoutAdapter;
 use IGBZ\Suite\Support\Cron;
 use IGBZ\Suite\Support\ModuleInterface;
 use IGBZ\Suite\Support\Modules;
@@ -78,6 +80,8 @@ final class FxModule implements ModuleInterface {
 		$plugin->bind( 'fx.accounts', static fn ( Plugin $c ) => new FxAccountsService( $c->get( 'db' ) ) );
 
 		$registry = new FxPayoutRegistry();
+		$registry->register( new PstNetPayoutAdapter( $plugin->settings(), $plugin->get( 'http' ), $plugin->logger() ) );
+		$registry->register( new RedotPayPayoutAdapter( $plugin->settings(), $plugin->get( 'http' ), $plugin->logger() ) );
 		do_action( 'igbz_register_fx_payout_providers', $registry );
 		$plugin->bind( 'fx.payouts', static fn () => $registry );
 

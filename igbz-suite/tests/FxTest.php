@@ -364,6 +364,9 @@ final class FxTest extends TestCase {
 		$this->test_a_monthly_bill_is_created_once_and_settled();
 		$this->test_an_unpaid_bill_stays_due_and_refunds_the_wallet();
 		$this->test_manychat_delivery_is_charged_once();
+		$this->test_the_pstnet_adapter_charges_and_reports_balance();
+		$this->test_the_redotpay_adapter_is_a_valid_pilot();
+		$this->test_manual_settlement_marks_the_bill_paid_and_debits();
 	}
 
 	public function test_the_fee_is_added_on_top_of_the_usd_amount(): void {
@@ -563,5 +566,57 @@ final class FxTest extends TestCase {
 		$second = $meter->charge_delivery( 7, 'funnel-hit:11' );
 		$this->assert_false( $second['ok'], 'a replayed delivery is not charged twice' );
 		$this->assert_same( 0.9, $this->wallet()->balance( 7 )['balance_usd'], 'the wallet is untouched by the replay' );
+	}
+
+	public function test_the_pstnet_adapter_charges_and_reports_balance(): void {
+		$this->boot();
+		$settings = igbz()->settings();
+		$settings->set( 'fx.pstnet_api_key', 'k-test' );
+		$settings->set( 'fx.pstnet_card_id', 'card-1' );
+
+		$adapter = new \IGBZ\Suite\Modules\Fx\Providers\PstNetPayoutAdapter(
+			$settings,
+			new Http( new Logger( $settings ) ),
+			new Logger( $settings )
+		);
+
+		$this->assert_true( $adapter->is_configured(), 'the adapter is configured once key and card are set' );
+		$this->assert_same( 'pstnet', $adapter->id(), 'the adapter id is stable' );
+	}
+
+	public function test_the_redotpay_adapter_is_a_valid_pilot(): void {
+		$this->boot();
+		$settings = igbz()->settings();
+		$settings->set( 'fx.redotpay_api_key', 'k-test' );
+		$settings->set( 'fx.redotpay_card_id', 'card-1' );
+
+		$adapter = new \IGBZ\Suite\Modules\Fx\Providers\RedotPayPayoutAdapter(
+			$settings,
+			new Http( new Logger( $settings ) ),
+			new Logger( $settings )
+		);
+
+		$this->assert_true( $adapter->is_configured(), 'the pilot adapter is configured once key and card are set' );
+		$this->assert_same( 'redotpay', $adapter->id(), 'the pilot adapter id is stable' );
+	}
+
+	public function test_manual_settlement_marks_the_bill_paid_and_debits(): void {
+		$this->boot();
+		$this->seed_price( 'manus_monthly', 25 );
+		$this->wallet()->credit( 7, 30, FxWalletService::REASON_TOPUP, 'payment:1' );
+
+		$accounts = new FxAccountsService( $this->db );
+		$account_id = $accounts->create( 7, 'manus', 'acct-1' );
+
+		$billing = $this->billing();
+		$bill_id = $billing->create_monthly_bill( $accounts->get( $account_id ) );
+		$bill    = $this->fxdb->tables['fx_bills'][ $bill_id ];
+
+		$result = $billing->settle_bill_manually( $bill, 99 );
+
+		$this->assert_true( $result['ok'], 'a manual settlement succeeds' );
+		$this->assert_same( FxBillingService::STATUS_PAID, $this->fxdb->tables['fx_bills'][ $bill_id ]['status'], 'the bill is marked paid' );
+		$this->assert_same( 5.0, $this->wallet()->balance( 7 )['balance_usd'], 'the wallet is debited the bill amount' );
+		$this->assert_same( 'manual:99', $this->fxdb->tables['fx_bills'][ $bill_id ]['payout_ref'], 'the payout ref names the operator' );
 	}
 }

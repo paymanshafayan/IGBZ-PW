@@ -150,6 +150,43 @@ final class FxBillingService {
 	}
 
 	/**
+	 * Operator-initiated manual settlement. When both API adapters are down
+	 * (or the operator prefers to pay from their own dashboard), this marks a
+	 * due bill paid with an explicit `manual:` payout ref, debiting the
+	 * tenant's wallet exactly like the automatic path.
+	 *
+	 * @return array{ok:bool,status:string,error:string}
+	 */
+	public function settle_bill_manually( array $bill, int $operator_user_id ): array {
+		$reference = 'bill:' . (int) $bill['id'];
+
+		$spend = $this->wallet->debit(
+			(int) $bill['tenant_id'],
+			(float) $bill['amount_usd'],
+			FxWalletService::REASON_SUBSCRIPTION,
+			$reference,
+			[ 'bill_id' => (int) $bill['id'], 'manual' => true, 'operator' => $operator_user_id ]
+		);
+		if ( ! $spend['ok'] ) {
+			return [ 'ok' => false, 'status' => self::STATUS_UNPAID, 'error' => $spend['error'] ];
+		}
+
+		$this->db->update(
+			'fx_bills',
+			[
+				'status'     => self::STATUS_PAID,
+				'paid_at'    => current_time( 'mysql', true ),
+				'payout_ref' => 'manual:' . $operator_user_id,
+			],
+			[ 'id' => (int) $bill['id'] ]
+		);
+
+		$this->logger->info( 'fx', 'Bill settled manually', [ 'bill_id' => (int) $bill['id'], 'operator' => $operator_user_id ] );
+
+		return [ 'ok' => true, 'status' => self::STATUS_PAID, 'error' => '' ];
+	}
+
+	/**
 	 * Daily cron: create the month's bill for every active account that does
 	 * not have one yet, then try to settle every due bill.
 	 */

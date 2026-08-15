@@ -1,6 +1,7 @@
 <?php
 namespace IGBZ\Suite\Modules\Fx\Admin;
 
+use IGBZ\Suite\Modules\Fx\FxBillingService;
 use IGBZ\Suite\Modules\Fx\FxMath;
 use IGBZ\Suite\Modules\Fx\FxWalletService;
 use IGBZ\Suite\Support\Admin\Menu;
@@ -158,6 +159,26 @@ final class FxPage {
 			$tenant
 		);
 
+		if ( $rows ) {
+			echo '<form method="post" style="margin:12px 0">';
+			wp_nonce_field( 'igbz_fx_manual' );
+			printf( '<input type="hidden" name="igbz_fx_action" value="manual_settle" />' );
+			echo '<select name="bill_id">';
+			foreach ( $rows as $row ) {
+				if ( FxBillingService::STATUS_DUE === $row['status'] ) {
+					printf(
+						'<option value="%1$d">%2$s — %3$s USD</option>',
+						(int) $row['id'],
+						esc_html( (string) $row['period_start'] ),
+						esc_html( number_format( (float) $row['amount_usd'], 2 ) )
+					);
+				}
+			}
+			echo '</select> ';
+			submit_button( __( 'Settle manually', 'igbz-suite' ), 'secondary', '', false );
+			echo '</form>';
+		}
+
 		if ( ! $rows ) {
 			echo '<p>' . esc_html__( 'No bills yet.', 'igbz-suite' ) . '</p>';
 			return;
@@ -243,6 +264,32 @@ final class FxPage {
 
 			wp_safe_redirect( (string) $result['redirect_url'] );
 			exit;
+		}
+
+		if ( 'manual_settle' === $action ) {
+			View::check_nonce( 'igbz_fx_manual' );
+
+			$bill_id = (int) ( $_POST['bill_id'] ?? 0 );
+			if ( $bill_id <= 0 ) {
+				View::notice( __( 'Choose a due bill.', 'igbz-suite' ), 'error' );
+				return;
+			}
+
+			$bill = igbz()->db()->row(
+				'SELECT * FROM ' . igbz()->db()->table( 'fx_bills' ) . ' WHERE id = %d',
+				$bill_id
+			);
+			if ( ! $bill ) {
+				View::notice( __( 'Bill not found.', 'igbz-suite' ), 'error' );
+				return;
+			}
+
+			$result = igbz()->get( 'fx.billing' )->settle_bill_manually( $bill, get_current_user_id() );
+			View::notice(
+				$result['ok'] ? __( 'Bill settled manually.', 'igbz-suite' ) : $result['error'],
+				$result['ok'] ? 'success' : 'error'
+			);
+			return;
 		}
 
 		if ( 'price' === $action ) {
