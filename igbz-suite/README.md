@@ -69,7 +69,7 @@ guarantees the wallet relies on are only meaningful there.
 
 You can boot a disposable demo with no server at all:
 
-[Launch in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/paymanshafayan/IGBZ-PW/refs/heads/arena/019ffbb1-igbz-pw/_playground/blueprint.json)
+[Launch in WordPress Playground](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/paymanshafayan/IGBZ-WP/refs/heads/main/_playground/blueprint.json)
 
 Outbound HTTP is proxied there, so payment gateways and the Manus/ManyChat calls will not reach
 real endpoints.
@@ -80,7 +80,7 @@ real endpoints.
 
 1. Copy the `igbz-suite` directory into `wp-content/plugins/`, or zip it and upload it through
    **Plugins → Add New → Upload Plugin**.
-2. Activate **IGBZ Suite**. On activation the plugin creates its 42 database tables, registers its
+2. Activate **IGBZ Suite**. On activation the plugin creates its 41 database tables, registers its
    roles and capabilities, schedules its cron events and seeds default settings.
 3. Go to **IGBZ → Settings → Modules** and enable the modules you need. Only *Multi-Tenant Stores*
    is on by default.
@@ -513,7 +513,7 @@ singletons; an unknown id throws.
 A module's services only exist while that module is enabled, so guard cross-module calls with
 `igbz()->has( 'wallet' )`.
 
-**Tenancy** is single-site with a `tenant_id` column, not WordPress Multisite. All 42 tables carry
+**Tenancy** is single-site with a `tenant_id` column, not WordPress Multisite. All 41 tables carry
 `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`, `plans`, `logs`, and
 `lesson_progress` (which inherits scope through `enrollment_id`). Products and orders are scoped
 with the `_igbz_tenant_id` meta key, where `0` or absent means platform-shared.

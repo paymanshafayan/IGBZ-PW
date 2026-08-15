@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       IGBZ Suite
- * Plugin URI:        https://github.com/paymanshafayan/IGBZ-PW
+ * Plugin URI:        https://github.com/paymanshafayan/IGBZ-WP
  * Description:       IGBZ multi-tenant commerce suite for WordPress + WooCommerce. Four toggleable modules: Multi-Tenant Stores (wallet, plans, BNPL, LMS, affiliate, Iranian gateways), Instagram Automation (Manus + ManyChat), Master Site Hub and Mobile REST API.
  * Version:           1.0.0
  * Requires at least: 6.3

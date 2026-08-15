@@ -134,7 +134,7 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 
 **REST**: 100 routes across `igbz/v1` (incl. 14 `/intake/*`, 29 `/vip/*`) and `igbz-hub/v1`.
 
-**Schema**: 42 tables in `src/Support/Schema.php` (DB version 13; `ig_intake` added in v8, the nine
+**Schema**: 41 tables in `src/Support/Schema.php` (DB version 13; `ig_intake` added in v8, the nine
 `vip_*` tables in v10; v11 adds no tables — it is the LMS quiz/certificate wiring; v12 adds
 `ig_content.ig_shortcode` and relabels funnel rewards; v13 drops the never-used `jobs` queue). All carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`,
 `plans`, `logs`, `lesson_progress`, `vip_post_likes`, `vip_post_views`. Product/order
@@ -199,7 +199,7 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
 - 875 assertions in 19 test cases; 158 files lint clean.
-- 18/18 admin screens return 200 with no notices; 42/42 tables; 3 cron hooks scheduled.
+- 18/18 admin screens return 200 with no notices; 41/41 tables; 3 cron hooks scheduled.
 - All six payment gateways register with WooCommerce and their settings screens render.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
   `processing`, sets the transaction id, and credits 2% cashback

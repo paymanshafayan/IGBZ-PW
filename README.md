@@ -1,4 +1,4 @@
-# IGBZ-PW
+# IGBZ-WP
 
 The IGBZ product ported from **nopCommerce** to **WordPress + WooCommerce**.
 
@@ -101,7 +101,7 @@ whose callback never arrived.
 No server needed — this boots a throwaway WordPress with WooCommerce and the plugin already
 activated, in about 30 seconds:
 
-**[▶ Launch the demo](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/paymanshafayan/IGBZ-PW/refs/heads/arena/019ffbb1-igbz-pw/_playground/blueprint.json)**
+**[▶ Launch the demo](https://playground.wordpress.net/?blueprint-url=https://raw.githubusercontent.com/paymanshafayan/IGBZ-WP/refs/heads/main/_playground/blueprint.json)**
 
 The blueprint lives in [`_playground/blueprint.json`](_playground/blueprint.json).
 

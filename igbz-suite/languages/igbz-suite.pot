@@ -3,7 +3,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: IGBZ Suite 1.0.0\n"
-"Report-Msgid-Bugs-To: https://github.com/paymanshafayan/IGBZ-PW/issues\n"
+"Report-Msgid-Bugs-To: https://github.com/paymanshafayan/IGBZ-WP/issues\n"
 "POT-Creation-Date: 2026-08-15 05:36+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
