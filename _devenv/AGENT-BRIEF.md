@@ -31,6 +31,12 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 - Tenancy is **single-site with `tenant_id` columns**. Not WordPress Multisite.
 - One plugin, four modules — **not** four separate plugins.
 - The deliverable is **complete and installable**, never a skeleton.
+- **Paid content is delivered by our own customer app**, not by a DM vendor and not by Instagram.
+  This was settled after a long detour through DM vendors; ManyChat cannot send video to Instagram
+  at all. See §7, "The VIP channel".
+- **Two security tiers.** Heavy anti-capture (`FLAG_SECURE`, `isCaptured`, emulator detection,
+  device-bound links, watermarking) is for the **LMS/courses** only. VIP gets Close-Friends-level
+  protection and no more.
 
 ---
 
@@ -110,19 +116,21 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 - core: `settings, logger, db, http, tenancy`
 - multitenant: `tenants, wallet, plans, bnpl.providers, bnpl, affiliate, lms, payments, otp, marketplace`
 - instagram: `ig.prompts, ig.credentials, ig.manus_client, ig.manus, ig.scheduler, ig.insights, ig.manychat, ig.subscribers, ig.funnels`,
-  plus the registration flow: `ig.skus, ig.translations, ig.manychat_bridge, ig.intake, ig.publisher, ig.intake_worker, ig.stt, ig.stt_http, ig.stt_manus`
+  plus the registration flow: `ig.skus, ig.translations, ig.manychat_bridge, ig.intake, ig.publisher, ig.intake_worker, ig.stt, ig.stt_http, ig.stt_manus`,
+  plus the VIP channel: `vip.access, vip.media, vip.posts, vip.social, vip.messages, vip.billing`
 - hub: `hub.stats, hub.directory, hub.vip, hub.domains, hub.blocks, hub.signup`
 - rest_api: `api.tokens, api.auth, api.devices, api.google_auth, api.push, api.notifications`
 
 **Admin screens** (top-level `igbz`): `igbz`, `igbz-settings`, `igbz-tenants`, `igbz-wallet`,
 `igbz-plans`, `igbz-bnpl`, `igbz-affiliate`, `igbz-courses`, `igbz-payments`, `igbz-ig-accounts`,
 `igbz-ig-intake`, `igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`,
-`igbz-hub`, `igbz-mobile-api`.
+`igbz-vip`, `igbz-hub`, `igbz-mobile-api`.
 
-**REST**: `igbz/v1` (62 routes, 14 of them `/intake/*`) and `igbz-hub/v1` (15 routes).
+**REST**: `igbz/v1` (91 routes — 14 `/intake/*`, 29 `/vip/*`) and `igbz-hub/v1` (14 routes).
 
-**Schema**: 33 tables in `src/Support/Schema.php` (DB version 8; `ig_intake` added in v8). All carry `tenant_id` except `tenants`,
-`tenant_domains`, `tenant_members`, `plans`, `logs`, `jobs`, `lesson_progress`. Product/order
+**Schema**: 43 tables in `src/Support/Schema.php` (DB version 10; `ig_intake` added in v8, the nine
+`vip_*` tables in v10). All carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`,
+`plans`, `logs`, `jobs`, `lesson_progress`, `vip_post_likes`, `vip_post_views`. Product/order
 tenant scoping uses the meta key `_igbz_tenant_id`.
 
 **Payments**: gateways `igbz_wallet`, `igbz_bnpl`, `igbz_zarinpal`, `igbz_idpay`, `igbz_nextpay`,
@@ -183,8 +191,8 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 627 assertions in 15 test cases; 136 files lint clean.
-- 17/17 admin screens return 200 with no notices; 33/33 tables; 3 cron hooks scheduled.
+- 798 assertions in 17 test cases; 154 files lint clean.
+- 18/18 admin screens return 200 with no notices; 42/42 tables; 3 cron hooks scheduled.
 - All six payment gateways register with WooCommerce and their settings screens render.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
   `processing`, sets the transaction id, and credits 2% cashback
@@ -205,6 +213,12 @@ zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs bet
   assets over HTTP, so a private directory would not work); missing price, missing category,
   missing description, composing before the product exists, scheduling before composing and an
   unknown post kind are each refused with their own error code.
+- **VIP channel, end to end**: create → publish → share link; anonymous `/vip/feed` returns the blur
+  with `locked: true` and no source URL; a forged media link is a 403; an owner's signed link 302s to
+  storage and 403s for anybody else; the pretty permalink 301s then 200s, an unknown code is a 404
+  and an expired one a **410**; the five-minute sweep reported `0 published, 1 expired`; the tip
+  floor, the missing-gateway message and a stale nonce each produce their own error; an anonymous
+  subscribe 302s to `wp-login.php` carrying `redirect_to`.
 - Translation bridge: with no multilingual plugin nothing is published but the copy is kept in
   `_igbz_translations`; with WPML's hooks satisfied two real translated products are created,
   linked by trid, and each carries the original's price, sale price and stock with a
@@ -430,6 +444,77 @@ during `plugins_loaded` whenever another plugin — Jetpack's `Nonce_Handler`, f
 event) and `Activator::add_roles()` / `seed_defaults()` (reached from `maybe_upgrade()` on
 `plugins_loaded`). Both persist their strings, so storing the English original is correct anyway.
 `CronScheduleTest` guards the regression.
+
+### The VIP channel (DB v10)
+
+The rule that shapes everything here: **the customer app is the delivery mechanism, not Instagram.**
+The public Instagram post is a teaser; the real media lives on storage we control and is only
+viewable by an entitled user. Close Friends was the original plan and is dead for three independent
+reasons — Instagram disables the share button on Close Friends content, oEmbed has been
+public-media-only since April 2025, and list membership has no API. Do not revisit it. Full design,
+in Persian, in `DESIGN-VIP.md` at the repo root.
+
+**Two tiers of security, and they are not the same tier.** VIP is deliberately *light*: the most we
+promise is what an Instagram Close Friends post gives you. Screenshots are possible and that is
+accepted. The heavy machinery — `FLAG_SECURE`, `isCaptured`, emulator detection, device-bound
+links, watermarking — belongs to the **LMS/courses** section only. Applying it to VIP would be
+re-litigating a decision already made.
+
+**Nine tables**, all `vip_*`: `plans`, `memberships`, `posts`, `post_likes`, `post_comments`,
+`post_views`, `entitlements`, `threads`, `messages`. `vip_post_likes` and `vip_post_views` carry
+**no `tenant_id`** on purpose — they are pure join rows and the tenant belongs to the post. They are
+whitelisted in `SchemaTest::$unscoped`; adding a tenant column to them is a regression, not a fix.
+
+**Services** (`src/Modules/Instagram/Vip/`), wired in `InstagramModule::bind_services()` as
+`vip.access`, `vip.media`, `vip.posts`, `vip.social`, `vip.messages`, `vip.billing`:
+
+| Service | Owns |
+| --- | --- |
+| `VipAccessService` | who may see a post — author / member / purchased / free. Returns a `VipAccess` value object, never a bool. |
+| `VipPostService` | CRUD, shortcodes, scheduling, expiry, feed assembly. |
+| `VipMediaService` | short-lived HMAC-signed URLs, purge on expiry. |
+| `VipSocialService` | likes, comments and replies, saves, view counts. |
+| `VipMessageService` | in-post direct messages to the admin. |
+| `VipBillingService` | subscribe, buy-one-post, tips. |
+| `VipLandingPage` | the public `/vip/p/{shortcode}` share page. |
+
+**Things that will look wrong until you know why:**
+
+- **Access is re-checked when the media is served, not only when the feed is built.** A signed URL
+  proves *who asked*; it does not prove they are still entitled. A membership that lapses inside the
+  15-minute TTL must stop working, so `handle_request()` calls `check_row()` again before
+  redirecting. The signature and the entitlement answer two different questions.
+- **The signature binds the user id**, and `handle_request()` compares it to
+  `get_current_user_id()`. A link pasted into a group chat is therefore useless to everyone else —
+  verified live: the owner's URL 302s to storage, the same URL anonymously is a 403.
+- **`purchase_post()` refuses to charge an active member.** Their membership already grants the
+  post, so taking the money would be selling something they own. The guard honours
+  `check_row(...)->allowed`, not just the entitlements table. A test caught this as a real bug.
+- **Expiry has two behaviours and `hide` is the default.** `delete` purges the media, and
+  `VipMediaService::purge()` refuses any path outside the uploads directory — an expiry job that can
+  be pointed at `/etc` is a much worse bug than a file left behind.
+- **The share page is public by design and leaks nothing.** It renders the blur, never the real URL.
+  Anonymous `/vip/feed` behaves the same way: `locked: true`, blur present, source absent.
+- **An expired share is 410, not 404.** The post existed; saying so is the honest answer and stops
+  the app from treating it as a bad link.
+- **Never run `wp_kses_post()` over admin markup containing form controls.** It strips every
+  `<select>` and `<input>`, which is exactly how the VIP post editor once shipped as a column of
+  bare labels. Escape the values, not the form.
+- **`esc_url()` drops the app's custom scheme** unless you pass the allow-list, so the deep link
+  `igbz://vip/p/{code}` becomes `href=""`. Use `VipLandingPage::allowed_schemes()`. A test pins it.
+- **The starter plan is seeded from `activate()` as well as `migrate_to_v10()`.** Only migrating
+  leaves a fresh install with no plan at all, which makes the landing page offer a subscription
+  nobody can buy.
+- **Tips are for public posts.** They are a third revenue path next to the subscription and the
+  single-post purchase, not a fallback when the other two are unpriced — when nothing is priced the
+  offers block is suppressed rather than rendered empty.
+
+Billing settles on the existing **`igbz_payment_verified`** hook and does not touch
+`PaymentService::settle()`, which still handles only `wallet_topup` and `order`. Scheduling and
+expiry ride the five-minute cron (`publish_due()` / `expire_due()`), with a "Run now" button on the
+admin screen for when you do not want to wait. `tests/VipChannelTest.php` covers 21 scenarios
+against an in-memory `VipDb` double; as everywhere else in this suite, module container bindings are
+not registered in the harness, so it builds the service graph by hand.
 
 ---
 
