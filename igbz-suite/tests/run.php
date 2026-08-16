@@ -34,6 +34,7 @@ $cases = [
 	'PostIdentityTest',
 	'FxTest',
 	'PhasesTest',
+	'Phases2Test',
 ];
 
 foreach ( $cases as $case ) {
