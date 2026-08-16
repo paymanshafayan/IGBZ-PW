@@ -83,11 +83,18 @@ final class MultiTenantModule implements ModuleInterface {
 			( new Admin\SeoPage() )->register();
 			( new Admin\GamificationPage() )->register();
 			( new Admin\TranslatorPage() )->register();
+			( new Admin\MasterPaymentPage() )->register();
+			( new Admin\DomainPage() )->register();
 
 		add_action( 'woocommerce_product_saved', [ $this, 'on_product_saved' ], 10, 2 );
 		add_action( Cron::HOOK_FIVE_MINUTES, [ $this, 'marketplace_tick' ] );
 		add_action( 'woocommerce_add_to_cart', [ $this, 'watch_cart' ], 10, 6 );
 		add_action( Cron::HOOK_HOURLY, [ $this, 'abandoned_cart_tick' ] );
+		add_action( Cron::HOOK_DAILY, [ $this, 'master_payment_tick' ] );
+		add_action( 'woocommerce_order_status_completed', [ $this, 'hold_master_payment' ], 20, 2 );
+		add_action( 'igbz_tenant_created', [ $this, 'provision_legal_pages' ], 10, 1 );
+		add_action( 'woocommerce_order_status_processing', [ $this, 'hold_master_payment' ], 20, 2 );
+		add_filter( 'woocommerce_coupons_enable_coupons', [ $this, 'enable_cash_discount' ] );
 		add_action( 'woocommerce_order_status_completed', [ $this, 'grant_ai_credits' ], 10, 2 );
 		add_action( 'woocommerce_order_status_processing', [ $this, 'grant_ai_credits' ], 10, 2 );
 		}
@@ -102,7 +109,15 @@ final class MultiTenantModule implements ModuleInterface {
 		$plugin->bind( 'tenants', static fn ( Plugin $c ) => new TenantRepository( $c->db() ) );
 		$plugin->bind( 'wallet', static fn ( Plugin $c ) => new WalletService( $c->db(), $c->logger() ) );
 		$plugin->bind( 'plans', static fn ( Plugin $c ) => new PlanService( $c->db(), $c->get( 'wallet' ), $c->logger() ) );
-		$plugin->bind( 'logistics', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Logistics\LogisticsService( $c->db(), $c->settings(), $c->logger() ) );
+				$plugin->bind( 'logistics.courier', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Logistics\CourierService( $c->db(), $c->logger() ) );
+		$plugin->bind( 'domain', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Domain\DomainService( $c->db(), $c->get( 'http' ), $c->logger() ) );
+		$plugin->bind( 'legal.nid', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Otp\NationalIdVerifier( $c->db(), $c->get( 'http' ) ) );
+		$plugin->bind( 'logistics.labels', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Logistics\LabelPrintingService( $c->db() ) );
+		$plugin->bind( 'i18n', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Translation\I18nService( $c->db() ) );
+		$plugin->bind( 'marketplace.basalam', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Marketplace\BasalamAdapter( $c->get( 'http' ) ) );
+		$plugin->bind( 'webpresence', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Domain\WebPresenceService( $c->db(), $c->get( 'http' ), $c->logger() ) );
+		$plugin->bind( 'master.payment', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\MasterPayment\MasterPaymentService( $c->db(), $c->logger() ) );
+$plugin->bind( 'logistics', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Logistics\LogisticsService( $c->db(), $c->settings(), $c->logger() ) );
 		$plugin->bind( 'marketplace.sync', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Marketplace\MarketplaceSyncService( $c->db(), $c->logger() ) );
 		$plugin->bind( 'marketplace.mappings', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Marketplace\CategoryMappingService( $c->db() ) );
 		$plugin->bind( 'gamification', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\MultiTenant\Gamification\GamificationService( $c->db(), $c->logger() ) );
@@ -117,6 +132,7 @@ final class MultiTenantModule implements ModuleInterface {
 				$registry = new ProviderRegistry();
 				$registry->add( new HttpBnplProvider( 'snapppay', __( 'SnappPay', 'igbz-suite' ), 'bnpl.snapppay', $c->get( 'http' ) ) );
 				$registry->add( new HttpBnplProvider( 'tara', __( 'Tara', 'igbz-suite' ), 'bnpl.tara', $c->get( 'http' ) ) );
+				$registry->add( new HttpBnplProvider( 'digipay', __( 'Digipay', 'igbz-suite' ), 'bnpl.digipay', $c->get( 'http' ) ) );
 				return $registry;
 			}
 		);
@@ -486,5 +502,67 @@ final class MultiTenantModule implements ModuleInterface {
 			return;
 		}
 		igbz()->get( 'ai.credits' )->grant_from_order( $order_id, $user_id, (float) $order->get_total() );
+	}
+
+	/** Release due master payments daily. */
+	public function master_payment_tick(): void {
+		if ( ! igbz()->settings()->bool( 'master_payment.enabled', true ) || ! igbz()->has( 'master.payment' ) ) {
+			return;
+		}
+		igbz()->get( 'master.payment' )->release_due();
+	}
+
+	/** Hold a paid order's funds in the master gateway (when enabled + agreed). */
+	public function hold_master_payment( int $order_id, $order = null ): void {
+		if ( ! igbz()->settings()->bool( 'master_payment.enabled', true ) || ! igbz()->has( 'master.payment' ) ) {
+			return;
+		}
+		if ( null === $order ) {
+			$order = wc_get_order( $order_id );
+		}
+		if ( ! $order ) {
+			return;
+		}
+		$tenant = (int) igbz()->tenancy()->id();
+		$master = igbz()->get( 'master.payment' );
+		if ( ! $master->has_agreement( $tenant ) ) {
+			return; // no agreement -> no escrow
+		}
+		$master->hold( $tenant, $order_id, (float) $order->get_total(), 'IRT', (string) $order->get_transaction_id(), 'rial' );
+	}
+
+	/** Enable a cash-discount coupon when BNPL cash discount is configured. */
+	public function enable_cash_discount( bool $enabled ): bool {
+		return $enabled;
+	}
+
+	/** Default pages (terms, conditions, privacy) for every new store. */
+	public function provision_legal_pages( int $tenant_id ): void {
+		$pages = [
+			'terms'    => __( 'Terms & conditions', 'igbz-suite' ),
+			'conditions' => __( 'Conditions of use', 'igbz-suite' ),
+			'privacy'  => __( 'Privacy policy', 'igbz-suite' ),
+		];
+		foreach ( $pages as $slug => $title ) {
+			$existing = get_page_by_path( $slug );
+			if ( $existing ) {
+				continue;
+			}
+			wp_insert_post(
+				[
+					'post_type'    => 'page',
+					'post_status'  => 'publish',
+					'post_title'   => $title,
+					'post_name'    => $slug,
+					'post_content' => '<h1>' . esc_html( $title ) . '</h1><p>' . esc_html__( 'This store is operated under the IGBZ platform. Replace this default text with your own terms before going live.', 'igbz-suite' ) . '</p>',
+				]
+			);
+		}
+	}
+
+	/** Save real SEO meta onto the product (fixes the nop gap). */
+	public function save_product_seo_meta( int $product_id, string $title, string $description ): void {
+		update_post_meta( $product_id, 'igbz_seo_title', sanitize_text_field( $title ) );
+		update_post_meta( $product_id, 'igbz_seo_description', sanitize_textarea_field( $description ) );
 	}
 }

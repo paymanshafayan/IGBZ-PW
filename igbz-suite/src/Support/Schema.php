@@ -72,6 +72,22 @@ final class Schema {
 			'ig_abandoned_carts',
 			'ig_ai_credit_ledger',
 			'ig_giveaways',
+			'ig_master_payments',
+			'ig_master_disputes',
+			'ig_master_withdrawals',
+			'ig_master_agreements',
+			'ig_nid_verifications',
+			'ig_legal_agreements',
+			'ig_domains',
+			'ig_domain_orders',
+			'ig_web_presence',
+			'ig_couriers',
+			'ig_label_groups',
+			'ig_label_group_items',
+			'ig_cod_payments',
+			'ig_courier_routes',
+			'ig_courier_tracking',
+			'ig_courier_chat',
 			'logs',
 		];
 	}
@@ -1054,6 +1070,220 @@ final class Schema {
 			updated_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
 			KEY tenant_status (tenant_id,status)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_master_payments (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			order_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			phase VARCHAR(8) NOT NULL DEFAULT 'rial',
+			amount DECIMAL(18,4) NOT NULL DEFAULT 0,
+			currency VARCHAR(8) NOT NULL DEFAULT 'IRT',
+			status VARCHAR(20) NOT NULL DEFAULT 'held',
+			hold_until DATETIME NULL,
+			released_at DATETIME NULL,
+			gateway_ref VARCHAR(191) NOT NULL DEFAULT '',
+			meta LONGTEXT NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY order_phase (order_id,phase),
+			KEY tenant_status (tenant_id,status)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_master_disputes (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			payment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			source VARCHAR(16) NOT NULL DEFAULT 'app',
+			reason VARCHAR(255) NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'open',
+			resolved_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY payment (payment_id),
+			KEY tenant_status (tenant_id,status)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_master_withdrawals (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			amount DECIMAL(18,4) NOT NULL DEFAULT 0,
+			method VARCHAR(16) NOT NULL DEFAULT 'card',
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			detail VARCHAR(255) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant_status (tenant_id,status)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_master_agreements (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			type VARCHAR(32) NOT NULL DEFAULT 'escrow',
+			version VARCHAR(16) NOT NULL DEFAULT '1.0',
+			accepted_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			accepted_at DATETIME NOT NULL,
+			ip VARCHAR(64) NOT NULL DEFAULT '',
+			content_hash VARCHAR(64) NOT NULL DEFAULT '',
+			PRIMARY KEY  (id),
+			UNIQUE KEY tenant_type (tenant_id,type)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_nid_verifications (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			national_id_hash VARCHAR(64) NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			ref VARCHAR(191) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY user (user_id),
+			KEY tenant (tenant_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_legal_agreements (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			type VARCHAR(32) NOT NULL DEFAULT 'payment_without_nid',
+			version VARCHAR(16) NOT NULL DEFAULT '1.0',
+			accepted_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			accepted_at DATETIME NOT NULL,
+			ip VARCHAR(64) NOT NULL DEFAULT '',
+			content_hash VARCHAR(64) NOT NULL DEFAULT '',
+			PRIMARY KEY  (id),
+			UNIQUE KEY tenant_type (tenant_id,type)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_domains (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			name VARCHAR(191) NOT NULL DEFAULT '',
+			type VARCHAR(16) NOT NULL DEFAULT 'subdomain',
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			provider_ref VARCHAR(191) NOT NULL DEFAULT '',
+			dns_verified TINYINT(1) NOT NULL DEFAULT 0,
+			expires_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant (tenant_id),
+			KEY name (name)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_domain_orders (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			domain_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			action VARCHAR(16) NOT NULL DEFAULT 'register',
+			amount DECIMAL(18,4) NOT NULL DEFAULT 0,
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			provider_ref VARCHAR(191) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant (tenant_id),
+			KEY domain (domain_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_web_presence (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			service VARCHAR(32) NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			detail VARCHAR(255) NOT NULL DEFAULT '',
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY tenant_service (tenant_id,service)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_couriers (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			user_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			name VARCHAR(191) NOT NULL DEFAULT '',
+			phone VARCHAR(32) NOT NULL DEFAULT '',
+			vehicle VARCHAR(32) NOT NULL DEFAULT '',
+			zone VARCHAR(64) NOT NULL DEFAULT '',
+			is_active TINYINT(1) NOT NULL DEFAULT 1,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant (tenant_id),
+			KEY user (user_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_label_groups (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			title VARCHAR(191) NOT NULL DEFAULT '',
+			status VARCHAR(20) NOT NULL DEFAULT 'open',
+			created_by BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY tenant (tenant_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_label_group_items (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			group_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			shipment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			PRIMARY KEY  (id),
+			UNIQUE KEY group_shipment (group_id,shipment_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_cod_payments (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			shipment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			method VARCHAR(16) NOT NULL DEFAULT 'cash',
+			status VARCHAR(20) NOT NULL DEFAULT 'pending',
+			amount DECIMAL(18,4) NOT NULL DEFAULT 0,
+			ref VARCHAR(191) NOT NULL DEFAULT '',
+			gateway_link VARCHAR(500) NOT NULL DEFAULT '',
+			card_transfer_ref VARCHAR(191) NOT NULL DEFAULT '',
+			created_at DATETIME NOT NULL,
+			updated_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY shipment (shipment_id),
+			KEY tenant (tenant_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_courier_routes (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			courier_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			shipment_ids TEXT NULL,
+			payload LONGTEXT NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY courier (courier_id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_courier_tracking (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			shipment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			lat DECIMAL(10,7) NOT NULL DEFAULT 0,
+			lng DECIMAL(10,7) NOT NULL DEFAULT 0,
+			at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY shipment (shipment_id),
+			KEY at (at)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}ig_courier_chat (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			tenant_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			shipment_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+			sender VARCHAR(12) NOT NULL DEFAULT 'courier',
+			body TEXT NULL,
+			read_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			KEY shipment (shipment_id)
 		) {$charset};";
 
 		$sql[] = "CREATE TABLE {$p}logs (

@@ -28,6 +28,14 @@ final class LogisticsPage {
 	}
 
 	public function render(): void {
+		// Print labels directly when ?igbz_labels=<id> (window.open target).
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( isset( $_GET['igbz_labels'] ) ) {
+			$gid = (int) $_GET['igbz_labels'];
+			echo igbz()->get( 'logistics.labels' )->render_labels( $gid );
+			exit;
+		}
+
 		$this->handle_post();
 
 		View::open(
@@ -40,6 +48,7 @@ final class LogisticsPage {
 		// phpcs:enable
 
 		$this->render_create_form();
+		$this->render_label_groups();
 		$this->render_list( $status );
 
 		View::close();
@@ -68,6 +77,35 @@ final class LogisticsPage {
 
 		submit_button( __( 'Create shipment', 'igbz-suite' ) );
 		echo '</form>';
+	}
+
+	private function render_label_groups(): void {
+		$labels = igbz()->get( 'logistics.labels' );
+		$groups = $labels->groups( (int) igbz()->tenancy()->id() );
+
+		echo '<h2>' . esc_html__( 'Label printing', 'igbz-suite' ) . '</h2>';
+		echo '<form method="post" style="max-width:520px">';
+		wp_nonce_field( 'igbz_labels_create' );
+		printf( '<input type="hidden" name="igbz_log_action" value="labels" />' );
+		echo '<p><input type="text" name="group_title" class="regular-text" placeholder="' . esc_attr__( 'Group title', 'igbz-suite' ) . '" required /> ';
+		echo '<select name="route_type"><option value="">' . esc_html__( 'All routes', 'igbz-suite' ) . '</option><option value="express">express</option><option value="national">national</option><option value="heavy">heavy</option></select> ';
+		submit_button( __( 'Create group & print', 'igbz-suite' ), 'secondary', '', false );
+		echo '</p></form>';
+
+		if ( $groups ) {
+			echo '<table class="widefat striped"><thead><tr><th>ID</th><th>' . esc_html__( 'Title', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Status', 'igbz-suite' ) . '</th><th></th></tr></thead><tbody>';
+			foreach ( $groups as $g ) {
+				printf(
+					'<tr><td>%1$d</td><td>%2$s</td><td>%3$s</td><td><a class="button button-small" target="_blank" href="%4$s">%5$s</a></td></tr>',
+					(int) $g['id'],
+					esc_html( (string) $g['title'] ),
+					esc_html( (string) $g['status'] ),
+					esc_url( add_query_arg( [ 'igbz_labels' => (int) $g['id'] ], admin_url( 'admin.php' ) ) ),
+					esc_html__( 'Print', 'igbz-suite' )
+				);
+			}
+			echo '</tbody></table>';
+		}
 	}
 
 	private function render_list( string $status ): void {
@@ -153,6 +191,18 @@ final class LogisticsPage {
 			}
 			$result = $service->register_with_carrier( $id, $adapter );
 			View::notice( $result['ok'] ? sprintf( 'Tracking: %s', $result['tracking_code'] ) : $result['message'], $result['ok'] ? 'success' : 'error' );
+			return;
+		}
+
+		if ( 'labels' === $action ) {
+			View::check_nonce( 'igbz_labels_create' );
+			$id = igbz()->get( 'logistics.labels' )->create_group(
+				(int) igbz()->tenancy()->id(),
+				get_current_user_id(),
+				sanitize_text_field( (string) ( $_POST['group_title'] ?? '' ) ),
+				sanitize_key( (string) ( $_POST['route_type'] ?? '' ) )
+			);
+			View::notice( $id > 0 ? __( 'Label group created.', 'igbz-suite' ) : __( 'No shipments matched.', 'igbz-suite' ), $id > 0 ? 'success' : 'error' );
 			return;
 		}
 

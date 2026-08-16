@@ -35,6 +35,7 @@ final class PaymentService {
 		$this->register( new PayirGateway( $http ) );
 		$this->register( new HttpPspGateway( $http ) );
 		$this->register( new NowPaymentsGateway( $http ) );
+		$this->register( new BalePayGateway( $http ) );
 		/**
 		 * Register additional PSP adapters.
 		 *

@@ -93,6 +93,9 @@ final class Activator {
 		if ( $from > 0 && $from < 15 ) {
 			self::migrate_to_v15();
 		}
+		if ( $from > 0 && $from < 16 ) {
+			self::migrate_to_v16();
+		}
 	}
 
 	/**
@@ -183,6 +186,10 @@ final class Activator {
 				'created_at'       => $now,
 			]
 		);
+	}
+
+	private static function migrate_to_v16(): void {
+		// Phase 6-14 tables are plain dbDelta work; nothing to back-fill yet.
 	}
 
 	private static function migrate_to_v13(): void {
@@ -727,6 +734,9 @@ final class Activator {
 			'nowpayments.pay_currency'      => 'usdttrc20',
 			'nowpayments.price_currency'    => 'usd',
 			'nowpayments.usd_rate_irt'      => 0,
+			'bale.provider_token'           => '',
+			'bale.bot_token'                => '',
+			'bnpl.cash_discount_percent'    => 0,
 			'translation.provider'          => '',
 			'translation.base_url'          => '',
 			'translation.api_key'           => '',
@@ -742,6 +752,31 @@ final class Activator {
 			'ai_credits.purchase_percent'   => 2.0,
 			'ai_credits.min_topup'          => 10000,
 			'giveaway.enabled'              => true,
+			'dm.provider'                   => 'manychat',
+			'chatplace.api_key'             => '',
+			'chatplace.base_url'            => 'https://api.chatplace.io',
+			'master_payment.enabled'        => true,
+			'master_payment.release_hours'  => 24,
+			'master_payment.fx_fee_percent' => 2.0,
+			'legal.national_id_check'       => false,
+			'legal.shahkar_api_key'         => '',
+			'legal.shahkar_base_url'        => '',
+			'domain.provider'               => '',
+			'domain.provider_api_key'       => '',
+			'domain.provider_base_url'      => '',
+			'domain.mother_subdomain'       => 'igbz.ir',
+			'webpresence.google_*'          => '',
+			'i18n.enabled'                  => false,
+			'i18n.languages'                => 'fa',
+			'i18n.default_language'         => 'fa',
+			'stripe.enabled'                => false,
+			'stripe.secret_key'             => '',
+			'paypal.enabled'                => false,
+			'paypal.client_id'              => '',
+			'basalam.enabled'               => false,
+			'basalam.api_key'               => '',
+			'basalam.base_url'              => 'https://api.basalam.com',
+			'basalam.gharhe_id'             => '',
 			'marketplace.enabled'           => true,
 			'marketplace.torob.enabled'     => true,
 			'marketplace.emalls.enabled'    => true,

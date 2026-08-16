@@ -143,6 +143,12 @@ final class RestApiModule implements ModuleInterface {
 			$controllers[] = new FxController();
 		if ( \IGBZ\Suite\Support\Modules::enabled( \IGBZ\Suite\Support\Modules::INSTAGRAM ) && $plugin->has( 'ai.studio' ) ) {
 			$controllers[] = new \IGBZ\Suite\Modules\RestApi\Controllers\AiStudioController();
+		if ( \IGBZ\Suite\Support\Modules::enabled( \IGBZ\Suite\Support\Modules::MULTITENANT ) && $plugin->has( 'logistics.courier' ) ) {
+			$controllers[] = new \IGBZ\Suite\Modules\RestApi\Controllers\CourierController();
+		if ( \IGBZ\Suite\Support\Modules::enabled( \IGBZ\Suite\Support\Modules::MULTITENANT ) && $plugin->has( 'domain' ) ) {
+			$controllers[] = new \IGBZ\Suite\Modules\RestApi\Controllers\DomainController();
+		}
+		}
 		}
 		}
 

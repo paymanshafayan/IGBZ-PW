@@ -77,6 +77,12 @@ final class SettingsPage {
 			$tabs['gamification'] = __( 'Gamification', 'igbz-suite' );
 			$tabs['translation'] = __( 'Translation', 'igbz-suite' );
 		}
+		if ( Modules::enabled( Modules::MULTITENANT ) ) {
+			$tabs['domain']    = __( 'Domain', 'igbz-suite' );
+			$tabs['master']    = __( 'Master payment', 'igbz-suite' );
+			$tabs['legal']     = __( 'Legal auth', 'igbz-suite' );
+			$tabs['i18n']      = __( 'Languages', 'igbz-suite' );
+		}
 
 		$tabs['advanced'] = __( 'Advanced', 'igbz-suite' );
 
@@ -763,6 +769,39 @@ final class SettingsPage {
 					[ 'key' => 'translation.auth_scheme', 'label' => __( 'Auth scheme', 'igbz-suite' ), 'placeholder' => 'Bearer' ],
 					[ 'key' => 'translation.path', 'label' => __( 'Translate path', 'igbz-suite' ), 'placeholder' => '/v1/translate' ],
 					[ 'key' => 'translation.result_json_path', 'label' => __( 'Result JSON path', 'igbz-suite' ), 'placeholder' => 'translatedFields' ],
+				];
+
+			case 'domain':
+				return [
+					[ 'key' => 'domain.provider', 'label' => __( 'Domain provider', 'igbz-suite' ) ],
+					[ 'key' => 'domain.provider_api_key', 'label' => __( 'Domain provider API key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'domain.provider_base_url', 'label' => __( 'Domain provider base URL', 'igbz-suite' ) ],
+					[ 'key' => 'domain.mother_subdomain', 'label' => __( 'Mother-site subdomain base', 'igbz-suite' ), 'placeholder' => 'igbz.ir' ],
+				];
+
+			case 'master':
+				return [
+					[ 'key' => 'master_payment.enabled', 'label' => __( 'Master payment (escrow) enabled', 'igbz-suite' ), 'type' => 'checkbox' ],
+					[ 'key' => 'master_payment.release_hours', 'label' => __( 'Release window (hours after delivery)', 'igbz-suite' ), 'type' => 'number', 'min' => 1, 'max' => 720 ],
+					[ 'key' => 'master_payment.fx_fee_percent', 'label' => __( 'FX central fee (%)', 'igbz-suite' ), 'type' => 'number', 'min' => 0, 'max' => 20, 'step' => 'any' ],
+				];
+
+			case 'legal':
+				return [
+					[ 'key' => 'legal.national_id_check', 'label' => __( 'National-id match at payment', 'igbz-suite' ), 'type' => 'checkbox', 'help' => __( 'Only active once the senior admin stores the Shahkar key.', 'igbz-suite' ) ],
+					[ 'key' => 'legal.shahkar_api_key', 'label' => __( 'Shahkar API key (senior admin only)', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'legal.shahkar_base_url', 'label' => __( 'Shahkar base URL', 'igbz-suite' ) ],
+				];
+
+			case 'i18n':
+				return [
+					[ 'key' => 'i18n.enabled', 'label' => __( 'Multilingual store', 'igbz-suite' ), 'type' => 'checkbox' ],
+					[ 'key' => 'i18n.languages', 'label' => __( 'Languages (comma: fa,en,ar,tr,ckb)', 'igbz-suite' ) ],
+					[ 'key' => 'i18n.default_language', 'label' => __( 'Default language', 'igbz-suite' ) ],
+					[ 'key' => 'stripe.enabled', 'label' => __( 'Stripe enabled (Cyprus card)', 'igbz-suite' ), 'type' => 'checkbox' ],
+					[ 'key' => 'stripe.secret_key', 'label' => __( 'Stripe secret key', 'igbz-suite' ), 'type' => 'password' ],
+					[ 'key' => 'paypal.enabled', 'label' => __( 'PayPal enabled (Cyprus)', 'igbz-suite' ), 'type' => 'checkbox' ],
+					[ 'key' => 'paypal.client_id', 'label' => __( 'PayPal client id', 'igbz-suite' ), 'type' => 'password' ],
 				];
 
 			case 'advanced':

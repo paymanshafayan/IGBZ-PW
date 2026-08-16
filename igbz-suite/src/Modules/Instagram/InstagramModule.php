@@ -2,6 +2,7 @@
 namespace IGBZ\Suite\Modules\Instagram;
 
 use IGBZ\Suite\Modules\Instagram\Gateways\ManyChatClient;
+use IGBZ\Suite\Modules\Instagram\Gateways\ChatPlaceClient;
 use IGBZ\Suite\Modules\Instagram\Services\AccountCredentials;
 use IGBZ\Suite\Modules\Instagram\Services\ContentScheduler;
 use IGBZ\Suite\Modules\Instagram\Services\FunnelService;
@@ -118,6 +119,8 @@ final class InstagramModule implements ModuleInterface {
 			( new Admin\InsightsPage() )->register();
 			( new Admin\AiStudioPage() )->register();
 			( new Admin\GiveawayPage() )->register();
+
+		add_action( 'igbz_ig_content_published', [ $this, 'basalam_publish' ], 10, 2 );
 		}
 	}
 
@@ -148,7 +151,16 @@ final class InstagramModule implements ModuleInterface {
 			'ig.insights',
 			static fn ( Plugin $c ) => new InsightsService( $c->db(), $c->get( 'ig.manus' ), $c->get( 'ig.prompts' ), $c->logger() )
 		);
-		$plugin->bind( 'ig.manychat', static fn ( Plugin $c ) => new ManyChatClient( $c->http(), $c->logger() ) );
+		$plugin->bind(
+			'ig.manychat',
+			static function ( Plugin $c ) {
+				$provider = $c->settings()->string( 'dm.provider', 'manychat' );
+				if ( 'chatplace' === $provider ) {
+					return new ChatPlaceClient( $c->http(), $c->logger() );
+				}
+				return new ManyChatClient( $c->http(), $c->logger() );
+			}
+		);
 
 		// Direct messaging is routed per capability rather than per vendor: no single provider
 		// covers text, video and native post sharing, and the paid-post feature needs all three.
@@ -626,5 +638,26 @@ final class InstagramModule implements ModuleInterface {
 		];
 
 		return $rows;
+	}
+
+	/** Auto-publish Instagram-made content to Basalam when enabled. */
+	public function basalam_publish( int $content_id, $content = null ): void {
+		if ( ! igbz()->settings()->bool( 'basalam.enabled', false ) || ! igbz()->has( 'marketplace.basalam' ) ) {
+			return;
+		}
+		if ( null === $content ) {
+			$content = igbz()->get( 'ig.manus' )->content( $content_id );
+		}
+		if ( ! $content ) {
+			return;
+		}
+		$media = json_decode( (string) ( $content['media'] ?? '{}' ), true );
+		igbz()->get( 'marketplace.basalam' )->publish_content(
+			[
+				'kind'       => (string) ( $content['kind'] ?? 'post' ),
+				'caption'    => (string) ( $content['caption'] ?? '' ),
+				'media_url'  => (string) ( $media['url'] ?? $media[0]['url'] ?? '' ),
+			]
+		);
 	}
 }
