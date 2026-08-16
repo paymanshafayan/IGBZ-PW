@@ -57,6 +57,7 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 bash _devenv/setup.sh     # build (~30s if npm is warm)
 bash _devenv/run.sh       # site on http://127.0.0.1:9400, auto-logged-in as admin
 bash _devenv/test.sh      # 1172 assertions + syntax check on 234 files
+bash _devenv/makepot.sh   # rebuild languages/igbz-suite.pot (--check to only report staleness)
 ```
 
 `_devenv/` contains committed WordPress and WooCommerce zips precisely because **`/tmp` is wiped
@@ -120,22 +121,30 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 > **Ordering trap:** anything needed *during activation* must be registered at file-load time, not
 > inside `on_plugins_loaded()`. This is why `Cron::register_schedules()` is called at load time.
 
-**Modules** (`Modules::all()`): `multitenant`, `instagram`, `hub`, `rest_api`. Default enabled:
-`multitenant`. Option: `igbz_enabled_modules`.
+**Modules** (`Modules::all()`): `multitenant`, `instagram`, `hub`, `rest_api`, `fx`. Default
+enabled: `multitenant`. Option: `igbz_enabled_modules`.
 
-**Container ids**
+**Container ids** (the authoritative per-module table is in `igbz-suite/README.md` → *Architecture*)
 - core: `settings, logger, db, http, tenancy`
-- multitenant: `tenants, wallet, plans, bnpl.providers, bnpl, affiliate, lms, payments, otp, marketplace`
+- multitenant: `tenants, wallet, plans, bnpl.providers, bnpl, affiliate, lms, lms.vod, payments,
+  otp, legal.nid, marketplace, marketplace.sync, marketplace.mappings, marketplace.basalam,
+  logistics, logistics.courier, logistics.labels, master.payment, domain, webpresence, seo,
+  translation, translation.adapter, i18n, gamification, gamification.carts`
 - instagram: `ig.prompts, ig.credentials, ig.manus_client, ig.manus, ig.scheduler, ig.insights, ig.manychat, ig.subscribers, ig.funnels`,
+  plus the DM provider switch (`dm.provider = manychat|chatplace`): `ig.dm, ig.dm_manychat, ig.dm_custom`,
   plus the registration flow: `ig.skus, ig.translations, ig.manychat_bridge, ig.intake, ig.publisher, ig.intake_worker, ig.stt, ig.stt_http, ig.stt_manus`,
-  plus the VIP channel: `vip.access, vip.media, vip.posts, vip.social, vip.messages, vip.billing`
+  plus the VIP channel: `vip.access, vip.media, vip.posts, vip.social, vip.messages, vip.billing`,
+  plus phases 8/14: `ai.studio, ai.credits, giveaways`
 - hub: `hub.stats, hub.directory, hub.vip, hub.domains, hub.blocks, hub.signup`
 - rest_api: `api.tokens, api.auth, api.devices, api.google_auth, api.push, api.notifications`
+- fx: `fx.wallet, fx.accounts, fx.rates, fx.meter, fx.topup, fx.billing, fx.payouts, fx.ramp, fx.reports`
 
-**Admin screens** (top-level `igbz`): `igbz`, `igbz-settings`, `igbz-tenants`, `igbz-wallet`,
-`igbz-plans`, `igbz-bnpl`, `igbz-affiliate`, `igbz-courses`, `igbz-payments`, `igbz-ig-accounts`,
-`igbz-ig-intake`, `igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`,
-`igbz-vip`, `igbz-hub`, `igbz-mobile-api`.
+**Admin screens** — 28 of them, all under the top-level `igbz`: `igbz`, `igbz-settings`,
+`igbz-tenants`, `igbz-wallet`, `igbz-plans`, `igbz-bnpl`, `igbz-affiliate`, `igbz-courses`,
+`igbz-payments`, `igbz-master-payment`, `igbz-logistics`, `igbz-marketplaces`, `igbz-seo`,
+`igbz-translator`, `igbz-gamification`, `igbz-domains`, `igbz-fx`, `igbz-ig-accounts`,
+`igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`, `igbz-ig-intake`,
+`igbz-vip`, `igbz-ai-studio`, `igbz-giveaways`, `igbz-hub`, `igbz-mobile-api`.
 
 **REST**: 199 routes across `igbz/v1` (incl. 14 `/intake/*`, 29 `/vip/*`, `/fx/*`, `/courier/*`,
 `/domains/*`, `/master-payment/*`, `/ai/*`) and `igbz-hub/v1`.
@@ -722,7 +731,33 @@ to enqueue. The DDL is in the git history if a future subsystem wants it.
 
 ---
 
-## 8. Git
+## 8. Translations (`.pot`)
+
+`wp-cli i18n make-pot` is not installable here (no Composer, and wordpress.org is blocked), so the
+template is rebuilt by **`bash _devenv/makepot.sh`** — `_devenv/makepot.php` run through the same
+php-wasm CLI the tests use. `--check` reports staleness without writing, which is what you want in
+a review pass.
+
+Things to know before you touch it:
+
+- It scans **`src/` only** and recognises the five gettext calls this plugin actually uses:
+  `__`, `_e`, `esc_html__`, `esc_html_e`, `esc_attr__`, `esc_attr_e` and `_n`. If you introduce
+  `_x`/`_nx`, add them to `FUNCTIONS` in the script *and* teach it to emit `msgctxt` — it does not
+  today, because no string in this plugin has ever needed one.
+- **Only literal strings are extracted.** A call whose text or domain is built from a variable or a
+  concatenation is skipped with a warning on stderr, exactly as wp-cli would skip it. A warning
+  there means the string is untranslatable in practice, not that the tool failed.
+- The output format is pinned to the file that shipped before — sorted by msgid, references sorted
+  one per line, no wrapping, no `msgctxt`, no translator comments — so a rebuild produces a
+  readable diff instead of a whole-file rewrite. It was validated by regenerating the template at
+  commit `b917913` and diffing: the only differences were the `FunnelsPage` strings that the
+  shipped `.pot` had missed since `92df5da`.
+- `POT-Creation-Date` is the one line that always changes; the staleness check ignores it, so an
+  up-to-date template is left untouched rather than re-stamped.
+
+---
+
+## 9. Git
 
 Work happens on the session branch; push only to that branch. Never rewrite `main`.
 Keep generated artifacts out of git — `_devenv/.work/` is ignored, and the two zips in `_devenv/`

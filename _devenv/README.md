@@ -47,6 +47,8 @@ unchanged on both WP 6.5.5 / WC 9.4.2 / PHP 8.2 and WP 7.0.4 / WC 11.0.1 / PHP 8
 bash _devenv/setup.sh          # build the environment (~1-2 min the first time)
 bash _devenv/run.sh            # start the site on http://127.0.0.1:9400
 bash _devenv/test.sh           # unit tests + lint
+bash _devenv/makepot.sh        # rebuild igbz-suite/languages/igbz-suite.pot
+bash _devenv/makepot.sh --check  # report whether that template is stale, write nothing
 ```
 
 `setup.sh` is idempotent and safe to re-run. It never writes inside the repository except to
@@ -67,3 +69,12 @@ is needed any more.
 
 WooCommerce needs no server: it is simply extracted and bind-mounted into the site as
 `wp-content/plugins/woocommerce`.
+
+## Translation template
+
+`makepot.sh` rebuilds `igbz-suite/languages/igbz-suite.pot` by running `makepot.php` through the
+php-wasm CLI, because `wp-cli i18n make-pot` needs Composer and wordpress.org, and neither is
+reachable here. It scans `src/`, collects the literal `__`/`_e`/`esc_html__`/`esc_html_e`/
+`esc_attr__`/`esc_attr_e`/`_n` calls carrying the `igbz-suite` domain, and writes the template in
+the same format as before (sorted by msgid, one reference per line, no wrapping) so rebuilds stay
+diffable. Non-literal calls are reported on stderr and skipped, which is what wp-cli does too.
