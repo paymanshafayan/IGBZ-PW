@@ -59,6 +59,11 @@ final class SeoPage {
 		wp_nonce_field( 'igbz_seo_meta' );
 		printf( '<input type="hidden" name="igbz_seo_action" value="meta" />' );
 		echo '<table class="form-table"><tbody>';
+		echo '<tr><th><label for="pprod">' . esc_html__( 'Product (optional save)', 'igbz-suite' ) . '</label></th><td><select id="pprod" name="product_id"><option value="0">' . esc_html__( '— preview only —', 'igbz-suite' ) . '</option>';
+		foreach ( wc_get_products( [ 'limit' => 100, 'status' => 'publish' ] ) as $prod ) {
+			printf( '<option value="%1$d">%2$s</option>', (int) $prod->get_id(), esc_html( (string) $prod->get_name() ) );
+		}
+		echo '</select></td></tr>';
 		echo '<tr><th><label for="pname">' . esc_html__( 'Product name', 'igbz-suite' ) . '</label></th><td><input type="text" id="pname" name="name" class="regular-text" required /></td></tr>';
 		echo '<tr><th><label for="pdesc">' . esc_html__( 'Description', 'igbz-suite' ) . '</label></th><td><textarea id="pdesc" name="description" rows="3" class="large-text"></textarea></td></tr>';
 		echo '</tbody></table>';
@@ -109,11 +114,19 @@ final class SeoPage {
 
 		if ( 'meta' === $action ) {
 			View::check_nonce( 'igbz_seo_meta' );
-			$meta = ( new SeoService() )->generate(
-				sanitize_text_field( (string) ( $_POST['name'] ?? '' ) ),
-				sanitize_textarea_field( (string) ( $_POST['description'] ?? '' ) )
-			);
-			set_transient( 'igbz_seo_last', $meta, 60 );
+			$name = sanitize_text_field( (string) ( $_POST['name'] ?? '' ) );
+			$desc = sanitize_textarea_field( (string) ( $_POST['description'] ?? '' ) );
+			$meta = ( new SeoService() )->generate( $name, $desc );
+
+			// Save onto a real product when one is chosen (fixes the nop gap).
+			$product_id = (int) ( $_POST['product_id'] ?? 0 );
+			if ( $product_id > 0 ) {
+				update_post_meta( $product_id, 'igbz_seo_title', sanitize_text_field( $meta['meta_title'] ) );
+				update_post_meta( $product_id, 'igbz_seo_description', sanitize_textarea_field( $meta['meta_description'] ) );
+				View::notice( __( 'Meta generated and saved onto the product.', 'igbz-suite' ), 'success' );
+			} else {
+				set_transient( 'igbz_seo_last', $meta, 60 );
+			}
 			return;
 		}
 

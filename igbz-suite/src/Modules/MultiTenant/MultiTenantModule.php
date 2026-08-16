@@ -531,9 +531,25 @@ $plugin->bind( 'logistics', static fn ( Plugin $c ) => new \IGBZ\Suite\Modules\M
 		$master->hold( $tenant, $order_id, (float) $order->get_total(), 'IRT', (string) $order->get_transaction_id(), 'rial' );
 	}
 
-	/** Enable a cash-discount coupon when BNPL cash discount is configured. */
-	public function enable_cash_discount( bool $enabled ): bool {
-		return $enabled;
+	/**
+	 * Cash discount (legal pricing rule, phase 6): when BNPL is enabled and
+	 * the buyer pays without instalments, they get an n% cash discount off
+	 * the base price (installment price stays the base price).
+	 */
+	public function apply_cash_discount( $cart ): void {
+		if ( is_admin() && ! defined( 'DOING_AJAX' ) ) {
+			return;
+		}
+		$percent = (float) igbz()->settings()->float( 'bnpl.cash_discount_percent', 0 );
+		if ( $percent <= 0 ) {
+			return;
+		}
+		$chosen = WC()->session ? (string) WC()->session->get( 'chosen_payment_method' ) : '';
+		if ( 'igbz_bnpl' === $chosen ) {
+			return; // instalments: no discount
+		}
+		$subtotal = (float) WC()->cart->get_subtotal();
+		WC()->cart->add_fee( __( 'Cash discount', 'igbz-suite' ), -1 * ( $subtotal * $percent / 100 ) );
 	}
 
 	/** Default pages (terms, conditions, privacy) for every new store. */

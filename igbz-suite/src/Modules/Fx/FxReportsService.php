@@ -119,7 +119,8 @@ final class FxReportsService {
 
 		$bills = $this->db->results(
 			'SELECT status, amount_usd FROM ' . $this->db->table( 'fx_bills' )
-			. ( $where ? ' WHERE ' . implode( ' AND ', $where ) : '' )
+			. ( $where ? ' WHERE ' . implode( ' AND ', $where ) : '' ),
+			...$params
 		);
 
 		return [ $rows, $bills ];
