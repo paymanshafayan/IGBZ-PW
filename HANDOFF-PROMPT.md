@@ -19,14 +19,16 @@
 
 1. `PROJECT-STATE.md` — **اول این.** وضعیت کامل پروژه: چه ساخته شده، در کدام کامیت، چرا، و
    چه تصمیم‌هایی هنوز باز است.
-2. `igbz-suite/README.md` — مرجع فنی افزونه: نصب، تنظیمات، صفحات مدیر، REST API، معماری.
-3. `_devenv/AGENT-BRIEF.md` — جزئیات درونی زیرسیستم‌ها و تله‌هایی که قبلاً وقت زیادی گرفته‌اند.
-4. سندهای طراحی فازهای اخیر: `DESIGN-PHASE6-PAYMENTS.md`، `DESIGN-PHASE7-COURIER.md`،
+2. `MODULES-REFERENCE.md` — مرجع ماژول‌ها: شرح کارکرد و مستندات فنی همهٔ ماژول‌ها و
+   زیرسیستم‌ها (سرویس‌ها، جداول، کرون‌ها، صفحات ادمین، REST، کلیدهای تنظیمات).
+3. `igbz-suite/README.md` — مرجع فنی افزونه: نصب، تنظیمات، صفحات مدیر، REST API، معماری.
+4. `_devenv/AGENT-BRIEF.md` — جزئیات درونی زیرسیستم‌ها و تله‌هایی که قبلاً وقت زیادی گرفته‌اند.
+5. سندهای طراحی فازهای اخیر: `DESIGN-PHASE6-PAYMENTS.md`، `DESIGN-PHASE7-COURIER.md`،
    `DESIGN-PHASE9-MARKETPLACES.md`، `DESIGN-PHASE10-SEO.md`، `DESIGN-PHASE12-INTERNATIONAL.md`،
    `DESIGN-DOMAIN.md`، `DESIGN-LEGAL-AUTH.md`، `DESIGN-FX.md`.
-5. `DESIGN-APPS-ROADMAP.md`، `API-KEYS.md`، `PROMPTS-SEO-HUSHVARE.md`،
+6. `DESIGN-APPS-ROADMAP.md`، `API-KEYS.md`، `PROMPTS-SEO-HUSHVARE.md`،
    `PROMPT-IG-GROWTH-HUSHVARE.md`.
-6. `_devenv/README.md` — محیط توسعهٔ آفلاین.
+7. `_devenv/README.md` — محیط توسعهٔ آفلاین.
 
 خلاصهٔ خیلی کوتاه: پورت محصول IGBZ از nopCommerce به **وردپرس + ووکامرس** به شکل **یک افزونه
 با پنج ماژول قابل‌خاموش‌وروشن** (`multitenant`, `instagram`, `hub`, `rest_api`, `fx`).
