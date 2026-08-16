@@ -1,0 +1,27 @@
+{
+  "name": "hoosha",
+  "version": "0.1.0",
+  "description": "هوشا — دستیار عامل (agent) بومی با پشتیبانی از هر پرووایدری",
+  "type": "module",
+  "bin": {
+    "hoosha": "./src/cli.js"
+  },
+  "main": "./src/server.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "desktop": "electron desktop/main.js"
+  },
+  "keywords": [
+    "agent",
+    "ai",
+    "mcp",
+    "openai-compatible",
+    "anthropic-compatible"
+  ],
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

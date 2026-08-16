@@ -1,0 +1,63 @@
+import { providerInfo } from './catalog.js';
+import { createOpenAiProvider } from './openai.js';
+import { createAnthropicProvider } from './anthropic.js';
+import { createMockProvider } from './mock.js';
+
+export { PROVIDERS, providerInfo } from './catalog.js';
+
+/**
+ * ساخت آداپتور از روی پروفایل ذخیره‌شده.
+ *
+ * @param {{provider:string,baseUrl?:string,apiKey?:string,model?:string}} profile
+ */
+export function createProvider( profile ) {
+	const info = providerInfo( profile.provider );
+	if ( ! info ) {
+		throw new Error( `پرووایدر ناشناخته: ${ profile.provider }` );
+	}
+
+	/** @type {import('./types.js').ProviderConfig} */
+	const cfg = {
+		providerId: info.id,
+		kind: info.kind,
+		baseUrl: profile.baseUrl || info.baseUrl,
+		apiKey: profile.apiKey || '',
+		model: profile.model || info.defaultModel || '',
+	};
+
+	if ( info.kind === 'mock' ) {
+		return createMockProvider( cfg );
+	}
+	if ( info.kind === 'anthropic' ) {
+		return createAnthropicProvider( cfg );
+	}
+	return createOpenAiProvider( cfg );
+}
+
+/**
+ * آیا این پروفایل برای کار آماده است؟
+ * @param {{provider:string,baseUrl?:string,apiKey?:string,model?:string}} profile
+ * @returns {{ok:boolean,missing:string[]}}
+ */
+export function validateProfile( profile ) {
+	const info = providerInfo( profile.provider );
+	/** @type {string[]} */
+	const missing = [];
+
+	if ( ! info ) {
+		return { ok: false, missing: [ 'پرووایدر' ] };
+	}
+	if ( info.kind !== 'mock' ) {
+		if ( ! ( profile.baseUrl || info.baseUrl ) ) {
+			missing.push( 'آدرس پایه (baseURL)' );
+		}
+		if ( info.needsKey && ! profile.apiKey ) {
+			missing.push( 'کلید API' );
+		}
+		if ( ! ( profile.model || info.defaultModel ) ) {
+			missing.push( 'نام مدل' );
+		}
+	}
+
+	return { ok: missing.length === 0, missing };
+}
