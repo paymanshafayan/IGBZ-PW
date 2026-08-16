@@ -247,6 +247,7 @@ final class VipLandingPage {
 				<a class="igbz-vip-btn igbz-vip-primary" href="<?php echo esc_url( $this->deep_link( (string) $post['shortcode'] ), $this->allowed_schemes() ); ?>">
 					<?php esc_html_e( 'Open in the app', 'igbz-suite' ); ?>
 				</a>
+				<?php $this->expiry_warning( $post, false ); ?>
 			</div>
 		<?php elseif ( $sell_membership || $sell_post ) : ?>
 			<div class="igbz-vip-offers">
@@ -257,6 +258,8 @@ final class VipLandingPage {
 						<?php esc_html_e( 'How to unlock it', 'igbz-suite' ); ?>
 					<?php endif; ?>
 				</h2>
+
+				<?php $this->expiry_warning( $post ); ?>
 
 				<?php if ( $sell_membership ) : ?>
 					<form class="igbz-vip-offer" method="post">
@@ -295,7 +298,7 @@ final class VipLandingPage {
 						<?php wp_nonce_field( 'igbz_vip_share', '_igbz_vip_nonce' ); ?>
 						<input type="hidden" name="igbz_vip_action" value="buy_post" />
 						<h3><?php esc_html_e( 'Just this post', 'igbz-suite' ); ?></h3>
-						<p class="igbz-vip-hint"><?php esc_html_e( 'A one-off payment. This post stays in your library, with no membership.', 'igbz-suite' ); ?></p>
+						<p class="igbz-vip-hint"><?php esc_html_e( 'A one-off payment, no membership. It unlocks this post for as long as the post is online — save it in the app to keep it after that.', 'igbz-suite' ); ?></p>
 						<p class="igbz-vip-price"><?php echo esc_html( $this->money( $access->price, '' ) ); ?></p>
 						<button type="submit" class="igbz-vip-btn"><?php esc_html_e( 'Buy this post', 'igbz-suite' ); ?></button>
 					</form>
@@ -508,6 +511,50 @@ final class VipLandingPage {
 	private function excerpt( string $caption ): string {
 		$clean = trim( wp_strip_all_tags( $caption ) );
 		return mb_strlen( $clean ) > 240 ? mb_substr( $clean, 0, 240 ) . '…' : $clean;
+	}
+
+	/**
+	 * Tell the buyer, before they pay, that the post does not last — and how to keep it.
+	 *
+	 * This sits above the buttons rather than in the small print underneath them, because the
+	 * complaint it exists to prevent is "I paid for something that vanished a week later". Saying
+	 * it late is the same as not saying it.
+	 */
+	private function expiry_warning( array $post, bool $before_purchase = true ): void {
+		$expires_at = (string) ( $post['expires_at'] ?? '' );
+		if ( '' === $expires_at ) {
+			return;
+		}
+
+		$timestamp = strtotime( $expires_at . ' UTC' );
+		if ( ! $timestamp ) {
+			return;
+		}
+
+		$when = wp_date(
+			(string) get_option( 'date_format', 'Y-m-d' ) . ' ' . (string) get_option( 'time_format', 'H:i' ),
+			$timestamp
+		);
+
+		?>
+		<p class="igbz-vip-expiry-warning">
+			<?php
+			echo esc_html(
+				sprintf(
+					/* translators: %s: date and time the post is deleted. */
+					__( 'This post is available until %s and is then removed from the server.', 'igbz-suite' ),
+					$when
+				)
+			);
+			?>
+			<br />
+			<?php if ( $before_purchase ) : ?>
+				<?php esc_html_e( 'Want to keep it? After buying, tap the save icon on the post in the app and your own copy stays in the app.', 'igbz-suite' ); ?>
+			<?php else : ?>
+				<?php esc_html_e( 'Want to keep it? Tap the save icon on the post in the app and your own copy stays in the app.', 'igbz-suite' ); ?>
+			<?php endif; ?>
+		</p>
+		<?php
 	}
 
 	private function expiry_label( string $expires_at ): string {

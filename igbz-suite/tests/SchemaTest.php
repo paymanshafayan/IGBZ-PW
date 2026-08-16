@@ -51,9 +51,9 @@ final class SchemaTest extends TestCase {
 
 		// Tenant scoping is the backbone of the suite: nearly every table must carry the column.
 		// lesson_progress inherits its tenant through enrollment_id, so it deliberately has none;
-		// vip_post_likes and vip_post_views are the same shape — a pure (post, user) join row whose
-		// tenant is whatever the post's is. Copying the column onto them would create a second
-		// place for it to be wrong.
+		// vip_post_likes, vip_post_saves and vip_post_views are the same shape — a pure (post, user)
+		// join row whose tenant is whatever the post's is. Copying the column onto them would create
+		// a second place for it to be wrong.
 		$unscoped = [
 			'plans',
 			'logs',
@@ -62,6 +62,7 @@ final class SchemaTest extends TestCase {
 			'tenants',
 			'lesson_progress',
 			'vip_post_likes',
+			'vip_post_saves',
 			'vip_post_views',
 			'fx_rates',
 			'fx_prices',

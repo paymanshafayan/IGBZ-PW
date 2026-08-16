@@ -56,7 +56,7 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 ```bash
 bash _devenv/setup.sh     # build (~30s if npm is warm)
 bash _devenv/run.sh       # site on http://127.0.0.1:9400, auto-logged-in as admin
-bash _devenv/test.sh      # 1172 assertions + syntax check on 234 files
+bash _devenv/test.sh      # 1209 assertions + syntax check on 235 files
 bash _devenv/makepot.sh   # rebuild languages/igbz-suite.pot (--check to only report staleness)
 ```
 
@@ -149,13 +149,15 @@ enabled: `multitenant`. Option: `igbz_enabled_modules`.
 **REST**: 199 routes across `igbz/v1` (incl. 14 `/intake/*`, 29 `/vip/*`, `/fx/*`, `/courier/*`,
 `/domains/*`, `/master-payment/*`, `/ai/*`) and `igbz-hub/v1`.
 
-**Schema**: 69 tables in `src/Support/Schema.php` (DB version 16; the ladder: v8 `ig_intake`,
+**Schema**: 70 tables in `src/Support/Schema.php` (DB version 17; the ladder: v8 `ig_intake`,
 v10 nine `vip_*` tables, v11 LMS wiring, v12 `ig_content.ig_shortcode` + funnel reward relabel,
 v13 dropped the never-used `jobs` queue, v14 six `fx_*` tables, v15 phases 6–14 tables, v16 the
-master-payment/courier/domain/label/legal completion pass). All carry `tenant_id` except
+master-payment/courier/domain/label/legal completion pass, v17 `vip_post_saves` plus the ratified
+VIP expiry policy). All carry `tenant_id` except
 `tenants`, `tenant_domains`, `tenant_members`, `plans`, `logs`, `lesson_progress`,
-`vip_post_likes`, `vip_post_views`, `fx_rates`, `fx_prices`, `ig_label_group_items`,
-`ig_courier_tracking`, `ig_courier_chat` (whitelist in `tests/SchemaTest.php`). Product/order
+`vip_post_likes`, `vip_post_saves`, `vip_post_views`, `fx_rates`, `fx_prices`,
+`ig_label_group_items`, `ig_courier_tracking`, `ig_courier_chat` (whitelist in
+`tests/SchemaTest.php`). Product/order
 tenant scoping uses the meta key `_igbz_tenant_id`.
 
 **Payments**: WooCommerce payment methods `igbz_wallet`, `igbz_bnpl`, and adapter ids
@@ -218,8 +220,8 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 1172 assertions in 23 test cases; 234 files lint clean.
-- 28/28 admin screens return 200 with no notices; 69/69 tables (`/?igbz_health=1`); 3 cron hooks
+- 1209 assertions in 23 test cases; 235 files lint clean.
+- 28/28 admin screens return 200 with no notices; 70/70 tables (`/?igbz_health=1`); 3 cron hooks
   scheduled.
 - All 14+ payment gateways register with WooCommerce and their settings screens render; the
   direct banks show a Test connection button.
@@ -489,10 +491,24 @@ accepted. The heavy machinery — `FLAG_SECURE`, `isCaptured`, emulator detectio
 links, watermarking — belongs to the **LMS/courses** section only. Applying it to VIP would be
 re-litigating a decision already made.
 
-**Nine tables**, all `vip_*`: `plans`, `memberships`, `posts`, `post_likes`, `post_comments`,
-`post_views`, `entitlements`, `threads`, `messages`. `vip_post_likes` and `vip_post_views` carry
-**no `tenant_id`** on purpose — they are pure join rows and the tenant belongs to the post. They are
-whitelisted in `SchemaTest::$unscoped`; adding a tenant column to them is a regression, not a fix.
+**Ten tables**, all `vip_*`: `plans`, `memberships`, `posts`, `post_likes`, `post_saves`,
+`post_comments`, `post_views`, `entitlements`, `threads`, `messages`. `vip_post_likes`,
+`vip_post_saves` and `vip_post_views` carry **no `tenant_id`** on purpose — they are pure join rows
+and the tenant belongs to the post. They are whitelisted in `SchemaTest::$unscoped`; adding a tenant
+column to them is a regression, not a fix.
+
+**Expiry is platform policy (v17).** A post is deleted from the server after
+`vip.default_expiry_days` (7), the window is the IGBZ senior admin's alone, and the store admin's
+editor no longer offers `expires_at`/`expiry_action` — it states them. Both facts are printed to
+the buyer *above* the buy buttons, because the whole risk is somebody paying on day six. The save
+icon is the compensation, and it is real: `vip_post_saves` plus `GET /vip/posts/{id}/offline`, which
+hands an entitled member a longer-lived signed link so the app can keep a private copy. `offline_at`
+records that the bytes were actually fetched — a bookmark alone does not survive the purge. **This
+offline path is VIP-only; the LMS must never get one.** Rationale: `DESIGN-VIP-EXPIRY.md`.
+
+> `VipLandingPage::render()` ends in `exit`, so it cannot be called from the test process — doing so
+> kills the whole suite (the buffered page then leaks into the runner's output, which is the
+> symptom you will see). Test the pieces through reflection and check placement on the live site.
 
 **Services** (`src/Modules/Instagram/Vip/`), wired in `InstagramModule::bind_services()` as
 `vip.access`, `vip.media`, `vip.posts`, `vip.social`, `vip.messages`, `vip.billing`:

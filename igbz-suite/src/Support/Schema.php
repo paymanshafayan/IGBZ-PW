@@ -53,6 +53,7 @@ final class Schema {
 			'vip_memberships',
 			'vip_posts',
 			'vip_post_likes',
+			'vip_post_saves',
 			'vip_post_comments',
 			'vip_post_views',
 			'vip_entitlements',
@@ -816,6 +817,17 @@ final class Schema {
 			PRIMARY KEY  (id),
 			UNIQUE KEY post_user (post_id,user_id),
 			KEY user_likes (user_id,id)
+		) {$charset};";
+
+		$sql[] = "CREATE TABLE {$p}vip_post_saves (
+			id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+			post_id BIGINT UNSIGNED NOT NULL,
+			user_id BIGINT UNSIGNED NOT NULL,
+			offline_at DATETIME NULL,
+			created_at DATETIME NOT NULL,
+			PRIMARY KEY  (id),
+			UNIQUE KEY post_user (post_id,user_id),
+			KEY user_saves (user_id,id)
 		) {$charset};";
 
 		$sql[] = "CREATE TABLE {$p}vip_post_comments (

@@ -33,6 +33,9 @@ final class VipController extends BaseController {
 		register_rest_route( $ns, '/vip/posts/(?P<id>[\d]+)/view', $this->route( 'POST', [ $this, 'view' ], [ $this, 'is_logged_in' ] ) );
 		register_rest_route( $ns, '/vip/posts/(?P<id>[\d]+)/purchase', $this->route( 'POST', [ $this, 'purchase' ], [ $this, 'is_logged_in' ] ) );
 		register_rest_route( $ns, '/vip/posts/(?P<id>[\d]+)/media', $this->route( 'GET', [ $this, 'media' ], [ $this, 'is_logged_in' ] ) );
+		register_rest_route( $ns, '/vip/posts/(?P<id>[\d]+)/save', $this->route( 'POST', [ $this, 'save' ], [ $this, 'is_logged_in' ] ) );
+		register_rest_route( $ns, '/vip/posts/(?P<id>[\d]+)/offline', $this->route( 'GET', [ $this, 'offline' ], [ $this, 'is_logged_in' ] ) );
+		register_rest_route( $ns, '/vip/saved', $this->route( 'GET', [ $this, 'saved' ], [ $this, 'is_logged_in' ] ) );
 
 		register_rest_route(
 			$ns,
@@ -133,6 +136,109 @@ final class VipController extends BaseController {
 	}
 
 	// ----------------------------------------------------------------- social
+
+	/**
+	 * Save (or unsave) a post.
+	 *
+	 * The bookmark half of the promise printed on the purchase page. The app is expected to follow
+	 * a save with a call to /offline: a bookmark alone does not survive the weekly purge, and a
+	 * customer who tapped save and lost the post anyway is a customer who was misled.
+	 */
+	public function save( \WP_REST_Request $request ): \WP_REST_Response {
+		try {
+			$result = $this->social()->toggle_save( (int) $request['id'], get_current_user_id() );
+		} catch ( \RuntimeException $e ) {
+			return 'igbz_vip_not_found' === $e->getMessage()
+				? $this->fail( 'igbz_vip_not_found', __( 'Post not found.', 'igbz-suite' ), 404 )
+				: $this->fail( 'igbz_vip_locked', __( 'You do not have access to this post.', 'igbz-suite' ), 403 );
+		}
+
+		return $this->ok( $result );
+	}
+
+	/**
+	 * The posts this member has saved.
+	 *
+	 * A saved post whose media has already been purged is still returned, locked and with its
+	 * expiry notice, so the app can say "this one is gone from the server — your copy is the only
+	 * one left" instead of quietly dropping it from the list.
+	 */
+	public function saved( \WP_REST_Request $request ): \WP_REST_Response {
+		$user_id             = get_current_user_id();
+		[ $page, $per_page ] = $this->page_args( $request, igbz()->settings()->int( 'vip.feed_page_size', 12 ) );
+
+		$ids   = $this->social()->saved_post_ids( $user_id, $per_page, ( $page - 1 ) * $per_page );
+		$items = [];
+
+		foreach ( $ids as $id ) {
+			$post = $this->posts()->post( $id );
+			if ( ! $post ) {
+				continue;
+			}
+			$items[] = $this->posts()->present(
+				$post,
+				$this->access()->check_row( $user_id, $post ),
+				$this->social()->has_liked( $id, $user_id ),
+				true
+			);
+		}
+
+		return $this->paged( $items, $this->social()->saved_count( $user_id ), $page, $per_page );
+	}
+
+	/**
+	 * Hand the member the bytes of a post they own, so the app can keep a copy.
+	 *
+	 * This is the one place the VIP channel deliberately lets content leave the server for good,
+	 * and it is allowed because the post is going to be deleted anyway: the alternative is selling
+	 * something that evaporates in a week with no way to keep it. The links are longer-lived than
+	 * feed links (a download is not a scroll) but they are still signed, still bound to this
+	 * viewer, and still refused once the post has expired — after that there is nothing to copy.
+	 *
+	 * The heavy-security tier is untouched: LMS video has no offline path and must not gain one.
+	 */
+	public function offline( \WP_REST_Request $request ): \WP_REST_Response {
+		$post_id = (int) $request['id'];
+		$post    = $this->posts()->post( $post_id );
+		if ( ! $post ) {
+			return $this->fail( 'igbz_vip_not_found', __( 'Post not found.', 'igbz-suite' ), 404 );
+		}
+
+		$user_id = get_current_user_id();
+		$access  = $this->access()->check_row( $user_id, $post );
+		if ( ! $access->allowed ) {
+			return $this->fail( 'igbz_vip_locked', __( 'You do not have access to this post.', 'igbz-suite' ), 403 );
+		}
+
+		$ttl   = igbz()->settings()->int( 'vip.offline_link_ttl', 3600 );
+		$media = [];
+
+		foreach ( $this->posts()->decode_media( $post ) as $index => $item ) {
+			$media[] = [
+				'type'     => (string) ( $item['type'] ?? 'image' ),
+				'url'      => igbz()->get( 'vip.media' )->signed_url( $post_id, (int) $index, $user_id, $ttl ),
+				'width'    => (int) ( $item['width'] ?? 0 ),
+				'height'   => (int) ( $item['height'] ?? 0 ),
+				'duration' => (int) ( $item['duration'] ?? 0 ),
+			];
+		}
+
+		if ( [] === $media ) {
+			return $this->fail( 'igbz_vip_no_media', __( 'This post has no media left to download.', 'igbz-suite' ), 410 );
+		}
+
+		$this->social()->mark_offline( $post_id, $user_id );
+
+		return $this->ok(
+			[
+				'post_id'    => $post_id,
+				'caption'    => (string) ( $post['caption'] ?? '' ),
+				'media'      => $media,
+				'expires_in' => $ttl,
+				'notice'     => $this->posts()->expiry_notice( $post['expires_at'] ?? null ),
+			]
+		);
+	}
 
 	public function like( \WP_REST_Request $request ): \WP_REST_Response {
 		$post_id = (int) $request['id'];

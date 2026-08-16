@@ -11,6 +11,9 @@
 declare( strict_types=1 );
 
 define( 'ABSPATH', __DIR__ . '/' );
+// The share page prints its own <head>, so it needs the plugin's asset constants.
+define( 'IGBZ_URL', 'https://example.test/wp-content/plugins/igbz-suite/' );
+define( 'IGBZ_VERSION', '1.0.0' );
 define( 'AUTH_KEY', 'test-auth-key-0123456789abcdefghijklmnop' );
 define( 'SECURE_AUTH_SALT', 'test-secure-salt-0123456789abcdefghijkl' );
 define( 'DAY_IN_SECONDS', 86400 );
@@ -332,6 +335,22 @@ function human_time_diff( int $from, int $to = 0 ): string {
 		: sprintf( '%d days', max( 1, (int) round( $diff / DAY_IN_SECONDS ) ) );
 }
 
+/**
+ * The share page sets a status and disables caching before it prints anything. Both are recorded
+ * rather than ignored, so a test can assert that an expired share really answered 410.
+ */
+function status_header( int $code, string $description = '' ): void {
+	$GLOBALS['igbz_test_status_header'] = $code;
+}
+
+function nocache_headers(): void {
+	$GLOBALS['igbz_test_nocache'] = true;
+}
+
+function is_rtl(): bool {
+	return (bool) ( $GLOBALS['igbz_test_rtl'] ?? false );
+}
+
 function wp_rand( int $min = 0, int $max = 0 ): int {
 	return random_int( $min, 0 === $max ? PHP_INT_MAX : $max );
 }
@@ -493,6 +512,42 @@ function __( string $text, string $domain = '' ): string {
 
 function esc_html__( string $text, string $domain = '' ): string {
 	return $text;
+}
+
+function esc_attr__( string $text, string $domain = '' ): string {
+	return $text;
+}
+
+function esc_html_e( string $text, string $domain = '' ): void {
+	echo $text;
+}
+
+function checked( $checked, $current = true, bool $display = true ): string {
+	$out = (string) $checked === (string) $current ? " checked='checked'" : '';
+	if ( $display ) {
+		echo $out;
+	}
+	return $out;
+}
+
+function wp_create_nonce( string $action = '-1' ): string {
+	return 'nonce-' . md5( $action );
+}
+
+function wp_verify_nonce( string $nonce, string $action = '-1' ): bool {
+	return $nonce === wp_create_nonce( $action );
+}
+
+function wp_nonce_field( string $action = '-1', string $name = '_wpnonce', bool $referer = true, bool $display = true ): string {
+	$field = sprintf( '<input type="hidden" name="%s" value="%s" />', $name, wp_create_nonce( $action ) );
+	if ( $display ) {
+		echo $field;
+	}
+	return $field;
+}
+
+function wp_login_url( string $redirect = '' ): string {
+	return 'https://example.test/wp-login.php' . ( '' === $redirect ? '' : '?redirect_to=' . rawurlencode( $redirect ) );
 }
 
 function esc_html( string $text ): string {
@@ -701,6 +756,9 @@ $GLOBALS['wpdb'] = new wpdb();
 require_once dirname( __DIR__ ) . '/src/Support/Autoloader.php';
 \IGBZ\Suite\Support\Autoloader::register( 'IGBZ\\Suite\\', dirname( __DIR__ ) . '/src' );
 
+// Doubles that must be declared inside a plugin namespace to win over a PHP built-in.
+require_once __DIR__ . '/doubles-namespaced.php';
+
 function get_bloginfo( string $show = '' ): string {
 	return 'IGBZ Test Store';
 }
@@ -756,6 +814,7 @@ function igbz_test_reset_settings(): \IGBZ\Suite\Support\Settings {
 	$GLOBALS['igbz_test_sideload_fails'] = false;
 	$GLOBALS['igbz_test_attachments']    = [];
 	$GLOBALS['igbz_test_capabilities']   = [];
+	$GLOBALS['igbz_test_headers']        = [];
 	igbz_test_reset_actions();
 	igbz()->bind( 'settings', static fn () => new \IGBZ\Suite\Support\Settings() );
 	igbz()->bind( 'logger', static fn ( $c ) => new \IGBZ\Suite\Support\Logger( $c->get( 'settings' ) ) );

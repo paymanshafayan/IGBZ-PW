@@ -331,12 +331,19 @@ final class VipPostService {
 		);
 
 		$grants = $this->access->check_many( $user_id, $rows );
-		$liked  = $this->liked_map( $user_id, array_map( static fn( $r ) => (int) $r['id'], $rows ) );
+		$ids    = array_map( static fn( $r ) => (int) $r['id'], $rows );
+		$liked  = $this->liked_map( $user_id, $ids );
+		$saved  = $this->saved_map( $user_id, $ids );
 
 		$items = [];
 		foreach ( $rows as $row ) {
 			$id      = (int) $row['id'];
-			$items[] = $this->present( $row, $grants[ $id ] ?? VipAccess::deny( VipAccess::DENY_NO_MEMBER ), isset( $liked[ $id ] ) );
+			$items[] = $this->present(
+				$row,
+				$grants[ $id ] ?? VipAccess::deny( VipAccess::DENY_NO_MEMBER ),
+				isset( $liked[ $id ] ),
+				isset( $saved[ $id ] )
+			);
 		}
 
 		return [ 'items' => $items, 'total' => $total ];
@@ -351,7 +358,7 @@ final class VipPostService {
 	 * @param array<string,mixed> $row
 	 * @return array<string,mixed>
 	 */
-	public function present( array $row, VipAccess $access, bool $liked = false ): array {
+	public function present( array $row, VipAccess $access, bool $liked = false, bool $saved = false ): array {
 		$media  = $this->decode_media( $row );
 		$locked = ! $access->allowed;
 
@@ -363,11 +370,14 @@ final class VipPostService {
 			'product_id'       => (int) $row['product_id'],
 			'published_at'     => $row['published_at'],
 			'expires_at'       => $row['expires_at'],
+			'retention_days'   => $this->retention_days(),
+			'expiry_notice'    => $this->expiry_notice( $row['expires_at'] ?? null ),
 			'likes_count'      => (int) $row['likes_count'],
 			'comments_count'   => (int) $row['comments_count'],
 			'views_count'      => (int) $row['views_count'],
 			'comments_enabled' => (bool) (int) $row['comments_enabled'],
 			'liked'            => $liked,
+			'saved'            => $saved,
 			'media_count'      => count( $media ),
 			'locked'           => $locked,
 			'access'           => $access->to_array(),
@@ -417,6 +427,22 @@ final class VipPostService {
 	 * @return array<int,true>
 	 */
 	private function liked_map( int $user_id, array $post_ids ): array {
+		return $this->flag_map( 'vip_post_likes', $user_id, $post_ids );
+	}
+
+	/**
+	 * @param array<int,int> $post_ids
+	 * @return array<int,bool>
+	 */
+	private function saved_map( int $user_id, array $post_ids ): array {
+		return $this->flag_map( 'vip_post_saves', $user_id, $post_ids );
+	}
+
+	/**
+	 * @param array<int,int> $post_ids
+	 * @return array<int,bool>
+	 */
+	private function flag_map( string $table, int $user_id, array $post_ids ): array {
 		$post_ids = array_values( array_filter( array_map( 'intval', $post_ids ) ) );
 		if ( $user_id <= 0 || [] === $post_ids ) {
 			return [];
@@ -424,7 +450,7 @@ final class VipPostService {
 
 		$in   = implode( ',', array_fill( 0, count( $post_ids ), '%d' ) );
 		$rows = $this->db->column(
-			'SELECT post_id FROM ' . $this->db->table( 'vip_post_likes' ) . " WHERE user_id = %d AND post_id IN ({$in})",
+			'SELECT post_id FROM ' . $this->db->table( $table ) . " WHERE user_id = %d AND post_id IN ({$in})",
 			...array_merge( [ $user_id ], $post_ids )
 		);
 
@@ -433,6 +459,45 @@ final class VipPostService {
 			$out[ (int) $id ] = true;
 		}
 		return $out;
+	}
+
+	/**
+	 * How long a published post survives, in days.
+	 *
+	 * One accessor rather than a settings read at each call site, because the number appears in
+	 * the app payload, on the store admin's screen and on the public share page, and those three
+	 * disagreeing is exactly the sort of thing a customer notices after they have paid.
+	 */
+	public function retention_days(): int {
+		return max( 0, $this->settings->int( 'vip.default_expiry_days', 7 ) );
+	}
+
+	/**
+	 * The one sentence every surface shows about expiry.
+	 *
+	 * Built here so the app, the share page and the admin screen cannot drift apart. Empty when a
+	 * post has no expiry at all — saying nothing is better than saying "expires never".
+	 */
+	public function expiry_notice( ?string $expires_at ): string {
+		$expires_at = (string) $expires_at;
+		if ( '' === $expires_at ) {
+			return '';
+		}
+
+		$timestamp = strtotime( $expires_at . ' UTC' );
+		if ( ! $timestamp ) {
+			return '';
+		}
+
+		if ( $timestamp <= time() ) {
+			return __( 'This post has expired and has been removed from the server.', 'igbz-suite' );
+		}
+
+		return sprintf(
+			/* translators: %s: formatted date and time the post is removed. */
+			__( 'Available until %s, then it is removed from the server. Tap the save icon in the app to keep your own copy.', 'igbz-suite' ),
+			wp_date( (string) get_option( 'date_format', 'Y-m-d' ) . ' ' . (string) get_option( 'time_format', 'H:i' ), $timestamp )
+		);
 	}
 
 	/**

@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: IGBZ Suite 1.0.0\n"
 "Report-Msgid-Bugs-To: https://github.com/paymanshafayan/IGBZ-WP/issues\n"
-"POT-Creation-Date: 2026-08-16 20:30+0000\n"
+"POT-Creation-Date: 2026-08-16 21:23+0000\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
@@ -63,7 +63,7 @@ msgstr ""
 msgid "%1$s does not point at %2$s yet, and no _igbz-verify TXT record was found."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:246
+#: src/Modules/Instagram/Admin/VipPage.php:278
 msgid "%1$s likes · %2$s comments · %3$s views"
 msgstr ""
 
@@ -75,7 +75,7 @@ msgstr ""
 msgid "%1$s × %2$d"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:965
+#: src/Support/Admin/SettingsPage.php:973
 msgid "%1$s — %2$s."
 msgstr ""
 
@@ -99,7 +99,7 @@ msgstr[1] ""
 msgid "%d commissions approved and credited."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:279
+#: src/Modules/Instagram/Vip/VipLandingPage.php:282
 msgid "%d day"
 msgid_plural "%d days"
 msgstr[0] ""
@@ -172,6 +172,12 @@ msgstr ""
 msgid "%s comments"
 msgstr ""
 
+#: src/Modules/Instagram/Admin/VipPage.php:1142
+msgid "%s day after it is published, this post is removed from the server."
+msgid_plural "%s days after it is published, this post is removed from the server."
+msgstr[0] ""
+msgstr[1] ""
+
 #: src/Modules/Instagram/InstagramModule.php:606
 msgid "%s is selected but not configured, so voice notes fall back to Manus, which takes minutes rather than seconds."
 msgstr ""
@@ -194,7 +200,7 @@ msgstr[1] ""
 msgid "%s was added to your wallet."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:949
+#: src/Support/Admin/SettingsPage.php:957
 msgid "%s — no endpoint set, so it is not used."
 msgstr ""
 
@@ -206,11 +212,11 @@ msgstr ""
 msgid "(awaiting approval)"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:674
+#: src/Modules/Instagram/Admin/VipPage.php:684
 msgid "(cancelling)"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:489
+#: src/Modules/Instagram/Admin/VipPage.php:499
 msgid "(pinned)"
 msgstr ""
 
@@ -218,7 +224,7 @@ msgstr ""
 msgid "(primary)"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:571
+#: src/Modules/Instagram/Admin/VipPage.php:581
 msgid "(unread)"
 msgstr ""
 
@@ -226,7 +232,7 @@ msgstr ""
 msgid "(untitled)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:969
+#: src/Support/Admin/SettingsPage.php:977
 msgid ", "
 msgstr ""
 
@@ -250,7 +256,7 @@ msgstr ""
 msgid "A VIP link signs a customer into a tenant store from the mother site. Each ticket is HMAC signed, expires quickly and can only be redeemed once."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:505
+#: src/Modules/Instagram/Vip/VipLandingPage.php:508
 msgid "A VIP post"
 msgstr ""
 
@@ -303,8 +309,8 @@ msgstr ""
 msgid "A new course is available in your library."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:298
-msgid "A one-off payment. This post stays in your library, with no membership."
+#: src/Modules/Instagram/Vip/VipLandingPage.php:301
+msgid "A one-off payment, no membership. It unlocks this post for as long as the post is online — save it in the app to keep it after that."
 msgstr ""
 
 #: src/Modules/RestApi/Controllers/AuthController.php:68
@@ -319,11 +325,11 @@ msgstr ""
 msgid "A phone number is required."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:899
+#: src/Modules/Instagram/Admin/VipPage.php:912
 msgid "A plan priced at zero cannot be active. Set a price, then activate it."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:705
+#: src/Modules/Instagram/Admin/VipPage.php:715
 msgid "A plan priced at zero is never buyable, which is why the sample plan ships switched off. Give it a price and activate it."
 msgstr ""
 
@@ -427,15 +433,15 @@ msgstr ""
 msgid "AUTH_KEY / AUTH_SALT are used to derive the encryption key."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:797
+#: src/Support/Admin/SettingsPage.php:805
 msgid "Abandoned cart coupon prefix"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:796
+#: src/Support/Admin/SettingsPage.php:804
 msgid "Abandoned cart discount (%)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:795
+#: src/Support/Admin/SettingsPage.php:803
 msgid "Abandoned cart remind after (hours)"
 msgstr ""
 
@@ -447,7 +453,7 @@ msgstr ""
 msgid "Accept the digital agreement"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:660
+#: src/Support/Admin/SettingsPage.php:668
 msgid "Accept tips on public posts"
 msgstr ""
 
@@ -455,7 +461,7 @@ msgstr ""
 msgid "Accept voice input"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:196
+#: src/Modules/Instagram/Admin/VipPage.php:228
 msgid "Access"
 msgstr ""
 
@@ -467,7 +473,7 @@ msgstr ""
 msgid "Access token %1$s, refresh token %2$s. Refresh tokens rotate on use and a replayed one revokes the device."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:710
+#: src/Support/Admin/SettingsPage.php:718
 msgid "Access token TTL (seconds)"
 msgstr ""
 
@@ -475,7 +481,7 @@ msgstr ""
 msgid "Access tokens are short lived; call /auth/refresh with the refresh token to rotate them."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:685
+#: src/Modules/Instagram/Admin/VipPage.php:695
 #: src/Modules/MultiTenant/Admin/LmsPage.php:558
 msgid "Access until"
 msgstr ""
@@ -520,7 +526,7 @@ msgstr ""
 #: src/Modules/Instagram/Admin/FunnelsPage.php:168
 #: src/Modules/Instagram/Admin/IntakePage.php:234
 #: src/Modules/Instagram/Admin/SubscribersPage.php:171
-#: src/Modules/Instagram/Admin/VipPage.php:200
+#: src/Modules/Instagram/Admin/VipPage.php:232
 #: src/Modules/MultiTenant/Admin/BnplPage.php:253
 #: src/Modules/MultiTenant/Admin/LmsPage.php:128
 #: src/Modules/MultiTenant/Admin/LmsPage.php:258
@@ -550,9 +556,9 @@ msgstr ""
 #: src/Modules/Instagram/Admin/AccountsPage.php:208
 #: src/Modules/Instagram/Admin/FunnelsPage.php:167
 #: src/Modules/Instagram/Admin/FunnelsPage.php:271
-#: src/Modules/Instagram/Admin/VipPage.php:713
-#: src/Modules/Instagram/Admin/VipPage.php:734
-#: src/Modules/Instagram/Admin/VipPage.php:754
+#: src/Modules/Instagram/Admin/VipPage.php:723
+#: src/Modules/Instagram/Admin/VipPage.php:744
+#: src/Modules/Instagram/Admin/VipPage.php:764
 #: src/Modules/MultiTenant/Admin/BnplPage.php:69
 #: src/Modules/MultiTenant/Admin/PlansPage.php:156
 #: src/Modules/MultiTenant/Admin/PlansPage.php:88
@@ -564,7 +570,7 @@ msgstr ""
 msgid "Active (%s)"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:214
+#: src/Modules/Instagram/Admin/VipPage.php:246
 msgid "Active members"
 msgstr ""
 
@@ -596,11 +602,11 @@ msgstr ""
 msgid "Add a new row:"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:378
+#: src/Modules/Instagram/Vip/VipLandingPage.php:381
 msgid "Add a note (optional)"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:744
+#: src/Modules/Instagram/Admin/VipPage.php:754
 msgid "Add a plan"
 msgstr ""
 
@@ -641,7 +647,7 @@ msgstr ""
 msgid "Add member"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:756
+#: src/Modules/Instagram/Admin/VipPage.php:766
 msgid "Add plan"
 msgstr ""
 
@@ -653,7 +659,7 @@ msgstr ""
 msgid "Add tenant"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:731
+#: src/Support/Admin/SettingsPage.php:739
 msgid "Added on top of the requested USD amount when charging with Rials. The wallet only receives the requested amount; the fee is the operator's."
 msgstr ""
 
@@ -729,7 +735,7 @@ msgstr ""
 msgid "Agent profile: %s"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:699
+#: src/Support/Admin/SettingsPage.php:707
 msgid "Aggregate refresh interval (seconds)"
 msgstr ""
 
@@ -777,7 +783,7 @@ msgstr ""
 msgid "Allowed browser origins"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:312
+#: src/Modules/Instagram/Vip/VipLandingPage.php:315
 msgid "Already a member? Sign in."
 msgstr ""
 
@@ -785,7 +791,7 @@ msgstr ""
 msgid "Already drawn."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:415
+#: src/Modules/Instagram/Vip/VipLandingPage.php:418
 msgid "Already installed? This post opens at %s"
 msgstr ""
 
@@ -819,12 +825,12 @@ msgstr ""
 msgid "An instalment is due"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:401
+#: src/Modules/Instagram/Vip/VipLandingPage.php:404
 #: src/Modules/RestApi/Admin/DevicesPage.php:112
 msgid "Android"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:716
+#: src/Support/Admin/SettingsPage.php:724
 msgid "Android notification channel"
 msgstr ""
 
@@ -832,15 +838,15 @@ msgstr ""
 msgid "Android only"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:721
+#: src/Support/Admin/SettingsPage.php:729
 msgid "Android package name"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:683
+#: src/Support/Admin/SettingsPage.php:691
 msgid "Android store link"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:373
+#: src/Modules/Instagram/Vip/VipLandingPage.php:376
 msgid "Another amount"
 msgstr ""
 
@@ -866,7 +872,7 @@ msgstr ""
 
 #: src/Modules/Instagram/Admin/ContentPage.php:114
 #: src/Modules/Instagram/Admin/IntakePage.php:204
-#: src/Modules/Instagram/Admin/VipPage.php:148
+#: src/Modules/Instagram/Admin/VipPage.php:180
 #: src/Modules/MultiTenant/Admin/TenantsPage.php:87
 msgid "Any status"
 msgstr ""
@@ -875,7 +881,7 @@ msgstr ""
 msgid "Anyone can check a certificate at /certificate/IGBZ-XXXX. Change it and re-save your permalinks; codes already printed will stop resolving."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:679
+#: src/Support/Admin/SettingsPage.php:687
 msgid "App deep-link scheme"
 msgstr ""
 
@@ -948,8 +954,8 @@ msgid "Auth header"
 msgstr ""
 
 #: src/Support/Admin/SettingsPage.php:443
-#: src/Support/Admin/SettingsPage.php:761
-#: src/Support/Admin/SettingsPage.php:804
+#: src/Support/Admin/SettingsPage.php:769
+#: src/Support/Admin/SettingsPage.php:812
 msgid "Auth scheme"
 msgstr ""
 
@@ -978,7 +984,7 @@ msgstr ""
 msgid "Auto approve new tenants"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:740
+#: src/Support/Admin/SettingsPage.php:748
 msgid "Auto falls back to the manual value when the URL is unreachable."
 msgstr ""
 
@@ -994,7 +1000,7 @@ msgstr ""
 msgid "Auto translator"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:738
+#: src/Support/Admin/SettingsPage.php:746
 msgid "Automatic (URL)"
 msgstr ""
 
@@ -1002,12 +1008,16 @@ msgstr ""
 msgid "Available balance:"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:521
+#: src/Modules/Instagram/Vip/VipLandingPage.php:568
 msgid "Available for another %s"
 msgstr ""
 
 #: src/Modules/MultiTenant/Frontend/AccountEndpoints.php:213
 msgid "Available instalment credit"
+msgstr ""
+
+#: src/Modules/Instagram/Vip/VipPostService.php:498
+msgid "Available until %s, then it is removed from the server. Tap the save icon in the app to keep your own copy."
 msgstr ""
 
 #: src/Modules/Hub/Admin/HubPage.php:106
@@ -1070,7 +1080,7 @@ msgstr ""
 msgid "Back to the course"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:608
+#: src/Modules/Instagram/Admin/VipPage.php:618
 msgid "Back to the inbox"
 msgstr ""
 
@@ -1078,7 +1088,7 @@ msgstr ""
 msgid "Back to the pipeline"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:298
+#: src/Modules/Instagram/Admin/VipPage.php:330
 msgid "Back to the posts"
 msgstr ""
 
@@ -1136,7 +1146,7 @@ msgstr ""
 msgid "Base URL: %s"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:289
+#: src/Modules/Instagram/Vip/VipLandingPage.php:292
 msgid "Become a member"
 msgstr ""
 
@@ -1188,7 +1198,7 @@ msgstr ""
 msgid "Block saved."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:327
+#: src/Modules/Instagram/Admin/VipPage.php:359
 msgid "Blurred placeholders"
 msgstr ""
 
@@ -1232,15 +1242,15 @@ msgstr ""
 msgid "Buy USDT now"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:759
+#: src/Support/Admin/SettingsPage.php:767
 msgid "Buy path"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:300
+#: src/Modules/Instagram/Vip/VipLandingPage.php:303
 msgid "Buy this post"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:754
+#: src/Support/Admin/SettingsPage.php:762
 msgid "Buys USDT with Rials from the configured Iranian exchange when the payout card runs low, then withdraws it to the card address. Off by default."
 msgstr ""
 
@@ -1256,7 +1266,7 @@ msgstr ""
 msgid "By domain / subdomain"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:702
+#: src/Support/Admin/SettingsPage.php:710
 msgid "CNAME target for custom domains"
 msgstr ""
 
@@ -1265,7 +1275,7 @@ msgstr ""
 msgid "COD failed."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:696
+#: src/Support/Admin/SettingsPage.php:704
 msgid "CORS is restricted to this origin. Empty means same-origin only, never a wildcard."
 msgstr ""
 
@@ -1290,12 +1300,12 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:218
+#: src/Modules/Instagram/Admin/VipPage.php:250
 msgid "Cancelling"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/ContentPage.php:350
-#: src/Modules/Instagram/Admin/VipPage.php:309
+#: src/Modules/Instagram/Admin/VipPage.php:341
 msgid "Caption"
 msgstr ""
 
@@ -1317,7 +1327,7 @@ msgstr ""
 
 #: src/Modules/Instagram/Admin/AccountsPage.php:240
 #: src/Modules/Instagram/Admin/ContentPage.php:535
-#: src/Modules/Instagram/Admin/VipPage.php:1079
+#: src/Modules/Instagram/Admin/VipPage.php:1092
 msgid "Carousel"
 msgstr ""
 
@@ -1508,7 +1518,7 @@ msgstr ""
 msgid "Comma separated, from: text, image, video, media_share, flow. Only claim what the vendor really supports — anything listed here will be sent to them, and anything omitted is routed elsewhere or refused. \"media_share\" means the vendor can attach one of your own published posts; \"flow\" means it can run a named automation."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:668
+#: src/Support/Admin/SettingsPage.php:676
 msgid "Comma separated, in the store currency."
 msgstr ""
 
@@ -1529,7 +1539,7 @@ msgstr ""
 msgid "Comment contains it"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:1006
+#: src/Modules/Instagram/Admin/VipPage.php:1019
 msgid "Comment deleted."
 msgstr ""
 
@@ -1545,15 +1555,15 @@ msgstr ""
 msgid "Comment giveaways"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:1001
+#: src/Modules/Instagram/Admin/VipPage.php:1014
 msgid "Comment hidden."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:643
+#: src/Support/Admin/SettingsPage.php:651
 msgid "Comment length limit"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:843
+#: src/Modules/Instagram/Admin/VipPage.php:856
 #: src/Modules/RestApi/Controllers/VipAdminController.php:249
 #: src/Modules/RestApi/Controllers/VipAdminController.php:279
 #: src/Modules/RestApi/Controllers/VipAdminController.php:287
@@ -1564,17 +1574,17 @@ msgstr ""
 msgid "Comment starts with it"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:996
+#: src/Modules/Instagram/Admin/VipPage.php:1009
 msgid "Comment updated."
 msgstr ""
 
 #: src/Modules/Instagram/Admin/InsightsPage.php:333
-#: src/Modules/Instagram/Admin/VipPage.php:361
+#: src/Modules/Instagram/Admin/VipPage.php:393
 #: src/Modules/Instagram/Admin/VipPage.php:74
 msgid "Comments"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipSocialService.php:112
+#: src/Modules/Instagram/Vip/VipSocialService.php:246
 msgid "Comments are turned off for this post."
 msgstr ""
 
@@ -1582,11 +1592,11 @@ msgstr ""
 msgid "Comments matching “%s”"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:642
+#: src/Support/Admin/SettingsPage.php:650
 msgid "Comments on new posts"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:440
+#: src/Modules/Instagram/Admin/VipPage.php:450
 msgid "Comments on this post"
 msgstr ""
 
@@ -1661,7 +1671,7 @@ msgstr ""
 msgid "Content pipeline"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1012
+#: src/Support/Admin/SettingsPage.php:1020
 msgid "Content research and design through Manus, auto publishing at peak hours, and comment-to-DM funnels through ManyChat."
 msgstr ""
 
@@ -1704,12 +1714,12 @@ msgstr ""
 msgid "Contracts are scored locally first; an external provider is only called when one is configured for the contract."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:597
+#: src/Modules/Instagram/Admin/VipPage.php:607
 #: src/Modules/Instagram/Vip/VipMessageService.php:74
 #: src/Modules/RestApi/Controllers/VipAdminController.php:316
 #: src/Modules/RestApi/Controllers/VipAdminController.php:330
-#: src/Modules/RestApi/Controllers/VipController.php:298
-#: src/Modules/RestApi/Controllers/VipController.php:314
+#: src/Modules/RestApi/Controllers/VipController.php:404
+#: src/Modules/RestApi/Controllers/VipController.php:420
 msgid "Conversation not found."
 msgstr ""
 
@@ -1730,7 +1740,7 @@ msgstr ""
 msgid "Could not create shipment."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:820
+#: src/Modules/Instagram/Admin/VipPage.php:833
 #: src/Modules/RestApi/Controllers/VipAdminController.php:116
 msgid "Could not create the post."
 msgstr ""
@@ -1743,7 +1753,7 @@ msgstr ""
 msgid "Could not reserve the amount."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:914
+#: src/Modules/Instagram/Admin/VipPage.php:927
 msgid "Could not save the plan."
 msgstr ""
 
@@ -1853,7 +1863,7 @@ msgstr ""
 msgid "Create plan"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:426
+#: src/Modules/Instagram/Admin/VipPage.php:436
 msgid "Create post"
 msgstr ""
 
@@ -1903,7 +1913,7 @@ msgstr ""
 msgid "Cross-store aggregates, the public store directory, landing blocks, self-service store creation, custom domain verification and signed VIP links."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1016
+#: src/Support/Admin/SettingsPage.php:1024
 msgid "Cross-store aggregation, store directory, VIP links and hub REST endpoints for the mother site."
 msgstr ""
 
@@ -2058,7 +2068,7 @@ msgstr ""
 msgid "Deep link"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:719
+#: src/Support/Admin/SettingsPage.php:727
 msgid "Deep link scheme"
 msgstr ""
 
@@ -2094,7 +2104,7 @@ msgstr ""
 msgid "Default instalment count"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:836
+#: src/Support/Admin/SettingsPage.php:844
 msgid "Default language"
 msgstr ""
 
@@ -2110,8 +2120,8 @@ msgstr ""
 #: src/Modules/Instagram/Admin/AccountsPage.php:114
 #: src/Modules/Instagram/Admin/ContentPage.php:258
 #: src/Modules/Instagram/Admin/FunnelsPage.php:154
-#: src/Modules/Instagram/Admin/VipPage.php:280
-#: src/Modules/Instagram/Admin/VipPage.php:533
+#: src/Modules/Instagram/Admin/VipPage.php:312
+#: src/Modules/Instagram/Admin/VipPage.php:543
 #: src/Modules/MultiTenant/Admin/LmsPage.php:115
 #: src/Modules/MultiTenant/Admin/LmsPage.php:245
 #: src/Modules/MultiTenant/Admin/LmsPage.php:341
@@ -2120,7 +2130,7 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:860
+#: src/Support/Admin/SettingsPage.php:868
 msgid "Delete all data on uninstall"
 msgstr ""
 
@@ -2140,7 +2150,7 @@ msgstr ""
 msgid "Delete this block?"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:532
+#: src/Modules/Instagram/Admin/VipPage.php:542
 msgid "Delete this comment?"
 msgstr ""
 
@@ -2172,8 +2182,8 @@ msgstr ""
 msgid "Delete this tenant? Its ledger and content rows stay in the database for auditing."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:613
-#: src/Modules/Instagram/Admin/VipPage.php:672
+#: src/Modules/Instagram/Admin/VipPage.php:623
+#: src/Modules/Instagram/Admin/VipPage.php:682
 #: src/Modules/Instagram/Vip/VipMessageService.php:296
 #: src/Modules/RestApi/Controllers/VipAdminController.php:373
 #: src/Modules/RestApi/Controllers/VipAdminController.php:594
@@ -2206,7 +2216,7 @@ msgstr ""
 msgid "Delivery"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:770
+#: src/Support/Admin/SettingsPage.php:778
 msgid "Delivery PIN digits"
 msgstr ""
 
@@ -2283,15 +2293,15 @@ msgstr ""
 msgid "Digipay"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:725
+#: src/Support/Admin/SettingsPage.php:733
 msgid "Direct APK download URL"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:687
+#: src/Support/Admin/SettingsPage.php:695
 msgid "Direct APK link"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:407
+#: src/Modules/Instagram/Vip/VipLandingPage.php:410
 msgid "Direct download (APK)"
 msgstr ""
 
@@ -2311,7 +2321,7 @@ msgstr ""
 msgid "Disabled: POST /signup answers 403. Turn it on under Settings → General."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1039
+#: src/Support/Admin/SettingsPage.php:1047
 msgid "Disabling a module only stops it from running; its data and tables are kept."
 msgstr ""
 
@@ -2372,15 +2382,15 @@ msgstr ""
 msgid "Domain order created."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:811
+#: src/Support/Admin/SettingsPage.php:819
 msgid "Domain provider"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:812
+#: src/Support/Admin/SettingsPage.php:820
 msgid "Domain provider API key"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:813
+#: src/Support/Admin/SettingsPage.php:821
 msgid "Domain provider base URL"
 msgstr ""
 
@@ -2398,11 +2408,11 @@ msgstr ""
 msgid "Domains"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:963
+#: src/Modules/Instagram/Admin/VipPage.php:976
 msgid "Done: %1$s published, %2$s expired."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:743
+#: src/Support/Admin/SettingsPage.php:751
 msgid "Dotted path into the response; empty looks for price/rate/usdt/price_irt."
 msgstr ""
 
@@ -2419,7 +2429,7 @@ msgid "Download attachment"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/ContentPage.php:515
-#: src/Modules/Instagram/Admin/VipPage.php:1062
+#: src/Modules/Instagram/Admin/VipPage.php:1075
 msgid "Draft"
 msgstr ""
 
@@ -2456,7 +2466,7 @@ msgstr ""
 msgid "Each account talks to Manus and ManyChat with its own keys, so tenants never share a quota or a page."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:640
+#: src/Support/Admin/SettingsPage.php:648
 msgid "Each media link is signed for one member and expires. Short enough that a copied link is useless, long enough to watch a video through."
 msgstr ""
 
@@ -2466,7 +2476,7 @@ msgid "Earned"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/IntakePage.php:451
-#: src/Modules/Instagram/Admin/VipPage.php:259
+#: src/Modules/Instagram/Admin/VipPage.php:291
 #: src/Modules/MultiTenant/Admin/PlansPage.php:74
 msgid "Edit"
 msgstr ""
@@ -2488,7 +2498,7 @@ msgid "Edited in the app"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/SubscribersPage.php:205
-#: src/Modules/Instagram/Admin/VipPage.php:683
+#: src/Modules/Instagram/Admin/VipPage.php:693
 msgid "Email"
 msgstr ""
 
@@ -2498,10 +2508,6 @@ msgstr ""
 
 #: src/Support/Admin/SettingsPage.php:345
 msgid "Emalls feed"
-msgstr ""
-
-#: src/Modules/Instagram/Admin/VipPage.php:385
-msgid "Empty falls back to the channel default of %d days (zero means never). Expiry is what keeps a membership worth renewing."
 msgstr ""
 
 #: src/Modules/MultiTenant/Payments/PspGateway.php:41
@@ -2528,7 +2534,7 @@ msgstr ""
 msgid "Enable instalment payments"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:695
+#: src/Support/Admin/SettingsPage.php:703
 msgid "Enable master site hub"
 msgstr ""
 
@@ -2536,7 +2542,7 @@ msgstr ""
 msgid "Enable product feeds"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:713
+#: src/Support/Admin/SettingsPage.php:721
 msgid "Enable push notifications"
 msgstr ""
 
@@ -2556,7 +2562,7 @@ msgstr ""
 msgid "Enable the VIP channel"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:754
+#: src/Support/Admin/SettingsPage.php:762
 msgid "Enable the automatic USDT on-ramp"
 msgstr ""
 
@@ -2574,7 +2580,7 @@ msgstr ""
 msgid "Enable/Disable"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1034
+#: src/Support/Admin/SettingsPage.php:1042
 msgid "Enabled"
 msgstr ""
 
@@ -2582,7 +2588,7 @@ msgstr ""
 msgid "Enabled but the service account JSON is missing or invalid. Paste it under Settings → Mobile API."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:826
+#: src/Support/Admin/SettingsPage.php:834
 msgid "Enamad active (verified)"
 msgstr ""
 
@@ -2608,7 +2614,7 @@ msgstr ""
 msgid "Ends"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:198
+#: src/Modules/Instagram/Admin/VipPage.php:230
 msgid "Engagement"
 msgstr ""
 
@@ -2683,7 +2689,7 @@ msgstr ""
 msgid "Error"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:266
+#: src/Modules/Instagram/Vip/VipLandingPage.php:269
 msgid "Every VIP post, this one included, for as long as your membership runs."
 msgstr ""
 
@@ -2723,11 +2729,11 @@ msgstr ""
 msgid "Everyone"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:344
+#: src/Modules/Instagram/Admin/VipPage.php:376
 msgid "Everyone — a public post"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:463
+#: src/Modules/Instagram/Admin/VipPage.php:473
 msgid "Everything members have said, newest first. Your own replies are hidden here so the list stays a to-do list."
 msgstr ""
 
@@ -2739,15 +2745,15 @@ msgstr ""
 msgid "Exactly this word"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:755
+#: src/Support/Admin/SettingsPage.php:763
 msgid "Exchange API key"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:756
+#: src/Support/Admin/SettingsPage.php:764
 msgid "Exchange base URL"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:734
+#: src/Support/Admin/SettingsPage.php:742
 msgid "Exchange rate source"
 msgstr ""
 
@@ -2755,32 +2761,29 @@ msgstr ""
 msgid "Exchange the code for a token pair."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:1065
+#: src/Modules/Instagram/Admin/VipPage.php:1078
 msgid "Expired"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:199
+#: src/Modules/Instagram/Admin/VipPage.php:231
+#: src/Modules/Instagram/Admin/VipPage.php:411
 #: src/Modules/MultiTenant/Admin/PaymentsPage.php:280
 msgid "Expires"
-msgstr ""
-
-#: src/Modules/Instagram/Admin/VipPage.php:379
-msgid "Expires at"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/AccountsPage.php:334
 msgid "Expires: %s UTC"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:516
+#: src/Modules/Instagram/Vip/VipLandingPage.php:563
 msgid "Expiring now"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:772
+#: src/Support/Admin/SettingsPage.php:780
 msgid "Express cities (comma)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:773
+#: src/Support/Admin/SettingsPage.php:781
 msgid "Express cost (IRT)"
 msgstr ""
 
@@ -2800,15 +2803,15 @@ msgstr ""
 msgid "FCM accepted none of the tokens."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:714
+#: src/Support/Admin/SettingsPage.php:722
 msgid "FCM project id"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:715
+#: src/Support/Admin/SettingsPage.php:723
 msgid "FCM service account JSON"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:821
+#: src/Support/Admin/SettingsPage.php:829
 msgid "FX central fee (%)"
 msgstr ""
 
@@ -2853,7 +2856,7 @@ msgstr ""
 msgid "Featured stores"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:700
+#: src/Support/Admin/SettingsPage.php:708
 msgid "Featured stores on the hub"
 msgstr ""
 
@@ -2873,7 +2876,7 @@ msgstr ""
 msgid "Feed cache flushed."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:785
+#: src/Support/Admin/SettingsPage.php:793
 msgid "Feed page size"
 msgstr ""
 
@@ -2903,7 +2906,7 @@ msgstr ""
 
 #: src/Modules/Instagram/Admin/ContentPage.php:120
 #: src/Modules/Instagram/Admin/IntakePage.php:210
-#: src/Modules/Instagram/Admin/VipPage.php:153
+#: src/Modules/Instagram/Admin/VipPage.php:185
 #: src/Modules/MultiTenant/Admin/BnplPage.php:101
 #: src/Modules/MultiTenant/Admin/PaymentsPage.php:129
 #: src/Modules/MultiTenant/Admin/TenantsPage.php:102
@@ -2947,7 +2950,7 @@ msgstr ""
 msgid "Followers"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:725
+#: src/Support/Admin/SettingsPage.php:733
 msgid "For distribution outside Google Play, which is the norm in Iran."
 msgstr ""
 
@@ -2967,7 +2970,7 @@ msgstr ""
 msgid "Forget a device."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:718
+#: src/Support/Admin/SettingsPage.php:726
 msgid "Forget silent devices after (days)"
 msgstr ""
 
@@ -3089,7 +3092,7 @@ msgstr ""
 msgid "Generated media"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:709
+#: src/Support/Admin/SettingsPage.php:717
 msgid "Generated on activation. Rotating it logs every mobile client out."
 msgstr ""
 
@@ -3097,7 +3100,7 @@ msgstr ""
 msgid "Generating"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:398
+#: src/Modules/Instagram/Vip/VipLandingPage.php:401
 msgid "Get the app"
 msgstr ""
 
@@ -3114,7 +3117,7 @@ msgstr ""
 msgid "Giveaways"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:585
+#: src/Modules/Instagram/Vip/VipLandingPage.php:632
 msgid "Go to the site"
 msgstr ""
 
@@ -3142,7 +3145,7 @@ msgstr ""
 msgid "Grow reach and pull comments into the DM funnel."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipSocialService.php:263
+#: src/Modules/Instagram/Vip/VipSocialService.php:397
 msgid "Guest"
 msgstr ""
 
@@ -3198,11 +3201,11 @@ msgstr ""
 msgid "Health of every enabled module, its integrations and background jobs."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:775
+#: src/Support/Admin/SettingsPage.php:783
 msgid "Heavy freight cost (IRT)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:771
+#: src/Support/Admin/SettingsPage.php:779
 msgid "Heavy weight threshold (kg)"
 msgstr ""
 
@@ -3224,17 +3227,12 @@ msgstr ""
 msgid "Hero copy, featured stores, plans, blocks and real statistics."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:527
+#: src/Modules/Instagram/Admin/VipPage.php:537
 msgid "Hide"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:397
-#: src/Support/Admin/SettingsPage.php:623
+#: src/Support/Admin/SettingsPage.php:624
 msgid "Hide it, keep the likes and comments"
-msgstr ""
-
-#: src/Support/Admin/SettingsPage.php:626
-msgid "Hiding is the safer default: deleting the row takes its comments and view counts with it, so you lose any way to tell how that post performed."
 msgstr ""
 
 #: src/Modules/Instagram/Admin/FunnelsPage.php:164
@@ -3258,7 +3256,7 @@ msgstr ""
 msgid "How the storefront decides which tenant store the visitor is on."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:257
+#: src/Modules/Instagram/Vip/VipLandingPage.php:258
 msgid "How to unlock it"
 msgstr ""
 
@@ -3275,15 +3273,15 @@ msgstr ""
 msgid "Hub API base"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:704
+#: src/Support/Admin/SettingsPage.php:712
 msgid "Hub hero description"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:703
+#: src/Support/Admin/SettingsPage.php:711
 msgid "Hub hero title"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:826
+#: src/Support/Admin/SettingsPage.php:834
 msgid "Hushvare guides the admin through obtaining Enamad; bank gateways unlock only with a verified domain + this flag."
 msgstr ""
 
@@ -3348,7 +3346,7 @@ msgstr ""
 msgid "IGBZ Instalments (BNPL)"
 msgstr ""
 
-#: src/Support/Activator.php:545
+#: src/Support/Activator.php:603
 msgid "IGBZ Instructor"
 msgstr ""
 
@@ -3360,7 +3358,7 @@ msgstr ""
 msgid "IGBZ Suite requires WooCommerce to be installed and active."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:880
+#: src/Support/Admin/SettingsPage.php:888
 msgid "IGBZ Suite settings"
 msgstr ""
 
@@ -3368,11 +3366,11 @@ msgstr ""
 msgid "IGBZ Suite status"
 msgstr ""
 
-#: src/Support/Activator.php:520
+#: src/Support/Activator.php:578
 msgid "IGBZ Tenant Owner"
 msgstr ""
 
-#: src/Support/Activator.php:539
+#: src/Support/Activator.php:597
 msgid "IGBZ Tenant Staff"
 msgstr ""
 
@@ -3401,7 +3399,7 @@ msgstr ""
 msgid "Id"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:746
+#: src/Support/Admin/SettingsPage.php:754
 msgid "Id of the automatic foreign-currency payout provider. Registered via igbz_register_fx_payout_providers. Options: pstnet, redotpay."
 msgstr ""
 
@@ -3465,7 +3463,7 @@ msgstr ""
 msgid "Instagram automation"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1011
+#: src/Support/Admin/SettingsPage.php:1019
 msgid "Instagram automation (Manus + ManyChat)"
 msgstr ""
 
@@ -3505,7 +3503,7 @@ msgstr ""
 msgid "Instagram username"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:333
+#: src/Modules/Instagram/Vip/VipLandingPage.php:336
 msgid "Install the app, sign in with the same phone number, and everything you buy here is waiting for you inside it."
 msgstr ""
 
@@ -3655,7 +3653,7 @@ msgstr ""
 msgid "Item"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:742
+#: src/Support/Admin/SettingsPage.php:750
 msgid "JSON endpoint returning the IRT-per-USD rate."
 msgstr ""
 
@@ -3663,7 +3661,7 @@ msgstr ""
 msgid "JSON matching the vendor's documented request. Placeholders are replaced with real values: {{subscriber_id}}, {{text}}, {{url}}, {{caption}}, {{media_ref}}, {{flow_ref}}, {{capability}}, {{account_id}}, {{ig_user_id}}, {{ig_username}}, {{button_label}}, {{button_url}}. Fields whose placeholder has no value for a given message are removed, so one template can serve every message kind."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1020
+#: src/Support/Admin/SettingsPage.php:1028
 msgid "JWT authentication with refresh and revocation, catalogue and account endpoints, device registration and FCM push."
 msgstr ""
 
@@ -3672,7 +3670,7 @@ msgid "JWT authentication with refresh tokens, catalogue and account endpoints f
 msgstr ""
 
 #: src/Modules/RestApi/RestApiModule.php:231
-#: src/Support/Admin/SettingsPage.php:709
+#: src/Support/Admin/SettingsPage.php:717
 msgid "JWT signing secret"
 msgstr ""
 
@@ -3692,7 +3690,7 @@ msgstr ""
 msgid "Just a ManyChat flow"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:297
+#: src/Modules/Instagram/Vip/VipLandingPage.php:300
 msgid "Just this post"
 msgstr ""
 
@@ -3751,7 +3749,7 @@ msgstr ""
 msgid "Languages"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:835
+#: src/Support/Admin/SettingsPage.php:843
 msgid "Languages (comma: fa,en,ar,tr,ckb)"
 msgstr ""
 
@@ -3772,7 +3770,7 @@ msgstr ""
 msgid "Last interaction"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:582
+#: src/Modules/Instagram/Admin/VipPage.php:592
 msgid "Last message"
 msgstr ""
 
@@ -3804,7 +3802,7 @@ msgstr ""
 msgid "Late penalty % per day"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:723
+#: src/Support/Admin/SettingsPage.php:731
 msgid "Latest app version"
 msgstr ""
 
@@ -3816,7 +3814,7 @@ msgstr ""
 msgid "Leave empty to disable the custom provider. This must be the vendor's documented send endpoint, not their website."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:374
+#: src/Modules/Instagram/Admin/VipPage.php:406
 msgid "Leave empty to keep it a draft, or use \"Publish now\" from the list. A time in the past publishes immediately."
 msgstr ""
 
@@ -3845,7 +3843,7 @@ msgstr ""
 msgid "Legal auth"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:712
+#: src/Modules/Instagram/Admin/VipPage.php:722
 msgid "Length (days)"
 msgstr ""
 
@@ -3874,11 +3872,11 @@ msgstr ""
 msgid "Let customers pay from their IGBZ wallet balance."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:365
+#: src/Modules/Instagram/Admin/VipPage.php:397
 msgid "Let members comment and reply on this post"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:654
+#: src/Support/Admin/SettingsPage.php:662
 msgid "Let members message you from a post"
 msgstr ""
 
@@ -3896,7 +3894,7 @@ msgstr ""
 msgid "Lifetime"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:360
+#: src/Modules/Instagram/Vip/VipLandingPage.php:363
 msgid "Liked it? Buy us a coffee. No account needed."
 msgstr ""
 
@@ -3920,7 +3918,7 @@ msgstr ""
 msgid "Link user"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:406
+#: src/Modules/Instagram/Admin/VipPage.php:416
 msgid "Linked product"
 msgstr ""
 
@@ -3956,7 +3954,7 @@ msgstr ""
 msgid "Locale"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:847
+#: src/Support/Admin/SettingsPage.php:855
 msgid "Log level"
 msgstr ""
 
@@ -3964,7 +3962,7 @@ msgstr ""
 msgid "Log only (development)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:856
+#: src/Support/Admin/SettingsPage.php:864
 msgid "Log retention (days)"
 msgstr ""
 
@@ -3990,7 +3988,7 @@ msgstr ""
 msgid "Manager"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:737
+#: src/Support/Admin/SettingsPage.php:745
 msgid "Manual"
 msgstr ""
 
@@ -3999,11 +3997,11 @@ msgstr ""
 msgid "Manual adjustment"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:765
+#: src/Support/Admin/SettingsPage.php:773
 msgid "Manual buy amount (IRT)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:744
+#: src/Support/Admin/SettingsPage.php:752
 msgid "Manual rate (IRT per USD)"
 msgstr ""
 
@@ -4236,13 +4234,13 @@ msgstr ""
 msgid "Master payment (escrow)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:819
+#: src/Support/Admin/SettingsPage.php:827
 msgid "Master payment (escrow) enabled"
 msgstr ""
 
 #: src/Modules/Hub/Admin/HubPage.php:67
 #: src/Modules/Hub/HubModule.php:45
-#: src/Support/Admin/SettingsPage.php:1015
+#: src/Support/Admin/SettingsPage.php:1023
 msgid "Master site hub"
 msgstr ""
 
@@ -4250,7 +4248,7 @@ msgstr ""
 msgid "Match mode"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:764
+#: src/Support/Admin/SettingsPage.php:772
 msgid "Max IRT per auto run (0 = uncapped)"
 msgstr ""
 
@@ -4287,11 +4285,11 @@ msgstr ""
 msgid "Maximum verify attempts"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:318
+#: src/Modules/Instagram/Admin/VipPage.php:350
 msgid "Media URLs"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:636
+#: src/Support/Admin/SettingsPage.php:644
 msgid "Media link lifetime (seconds)"
 msgstr ""
 
@@ -4331,9 +4329,9 @@ msgstr ""
 msgid "Mellat username"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:581
-#: src/Modules/Instagram/Admin/VipPage.php:623
-#: src/Modules/Instagram/Admin/VipPage.php:682
+#: src/Modules/Instagram/Admin/VipPage.php:591
+#: src/Modules/Instagram/Admin/VipPage.php:633
+#: src/Modules/Instagram/Admin/VipPage.php:692
 msgid "Member"
 msgstr ""
 
@@ -4353,24 +4351,24 @@ msgstr ""
 msgid "Members"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:1094
-#: src/Modules/Instagram/Admin/VipPage.php:342
+#: src/Modules/Instagram/Admin/VipPage.php:1107
+#: src/Modules/Instagram/Admin/VipPage.php:374
 msgid "Members only"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:1091
+#: src/Modules/Instagram/Admin/VipPage.php:1104
 msgid "Members or %s"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:343
+#: src/Modules/Instagram/Admin/VipPage.php:375
 msgid "Members, or anyone who buys this post"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:265
+#: src/Modules/Instagram/Vip/VipLandingPage.php:268
 msgid "Membership"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:215
+#: src/Modules/Instagram/Admin/VipPage.php:247
 msgid "Memberships, 30 days"
 msgstr ""
 
@@ -4393,7 +4391,7 @@ msgstr ""
 msgid "Message on a repeat request"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:867
+#: src/Modules/Instagram/Admin/VipPage.php:880
 msgid "Message sent."
 msgstr ""
 
@@ -4405,7 +4403,7 @@ msgstr ""
 msgid "Messaging is turned off."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:940
+#: src/Support/Admin/SettingsPage.php:948
 msgid "Messaging providers are unavailable because the Instagram module is not loaded."
 msgstr ""
 
@@ -4421,7 +4419,7 @@ msgstr ""
 msgid "Method"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:763
+#: src/Support/Admin/SettingsPage.php:771
 msgid "Minimum card balance (USD)"
 msgstr ""
 
@@ -4445,7 +4443,7 @@ msgstr ""
 msgid "Minimum single top-up"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:724
+#: src/Support/Admin/SettingsPage.php:732
 msgid "Minimum supported app version"
 msgstr ""
 
@@ -4482,7 +4480,7 @@ msgstr ""
 msgid "Mobile API"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1019
+#: src/Support/Admin/SettingsPage.php:1027
 msgid "Mobile REST API"
 msgstr ""
 
@@ -4511,11 +4509,11 @@ msgstr ""
 msgid "Modules"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1051
+#: src/Support/Admin/SettingsPage.php:1059
 msgid "Modules updated. Reload any open admin screen to see the new menus."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:749
+#: src/Modules/Instagram/Admin/VipPage.php:759
 #: src/Modules/MultiTenant/Admin/PlansPage.php:116
 msgid "Monthly"
 msgstr ""
@@ -4524,24 +4522,24 @@ msgstr ""
 msgid "Monthly recurring"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:696
+#: src/Support/Admin/SettingsPage.php:704
 msgid "Mother site origin"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:814
+#: src/Support/Admin/SettingsPage.php:822
 msgid "Mother-site subdomain base"
 msgstr ""
 
 #: src/Modules/MultiTenant/MultiTenantModule.php:40
-#: src/Support/Admin/SettingsPage.php:1007
+#: src/Support/Admin/SettingsPage.php:1015
 msgid "Multi-tenant stores"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:834
+#: src/Support/Admin/SettingsPage.php:842
 msgid "Multilingual store"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:716
+#: src/Support/Admin/SettingsPage.php:724
 msgid "Must match a channel the app creates, otherwise Android silently drops the notification."
 msgstr ""
 
@@ -4571,7 +4569,7 @@ msgstr ""
 
 #: src/Modules/Instagram/Admin/FunnelsPage.php:216
 #: src/Modules/Instagram/Admin/SubscribersPage.php:203
-#: src/Modules/Instagram/Admin/VipPage.php:710
+#: src/Modules/Instagram/Admin/VipPage.php:720
 #: src/Modules/MultiTenant/Admin/DomainPage.php:46
 #: src/Modules/MultiTenant/Admin/PlansPage.php:108
 msgid "Name"
@@ -4589,11 +4587,11 @@ msgstr ""
 msgid "National post"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:774
+#: src/Support/Admin/SettingsPage.php:782
 msgid "National post cost (IRT)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:827
+#: src/Support/Admin/SettingsPage.php:835
 msgid "National-id match at payment"
 msgstr ""
 
@@ -4601,7 +4599,7 @@ msgstr ""
 msgid "National-id verification is not activated (no Shahkar key)."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:141
+#: src/Modules/Instagram/Admin/VipPage.php:173
 msgid "New VIP post"
 msgstr ""
 
@@ -4625,7 +4623,7 @@ msgstr ""
 msgid "New products are"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:701
+#: src/Support/Admin/SettingsPage.php:709
 msgid "New stores get {slug}.{base}. Leave empty to use path prefixes instead."
 msgstr ""
 
@@ -4690,7 +4688,7 @@ msgstr ""
 msgid "No SMS provider is configured for this store."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:204
+#: src/Modules/Instagram/Admin/VipPage.php:236
 msgid "No VIP posts yet. Publish the teaser on Instagram, then put the real thing here."
 msgstr ""
 
@@ -4750,7 +4748,7 @@ msgstr ""
 msgid "No codes have been sent."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:475
+#: src/Modules/Instagram/Admin/VipPage.php:485
 msgid "No comments yet."
 msgstr ""
 
@@ -4863,7 +4861,7 @@ msgstr ""
 msgid "No master payments yet."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:690
+#: src/Modules/Instagram/Admin/VipPage.php:700
 msgid "No memberships yet. Price a plan first — the paywall has nothing to sell until then."
 msgstr ""
 
@@ -4994,7 +4992,7 @@ msgstr ""
 msgid "Nobody has taken this quiz yet."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:588
+#: src/Modules/Instagram/Admin/VipPage.php:598
 msgid "Nobody has written yet. Members message you from inside a post, the way they would send an Instagram DM."
 msgstr ""
 
@@ -5094,7 +5092,7 @@ msgstr ""
 msgid "Notify N days before renewal"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:717
+#: src/Support/Admin/SettingsPage.php:725
 msgid "Notify on order status changes"
 msgstr ""
 
@@ -5107,7 +5105,7 @@ msgstr ""
 msgid "OTP"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:862
+#: src/Support/Admin/SettingsPage.php:870
 msgid "Off by default. When on, deleting the plugin drops every IGBZ table."
 msgstr ""
 
@@ -5127,16 +5125,16 @@ msgstr ""
 msgid "Offer wallet at checkout"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:689
+#: src/Support/Admin/SettingsPage.php:697
 msgid "Offered alongside the stores for people who cannot reach one."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:724
-msgid "Older builds get a forced-update screen from /app/config."
+#: src/Support/Admin/SettingsPage.php:636
+msgid "Offline download link lifetime (seconds)"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:392
-msgid "On expiry"
+#: src/Support/Admin/SettingsPage.php:732
+msgid "Older builds get a forced-update screen from /app/config."
 msgstr ""
 
 #: src/Support/Admin/SettingsPage.php:187
@@ -5159,11 +5157,11 @@ msgstr ""
 msgid "One order with its lines."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:322
+#: src/Modules/Instagram/Admin/VipPage.php:354
 msgid "One per line, in order. Images and video are told apart by their extension. These URLs are never handed to the app directly: every request is re-signed for one member and expires."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:331
+#: src/Modules/Instagram/Admin/VipPage.php:363
 msgid "One per line, matching the order above. This is the only image a locked post ever shows, so it must be a genuinely low-resolution copy — a CSS blur over the real file is not privacy."
 msgstr ""
 
@@ -5203,7 +5201,7 @@ msgstr ""
 msgid "Only a hash of each code is stored; the plaintext never touches the database."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:827
+#: src/Support/Admin/SettingsPage.php:835
 msgid "Only active once the senior admin stores the Shahkar key."
 msgstr ""
 
@@ -5227,7 +5225,7 @@ msgstr ""
 msgid "Only used by accounts set to the free trial. Accounts on their own keys never touch it, so tasks are billed to the tenant."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:356
+#: src/Modules/Instagram/Admin/VipPage.php:388
 msgid "Only used by the middle option. A member never pays it twice — a subscription already unlocks the post."
 msgstr ""
 
@@ -5250,7 +5248,7 @@ msgstr ""
 #: src/Modules/Instagram/Services/FunnelService.php:607
 #: src/Modules/Instagram/Services/FunnelService.php:789
 #: src/Modules/Instagram/Webhooks/ManyChatWebhook.php:193
-#: src/Support/Activator.php:867
+#: src/Support/Activator.php:926
 msgid "Open the link"
 msgstr ""
 
@@ -5270,7 +5268,7 @@ msgstr ""
 msgid "Optional ManyChat tag applied on every hit."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:410
+#: src/Modules/Instagram/Admin/VipPage.php:420
 msgid "Optional WooCommerce product ID, so the app can show a buy button under the post."
 msgstr ""
 
@@ -5303,7 +5301,7 @@ msgid "Optional. Used to route incoming funnel events to the right account."
 msgstr ""
 
 #: src/Modules/Hub/Admin/HubPage.php:283
-#: src/Modules/Instagram/Admin/VipPage.php:714
+#: src/Modules/Instagram/Admin/VipPage.php:724
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:195
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:255
 #: src/Modules/MultiTenant/Admin/BnplPage.php:152
@@ -5360,7 +5358,7 @@ msgstr ""
 msgid "Original language"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:857
+#: src/Support/Admin/SettingsPage.php:865
 msgid "Outbound HTTP timeout (seconds)"
 msgstr ""
 
@@ -5406,15 +5404,15 @@ msgstr ""
 msgid "PSP payment history."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:750
+#: src/Support/Admin/SettingsPage.php:758
 msgid "PST.NET API base URL"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:748
+#: src/Support/Admin/SettingsPage.php:756
 msgid "PST.NET API key"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:749
+#: src/Support/Admin/SettingsPage.php:757
 msgid "PST.NET card id"
 msgstr ""
 
@@ -5427,7 +5425,7 @@ msgid "Page not found."
 msgstr ""
 
 #: src/Modules/Fx/Admin/FxPage.php:248
-#: src/Modules/Instagram/Admin/VipPage.php:686
+#: src/Modules/Instagram/Admin/VipPage.php:696
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:126
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:170
 msgid "Paid"
@@ -5455,7 +5453,7 @@ msgstr ""
 msgid "Paid via %1$s. Reference: %2$s"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:976
+#: src/Support/Admin/SettingsPage.php:984
 msgid "Paid video cannot be delivered yet: no configured provider can send a video or share a post."
 msgstr ""
 
@@ -5553,7 +5551,7 @@ msgstr ""
 msgid "Paste into the External Request action of your ManyChat comment flow. The token identifies this account — do not share it."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:715
+#: src/Support/Admin/SettingsPage.php:723
 msgid "Paste the whole service account JSON. Stored encrypted, never written to disk."
 msgstr ""
 
@@ -5628,11 +5626,11 @@ msgstr ""
 msgid "Pay.ir sandbox"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:840
+#: src/Support/Admin/SettingsPage.php:848
 msgid "PayPal client id"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:839
+#: src/Support/Admin/SettingsPage.php:847
 msgid "PayPal enabled (Cyprus)"
 msgstr ""
 
@@ -5671,7 +5669,7 @@ msgstr ""
 msgid "Payments"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:746
+#: src/Support/Admin/SettingsPage.php:754
 msgid "Payout adapter"
 msgstr ""
 
@@ -5679,7 +5677,7 @@ msgstr ""
 msgid "Payout ref"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:747
+#: src/Support/Admin/SettingsPage.php:755
 msgid "Payout webhook token"
 msgstr ""
 
@@ -5702,7 +5700,7 @@ msgstr ""
 msgid "Pending commissions"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:650
+#: src/Support/Admin/SettingsPage.php:658
 msgid "Per member. Stops one person flooding a post."
 msgstr ""
 
@@ -5741,7 +5739,7 @@ msgid "Phone OTP login"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/IntakePage.php:230
-#: src/Modules/Instagram/Admin/VipPage.php:1082
+#: src/Modules/Instagram/Admin/VipPage.php:1095
 msgid "Photo"
 msgstr ""
 
@@ -5783,7 +5781,7 @@ msgstr ""
 msgid "Pick an existing user or provide a valid e-mail for the new owner."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:522
+#: src/Modules/Instagram/Admin/VipPage.php:532
 msgid "Pin"
 msgstr ""
 
@@ -5810,7 +5808,7 @@ msgstr ""
 msgid "Plan #%1$d — %2$s"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:918
+#: src/Modules/Instagram/Admin/VipPage.php:931
 msgid "Plan added."
 msgstr ""
 
@@ -5822,7 +5820,7 @@ msgstr ""
 msgid "Plan deleted."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:904
+#: src/Modules/Instagram/Admin/VipPage.php:917
 msgid "Plan saved."
 msgstr ""
 
@@ -5848,12 +5846,16 @@ msgstr ""
 msgid "Platform aggregates (super admin)."
 msgstr ""
 
+#: src/Support/Admin/SettingsPage.php:616
+msgid "Platform policy, set here and nowhere else: a store admin cannot change it per post. The default is 7 days. Both the store admin and the customer are told the number before they publish or pay, so lengthening or shortening it changes what they are promised. Zero switches expiry off entirely."
+msgstr ""
+
 #: src/Modules/Instagram/Vip/VipBillingService.php:280
 #: src/Modules/Instagram/Vip/VipBillingService.php:59
 msgid "Please sign in first."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipSocialService.php:194
+#: src/Modules/Instagram/Vip/VipSocialService.php:328
 msgid "Please wait %d seconds before commenting again."
 msgstr ""
 
@@ -5877,7 +5879,7 @@ msgstr ""
 #: src/Modules/Instagram/Admin/FunnelsPage.php:321
 #: src/Modules/Instagram/Admin/FunnelsPage.php:397
 #: src/Modules/Instagram/Admin/GiveawayPage.php:51
-#: src/Modules/Instagram/Admin/VipPage.php:195
+#: src/Modules/Instagram/Admin/VipPage.php:227
 msgid "Post"
 msgstr ""
 
@@ -5885,7 +5887,7 @@ msgstr ""
 msgid "Post adjustment"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:824
+#: src/Modules/Instagram/Admin/VipPage.php:837
 msgid "Post created. Publish it when the teaser goes out on Instagram."
 msgstr ""
 
@@ -5897,33 +5899,35 @@ msgstr ""
 msgid "Post link"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:289
-#: src/Modules/Instagram/Vip/VipSocialService.php:107
+#: src/Modules/Instagram/Admin/VipPage.php:321
+#: src/Modules/Instagram/Vip/VipSocialService.php:241
 #: src/Modules/RestApi/Controllers/VipAdminController.php:105
 #: src/Modules/RestApi/Controllers/VipAdminController.php:125
 #: src/Modules/RestApi/Controllers/VipAdminController.php:146
 #: src/Modules/RestApi/Controllers/VipAdminController.php:159
-#: src/Modules/RestApi/Controllers/VipController.php:115
-#: src/Modules/RestApi/Controllers/VipController.php:143
-#: src/Modules/RestApi/Controllers/VipController.php:170
-#: src/Modules/RestApi/Controllers/VipController.php:82
-#: src/Modules/RestApi/Controllers/VipController.php:91
+#: src/Modules/RestApi/Controllers/VipController.php:118
+#: src/Modules/RestApi/Controllers/VipController.php:152
+#: src/Modules/RestApi/Controllers/VipController.php:204
+#: src/Modules/RestApi/Controllers/VipController.php:249
+#: src/Modules/RestApi/Controllers/VipController.php:276
+#: src/Modules/RestApi/Controllers/VipController.php:85
+#: src/Modules/RestApi/Controllers/VipController.php:94
 msgid "Post not found."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:470
+#: src/Modules/Instagram/Vip/VipLandingPage.php:473
 msgid "Post preview"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:978
+#: src/Modules/Instagram/Admin/VipPage.php:991
 msgid "Post published."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:986
+#: src/Modules/Instagram/Admin/VipPage.php:999
 msgid "Post removed."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:814
+#: src/Modules/Instagram/Admin/VipPage.php:827
 msgid "Post saved."
 msgstr ""
 
@@ -5940,11 +5944,11 @@ msgstr ""
 msgid "Posted"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:778
+#: src/Support/Admin/SettingsPage.php:786
 msgid "Postex API key"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:779
+#: src/Support/Admin/SettingsPage.php:787
 msgid "Postex base URL"
 msgstr ""
 
@@ -5989,22 +5993,22 @@ msgid "Preview"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/IntakePage.php:429
-#: src/Modules/Instagram/Admin/VipPage.php:711
-#: src/Modules/Instagram/Admin/VipPage.php:750
+#: src/Modules/Instagram/Admin/VipPage.php:721
+#: src/Modules/Instagram/Admin/VipPage.php:760
 #: src/Modules/MultiTenant/Admin/PlansPage.php:110
 #: src/Modules/MultiTenant/Admin/PlansPage.php:85
 msgid "Price"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:758
+#: src/Support/Admin/SettingsPage.php:766
 msgid "Price JSON path"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:352
+#: src/Modules/Instagram/Admin/VipPage.php:384
 msgid "Price for a single purchase"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:757
+#: src/Support/Admin/SettingsPage.php:765
 msgid "Price path"
 msgstr ""
 
@@ -6158,7 +6162,7 @@ msgstr ""
 msgid "Provider status"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:1088
+#: src/Modules/Instagram/Admin/VipPage.php:1101
 msgid "Public"
 msgstr ""
 
@@ -6166,7 +6170,7 @@ msgstr ""
 msgid "Publish advertorial"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:370
+#: src/Modules/Instagram/Admin/VipPage.php:402
 msgid "Publish at"
 msgstr ""
 
@@ -6175,7 +6179,7 @@ msgid "Publish failed: %s"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/ContentPage.php:239
-#: src/Modules/Instagram/Admin/VipPage.php:266
+#: src/Modules/Instagram/Admin/VipPage.php:298
 msgid "Publish now"
 msgstr ""
 
@@ -6187,7 +6191,7 @@ msgstr ""
 #: src/Modules/Instagram/Admin/ContentPage.php:181
 #: src/Modules/Instagram/Admin/ContentPage.php:520
 #: src/Modules/Instagram/Admin/InsightsPage.php:256
-#: src/Modules/Instagram/Admin/VipPage.php:1064
+#: src/Modules/Instagram/Admin/VipPage.php:1077
 #: src/Modules/MultiTenant/Admin/LmsPage.php:127
 #: src/Modules/MultiTenant/Admin/LmsPage.php:211
 msgid "Published"
@@ -6340,15 +6344,15 @@ msgstr ""
 msgid "Rate"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:742
+#: src/Support/Admin/SettingsPage.php:750
 msgid "Rate API URL"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:743
+#: src/Support/Admin/SettingsPage.php:751
 msgid "Rate JSON path"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:745
+#: src/Support/Admin/SettingsPage.php:753
 msgid "Rate cache TTL (seconds)"
 msgstr ""
 
@@ -6410,15 +6414,15 @@ msgstr ""
 msgid "Redirect path"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:753
+#: src/Support/Admin/SettingsPage.php:761
 msgid "RedotPay API base URL"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:751
+#: src/Support/Admin/SettingsPage.php:759
 msgid "RedotPay API key"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:752
+#: src/Support/Admin/SettingsPage.php:760
 msgid "RedotPay card id"
 msgstr ""
 
@@ -6470,7 +6474,7 @@ msgstr ""
 msgid "Refresh now"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:711
+#: src/Support/Admin/SettingsPage.php:719
 msgid "Refresh token TTL (seconds)"
 msgstr ""
 
@@ -6535,7 +6539,7 @@ msgstr ""
 msgid "Regular expression"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:820
+#: src/Support/Admin/SettingsPage.php:828
 msgid "Release window (hours after delivery)"
 msgstr ""
 
@@ -6564,8 +6568,7 @@ msgstr ""
 msgid "Remove background"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:398
-#: src/Support/Admin/SettingsPage.php:624
+#: src/Support/Admin/SettingsPage.php:623
 msgid "Remove it completely"
 msgstr ""
 
@@ -6581,12 +6584,16 @@ msgstr ""
 msgid "Remove this member?"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:279
+#: src/Modules/Instagram/Admin/VipPage.php:311
 msgid "Remove this post and its media file?"
 msgstr ""
 
 #: src/Modules/MultiTenant/Admin/LmsPage.php:545
 msgid "Remove this student's access to the course?"
+msgstr ""
+
+#: src/Modules/Instagram/Admin/VipPage.php:1152
+msgid "Removed from the server on %s."
 msgstr ""
 
 #: src/Modules/MultiTenant/Admin/PlansPage.php:195
@@ -6601,11 +6608,11 @@ msgstr ""
 msgid "Renewal retries before suspending"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:518
+#: src/Modules/Instagram/Admin/VipPage.php:528
 msgid "Reply"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:516
+#: src/Modules/Instagram/Admin/VipPage.php:526
 msgid "Reply as the page…"
 msgstr ""
 
@@ -6613,7 +6620,7 @@ msgstr ""
 msgid "Reply asynchronously"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:849
+#: src/Modules/Instagram/Admin/VipPage.php:862
 msgid "Reply posted."
 msgstr ""
 
@@ -6629,7 +6636,7 @@ msgstr ""
 msgid "Request timeout (seconds)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:712
+#: src/Support/Admin/SettingsPage.php:720
 msgid "Requests per minute per token"
 msgstr ""
 
@@ -6637,7 +6644,7 @@ msgstr ""
 msgid "Resend cool-down (seconds)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:806
+#: src/Support/Admin/SettingsPage.php:814
 msgid "Result JSON path"
 msgstr ""
 
@@ -6737,7 +6744,7 @@ msgstr ""
 msgid "Run pipeline now"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:157
+#: src/Modules/Instagram/Admin/VipPage.php:189
 msgid "Run scheduling and expiry now"
 msgstr ""
 
@@ -6839,7 +6846,7 @@ msgstr ""
 msgid "Saman terminal id"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:737
+#: src/Modules/Instagram/Admin/VipPage.php:747
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:228
 msgid "Save"
 msgstr ""
@@ -6852,7 +6859,7 @@ msgstr ""
 msgid "Save block"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:896
+#: src/Support/Admin/SettingsPage.php:904
 msgid "Save changes"
 msgstr ""
 
@@ -6872,7 +6879,7 @@ msgstr ""
 msgid "Save mappings"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:426
+#: src/Modules/Instagram/Admin/VipPage.php:436
 msgid "Save post"
 msgstr ""
 
@@ -6905,7 +6912,7 @@ msgid "Schedule at peak"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/ContentPage.php:518
-#: src/Modules/Instagram/Admin/VipPage.php:1063
+#: src/Modules/Instagram/Admin/VipPage.php:1076
 msgid "Scheduled"
 msgstr ""
 
@@ -6939,7 +6946,7 @@ msgstr ""
 msgid "Search courses"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:646
+#: src/Support/Admin/SettingsPage.php:654
 msgid "Seconds between comments"
 msgstr ""
 
@@ -6974,7 +6981,7 @@ msgstr ""
 msgid "Self sign-up is disabled."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:645
+#: src/Modules/Instagram/Admin/VipPage.php:655
 msgid "Send"
 msgstr ""
 
@@ -7003,7 +7010,7 @@ msgstr ""
 msgid "Send reminders now"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:382
+#: src/Modules/Instagram/Vip/VipLandingPage.php:385
 msgid "Send support"
 msgstr ""
 
@@ -7104,7 +7111,7 @@ msgstr ""
 msgid "Settings &rarr; API in ManyChat, Pro required. A ManyChat key drives one page only, so this is the trial page; every other account needs its own key."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1082
+#: src/Support/Admin/SettingsPage.php:1090
 msgid "Settings saved."
 msgstr ""
 
@@ -7116,27 +7123,27 @@ msgstr ""
 msgid "Settled at"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:828
+#: src/Support/Admin/SettingsPage.php:836
 msgid "Shahkar API key (senior admin only)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:829
+#: src/Support/Admin/SettingsPage.php:837
 msgid "Shahkar base URL"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:416
+#: src/Modules/Instagram/Admin/VipPage.php:426
 msgid "Share link"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:675
+#: src/Support/Admin/SettingsPage.php:683
 msgid "Share links look like /vip/p/AbC123. Change it and re-save your permalinks so the new address starts working."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:273
+#: src/Modules/Instagram/Admin/VipPage.php:305
 msgid "Share page"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:673
+#: src/Support/Admin/SettingsPage.php:681
 msgid "Share page prefix"
 msgstr ""
 
@@ -7148,7 +7155,7 @@ msgstr ""
 msgid "Shared ManyChat API key (free trial)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:747
+#: src/Support/Admin/SettingsPage.php:755
 msgid "Shared secret the payout providers send to /igbz/v1/fx/payout-webhook/{provider}."
 msgstr ""
 
@@ -7195,7 +7202,7 @@ msgstr ""
 msgid "Shopkeepers photograph a product in the app and the assistant does the rest. No product is ever created through the WooCommerce admin."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:710
+#: src/Support/Admin/SettingsPage.php:718
 msgid "Short lived on purpose; the original issued 30 day tokens with no revocation."
 msgstr ""
 
@@ -7208,11 +7215,11 @@ msgstr ""
 msgid "Shown in logs and on delivery screens so failures name a real vendor."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:662
+#: src/Support/Admin/SettingsPage.php:670
 msgid "Shown on the share page of a free post, so a passer-by can support the shop without buying anything."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:702
+#: src/Support/Admin/SettingsPage.php:710
 msgid "Shown to store owners and checked during domain verification."
 msgstr ""
 
@@ -7263,7 +7270,7 @@ msgstr ""
 msgid "Single language store; listings are written once."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:216
+#: src/Modules/Instagram/Admin/VipPage.php:248
 msgid "Single posts, 30 days"
 msgstr ""
 
@@ -7281,7 +7288,7 @@ msgstr ""
 msgid "Slug"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:670
+#: src/Support/Admin/SettingsPage.php:678
 msgid "Smallest tip"
 msgstr ""
 
@@ -7327,11 +7334,11 @@ msgstr ""
 msgid "Spin (test)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:792
+#: src/Support/Admin/SettingsPage.php:800
 msgid "Spin cooldown (hours)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:794
+#: src/Support/Admin/SettingsPage.php:802
 msgid "Spin coupon prefix"
 msgstr ""
 
@@ -7339,7 +7346,7 @@ msgstr ""
 msgid "Spin for user id"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:793
+#: src/Support/Admin/SettingsPage.php:801
 msgid "Spin reward percents (comma)"
 msgstr ""
 
@@ -7399,9 +7406,9 @@ msgstr ""
 #: src/Modules/Instagram/Admin/ContentPage.php:179
 #: src/Modules/Instagram/Admin/ContentPage.php:287
 #: src/Modules/Instagram/Admin/GiveawayPage.php:51
-#: src/Modules/Instagram/Admin/VipPage.php:197
-#: src/Modules/Instagram/Admin/VipPage.php:584
-#: src/Modules/Instagram/Admin/VipPage.php:684
+#: src/Modules/Instagram/Admin/VipPage.php:229
+#: src/Modules/Instagram/Admin/VipPage.php:594
+#: src/Modules/Instagram/Admin/VipPage.php:694
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:127
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:201
 #: src/Modules/MultiTenant/Admin/AffiliatePage.php:220
@@ -7484,11 +7491,11 @@ msgstr ""
 msgid "Story"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:837
+#: src/Support/Admin/SettingsPage.php:845
 msgid "Stripe enabled (Cyprus card)"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:838
+#: src/Support/Admin/SettingsPage.php:846
 msgid "Stripe secret key"
 msgstr ""
 
@@ -7506,7 +7513,7 @@ msgstr ""
 msgid "Students"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:701
+#: src/Support/Admin/SettingsPage.php:709
 msgid "Sub-domain base"
 msgstr ""
 
@@ -7581,7 +7588,7 @@ msgstr ""
 msgid "Successful"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:666
+#: src/Support/Admin/SettingsPage.php:674
 msgid "Suggested tip amounts"
 msgstr ""
 
@@ -7594,7 +7601,7 @@ msgstr ""
 msgid "Super admin only."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:359
+#: src/Modules/Instagram/Vip/VipLandingPage.php:362
 msgid "Support this post"
 msgstr ""
 
@@ -7632,7 +7639,7 @@ msgstr ""
 msgid "Sync status"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:762
+#: src/Support/Admin/SettingsPage.php:770
 msgid "TRC20 address of the payout card wallet."
 msgstr ""
 
@@ -7648,11 +7655,11 @@ msgstr ""
 msgid "Taken"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:776
+#: src/Support/Admin/SettingsPage.php:784
 msgid "Tapin API key"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:777
+#: src/Support/Admin/SettingsPage.php:785
 msgid "Tapin base URL"
 msgstr ""
 
@@ -7739,7 +7746,7 @@ msgstr ""
 msgid "Tenants"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:1008
+#: src/Support/Admin/SettingsPage.php:1016
 msgid "Tenants, wallet, subscription plans, BNPL, affiliate, LMS, payment gateways, OTP and marketplace feeds."
 msgstr ""
 
@@ -7769,7 +7776,7 @@ msgstr ""
 msgid "Test push"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:1081
+#: src/Modules/Instagram/Admin/VipPage.php:1094
 msgid "Text"
 msgstr ""
 
@@ -7801,7 +7808,7 @@ msgstr ""
 msgid "That plan still has active subscriptions; deactivate it instead."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:979
+#: src/Modules/Instagram/Admin/VipPage.php:992
 msgid "That post could not be published — it may already be live."
 msgstr ""
 
@@ -7864,6 +7871,14 @@ msgstr ""
 
 #: src/Modules/MultiTenant/Payments/HttpPspGateway.php:41
 msgid "The HTTP PSP gateway is not configured."
+msgstr ""
+
+#: src/Modules/Instagram/Admin/VipPage.php:1135
+msgid "The IGBZ administrator has switched expiry off, so posts stay until you delete them."
+msgstr ""
+
+#: src/Modules/Instagram/Admin/VipPage.php:1159
+msgid "The IGBZ administrator sets this window; it cannot be changed per post. The media file is deleted for good — to keep the content, post it to your own Instagram Close Friends before then."
 msgstr ""
 
 #: src/Modules/Instagram/Services/ManusService.php:642
@@ -7936,7 +7951,7 @@ msgstr ""
 msgid "The REST module powers a Flutter client with JWT login, push notifications and deep links straight into your catalogue."
 msgstr ""
 
-#: src/Modules/RestApi/Controllers/VipController.php:62
+#: src/Modules/RestApi/Controllers/VipController.php:65
 msgid "The VIP channel is not enabled."
 msgstr ""
 
@@ -8106,7 +8121,7 @@ msgstr ""
 msgid "The free trial period has ended. Add your own API keys to continue."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:656
+#: src/Support/Admin/SettingsPage.php:664
 msgid "The in-app equivalent of an Instagram DM. Replies are written from the VIP inbox, not from Instagram."
 msgstr ""
 
@@ -8114,7 +8129,7 @@ msgstr ""
 msgid "The instalment could not be paid. Check your wallet balance."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:583
+#: src/Modules/Instagram/Vip/VipLandingPage.php:630
 msgid "The link may be mistyped, or the post has been taken down. Members always see the latest posts in the app."
 msgstr ""
 
@@ -8196,7 +8211,7 @@ msgstr ""
 msgid "The photo was refused (scored %d)."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:891
+#: src/Modules/Instagram/Admin/VipPage.php:904
 #: src/Modules/MultiTenant/Admin/PlansPage.php:280
 #: src/Modules/RestApi/Controllers/VipAdminController.php:444
 msgid "The plan needs a name."
@@ -8234,11 +8249,15 @@ msgstr ""
 msgid "The ramp is not enabled or not configured."
 msgstr ""
 
+#: src/Support/Admin/SettingsPage.php:626
+msgid "The ratified policy is to remove it: the share page promises the buyer that the post leaves the server, and the app offers them a saved copy instead. Hiding is kept for a channel that is not selling single posts — it keeps the row, so the engagement figures survive."
+msgstr ""
+
 #: src/Modules/RestApi/Controllers/AuthController.php:185
 msgid "The refresh token is not valid. Please sign in again."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:313
+#: src/Modules/Instagram/Admin/VipPage.php:345
 msgid "The same caption a member would read under an Instagram post. Shown in full on the share page even when the media is locked — it is what sells the post."
 msgstr ""
 
@@ -8408,11 +8427,11 @@ msgstr ""
 msgid "This endpoint is limited to store owners."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:327
+#: src/Modules/Instagram/Vip/VipLandingPage.php:330
 msgid "This is a private post from %s. The version on Instagram is only a preview — the full one lives in our app, where members watch it without ads, comment, and message us directly."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:420
+#: src/Modules/Instagram/Admin/VipPage.php:430
 msgid "This is what the share sheet opens: a teaser, the price, and the buttons to subscribe, buy the post, or install the app."
 msgstr ""
 
@@ -8420,7 +8439,19 @@ msgstr ""
 msgid "This order belongs to another store."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:306
+#: src/Modules/Instagram/Vip/VipPostService.php:493
+msgid "This post has expired and has been removed from the server."
+msgstr ""
+
+#: src/Modules/RestApi/Controllers/VipController.php:227
+msgid "This post has no media left to download."
+msgstr ""
+
+#: src/Modules/Instagram/Vip/VipLandingPage.php:545
+msgid "This post is available until %s and is then removed from the server."
+msgstr ""
+
+#: src/Modules/Instagram/Vip/VipLandingPage.php:309
 msgid "This post is for members. Open the app to see how to join."
 msgstr ""
 
@@ -8428,7 +8459,7 @@ msgstr ""
 msgid "This post is no longer available. Members see every new post the moment it goes live — join and you will not miss the next one."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:581
+#: src/Modules/Instagram/Vip/VipLandingPage.php:628
 msgid "This post is not here"
 msgstr ""
 
@@ -8539,7 +8570,7 @@ msgstr ""
 msgid "Tips are turned off."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:217
+#: src/Modules/Instagram/Admin/VipPage.php:249
 msgid "Tips, 30 days"
 msgstr ""
 
@@ -8570,7 +8601,7 @@ msgstr ""
 msgid "Token lifetimes"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:528
+#: src/Modules/Instagram/Vip/VipLandingPage.php:575
 msgid "Toman"
 msgstr ""
 
@@ -8622,7 +8653,7 @@ msgstr ""
 msgid "Top-up fee"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:731
+#: src/Support/Admin/SettingsPage.php:739
 msgid "Top-up fee (%)"
 msgstr ""
 
@@ -8692,7 +8723,7 @@ msgstr ""
 msgid "Translate listings into"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:805
+#: src/Support/Admin/SettingsPage.php:813
 msgid "Translate path"
 msgstr ""
 
@@ -8708,11 +8739,11 @@ msgstr ""
 msgid "Translation"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:802
+#: src/Support/Admin/SettingsPage.php:810
 msgid "Translation API base URL"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:803
+#: src/Support/Admin/SettingsPage.php:811
 msgid "Translation API key"
 msgstr ""
 
@@ -8757,11 +8788,11 @@ msgstr ""
 msgid "Trial task quota"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:786
+#: src/Support/Admin/SettingsPage.php:794
 msgid "Triboon API key"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:787
+#: src/Support/Admin/SettingsPage.php:795
 msgid "Triboon base URL"
 msgstr ""
 
@@ -8781,7 +8812,7 @@ msgstr ""
 msgid "Try to link a user"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:255
+#: src/Modules/Instagram/Vip/VipLandingPage.php:256
 msgid "Two ways to unlock it"
 msgstr ""
 
@@ -8811,7 +8842,7 @@ msgstr ""
 msgid "USD credit"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:762
+#: src/Support/Admin/SettingsPage.php:770
 msgid "USDT deposit address (card)"
 msgstr ""
 
@@ -8827,7 +8858,7 @@ msgstr ""
 msgid "UTC, format YYYY-MM-DD HH:MM:SS. Leave empty for no trial."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:720
+#: src/Support/Admin/SettingsPage.php:728
 msgid "Universal / App Link base URL"
 msgstr ""
 
@@ -8859,7 +8890,7 @@ msgstr ""
 msgid "Unlimited"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:522
+#: src/Modules/Instagram/Admin/VipPage.php:532
 msgid "Unpin"
 msgstr ""
 
@@ -8891,7 +8922,7 @@ msgstr ""
 msgid "Use subdomain"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:784
+#: src/Support/Admin/SettingsPage.php:792
 msgid "Use the AI provider for meta"
 msgstr ""
 
@@ -8903,7 +8934,7 @@ msgstr ""
 msgid "Use {code} as the placeholder."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:765
+#: src/Support/Admin/SettingsPage.php:773
 msgid "Used by the \"Buy USDT now\" button on the FX screen, and as the fallback auto amount."
 msgstr ""
 
@@ -8915,8 +8946,12 @@ msgstr ""
 msgid "Used in the hub URL: /wp-json/igbz-hub/v1/blocks/{page_key}."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:681
+#: src/Support/Admin/SettingsPage.php:689
 msgid "Used to open a shared post straight in the app: scheme://vip/p/AbC123. It must match the scheme registered in the mobile build."
+msgstr ""
+
+#: src/Support/Admin/SettingsPage.php:640
+msgid "Used when a member taps save and the app pulls its own copy before the post is deleted. Longer than a feed link because a download over a slow connection is not a scroll, and still signed for that one member."
 msgstr ""
 
 #: src/Support/Admin/SettingsPage.php:138
@@ -8953,7 +8988,7 @@ msgstr ""
 msgid "VIP channel"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:697
+#: src/Support/Admin/SettingsPage.php:705
 msgid "VIP link TTL (seconds)"
 msgstr ""
 
@@ -8961,7 +8996,7 @@ msgstr ""
 msgid "VIP link signing"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:698
+#: src/Support/Admin/SettingsPage.php:706
 msgid "VIP link signing secret"
 msgstr ""
 
@@ -8976,6 +9011,12 @@ msgstr ""
 #: src/Modules/Instagram/Vip/VipBillingService.php:320
 msgid "VIP post purchase"
 msgstr ""
+
+#: src/Modules/Instagram/Admin/VipPage.php:144
+msgid "VIP posts do not last. Each post is removed from the server %s day after it is published, and the file cannot be recovered. The IGBZ administrator sets this window. If you want to keep the content, post it to your own Instagram Close Friends before it expires — your copy stays yours there."
+msgid_plural "VIP posts do not last. Each post is removed from the server %s days after it is published, and the file cannot be recovered. The IGBZ administrator sets this window. If you want to keep the content, post it to your own Instagram Close Friends before it expires — your copy stays yours there."
+msgstr[0] ""
+msgstr[1] ""
 
 #: src/Modules/Hub/Admin/HubPage.php:368
 msgid "Valid for %d seconds and single use."
@@ -9012,7 +9053,7 @@ msgid "Verifying…"
 msgstr ""
 
 #: src/Modules/Instagram/Admin/IntakePage.php:488
-#: src/Modules/Instagram/Admin/VipPage.php:1080
+#: src/Modules/Instagram/Admin/VipPage.php:1093
 msgid "Video"
 msgstr ""
 
@@ -9124,6 +9165,14 @@ msgstr ""
 msgid "Wallet, cashback and instalment payments"
 msgstr ""
 
+#: src/Modules/Instagram/Vip/VipLandingPage.php:552
+msgid "Want to keep it? After buying, tap the save icon on the post in the app and your own copy stays in the app."
+msgstr ""
+
+#: src/Modules/Instagram/Vip/VipLandingPage.php:554
+msgid "Want to keep it? Tap the save icon on the post in the app and your own copy stays in the app."
+msgstr ""
+
 #: src/Modules/Instagram/Admin/IntakePage.php:423
 msgid "Warehouse SKU"
 msgstr ""
@@ -9176,7 +9225,7 @@ msgstr ""
 msgid "What can be delivered now"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:321
+#: src/Modules/Instagram/Vip/VipLandingPage.php:324
 msgid "What is this?"
 msgstr ""
 
@@ -9191,7 +9240,7 @@ msgstr ""
 #: src/Modules/Fx/Admin/FxPage.php:291
 #: src/Modules/Instagram/Admin/FunnelsPage.php:318
 #: src/Modules/Instagram/Admin/SubscribersPage.php:273
-#: src/Modules/Instagram/Admin/VipPage.php:583
+#: src/Modules/Instagram/Admin/VipPage.php:593
 msgid "When"
 msgstr ""
 
@@ -9207,7 +9256,7 @@ msgstr ""
 msgid "Which sign-in methods this store offers."
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:337
+#: src/Modules/Instagram/Admin/VipPage.php:369
 msgid "Who can open it"
 msgstr ""
 
@@ -9223,7 +9272,7 @@ msgstr ""
 msgid "Winner"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:760
+#: src/Support/Admin/SettingsPage.php:768
 msgid "Withdraw path"
 msgstr ""
 
@@ -9231,7 +9280,7 @@ msgstr ""
 msgid "Withdrawals"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:719
+#: src/Support/Admin/SettingsPage.php:727
 msgid "Without \"://\". Used to build igbz://products/42 style links."
 msgstr ""
 
@@ -9266,12 +9315,12 @@ msgstr ""
 msgid "WordPress user"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:643
+#: src/Modules/Instagram/Admin/VipPage.php:653
 msgid "Write a reply…"
 msgstr ""
 
 #: src/Modules/Instagram/Vip/VipMessageService.php:79
-#: src/Modules/Instagram/Vip/VipSocialService.php:123
+#: src/Modules/Instagram/Vip/VipSocialService.php:257
 msgid "Write something first."
 msgstr ""
 
@@ -9295,7 +9344,7 @@ msgstr ""
 msgid "Yektanet XML feed"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:623
+#: src/Modules/Instagram/Admin/VipPage.php:633
 msgid "You"
 msgstr ""
 
@@ -9311,11 +9360,13 @@ msgstr ""
 msgid "You are not enrolled on this course."
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipSocialService.php:117
-#: src/Modules/RestApi/Controllers/VipController.php:121
-#: src/Modules/RestApi/Controllers/VipController.php:146
-#: src/Modules/RestApi/Controllers/VipController.php:158
-#: src/Modules/RestApi/Controllers/VipController.php:174
+#: src/Modules/Instagram/Vip/VipSocialService.php:251
+#: src/Modules/RestApi/Controllers/VipController.php:124
+#: src/Modules/RestApi/Controllers/VipController.php:153
+#: src/Modules/RestApi/Controllers/VipController.php:210
+#: src/Modules/RestApi/Controllers/VipController.php:252
+#: src/Modules/RestApi/Controllers/VipController.php:264
+#: src/Modules/RestApi/Controllers/VipController.php:280
 msgid "You do not have access to this post."
 msgstr ""
 
@@ -9333,7 +9384,7 @@ msgstr ""
 
 #: src/Modules/Instagram/Webhooks/ManyChatWebhook.php:153
 #: src/Modules/Instagram/Webhooks/ManyChatWebhook.php:172
-#: src/Support/Activator.php:868
+#: src/Support/Activator.php:927
 msgid "You have already received this link."
 msgstr ""
 
@@ -9447,7 +9498,7 @@ msgid "Your session expired. Please try again."
 msgstr ""
 
 #: src/Modules/MultiTenant/Otp/OtpService.php:208
-#: src/Support/Activator.php:629
+#: src/Support/Activator.php:688
 msgid "Your verification code: {code}"
 msgstr ""
 
@@ -9500,10 +9551,6 @@ msgstr ""
 msgid "Zero issues a link that only switches the tenant context, without logging anybody in."
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:616
-msgid "Zero keeps posts forever. A window is what makes membership worth renewing: what is inside today is gone next month."
-msgstr ""
-
 #: src/Modules/Instagram/Admin/FunnelsPage.php:657
 msgid "a ManyChat flow"
 msgstr ""
@@ -9520,7 +9567,7 @@ msgstr ""
 msgid "a unique coupon"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:630
+#: src/Modules/Instagram/Admin/VipPage.php:640
 msgid "about post #%d"
 msgstr ""
 
@@ -9536,7 +9583,7 @@ msgstr ""
 msgid "auto"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:922
+#: src/Support/Admin/SettingsPage.php:930
 msgid "automation"
 msgstr ""
 
@@ -9591,11 +9638,11 @@ msgstr ""
 msgid "iOS"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:722
+#: src/Support/Admin/SettingsPage.php:730
 msgid "iOS bundle id"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:726
+#: src/Support/Admin/SettingsPage.php:734
 msgid "iOS download URL"
 msgstr ""
 
@@ -9603,15 +9650,15 @@ msgstr ""
 msgid "iOS only"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:684
+#: src/Support/Admin/SettingsPage.php:692
 msgid "iOS store link"
 msgstr ""
 
-#: src/Modules/Instagram/Vip/VipLandingPage.php:404
+#: src/Modules/Instagram/Vip/VipLandingPage.php:407
 msgid "iPhone"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:919
+#: src/Support/Admin/SettingsPage.php:927
 msgid "image"
 msgstr ""
 
@@ -9682,7 +9729,7 @@ msgstr ""
 msgid "not written yet"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:970
+#: src/Support/Admin/SettingsPage.php:978
 msgid "nothing configured"
 msgstr ""
 
@@ -9707,7 +9754,7 @@ msgstr ""
 msgid "pending"
 msgstr ""
 
-#: src/Modules/Instagram/Admin/VipPage.php:496
+#: src/Modules/Instagram/Admin/VipPage.php:506
 msgid "post #%d"
 msgstr ""
 
@@ -9727,7 +9774,7 @@ msgstr ""
 msgid "sent, unconfirmed"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:921
+#: src/Support/Admin/SettingsPage.php:929
 msgid "shared post"
 msgstr ""
 
@@ -9735,7 +9782,7 @@ msgstr ""
 msgid "shop.example.com"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:918
+#: src/Support/Admin/SettingsPage.php:926
 msgid "text"
 msgstr ""
 
@@ -9759,7 +9806,7 @@ msgstr ""
 msgid "verified"
 msgstr ""
 
-#: src/Support/Admin/SettingsPage.php:920
+#: src/Support/Admin/SettingsPage.php:928
 msgid "video"
 msgstr ""
 

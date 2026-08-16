@@ -106,6 +106,8 @@ final class VipPage {
 			);
 		}
 
+		$this->retention_notice();
+
 		View::tabs( $tabs, $tab, self::SLUG );
 
 		match ( $tab ) {
@@ -120,6 +122,36 @@ final class VipPage {
 	}
 
 	// ----------------------------------------------------------- posts tab
+
+	/**
+	 * The retention banner.
+	 *
+	 * The store admin does not own this number — the IGBZ senior admin sets it for the whole
+	 * platform — so the screen states it rather than offering a field. The Close Friends line is
+	 * the honest way out for an admin who wants to keep a post: it is advice to a human, not an
+	 * integration. Nothing here touches the Instagram API.
+	 */
+	private function retention_notice(): void {
+		$days = $this->posts()->retention_days();
+
+		if ( $days <= 0 ) {
+			return;
+		}
+
+		View::notice(
+			sprintf(
+				/* translators: %s: number of days a VIP post survives. */
+				_n(
+					'VIP posts do not last. Each post is removed from the server %s day after it is published, and the file cannot be recovered. The IGBZ administrator sets this window. If you want to keep the content, post it to your own Instagram Close Friends before it expires — your copy stays yours there.',
+					'VIP posts do not last. Each post is removed from the server %s days after it is published, and the file cannot be recovered. The IGBZ administrator sets this window. If you want to keep the content, post it to your own Instagram Close Friends before it expires — your copy stays yours there.',
+					$days,
+					'igbz-suite'
+				),
+				number_format_i18n( $days )
+			),
+			'info'
+		);
+	}
 
 	private function render_posts(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
@@ -376,30 +408,8 @@ final class VipPage {
 		);
 
 		$this->row(
-			__( 'Expires at', 'igbz-suite' ),
-			sprintf(
-				'<input type="datetime-local" name="expires_at" value="%s" /><p class="description">%s</p>',
-				esc_attr( $this->local_input( $post['expires_at'] ?? null ) ),
-				sprintf(
-					/* translators: %d: default number of days. */
-					esc_html__( 'Empty falls back to the channel default of %d days (zero means never). Expiry is what keeps a membership worth renewing.', 'igbz-suite' ),
-					(int) igbz()->settings()->int( 'vip.default_expiry_days', 0 )
-				)
-			)
-		);
-
-		$this->row(
-			__( 'On expiry', 'igbz-suite' ),
-			sprintf(
-				'<select name="expiry_action">%s</select>',
-				$this->options(
-					[
-						VipPostService::EXPIRY_HIDE   => __( 'Hide it, keep the likes and comments', 'igbz-suite' ),
-						VipPostService::EXPIRY_DELETE => __( 'Remove it completely', 'igbz-suite' ),
-					],
-					(string) ( $post['expiry_action'] ?? igbz()->settings()->string( 'vip.default_expiry_action', VipPostService::EXPIRY_HIDE ) )
-				)
-			)
+			__( 'Expires', 'igbz-suite' ),
+			$this->expiry_summary( $post )
 		);
 
 		$this->row(
@@ -799,11 +809,14 @@ final class VipPage {
 			'price'            => isset( $_POST['price'] ) ? (float) $_POST['price'] : 0.0,
 			'comments_enabled' => ! empty( $_POST['comments_enabled'] ),
 			'product_id'       => isset( $_POST['product_id'] ) ? (int) $_POST['product_id'] : 0,
-			'expiry_action'    => isset( $_POST['expiry_action'] ) ? sanitize_key( wp_unslash( $_POST['expiry_action'] ) ) : VipPostService::EXPIRY_HIDE,
 			'publish_at'       => $this->from_input( isset( $_POST['publish_at'] ) ? sanitize_text_field( wp_unslash( $_POST['publish_at'] ) ) : '' ),
-			'expires_at'       => $this->from_input( isset( $_POST['expires_at'] ) ? sanitize_text_field( wp_unslash( $_POST['expires_at'] ) ) : '' ),
 		];
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
+
+		// Expiry is deliberately not in that list. The window and what happens at the end of it
+		// belong to the IGBZ senior admin (Settings → VIP channel), and the service derives both
+		// from the settings; accepting them from this form would let one store quietly opt out of
+		// a platform policy the customer was promised on the purchase page.
 
 		if ( '' !== (string) $data['publish_at'] ) {
 			$data['status'] = VipPostService::STATUS_SCHEDULED;
@@ -1108,6 +1121,45 @@ final class VipPage {
 	}
 
 	/** Value for a datetime-local input, in site time. */
+	/**
+	 * The read-only expiry line in the post editor.
+	 *
+	 * A statement, not a control: the window is platform policy. A draft has no expiry yet, so it
+	 * says what will happen at publish time rather than showing an empty date the admin might
+	 * think they have to fill in.
+	 */
+	private function expiry_summary( ?array $post ): string {
+		$days = $this->posts()->retention_days();
+
+		if ( $days <= 0 ) {
+			return '<p class="description">' . esc_html__( 'The IGBZ administrator has switched expiry off, so posts stay until you delete them.', 'igbz-suite' ) . '</p>';
+		}
+
+		$when = (string) ( $post['expires_at'] ?? '' );
+		$line = '' === $when
+			? sprintf(
+				/* translators: %s: number of days. */
+				_n(
+					'%s day after it is published, this post is removed from the server.',
+					'%s days after it is published, this post is removed from the server.',
+					$days,
+					'igbz-suite'
+				),
+				number_format_i18n( $days )
+			)
+			: sprintf(
+				/* translators: %s: local date and time. */
+				__( 'Removed from the server on %s.', 'igbz-suite' ),
+				$this->local_time( $when )
+			);
+
+		return sprintf(
+			'<p><strong>%s</strong></p><p class="description">%s</p>',
+			esc_html( $line ),
+			esc_html__( 'The IGBZ administrator sets this window; it cannot be changed per post. The media file is deleted for good — to keep the content, post it to your own Instagram Close Friends before then.', 'igbz-suite' )
+		);
+	}
+
 	private function local_input( ?string $mysql_utc ): string {
 		if ( ! $mysql_utc || '0000-00-00 00:00:00' === $mysql_utc ) {
 			return '';

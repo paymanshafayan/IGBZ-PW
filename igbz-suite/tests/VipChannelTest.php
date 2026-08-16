@@ -53,6 +53,7 @@ final class VipDb extends wpdb {
 		'vip_memberships'   => [],
 		'vip_entitlements'  => [],
 		'vip_post_likes'    => [],
+		'vip_post_saves'    => [],
 		'vip_post_comments' => [],
 		'vip_post_views'    => [],
 		'vip_threads'       => [],
@@ -186,6 +187,7 @@ final class VipDb extends wpdb {
 		$names = [
 			'vip_post_comments',
 			'vip_post_likes',
+			'vip_post_saves',
 			'vip_post_views',
 			'vip_memberships',
 			'vip_entitlements',
@@ -275,7 +277,7 @@ final class VipDb extends wpdb {
 			return null;
 		}
 
-		if ( 'vip_post_likes' === $table || 'vip_post_views' === $table || 'vip_entitlements' === $table ) {
+		if ( 'vip_post_likes' === $table || 'vip_post_saves' === $table || 'vip_post_views' === $table || 'vip_entitlements' === $table ) {
 			$rows = $this->matching( $table, $sql, [ 'post_id', 'user_id' ] );
 			return $rows[0] ?? null;
 		}
@@ -375,6 +377,38 @@ final class VipDb extends wpdb {
 			}
 
 			return $out;
+		}
+
+		if ( 'vip_post_likes' === $table || 'vip_post_saves' === $table ) {
+			// Two shapes reach here: the feed's "which of these ids did this user flag" IN-list,
+			// and the saved-posts list, which is ordered and paged. Both are answered from the
+			// statement itself — the ORDER BY direction and the LIMIT are read out of the SQL, so
+			// reversing either in production makes this double disagree.
+			$user_id = self::int_of( 'user_id', $sql );
+			$rows    = [];
+
+			foreach ( $this->tables[ $table ] as $row ) {
+				if ( (int) $row['user_id'] !== $user_id ) {
+					continue;
+				}
+				if ( str_contains( $sql, 'post_id IN' ) && ! str_contains( $sql, "'" . $row['post_id'] . "'" ) ) {
+					continue;
+				}
+				$rows[] = $row;
+			}
+
+			usort(
+				$rows,
+				static fn ( array $a, array $b ): int => str_contains( $sql, 'ORDER BY id DESC' )
+					? (int) $b['id'] <=> (int) $a['id']
+					: (int) $a['id'] <=> (int) $b['id']
+			);
+
+			if ( preg_match( '/LIMIT \'?(\d+)\'? OFFSET \'?(\d+)\'?/', $sql, $m ) ) {
+				$rows = array_slice( $rows, (int) $m[2], (int) $m[1] );
+			}
+
+			return array_map( static fn ( array $row ): int => (int) $row['post_id'], $rows );
 		}
 
 		if ( 'vip_memberships' === $table ) {
@@ -578,8 +612,8 @@ final class VipChannelTest extends TestCase {
 				'vip.enabled'               => true,
 				'vip.media_hmac_secret'     => 'test-vip-secret',
 				'vip.media_link_ttl'        => 900,
-				'vip.default_expiry_days'   => 0,
-				'vip.default_expiry_action' => VipPostService::EXPIRY_HIDE,
+				'vip.default_expiry_days'   => 7,
+				'vip.default_expiry_action' => VipPostService::EXPIRY_DELETE,
 				'vip.purge_media_on_expiry' => true,
 				'vip.comments_enabled'      => true,
 				'vip.comment_rate_seconds'  => 0,
@@ -623,6 +657,11 @@ final class VipChannelTest extends TestCase {
 		$this->test_a_second_like_from_the_same_person_does_not_count_twice();
 		$this->test_the_share_page_cover_falls_back_to_the_blur();
 		$this->test_the_deep_link_survives_url_escaping();
+		$this->test_a_new_post_inherits_the_platform_expiry_window();
+		$this->test_the_shipped_defaults_carry_the_ratified_policy();
+		$this->test_the_share_page_warns_the_buyer_before_they_pay();
+		$this->test_saving_needs_access_and_toggles();
+		$this->test_the_offline_copy_marks_the_save_and_survives_the_purge();
 	}
 
 	// --------------------------------------------------- the share page
@@ -695,6 +734,208 @@ final class VipChannelTest extends TestCase {
 			$this->access,
 			$this->billing,
 			igbz()->settings()
+		);
+	}
+
+	// ------------------------------------------------- the expiry policy
+
+	/**
+	 * The window belongs to the platform, not to the post.
+	 *
+	 * The client ratified a central retention period (a week by default) set by the IGBZ senior
+	 * admin, after which the post really leaves the server. Two things have to hold for that to
+	 * mean anything: a post created without an expiry has to inherit the platform's, and the date
+	 * has to be counted from the moment it is actually published — a draft written on Monday and
+	 * published on Friday gets its full week from Friday.
+	 */
+	private function test_a_new_post_inherits_the_platform_expiry_window(): void {
+		$this->boot();
+
+		$id   = $this->posts->create( [ 'caption' => 'Sunday drop', 'tenant_id' => 1, 'author_id' => 99 ] );
+		$post = $this->db->get( 'vip_posts', $id );
+
+		$this->assert_same( 7, $this->posts->retention_days(), 'The default window is a week' );
+		$this->assert_same(
+			VipPostService::EXPIRY_DELETE,
+			(string) $post['expiry_action'],
+			'and a new post is set to be removed, not hidden — that is what the buyer is promised'
+		);
+
+		$expected = gmdate( 'Y-m-d', time() + ( 7 * DAY_IN_SECONDS ) );
+		$this->assert_contains(
+			$expected,
+			(string) $post['expires_at'],
+			'A post created with no date of its own inherits the platform window'
+		);
+
+		// Publish a draft that has been sitting around: the clock restarts at publication.
+		$draft = $this->posts->create( [ 'caption' => 'Written early', 'tenant_id' => 1, 'author_id' => 99 ] );
+		$this->db->tables['vip_posts'][ $draft ]['expires_at']   = null;
+		$this->db->tables['vip_posts'][ $draft ]['status']       = VipPostService::STATUS_DRAFT;
+		$this->db->tables['vip_posts'][ $draft ]['published_at'] = null;
+
+		$this->posts->publish( $draft );
+
+		$this->assert_contains(
+			$expected,
+			(string) $this->db->get( 'vip_posts', $draft )['expires_at'],
+			'and publishing a stale draft counts the week from the publish moment'
+		);
+
+		$notice = $this->posts->expiry_notice( (string) $this->db->get( 'vip_posts', $draft )['expires_at'] );
+		$this->assert_contains( 'removed from the server', $notice, 'The one shared sentence says where the post goes' );
+		$this->assert_contains( 'save icon', $notice, 'and how the customer keeps their own copy' );
+		$this->assert_same( '', $this->posts->expiry_notice( null ), 'A post with no expiry says nothing rather than "expires never"' );
+	}
+
+	/**
+	 * The policy has to be what a fresh install actually gets.
+	 *
+	 * Every other test here pins the VIP settings on purpose, so that a changed default cannot
+	 * quietly move an assertion — which also means none of them would notice the shipped default
+	 * drifting away from the ratified policy. This one reads what `seed_defaults()` really writes.
+	 */
+	private function test_the_shipped_defaults_carry_the_ratified_policy(): void {
+		$settings = igbz_test_reset_settings();
+		$GLOBALS['wpdb'] = new VipDb();
+
+		\IGBZ\Suite\Support\Activator::seed_defaults();
+
+		$this->assert_same( 7, $settings->int( 'vip.default_expiry_days', 0 ), 'A fresh install expires VIP posts after a week' );
+		$this->assert_same(
+			VipPostService::EXPIRY_DELETE,
+			$settings->string( 'vip.default_expiry_action', '' ),
+			'and removes them rather than hiding them — the buyer was promised the post leaves the server'
+		);
+		$this->assert_true( $settings->bool( 'vip.purge_media_on_expiry', false ), 'with the file itself deleted' );
+		$this->assert_true( $settings->int( 'vip.offline_link_ttl', 0 ) > 0, 'and a download window long enough to keep a copy' );
+	}
+
+	/**
+	 * The buyer is told before they pay, not after.
+	 *
+	 * The whole risk in "the post is deleted in a week" is somebody paying for a single post on
+	 * day six. The warning names the date and points at the way to keep a copy, and it is rendered
+	 * from the offers block, above the buttons — that placement is checked on the live site,
+	 * because `render()` ends in `exit` and cannot be called from a test process.
+	 */
+	private function test_the_share_page_warns_the_buyer_before_they_pay(): void {
+		$this->boot();
+
+		$expires = gmdate( 'Y-m-d H:i:s', time() + ( 3 * DAY_IN_SECONDS ) );
+		$post    = $this->db->get(
+			'vip_posts',
+			$this->db->seed_post(
+				[
+					'access'        => VipAccessService::ACCESS_PURCHASE,
+					'price'         => 90000.0,
+					'expires_at'    => $expires,
+					'expiry_action' => VipPostService::EXPIRY_DELETE,
+				]
+			)
+		);
+
+		$warning = new \ReflectionMethod( \IGBZ\Suite\Modules\Instagram\Vip\VipLandingPage::class, 'expiry_warning' );
+		$page    = $this->landing();
+
+		ob_start();
+		$warning->invoke( $page, $post, true );
+		$before_buying = (string) ob_get_clean();
+
+		$this->assert_contains( 'igbz-vip-expiry-warning', $before_buying, 'The share page carries the expiry warning' );
+		$this->assert_contains( 'is then removed from the server', $before_buying, 'stating plainly that the post goes away' );
+		$this->assert_contains(
+			wp_date( 'Y-m-d', (int) strtotime( $expires . ' UTC' ) ),
+			$before_buying,
+			'and naming the date it happens, in the shop\'s own timezone rather than UTC'
+		);
+		$this->assert_contains( 'After buying, tap the save icon', $before_buying, 'then telling the buyer how to keep a copy' );
+
+		ob_start();
+		$warning->invoke( $page, $post, false );
+		$already_owned = (string) ob_get_clean();
+
+		$this->assert_contains( 'save icon on the post', $already_owned, 'A member who already owns it gets the same advice' );
+		$this->assert_true(
+			! str_contains( $already_owned, 'After buying' ),
+			'without being told to buy something they have already bought'
+		);
+
+		ob_start();
+		$warning->invoke( $page, array_merge( $post, [ 'expires_at' => null ] ), true );
+		$this->assert_same( '', trim( (string) ob_get_clean() ), 'A post with no expiry says nothing at all' );
+	}
+
+	/**
+	 * Saving is gated on the same rule as viewing, and it toggles.
+	 *
+	 * A bookmark on a post the customer cannot open would promise a copy that can never be
+	 * fetched, so the entitlement check is the same one the feed uses.
+	 */
+	private function test_saving_needs_access_and_toggles(): void {
+		$this->boot();
+
+		$locked = $this->db->seed_post( [ 'access' => VipAccessService::ACCESS_MEMBERS ] );
+		$free   = $this->db->seed_post( [ 'access' => VipAccessService::ACCESS_FREE ] );
+
+		$refused = false;
+		try {
+			$this->social->toggle_save( $locked, 7 );
+		} catch ( \RuntimeException $e ) {
+			$refused = 'igbz_vip_locked' === $e->getMessage();
+		}
+		$this->assert_true( $refused, 'A post the customer cannot open cannot be saved either' );
+		$this->assert_false( $this->social->has_saved( $locked, 7 ), 'and nothing was written' );
+
+		$first = $this->social->toggle_save( $free, 7 );
+		$this->assert_true( $first['saved'], 'Saving an open post works' );
+		$this->assert_true( $this->social->has_saved( $free, 7 ), 'and it is remembered' );
+		$this->assert_same( [ $free ], $this->social->saved_post_ids( 7 ), 'and it shows up in the saved list' );
+		$this->assert_same( 1, $this->social->saved_count( 7 ), 'which knows how long it is' );
+
+		$second = $this->social->toggle_save( $free, 7 );
+		$this->assert_false( $second['saved'], 'Tapping the icon again unsaves it' );
+		$this->assert_same( [], $this->social->saved_post_ids( 7 ), 'and the list is empty again' );
+		$this->assert_same( 0, $this->social->saved_count( 8 ), 'One member saving says nothing about another' );
+	}
+
+	/**
+	 * The saved row survives the purge — which is the entire point.
+	 *
+	 * The post is removed from the server on schedule; what the customer was promised is that
+	 * their own copy stays. `offline_at` is how the app knows which saves are backed by real bytes
+	 * and which are only bookmarks, so it must be stamped when the download endpoint hands the
+	 * media over and must still be there after the sweep has run.
+	 */
+	private function test_the_offline_copy_marks_the_save_and_survives_the_purge(): void {
+		$this->boot();
+
+		$id = $this->db->seed_post(
+			[
+				'access'        => VipAccessService::ACCESS_FREE,
+				'expires_at'    => gmdate( 'Y-m-d H:i:s', time() - HOUR_IN_SECONDS ),
+				'expiry_action' => VipPostService::EXPIRY_DELETE,
+			]
+		);
+
+		// Downloading implies saving: the customer taps one button, not two.
+		$this->social->mark_offline( $id, 12 );
+		$saved = $this->db->all( 'vip_post_saves' );
+
+		$this->assert_same( 1, count( $saved ), 'Fetching the offline copy records the save' );
+		$this->assert_false( null === reset( $saved )['offline_at'], 'and stamps when the bytes were handed over' );
+
+		$this->posts->expire_due();
+
+		$post = $this->db->get( 'vip_posts', $id );
+		$this->assert_same( VipPostService::STATUS_DELETED, (string) $post['status'], 'The post is gone from the server' );
+		$this->assert_same( '[]', (string) $post['media'], 'and so is its media' );
+		$this->assert_same( 1, count( $this->db->all( 'vip_post_saves' ) ), 'but the record of the customer keeping a copy is untouched' );
+
+		$this->assert_contains(
+			'has expired',
+			$this->posts->expiry_notice( (string) $post['expires_at'] ),
+			'and the app is told, in one sentence, why the post is no longer there'
 		);
 	}
 

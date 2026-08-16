@@ -134,6 +134,18 @@ body.igbz-vip-share {
 .igbz-vip-offer:last-of-type { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
 
 .igbz-vip-hint { color: var(--igbz-vip-muted); font-size: .87rem; }
+
+/* The buyer has to read this before the buttons, not after: the post is deleted in a week. */
+.igbz-vip-expiry-warning {
+	margin: 0 0 14px;
+	padding: 10px 12px;
+	font-size: .87rem;
+	line-height: 1.6;
+	border: 1px solid var(--igbz-vip-line);
+	border-left-width: 3px;
+	border-radius: var(--igbz-vip-radius);
+	background: rgba(255, 255, 255, .03);
+}
 .igbz-vip-price { font-size: 1.15rem; font-weight: 700; margin: 6px 0 12px; }
 .igbz-vip-owned { font-size: .95rem; }
 
