@@ -759,6 +759,7 @@ final class Activator {
 			'master_payment.release_hours'  => 24,
 			'master_payment.fx_fee_percent' => 2.0,
 			'legal.national_id_check'       => false,
+			'legal.enamad_active'           => false,
 			'legal.shahkar_api_key'         => '',
 			'legal.shahkar_base_url'        => '',
 			'domain.provider'               => '',
