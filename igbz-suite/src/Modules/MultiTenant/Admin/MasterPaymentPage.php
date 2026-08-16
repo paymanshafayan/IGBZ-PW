@@ -83,6 +83,26 @@ final class MasterPaymentPage {
 			echo '</tbody></table>';
 		}
 
+		echo '<h2>' . esc_html__( 'Withdrawals', 'igbz-suite' ) . '</h2>';
+		$wds = $master->withdrawals( $tenant, 50 );
+		if ( ! $wds ) {
+			echo '<p>' . esc_html__( 'No withdrawal requests.', 'igbz-suite' ) . '</p>';
+		} else {
+			echo '<table class="widefat striped"><thead><tr><th>ID</th><th>' . esc_html__( 'User', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Amount', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Method', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Status', 'igbz-suite' ) . '</th><th>' . esc_html__( 'Detail', 'igbz-suite' ) . '</th></tr></thead><tbody>';
+			foreach ( $wds as $w ) {
+				printf(
+					'<tr><td>%1$d</td><td>%2$s</td><td>%3$s</td><td>%4$s</td><td>%5$s</td><td>%6$s</td></tr>',
+					(int) $w['id'],
+					esc_html( (string) $w['user_id'] ),
+					esc_html( number_format( (float) $w['amount'], 0 ) ),
+					esc_html( (string) $w['method'] ),
+					esc_html( (string) $w['status'] ),
+					esc_html( (string) $w['detail'] )
+				);
+			}
+			echo '</tbody></table>';
+		}
+
 		View::close();
 	}
 

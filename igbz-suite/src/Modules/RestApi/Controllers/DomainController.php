@@ -26,6 +26,7 @@ final class DomainController extends BaseController {
 		register_rest_route( $ns, '/domains', $this->route( 'GET', [ $this, 'domains' ], $auth ) );
 		register_rest_route( $ns, '/domains/search', $this->route( 'POST', [ $this, 'search' ], $auth ) );
 		register_rest_route( $ns, '/domains/register', $this->route( 'POST', [ $this, 'register_domain' ], $auth ) );
+		register_rest_route( $ns, '/domains/transfer', $this->route( 'POST', [ $this, 'transfer' ], $auth ) );
 		register_rest_route( $ns, '/domains/subdomain', $this->route( 'POST', [ $this, 'subdomain' ], $auth ) );
 		register_rest_route( $ns, '/domains/(?P<id>\\d+)/verify-dns', $this->route( 'POST', [ $this, 'verify_dns' ], $auth ) );
 		register_rest_route( $ns, '/domains/web-presence', $this->route( 'GET', [ $this, 'web_presence' ], $auth ) );
@@ -33,6 +34,7 @@ final class DomainController extends BaseController {
 		register_rest_route( $ns, '/i18n/config', $this->route( 'GET', [ $this, 'i18n' ], $auth ) );
 		register_rest_route( $ns, '/master-payment', $this->route( 'GET', [ $this, 'master' ], $auth ) );
 		register_rest_route( $ns, '/master-payment/agreement', $this->route( 'POST', [ $this, 'master_agree' ], $auth ) );
+		register_rest_route( $ns, '/master-payment/withdraw', $this->route( 'POST', [ $this, 'master_withdraw' ], $auth ) );
 	}
 
 	private function tenant(): int {
@@ -58,6 +60,15 @@ final class DomainController extends BaseController {
 			sanitize_key( (string) $request->get_param( 'tld' ) ?: 'ir' )
 		);
 		return $result['ok'] ? $this->ok( [ 'ok' => true, 'domain_id' => $result['domain_id'] ], 201 ) : $this->fail( 'register_failed', $result['error'] );
+	}
+
+	public function transfer( \WP_REST_Request $request ): \WP_REST_Response {
+		$result = igbz()->get( 'domain' )->transfer(
+			$this->tenant(),
+			sanitize_text_field( (string) $request->get_param( 'name' ) ),
+			sanitize_text_field( (string) $request->get_param( 'auth_code' ) )
+		);
+		return $result['ok'] ? $this->ok( [ 'ok' => true, 'domain_id' => $result['domain_id'] ], 201 ) : $this->fail( 'transfer_failed', $result['error'] );
 	}
 
 	public function subdomain( \WP_REST_Request $request ): \WP_REST_Response {
@@ -110,6 +121,17 @@ final class DomainController extends BaseController {
 				'disputes'  => $master->disputes( $this->tenant(), 20 ),
 			]
 		);
+	}
+
+	public function master_withdraw( \WP_REST_Request $request ): \WP_REST_Response {
+		$result = igbz()->get( 'master.payment' )->request_withdrawal(
+			$this->tenant(),
+			get_current_user_id(),
+			(float) $request->get_param( 'amount' ),
+			sanitize_key( (string) $request->get_param( 'method' ) ?: 'card' ),
+			sanitize_text_field( (string) $request->get_param( 'detail' ) )
+		);
+		return $result['ok'] ? $this->ok( [ 'ok' => true ] ) : $this->fail( 'withdraw_failed', $result['error'], 400 );
 	}
 
 	public function master_agree(): \WP_REST_Response {

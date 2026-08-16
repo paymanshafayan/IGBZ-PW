@@ -125,6 +125,41 @@ final class DomainService {
 		return [ 'ok' => true, 'domain_id' => $id, 'error' => '' ];
 	}
 
+	/** Transfer an existing domain the admin already owns (auth code optional). */
+	public function transfer( int $tenant_id, string $name, string $auth_code = '' ): array {
+		if ( ! $this->is_configured() ) {
+			return [ 'ok' => false, 'domain_id' => 0, 'error' => __( 'Domain provider is not configured.', 'igbz-suite' ) ];
+		}
+		$base = rtrim( igbz()->settings()->string( 'domain.provider_base_url' ), '/' );
+		$response = $this->http->post(
+			$base . '/v1/domains/transfer',
+			[
+				'json'    => [ 'name' => $name, 'auth_code' => $auth_code, 'api_key' => igbz()->settings()->string( 'domain.provider_api_key' ) ],
+				'headers' => $this->headers(),
+				'channel' => 'domain',
+				'timeout' => 60,
+			]
+		);
+		$body = $response->json();
+		if ( ! $response->ok() ) {
+			return [ 'ok' => false, 'domain_id' => 0, 'error' => $response->error_message() ];
+		}
+		$now = current_time( 'mysql', true );
+		$id  = (int) $this->db->insert(
+			'ig_domains',
+			[
+				'tenant_id'    => $tenant_id,
+				'name'         => $name,
+				'type'         => 'transferred',
+				'status'       => 'pending',
+				'provider_ref' => (string) ( $body['id'] ?? '' ),
+				'created_at'   => $now,
+				'updated_at'   => $now,
+			]
+		);
+		return [ 'ok' => true, 'domain_id' => $id, 'error' => '' ];
+	}
+
 	/** Mark DNS verified (gates bank gateway + Google/Bing). */
 	public function verify_dns( int $domain_id ): bool {
 		$this->db->update(

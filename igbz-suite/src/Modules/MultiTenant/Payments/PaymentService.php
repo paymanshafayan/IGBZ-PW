@@ -36,6 +36,14 @@ final class PaymentService {
 		$this->register( new HttpPspGateway( $http ) );
 		$this->register( new NowPaymentsGateway( $http ) );
 		$this->register( new BalePayGateway( $http ) );
+		$this->register( new SadadGateway( $http ) );
+		$this->register( new AsanPardakhtGateway( $http ) );
+		$this->register( new ParsianGateway( $http ) );
+		$this->register( new IranKishGateway( $http ) );
+		$this->register( new MellatGateway( $http ) );
+		$this->register( new SamanGateway( $http ) );
+		$this->register( new PasargadGateway( $http ) );
+		$this->register( new SepehrGateway( $http ) );
 		/**
 		 * Register additional PSP adapters.
 		 *
@@ -74,7 +82,7 @@ final class PaymentService {
 				}
 				// Bank (PSP) gateways are locked until the store has a verified
 				// standalone domain and an active Enamad (phase-6 rule).
-				if ( in_array( $gateway->id(), [ 'zarinpal', 'idpay', 'nextpay', 'payir', 'httppsp' ], true ) && ! $this->bank_gateway_allowed() ) {
+				if ( in_array( $gateway->id(), [ 'zarinpal', 'idpay', 'nextpay', 'payir', 'httppsp', 'sadad', 'asanpardakht', 'parsian', 'irankish', 'mellat', 'saman', 'pasargad', 'sepehr' ], true ) && ! $this->bank_gateway_allowed() ) {
 					return false;
 				}
 				return true;

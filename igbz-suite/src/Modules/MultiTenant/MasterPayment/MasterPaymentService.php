@@ -226,4 +226,57 @@ final class MasterPaymentService {
 			$limit
 		);
 	}
+	/** Admin requests a withdrawal from the released balance to card/bank. */
+	public function request_withdrawal( int $tenant_id, int $user_id, float $amount, string $method = 'card', string $detail = '' ): array {
+		if ( $amount <= 0 ) {
+			return [ 'ok' => false, 'error' => __( 'Invalid amount.', 'igbz-suite' ) ];
+		}
+		$wallet = igbz()->has( 'wallet' ) ? igbz()->get( 'wallet' ) : null;
+		if ( ! $wallet ) {
+			return [ 'ok' => false, 'error' => __( 'Wallet unavailable.', 'igbz-suite' ) ];
+		}
+		$balance = $wallet->balance( $user_id );
+		$available = (float) ( is_array( $balance ) ? ( $balance['balance'] ?? 0 ) : $balance );
+		if ( $available < $amount ) {
+			return [ 'ok' => false, 'error' => __( 'Insufficient wallet balance.', 'igbz-suite' ) ];
+		}
+
+		$ok = $wallet->debit(
+			$user_id,
+			$amount,
+			'withdrawal',
+			'withdraw:' . time() . ':' . $user_id,
+			[ 'method' => $method ],
+			$tenant_id
+		);
+		if ( ! $ok ) {
+			return [ 'ok' => false, 'error' => __( 'Could not reserve the amount.', 'igbz-suite' ) ];
+		}
+
+		$this->db->insert(
+			'ig_master_withdrawals',
+			[
+				'tenant_id'  => $tenant_id,
+				'user_id'    => $user_id,
+				'amount'     => $amount,
+				'method'     => $method,
+				'status'     => 'pending',
+				'detail'     => mb_substr( $detail, 0, 255 ),
+				'created_at' => current_time( 'mysql', true ),
+				'updated_at' => current_time( 'mysql', true ),
+			]
+		);
+
+		return [ 'ok' => true, 'error' => '' ];
+	}
+
+	/** @return array<int,array<string,mixed>> */
+	public function withdrawals( int $tenant_id, int $limit = 50 ): array {
+		return $this->db->results(
+			'SELECT * FROM ' . $this->db->table( 'ig_master_withdrawals' ) . ' WHERE tenant_id = %d ORDER BY id DESC LIMIT %d',
+			$tenant_id,
+			$limit
+		);
+	}
 }
+

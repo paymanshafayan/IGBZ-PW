@@ -35,6 +35,7 @@ $cases = [
 	'FxTest',
 	'PhasesTest',
 	'Phases2Test',
+	'IpgAdaptersTest',
 ];
 
 foreach ( $cases as $case ) {
