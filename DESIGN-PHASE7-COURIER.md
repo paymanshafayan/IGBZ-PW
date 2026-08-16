@@ -55,6 +55,8 @@
 | `ig_label_group_items` | مرسوله‌های هر گروه (many-to-many) |
 | `ig_cod_payments` | تلاش‌های COD: `shipment_id`، `method` (`app`/`cash`/`gateway`/`card`)، `status`، `amount`، `ref`، `gateway_link`، `card_transfer_ref`، `timestamps` |
 | `ig_courier_routes` | مسیر محاسبه‌شدهٔ پیک: `courier_id`، `shipment_ids` (ترتیب)، `payload`، `created_at` |
+| `ig_courier_tracking` | موقعیت زنده: `shipment_id`، `lat`/`lng`، `at` (هر N ثانیه از اپ پیک) |
+| `ig_courier_chat` | چت پیک↔مشتری: `shipment_id`، `sender` (`courier`/`customer`)، `body`، `read_at`، `created_at` |
 
 ### بارکد
 - مقدار: `IGBZ-<shipment_id>-<random>` (یکتا، قابل اسکن)
@@ -144,12 +146,19 @@ POST   /courier/shipments/{id}/deliver         { pin }
 POST   /courier/shipments/{id}/cod             { method: cash|gateway|card }
 POST   /courier/shipments/{id}/cod/confirm     { method: card, card_transfer_ref }
 GET    /courier/shipments/{id}/cod/status      (نتیجهٔ درگاه/اپ)
+POST   /courier/tracking/{shipment_id}         { lat, lng } — موقعیت زنده (هر N ثانیه)
+GET    /courier/chat/{shipment_id}             (پیام‌های چت)
+POST   /courier/chat/{shipment_id}/send        { body } — چت با مشتری
 ```
 
-### مشتری (COD در لحظهٔ تحویل)
+### مشتری (COD در لحظهٔ تحویل + رصد)
 ```
 POST   /igbz/v1/checkout/cod-pay               { shipment_barcode } → پرداخت
 GET    /igbz/v1/checkout/cod/status            { shipment_barcode }
+GET    /igbz/v1/shipments/{id}/status          (وضعیت مرسوله در اپ مشتری)
+GET    /igbz/v1/shipments/{id}/tracking        (موقعیت زنده روی نقشه — پس از «تحویل به پیک»)
+GET    /igbz/v1/shipments/{id}/chat            (چت با پیک)
+POST   /igbz/v1/shipments/{id}/chat/send       { body }
 ```
 
 ### اپراتور (پنل)
@@ -160,6 +169,19 @@ POST   /igbz/v1/admin/label-groups/{id}/print  (تولید HTML چاپی)
 GET    /igbz/v1/admin/label-groups/{id}/barcodes
 GET/POST /igbz/v1/admin/couriers               (مدیریت پیک‌ها)
 ```
+
+---
+
+## ۵ب. رصد زنده و ارتباط (الهام از اپ رانندگان اسنپ‌باکس)
+
+- **رصد زنده در اپ مشتری:** پس از تغییر وضعیت به «تحویل به پیک»، مشتری موقعیت زندهٔ
+  مرسوله را روی نقشه می‌بیند. فنی: اپ پیک هر N ثانیه GPS می‌فرستد
+  (`POST /courier/tracking/{id}` → `ig_courier_tracking`) و اپ مشتری با poll سبک یا FCM
+  موقعیت را می‌گیرد. (برای مقیاس بزرگ‌تر: MQTT/WebSocket — الگوی اسنپ که از MQTT + Pusher
+  fallback استفاده می‌کند.)
+- **تماس با مشتری در اپ پیک:** دکمهٔ تماس (درون‌برنامه‌ای صوتی یا تلفنی).
+- **چت پیک ↔ مشتری:** متن آزاد + پیام‌های ازپیش‌تعریف‌شده (مثل اسنپ برای حفظ تمرکز راننده)،
+  در `ig_courier_chat`؛ خوانده/نخوانده با `read_at`.
 
 ---
 
