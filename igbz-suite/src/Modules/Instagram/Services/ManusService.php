@@ -16,7 +16,7 @@ defined( 'ABSPATH' ) || exit;
  *
  * This is the replacement for the Instagram Graph API integration of the nopCommerce original.
  * Manus performs the whole workflow as an autonomous agent:
- *   research -> design (Canva) / reel production -> caption + hashtags -> schedule -> publish.
+ *   research -> design / reel production -> caption + hashtags -> schedule -> publish.
  * No asset is ever downloaded and re-uploaded manually.
  *
  * Every call is asynchronous: we store the returned task id on the content row and a cron worker
@@ -280,7 +280,7 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			$this->prompts->graphic_design( $account, $brief ),
 			$account,
 			sprintf( 'Design: %s', (string) ( $brief['subject'] ?? '' ) ),
-			igbz()->settings()->bool( 'manus.use_canva', true ) ? [ 'canva' ] : []
+			[]
 		);
 	}
 
@@ -332,7 +332,7 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			$this->prompts->product_image( $account, $brief ),
 			$account,
 			sprintf( /* translators: %s: product name */ __( 'Product image: %s', 'igbz-suite' ), (string) ( $brief['product'] ?? '' ) ),
-			igbz()->settings()->bool( 'manus.use_canva', true ) ? [ 'canva' ] : [],
+			[],
 			[ 'attachments' => [ $image_url ] ]
 		);
 	}
@@ -385,7 +385,7 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			$this->prompts->product_post( $account, $brief ),
 			$account,
 			sprintf( /* translators: %s: product code */ __( 'Instagram post: %s', 'igbz-suite' ), (string) ( $brief['code'] ?? '' ) ),
-			igbz()->settings()->bool( 'manus.use_canva', true ) ? [ 'canva' ] : [],
+			[],
 			[ 'attachments' => '' !== $image_url ? [ $image_url ] : [] ]
 		);
 	}
@@ -441,6 +441,24 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 			return '';
 		}
 
+		// FX credit gate: only for accounts on their own keys, only when the FX module is
+		// enabled, and never a queue — enough credit and the task goes out now, otherwise it is
+		// refused on the spot so the tenant tops up instead of waiting.
+		$meter  = igbz()->has( 'fx.meter' ) ? igbz()->get( 'fx.meter' ) : null;
+		$fx_ref = '';
+		if ( $meter && AccountCredentials::MODE_OWN === ( $account['credential_mode'] ?? AccountCredentials::MODE_OWN ) ) {
+			$fx_ref = 'manus-task:' . bin2hex( random_bytes( 6 ) );
+			$spend  = $meter->consume( (int) ( $account['tenant_id'] ?? 0 ), 'manus_task', $fx_ref );
+			if ( ! $spend['ok'] ) {
+				$this->logger->warning(
+					'manus',
+					'Task creation skipped: insufficient FX credit',
+					[ 'account_id' => (int) ( $account['id'] ?? 0 ), 'error' => $spend['error'] ]
+				);
+				return '';
+			}
+		}
+
 		$result = $this->client_for( $account )->create_task(
 			$prompt,
 			array_filter(
@@ -461,6 +479,9 @@ final class ManusService implements ContentGeneratorInterface, PublisherInterfac
 		if ( ! $result['ok'] ) {
 			// Manus never took the job, so the tenant should not lose their one free request.
 			$this->credentials->release_trial_task( $account );
+			if ( '' !== $fx_ref && $meter ) {
+				$meter->release( (int) ( $account['tenant_id'] ?? 0 ), 'manus_task', $fx_ref );
+			}
 			$this->logger->error( 'manus', 'Task creation failed', [ 'title' => $title, 'error' => $result['error'] ] );
 			return '';
 		}

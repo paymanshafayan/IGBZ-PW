@@ -700,6 +700,16 @@ final class FunnelService {
 
 		$this->grant_wallet_credit( $funnel, $subscriber_row_id, $hit_id );
 
+		// FX meter for delivered DMs: charge the funnel's tenant only when the FX module is
+		// enabled, and only on a confirmed settlement (the single writer of `delivered`). A
+		// short wallet refuses here too — same "no queue" rule as Manus tasks.
+		if ( igbz()->has( 'fx.meter' ) ) {
+			igbz()->get( 'fx.meter' )->charge_delivery(
+				(int) ( $funnel['tenant_id'] ?? 0 ),
+				'funnel-hit:' . (int) $hit_id
+			);
+		}
+
 		if ( self::DELIVERY_UNCONFIRMED === $error ) {
 			// Same honesty rule as an unverified publish: the reply went back to ManyChat in the
 			// webhook response and almost certainly reached the subscriber, but no API call

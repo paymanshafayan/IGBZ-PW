@@ -32,6 +32,14 @@ abstract class TestCase {
 		$this->record( str_contains( $haystack, $needle ), $message );
 	}
 
+	protected function assert_not_same( $expected, $actual, string $message ): void {
+		$this->record( $expected !== $actual, $message . sprintf( ' (expected not %s, got %s)', var_export( $expected, true ), var_export( $actual, true ) ) );
+	}
+
+	protected function assert_not_contains( string $needle, string $haystack, string $message ): void {
+		$this->record( ! str_contains( $haystack, $needle ), $message );
+	}
+
 	private function record( bool $ok, string $message ): void {
 		if ( $ok ) {
 			++self::$passed;

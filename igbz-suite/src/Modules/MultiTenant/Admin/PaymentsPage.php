@@ -33,6 +33,7 @@ final class PaymentsPage {
 	}
 
 	public function render(): void {
+		$this->handle_test();
 		$this->handle_get_actions();
 
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended
@@ -65,6 +66,34 @@ final class PaymentsPage {
 		};
 
 		View::close();
+	}
+
+	private function handle_test(): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		if ( ! isset( $_POST['igbz_pay_action'] ) || 'test' !== $_POST['igbz_pay_action'] ) {
+			return;
+		}
+		View::check_nonce( 'igbz_payment_test' );
+
+		$id      = sanitize_key( (string) ( $_POST['gateway_id'] ?? '' ) );
+		$gateway = $this->payments()->gateway( $id );
+		if ( ! $gateway ) {
+			View::notice( __( 'Unknown gateway.', 'igbz-suite' ), 'error' );
+			return;
+		}
+
+		// A 1-Rial sandbox request verifies credentials + endpoint without charging.
+		$result = $gateway->request(
+			0.0001,
+			add_query_arg( [ 'igbz_payment_callback' => $gateway->id(), 'payment_id' => 'test' ], home_url( '/' ) ),
+			[ 'order_id' => 'TEST-' . time(), 'description' => 'IGBZ connection test' ]
+		);
+
+		if ( $result->success ) {
+			View::notice( sprintf( /* translators: %s: gateway title */ __( '%s responded — connection OK.', 'igbz-suite' ), $gateway->title() ), 'success' );
+		} else {
+			View::notice( sprintf( /* translators: 1: gateway title, 2: error */ __( '%1$s test failed: %2$s', 'igbz-suite' ), $gateway->title(), $result->error_message ), 'error' );
+		}
 	}
 
 	private function render_payments( string $status, int $paged ): void {
@@ -166,6 +195,16 @@ final class PaymentsPage {
 				}
 			}
 
+			// Test connection button for each configured gateway.
+			$test = '';
+			if ( $gateway->is_configured() ) {
+				$test = '<form method="post" style="display:inline">'
+					. wp_nonce_field( 'igbz_payment_test', '_wpnonce', true, false )
+					. '<input type="hidden" name="igbz_pay_action" value="test" />'
+					. '<input type="hidden" name="gateway_id" value="' . esc_attr( $gateway->id() ) . '" />'
+					. '<button class="button button-small">' . esc_html__( 'Test', 'igbz-suite' ) . '</button></form>';
+			}
+
 			$rows[] = [
 				'title'    => esc_html( $gateway->title() ),
 				'id'       => '<code>' . esc_html( $gateway->id() ) . '</code>',
@@ -173,6 +212,7 @@ final class PaymentsPage {
 					. ' ' . esc_html( $gateway->is_configured() ? __( 'configured', 'igbz-suite' ) : __( 'missing credentials', 'igbz-suite' ) ),
 				'missing'  => $missing ? '<code>' . esc_html( implode( ', ', $missing ) ) . '</code>' : '—',
 				'default'  => $default === $gateway->id() ? esc_html__( 'yes', 'igbz-suite' ) : '—',
+				'test'     => $test,
 				'callback' => '<code>' . esc_html(
 					add_query_arg(
 						[ 'igbz_payment_callback' => $gateway->id(), 'payment_id' => '{id}' ],
@@ -185,6 +225,7 @@ final class PaymentsPage {
 		View::table(
 			[
 				'title'    => __( 'Gateway', 'igbz-suite' ),
+				'test'     => __( 'Test', 'igbz-suite' ),
 				'id'       => __( 'Id', 'igbz-suite' ),
 				'ready'    => __( 'Status', 'igbz-suite' ),
 				'missing'  => __( 'Missing settings', 'igbz-suite' ),

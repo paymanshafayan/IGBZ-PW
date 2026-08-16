@@ -9,12 +9,13 @@ final class Modules {
 	public const INSTAGRAM   = 'instagram';
 	public const HUB         = 'hub';
 	public const REST_API    = 'rest_api';
+	public const FX          = 'fx';
 
 	public const OPTION = 'igbz_enabled_modules';
 
 	/** @return string[] */
 	public static function all(): array {
-		return [ self::MULTITENANT, self::INSTAGRAM, self::HUB, self::REST_API ];
+		return [ self::MULTITENANT, self::INSTAGRAM, self::HUB, self::FX, self::REST_API ];
 	}
 
 	/** @return string[] */

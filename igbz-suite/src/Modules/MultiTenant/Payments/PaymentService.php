@@ -33,6 +33,17 @@ final class PaymentService {
 		$this->register( new IdPayGateway( $http ) );
 		$this->register( new NextPayGateway( $http ) );
 		$this->register( new PayirGateway( $http ) );
+		$this->register( new HttpPspGateway( $http ) );
+		$this->register( new NowPaymentsGateway( $http ) );
+		$this->register( new BalePayGateway( $http ) );
+		$this->register( new SadadGateway( $http ) );
+		$this->register( new AsanPardakhtGateway( $http ) );
+		$this->register( new ParsianGateway( $http ) );
+		$this->register( new IranKishGateway( $http ) );
+		$this->register( new MellatGateway( $http ) );
+		$this->register( new SamanGateway( $http ) );
+		$this->register( new PasargadGateway( $http ) );
+		$this->register( new SepehrGateway( $http ) );
 		/**
 		 * Register additional PSP adapters.
 		 *
@@ -65,10 +76,27 @@ final class PaymentService {
 	public function enabled_gateways(): array {
 		return array_filter(
 			$this->gateways,
-			static fn ( GatewayInterface $gateway ): bool =>
-				igbz()->settings()->bool( 'payments.' . $gateway->id() . '.enabled', false )
-				&& $gateway->is_configured()
+			function ( GatewayInterface $gateway ): bool {
+				if ( ! igbz()->settings()->bool( 'payments.' . $gateway->id() . '.enabled', false ) || ! $gateway->is_configured() ) {
+					return false;
+				}
+				// Bank (PSP) gateways are locked until the store has a verified
+				// standalone domain and an active Enamad (phase-6 rule).
+				if ( in_array( $gateway->id(), [ 'zarinpal', 'idpay', 'nextpay', 'payir', 'httppsp', 'sadad', 'asanpardakht', 'parsian', 'irankish', 'mellat', 'saman', 'pasargad', 'sepehr' ], true ) && ! $this->bank_gateway_allowed() ) {
+					return false;
+				}
+				return true;
+			}
 		);
+	}
+
+	/** Bank gateways require a verified standalone domain + active Enamad. */
+	private function bank_gateway_allowed(): bool {
+		$domain_ok = true;
+		if ( igbz()->has( 'domain' ) ) {
+			$domain_ok = igbz()->get( 'domain' )->has_verified_domain( (int) igbz()->tenancy()->id() );
+		}
+		return $domain_ok && igbz()->settings()->bool( 'legal.enamad_active', false );
 	}
 
 	public function is_enabled( string $id ): bool {

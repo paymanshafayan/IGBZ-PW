@@ -215,11 +215,11 @@ PHP
 cat > "$WORK/mu/010-enable-modules.php" <<'PHP'
 <?php
 /**
- * Harness only. Turn on all four modules once, so every admin screen and REST route exists.
+ * Harness only. Turn on all five modules once, so every admin screen and REST route exists.
  */
 add_action( 'igbz_booted', function () {
 	if ( get_option( 'igbz_devenv_modules_on' ) ) { return; }
-	update_option( 'igbz_enabled_modules', [ 'multitenant', 'instagram', 'hub', 'rest_api' ] );
+	update_option( 'igbz_enabled_modules', [ 'multitenant', 'instagram', 'hub', 'rest_api', 'fx' ] );
 	update_option( 'igbz_devenv_modules_on', 1 );
 } );
 PHP

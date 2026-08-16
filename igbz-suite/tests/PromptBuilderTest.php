@@ -39,7 +39,7 @@ final class PromptBuilderTest extends TestCase {
 		$carousel = $builder->graphic_design( $account, [ 'subject' => 'winter care', 'slides' => 5 ] );
 		$this->assert_contains( '5-slide carousel', $carousel, 'a multi-slide brief asks for a carousel' );
 		$this->assert_contains( 'winter care', $carousel, 'the subject reaches the prompt' );
-		$this->assert_contains( '1080x1350', $carousel, 'the Instagram canvas size is specified' );
+		$this->assert_contains( '1080x1350', $carousel, 'the Instagram format size is specified' );
 		$this->assert_contains( 'RTL', $carousel, 'Persian typography is called out' );
 
 		$single = $builder->graphic_design( $account, [ 'subject' => 'new arrival' ] );

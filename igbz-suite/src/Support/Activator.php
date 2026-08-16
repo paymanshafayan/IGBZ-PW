@@ -26,6 +26,7 @@ final class Activator {
 		// used to be written only by the v10 migration, so a brand-new site got a Plans screen with
 		// nothing on it and a share page with nothing to sell.
 		self::seed_starter_vip_plan();
+		self::seed_fx_prices();
 		update_option( self::VERSION_OPTION, IGBZ_DB_VERSION, true );
 		if ( false === get_option( Modules::OPTION, false ) ) {
 			Modules::save( Modules::defaults() );
@@ -86,6 +87,60 @@ final class Activator {
 		if ( $from > 0 && $from < 13 ) {
 			self::migrate_to_v13();
 		}
+		if ( $from > 0 && $from < 14 ) {
+			self::migrate_to_v14();
+		}
+		if ( $from > 0 && $from < 15 ) {
+			self::migrate_to_v15();
+		}
+		if ( $from > 0 && $from < 16 ) {
+			self::migrate_to_v16();
+		}
+	}
+
+	/**
+	 * v14: the FX payment gateway tables (created by dbDelta) plus default prices.
+	 *
+	 * The six fx_* tables are plain dbDelta work. What cannot be expressed in DDL is the price
+	 * list the meter and the top-up screen depend on, so an upgrade seeds it exactly like a fresh
+	 * install does. Prices are deliberately conservative defaults; the operator edits them on the
+	 * FX payments screen (or leaves the module off entirely).
+	 */
+	private static function migrate_to_v14(): void {
+		self::seed_fx_prices();
+	}
+
+	/**
+	 * Seed the default per-service USD prices. No-op once anything is priced, so a shop that
+	 * deliberately cleared the list never has it come back.
+	 */
+	private static function seed_fx_prices(): void {
+		$db = igbz()->db();
+
+		$existing = (int) $db->scalar( 'SELECT COUNT(*) FROM ' . $db->table( 'fx_prices' ) );
+		if ( $existing > 0 ) {
+			return;
+		}
+
+		$now = current_time( 'mysql', true );
+		foreach (
+			[
+				'manus_task'      => 0.5,
+				'manus_monthly'   => 25.0,
+				'manychat_monthly' => 30.0,
+			] as $service => $price
+		) {
+			$db->insert(
+				'fx_prices',
+				[
+					'service'    => $service,
+					'price_usd'  => $price,
+					'is_active'  => 1,
+					'created_at' => $now,
+					'updated_at' => $now,
+				]
+			);
+		}
 	}
 
 	/**
@@ -104,6 +159,39 @@ final class Activator {
 	 * something needs to enqueue, and nothing does. If a future subsystem wants one, it will want
 	 * columns chosen for that job anyway, and this DDL is in the history.
 	 */
+	private static function migrate_to_v15(): void {
+		// Phase 6-14 tables are plain dbDelta work; nothing to back-fill.
+		self::seed_phase_defaults();
+	}
+
+	/**
+	 * Defaults for the phase 6-14 features. Guarded so a deliberate removal
+	 * is not resurrected on the next upgrade.
+	 */
+	private static function seed_phase_defaults(): void {
+		$db   = igbz()->db();
+		$have = (int) $db->scalar( 'SELECT COUNT(*) FROM ' . $db->table( 'ig_category_mapping' ) );
+		if ( $have > 0 ) {
+			return;
+		}
+
+		$now = current_time( 'mysql', true );
+		$db->insert(
+			'ig_category_mapping',
+			[
+				'tenant_id'        => 0,
+				'marketplace'      => 'digikala',
+				'local_category'   => 'default',
+				'remote_category'  => '',
+				'created_at'       => $now,
+			]
+		);
+	}
+
+	private static function migrate_to_v16(): void {
+		// Phase 6-14 tables are plain dbDelta work; nothing to back-fill yet.
+	}
+
 	private static function migrate_to_v13(): void {
 		$db = new Db();
 
@@ -554,9 +642,169 @@ final class Activator {
 			'payments.nextpay.enabled'      => false,
 			'payments.payir.enabled'        => false,
 			'payments.payir.sandbox'        => false,
+			'payments.httppsp.enabled'      => false,
+			'payments.httppsp.api_key'      => '',
+			'payments.httppsp.send_url'     => '',
+			'payments.httppsp.verify_url'   => '',
+			'payments.httppsp.redirect_base' => '',
+			'payments.httppsp.auth_scheme'  => 'Bearer',
+			'payments.httppsp.field_token'  => '',
+			'payments.httppsp.field_redirect_url' => '',
+			'payments.httppsp.field_status' => '',
+			'payments.httppsp.field_amount' => '',
+			'payments.httppsp.field_ref_id' => '',
+			'bnpl.snapppay_api_key'         => '',
+			'bnpl.snapppay_base_url'        => 'https://api.snapppay.ir',
+			'bnpl.snapppay_auth_scheme'     => 'Bearer',
+			'bnpl.tara_api_key'             => '',
+			'bnpl.tara_base_url'            => 'https://api.tara.ir',
+			'bnpl.tara_auth_scheme'         => 'Bearer',
 			'payments.currency_multiplier'  => 10,
 			'payments.zarinpal.sandbox'     => false,
 			'payments.idpay.sandbox'        => false,
+			'fx.enabled'                    => true,
+			'fx.fee_percent'                => 10,
+			'fx.rate_source'                => 'manual',
+			'fx.rate_url'                   => '',
+			'fx.rate_json_path'             => '',
+			'fx.rate_manual'                => 0,
+			'fx.rate_cache_ttl'             => 3600,
+			'fx.payout_provider'            => '',
+			'fx.webhook_token'              => '',
+			'fx.pstnet_api_key'             => '',
+			'fx.pstnet_card_id'             => '',
+			'fx.pstnet_base_url'            => 'https://api.pst.net',
+			'fx.redotpay_api_key'           => '',
+			'fx.redotpay_card_id'           => '',
+			'fx.redotpay_base_url'          => 'https://openapi.redotpay.com',
+			'fx.ramp_enabled'               => false,
+			'fx.ramp_api_key'               => '',
+			'fx.ramp_base_url'              => 'https://api.nobitex.ir',
+			'fx.ramp_price_path'            => '/v2/otc/price',
+			'fx.ramp_price_json_path'       => 'price',
+			'fx.ramp_buy_path'              => '/v2/otc/orders/create',
+			'fx.ramp_withdraw_path'         => '/v2/profile/wallets/withdraw',
+			'fx.ramp_auth_scheme'           => 'Token',
+			'fx.ramp_usdt_deposit_address'  => '',
+			'fx.ramp_min_card_balance'      => 50,
+			'fx.ramp_max_irt_per_run'       => 0,
+			'fx.ramp_manual_irt'            => 0,
+			'logistics.enabled'             => true,
+			'logistics.delivery_pin_digits' => 4,
+			'logistics.weight_threshold_kg' => 30,
+			'logistics.express_cities'      => 'تهران',
+			'logistics.express_cost_irt'    => 65000,
+			'logistics.national_cost_irt'   => 45000,
+			'logistics.heavy_cost_irt'      => 150000,
+			'logistics.tapin_api_key'       => '',
+			'logistics.tapin_base_url'      => 'https://api.tapin.ir',
+			'logistics.postex_api_key'      => '',
+			'logistics.postex_base_url'     => 'https://api.postex.ir',
+			'ai_studio.enabled'             => true,
+			'ai_studio.provider'            => '',
+			'ai_studio.base_url'            => '',
+			'ai_studio.api_key'             => '',
+			'ai_studio.auth_scheme'         => 'Bearer',
+			'ai_studio.image_path'          => '/v1/enhance',
+			'ai_studio.background_path'     => '/v1/remove-background',
+			'ai_studio.video_path'          => '/v1/story',
+			'ai_studio.tts_path'            => '/v1/synthesize',
+			'ai_studio.model_image_path'    => '/v1/generate-model',
+			'ai_studio.result_json_path'    => 'result_url',
+			'marketplace.digikala_api_key'  => '',
+			'marketplace.digikala_base_url' => 'https://openapi.digikala.com',
+			'marketplace.divar_token'       => '',
+			'marketplace.divar_base_url'    => 'https://api.divar.ir',
+			'marketplace.sync_retries'      => 3,
+			'seo.enabled'                   => true,
+			'seo.use_ai'                    => false,
+			'seo.feed_page_size'            => 500,
+			'seo.triboon_api_key'           => '',
+			'seo.triboon_base_url'          => 'https://api.triboon.ir',
+			'gamification.enabled'          => true,
+			'gamification.spin_cooldown_hours' => 24,
+			'gamification.spin_rewards'     => '5,10,20',
+			'gamification.spin_coupon_prefix' => 'SPIN',
+			'abandoned_cart.enabled'        => true,
+			'abandoned_cart.remind_after_hours' => 6,
+			'abandoned_cart.discount_percent' => 30,
+			'abandoned_cart.coupon_prefix'  => 'CART',
+			'nowpayments.enabled'           => true,
+			'nowpayments.api_key'           => '',
+			'nowpayments.pay_currency'      => 'usdttrc20',
+			'nowpayments.price_currency'    => 'usd',
+			'nowpayments.usd_rate_irt'      => 0,
+			'bale.provider_token'           => '',
+			'bale.bot_token'                => '',
+			'bnpl.cash_discount_percent'    => 0,
+			'payments.sadad.enabled'        => false,
+			'payments.sadad.merchant_id'    => '',
+			'payments.sadad.terminal_id'    => '',
+			'payments.sadad.private_key'    => '',
+			'payments.asanpardakht.enabled' => false,
+			'payments.asanpardakht.api_key' => '',
+			'payments.asanpardakht.merchant_config' => '',
+			'payments.parsian.enabled'      => false,
+			'payments.parsian.login_account' => '',
+			'payments.irankish.enabled'     => false,
+			'payments.irankish.terminal_id' => '',
+			'payments.irankish.api_key'     => '',
+			'payments.mellat.enabled'       => false,
+			'payments.mellat.terminal_id'   => '',
+			'payments.mellat.username'      => '',
+			'payments.mellat.password'      => '',
+			'payments.saman.enabled'        => false,
+			'payments.saman.terminal_id'    => '',
+			'payments.saman.public_key'     => '',
+			'payments.saman.private_key'    => '',
+			'payments.pasargad.enabled'     => false,
+			'payments.pasargad.merchant_code' => '',
+			'payments.pasargad.terminal_code' => '',
+			'payments.pasargad.private_key' => '',
+			'payments.sepehr.enabled'       => false,
+			'payments.sepehr.terminal_id'   => '',
+			'payments.sepehr.api_key'       => '',
+			'translation.provider'          => '',
+			'translation.base_url'          => '',
+			'translation.api_key'           => '',
+			'translation.auth_scheme'       => 'Bearer',
+			'translation.path'              => '/v1/translate',
+			'translation.result_json_path'  => 'translatedFields',
+			'lms.vod_enabled'               => false,
+			'lms.vod_secure_key'            => '',
+			'lms.vod_base_url'              => '',
+			'lms.vod_ttl_seconds'           => 7200,
+			'lms.vod_bind_ip'               => true,
+			'ai_credits.enabled'            => true,
+			'ai_credits.purchase_percent'   => 2.0,
+			'ai_credits.min_topup'          => 10000,
+			'giveaway.enabled'              => true,
+			'dm.provider'                   => 'manychat',
+			'chatplace.api_key'             => '',
+			'chatplace.base_url'            => 'https://api.chatplace.io',
+			'master_payment.enabled'        => true,
+			'master_payment.release_hours'  => 24,
+			'master_payment.fx_fee_percent' => 2.0,
+			'legal.national_id_check'       => false,
+			'legal.enamad_active'           => false,
+			'legal.shahkar_api_key'         => '',
+			'legal.shahkar_base_url'        => '',
+			'domain.provider'               => '',
+			'domain.provider_api_key'       => '',
+			'domain.provider_base_url'      => '',
+			'domain.mother_subdomain'       => 'igbz.ir',
+			'webpresence.google_*'          => '',
+			'i18n.enabled'                  => false,
+			'i18n.languages'                => 'fa',
+			'i18n.default_language'         => 'fa',
+			'stripe.enabled'                => false,
+			'stripe.secret_key'             => '',
+			'paypal.enabled'                => false,
+			'paypal.client_id'              => '',
+			'basalam.enabled'               => false,
+			'basalam.api_key'               => '',
+			'basalam.base_url'              => 'https://api.basalam.com',
+			'basalam.gharhe_id'             => '',
 			'marketplace.enabled'           => true,
 			'marketplace.torob.enabled'     => true,
 			'marketplace.emalls.enabled'    => true,
@@ -571,7 +819,6 @@ final class Activator {
 			'manus.locale'                  => 'fa-IR',
 			'manus.content_language'        => 'Persian (Farsi)',
 			'manus.poll_interval'           => 300,
-			'manus.use_canva'               => true,
 			'manus.auto_generate'           => true,
 			'manus.auto_schedule'           => true,
 			'manus.collect_insights'        => true,

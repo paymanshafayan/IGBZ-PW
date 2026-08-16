@@ -63,6 +63,11 @@ final class SchemaTest extends TestCase {
 			'lesson_progress',
 			'vip_post_likes',
 			'vip_post_views',
+			'fx_rates',
+			'fx_prices',
+			'ig_label_group_items',
+			'ig_courier_tracking',
+			'ig_courier_chat',
 		];
 		foreach ( $statements as $sql ) {
 			preg_match( '/CREATE TABLE\s+wp_igbz_(\S+)\s*\(/', $sql, $m );

@@ -5,6 +5,7 @@ use IGBZ\Suite\Modules\Hub\HubModule;
 use IGBZ\Suite\Modules\Instagram\InstagramModule;
 use IGBZ\Suite\Modules\MultiTenant\MultiTenantModule;
 use IGBZ\Suite\Modules\RestApi\RestApiModule;
+use IGBZ\Suite\Modules\Fx\FxModule;
 
 defined( 'ABSPATH' ) || exit;
 
@@ -84,6 +85,9 @@ final class Plugin {
 			Modules::MULTITENANT => MultiTenantModule::class,
 			Modules::INSTAGRAM   => InstagramModule::class,
 			Modules::HUB         => HubModule::class,
+			// FX binds fx.wallet/fx.rates/fx.topup before REST_API asks for them, so the mobile
+			// API can register the /fx/* routes when the FX module is on.
+			Modules::FX          => FxModule::class,
 			Modules::REST_API    => RestApiModule::class,
 		];
 	}

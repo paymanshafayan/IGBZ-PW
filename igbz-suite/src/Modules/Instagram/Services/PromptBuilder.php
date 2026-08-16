@@ -48,7 +48,6 @@ final class PromptBuilder {
 	 * @param array<string,mixed> $brief
 	 */
 	public function graphic_design( array $account, array $brief ): string {
-		$canva  = igbz()->settings()->bool( 'manus.use_canva', true );
 		$slides = max( 1, (int) ( $brief['slides'] ?? 1 ) );
 
 		$prompt = $this->context( $account ) . "\n\n"
@@ -57,13 +56,8 @@ final class PromptBuilder {
 			. ( ! empty( $brief['key_points'] ) ? 'Key points to cover: ' . implode( '; ', (array) $brief['key_points'] ) . "\n" : '' )
 			. ( ! empty( $brief['product_url'] ) ? sprintf( "Product page: %s\n", (string) $brief['product_url'] ) : '' )
 			. ( ! empty( $brief['palette'] ) ? sprintf( "Brand palette: %s\n", (string) $brief['palette'] ) : '' )
-			. "Format: 1080x1350 px, safe margins for the Instagram UI, legible Persian typography with correct RTL shaping.\n";
-
-		if ( $canva ) {
-			$prompt .= "Use the Canva connector to build the design in Canva, then export every slide as a high quality PNG and attach the exported files to this task.\n";
-		} else {
-			$prompt .= "Produce the final images and attach them to this task as PNG files.\n";
-		}
+			. "Format: 1080x1350 px, safe margins for the Instagram UI, legible Persian typography with correct RTL shaping.\n"
+			. "Produce the final images and attach them to this task as PNG files.\n";
 
 		$prompt .= "Also attach a captions.json file containing: caption, hashtags[], alt_text, first_comment.";
 
