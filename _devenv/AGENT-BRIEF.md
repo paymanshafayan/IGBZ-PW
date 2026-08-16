@@ -56,7 +56,7 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 ```bash
 bash _devenv/setup.sh     # build (~30s if npm is warm)
 bash _devenv/run.sh       # site on http://127.0.0.1:9400, auto-logged-in as admin
-bash _devenv/test.sh      # 1044 assertions + syntax check on 209 files
+bash _devenv/test.sh      # 1172 assertions + syntax check on 234 files
 ```
 
 `_devenv/` contains committed WordPress and WooCommerce zips precisely because **`/tmp` is wiped
@@ -137,17 +137,23 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 `igbz-ig-intake`, `igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`,
 `igbz-vip`, `igbz-hub`, `igbz-mobile-api`.
 
-**REST**: 100 routes across `igbz/v1` (incl. 14 `/intake/*`, 29 `/vip/*`) and `igbz-hub/v1`.
+**REST**: 199 routes across `igbz/v1` (incl. 14 `/intake/*`, 29 `/vip/*`, `/fx/*`, `/courier/*`,
+`/domains/*`, `/master-payment/*`, `/ai/*`) and `igbz-hub/v1`.
 
-**Schema**: 47 tables in `src/Support/Schema.php` (DB version 14; `ig_intake` added in v8, the nine
-`vip_*` tables in v10; v11 adds no tables — it is the LMS quiz/certificate wiring; v12 adds
-`ig_content.ig_shortcode` and relabels funnel rewards; v13 drops the never-used `jobs` queue). All carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`,
-`plans`, `logs`, `lesson_progress`, `vip_post_likes`, `vip_post_views`. Product/order
+**Schema**: 69 tables in `src/Support/Schema.php` (DB version 16; the ladder: v8 `ig_intake`,
+v10 nine `vip_*` tables, v11 LMS wiring, v12 `ig_content.ig_shortcode` + funnel reward relabel,
+v13 dropped the never-used `jobs` queue, v14 six `fx_*` tables, v15 phases 6–14 tables, v16 the
+master-payment/courier/domain/label/legal completion pass). All carry `tenant_id` except
+`tenants`, `tenant_domains`, `tenant_members`, `plans`, `logs`, `lesson_progress`,
+`vip_post_likes`, `vip_post_views`, `fx_rates`, `fx_prices`, `ig_label_group_items`,
+`ig_courier_tracking`, `ig_courier_chat` (whitelist in `tests/SchemaTest.php`). Product/order
 tenant scoping uses the meta key `_igbz_tenant_id`.
 
-**Payments**: gateways `igbz_wallet`, `igbz_bnpl`, `igbz_zarinpal`, `igbz_idpay`, `igbz_nextpay`,
-`igbz_payir`. `Money::to_rial/from_rial` handles the Toman/Rial factor
-(`payments.currency_multiplier`, default 10).
+**Payments**: WooCommerce payment methods `igbz_wallet`, `igbz_bnpl`, and adapter ids
+`zarinpal`, `idpay`, `nextpay`, `payir`, `httppsp`, `sadad`, `asanpardakht`, `parsian`,
+`irankish`, `mellat`, `saman`, `pasargad`, `sepehr`, `balepay`, `nowpayments` (the bank-gated set
+is the `bank_gateway_allowed()` list in `PaymentService`). `Money::to_rial/from_rial` handles the
+Toman/Rial factor (`payments.currency_multiplier`, default 10).
 
 ---
 
@@ -203,9 +209,11 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 1044 assertions in 21 test cases; 209 files lint clean.
-- 18/18 admin screens return 200 with no notices; 47/47 tables; 3 cron hooks scheduled.
-- All six payment gateways register with WooCommerce and their settings screens render.
+- 1172 assertions in 23 test cases; 234 files lint clean.
+- 28/28 admin screens return 200 with no notices; 69/69 tables (`/?igbz_health=1`); 3 cron hooks
+  scheduled.
+- All 14+ payment gateways register with WooCommerce and their settings screens render; the
+  direct banks show a Test connection button.
 - Paying a real order with the wallet gateway debits exactly the order total, moves the order to
   `processing`, sets the transaction id, and credits 2% cashback
   (`wallet.order_cashback_percent`), with a correct running balance in `wallet_ledger`.
@@ -643,6 +651,74 @@ Every background job here is already durable through a queue that models its own
 delivery — each with its own retry counter and `last_error`, driven by the cron ticks. It was
 removed rather than given a runner: a runner is only worth its failure modes once something needs
 to enqueue. The DDL is in the git history if a future subsystem wants it.
+
+---
+
+## 7c. FX (v14), phases 6–14 (v15), the completion pass (v16)
+
+### FX gateway (module `fx`, DB v14 — six tables)
+
+- **Dollar wallet, Rial top-up.** `fx.fee_percent` (10%) is charged *on the currency*, converted
+  at a rate locked into `fx_rates` at top-up time, paid through the Iranian gateways with
+  `purpose=fx_topup`, and only the net amount is credited. Credit happens on
+  `igbz_payment_verified` with the same idempotency-key discipline as the wallet.
+- **Metering is synchronous, not queued.** `ManusService::dispatch()` checks the tenant's own
+  balance at dispatch: enough → task goes out; not enough → rejected immediately with a
+  "top up" message; a task Manus refused refunds the amount (`release`). Same for ManyChat in
+  `FunnelService::settle()` — a metered `ig_funnel_hits` row is claimed before the charge.
+- **Bills.** Monthly bills per active `fx_account`, settled by a daily cron through the payout
+  adapter; failure reverses the charge and leaves the bill `due`. All of it is ledger-based
+  (`fx_*` ledger tables) — never stored balances.
+- **Payout adapters.** `FxPayoutAdapterInterface` + `igbz_register_fx_payout_providers`:
+  `PstNetPayoutAdapter` (primary; the card is held by the registered Cyprus company — this is the
+  legal layer), `RedotPayPayoutAdapter` (pilot). `fx.payout_provider` switches. Manual settlement
+  button and a webhook (`POST /igbz/v1/fx/payout-webhook/{provider}`) are the always-on fallbacks.
+- **USDT on-ramp.** `HttpRampAdapter` defaults to Nobitex endpoints; every buy is an operator
+  ledger entry (tenant 0, reason `ramp`). `fx.ramp_enabled` defaults to **false** on purpose —
+  Iranian exchanges need a manual approval per withdrawal.
+
+### Phases 6–14 (DB v15, then v16)
+
+- **Gate the banks, not the wallets.** The direct-bank IPGs and the original four PSPs are hidden
+  from checkout until the tenant has a DNS-verified standalone domain **and** `legal.enamad_active`
+  is on. Wallet, BNPL, FX, BalePay and NowPayments are *not* gated — a store that has not yet
+  passed legal onboarding must still be able to take money.
+- **`AbstractIpgGateway`** is the base for all eight bank adapters; it type-hints
+  `IGBZ\Suite\Support\Http`, so **every adapter file needs `use IGBZ\Suite\Support\Http;`** — an
+  adapter that forgets it dies with a `TypeError` at payment time, not at save time (this actually
+  happened and cost a round).
+- **Sandbox-friendly by construction.** Bank gateways parse *malformed* responses without fatal
+  errors, but the parse paths emit `Undefined array key` warnings when a probe response is
+  incomplete — expected noise in tests (`IpgAdaptersTest`), not a bug to fix blindly. If you make
+  these parsers stricter, the test suite is the place to prove it.
+- **Master payment (escrow).** `ig_master_*` tables; a daily (release) cron moves held funds on
+  delivery confirmation; disputes block release; a digital agreement row is written per
+  transaction before funds move. Withdrawals reserve from the wallet first, then become
+  withdrawable — REST: `POST /master-payment/withdraw`.
+- **Courier app.** Sequential routing: the `arrived` button opens the *next* shipment in the
+  route. Delivery requires the customer-held PIN (`random_int`, `hash_equals`); the PIN is the
+  same one printed on the label (barcode + PIN on `ig_label_groups`). COD supports four forms
+  (cash/gateway/card reader/in-app). Tracking rows and chat are append-only logs, not mutable
+  state.
+- **Domains.** `DomainService` search/register/subdomain/DNS-verify/transfer — all behind
+  `domain.provider*` keys (no real registrar wired yet). `WebPresenceService` registers verified
+  domains with Google/Bing webmaster tools. DNS verification must confirm via a real lookup in
+  production; in tests it is stubbed.
+- **Legal.** `NationalIdVerifier` (Shahkar) refuses to enable itself until the senior admin
+  stores `legal.shahkar_api_key` — the lock is deliberate and must not be bypassed by defaulting
+  the check to "pass".
+- **ChatPlace.** `dm.provider = manychat|chatplace`; ManyChat stays implemented as the inactive
+  fallback. ChatPlace is the chosen provider (flat price, built-in AI agent, VIRALE, MCP later).
+- **i18n/SEO.** `I18nService` is a config endpoint, not a full translation memory.
+  `SeoService` can write generated meta onto **real products** (the `igbz-seo` picker) — the nop
+  gap. Feeds are served from the real catalog, never from a template string.
+
+### DB v16 accounting
+
+69 tables total. Unscoped (deliberately, keep them in the SchemaTest whitelist):
+`plans`, `logs`, `tenants`, `tenant_domains`, `tenant_members`, `lesson_progress`,
+`vip_post_likes`, `vip_post_views`, `fx_rates`, `fx_prices`, `ig_label_group_items`,
+`ig_courier_tracking`, `ig_courier_chat`.
 
 ---
 
