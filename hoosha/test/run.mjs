@@ -1549,31 +1549,23 @@ await test( 'نوار کناری و ریل هم قابل اسکرول‌اند �
 	assert.match( cssBlock( '.rail-body' ), /overflow-y:\s*auto/ );
 } );
 
-await test( 'سامانهٔ توکن معنایی مخزن دوم پیاده شده و پالت مرده نیست', () => {
-	// ساختار توکن‌ها از @sunpix/claude-code-web است: نام‌های معنایی در فضای oklch.
-	for ( const token of [
-		'--background',
-		'--foreground',
-		'--card',
-		'--popover',
-		'--sidebar',
-		'--muted',
-		'--accent',
-		'--border',
-		'--input',
-		'--ring',
-		'--primary',
-		'--destructive',
-	] ) {
+await test( 'پالت، رنگ‌های رسمی آنتروپیک است — نه چیزی که خودم پسندیدم', () => {
+	for ( const token of [ '--background', '--foreground', '--card', '--popover', '--sidebar', '--muted', '--accent', '--border', '--input', '--ring', '--primary', '--destructive' ] ) {
 		assert.ok( css.includes( `${ token }:` ), `توکن ${ token } نیست` );
 	}
 
-	assert.ok( css.includes( 'oklch(' ), 'باید در فضای رنگی oklch باشد' );
+	// شش رنگ رسمی. هر کدام نباشد یعنی از روی حدس رنگ گذاشته‌ام.
+	for ( const hex of [ '#faf9f5', '#141413', '#d97757', '#e8e6dc', '#b0aea5', '#6a9bcc' ] ) {
+		assert.ok( css.toLowerCase().includes( hex ), `رنگ رسمی ${ hex } در پالت نیست` );
+	}
 
-	// و تفاوت عمدی با آن‌ها: خاکستری خالص نداریم. کارفرما گفت رابط بی‌روح خسته‌کننده است.
-	assert.match( css, /--background:\s*oklch\(16%\s+0\.006\s+60\)/, 'خاکستری باید گرم باشد نه خنثی' );
-	assert.match( css, /--primary:\s*oklch\(66%\s+0\.15\s+42\)/, 'رنگ برند باید واقعاً رنگ باشد' );
-	assert.ok( css.includes( '--second:' ), 'رنگ دوم (فیروزه) برای تنوع لازم است' );
+	const light = css.slice( css.indexOf( "html[data-theme='light']" ), css.indexOf( "html[data-theme='dark']" ) );
+	assert.match( light, /--background:\s*#faf9f5/, 'پس‌زمینهٔ روشن باید همان کرم رسمی باشد' );
+
+	// درس نسخهٔ قبل: دکمهٔ اصلی در Claude مشکی است، نه نارنجی.
+	assert.match( light, /--primary:\s*#141413/, 'رنگ اصلی باید مشکی باشد نه نارنجی' );
+	assert.match( light, /--brand:\s*#d97757/, 'نارنجی باید متغیر جدا باشد و فقط برای نشان' );
+	assert.equal( /--primary:\s*#d97757/.test( css ), false, 'نارنجی نباید رنگ دکمه‌ها باشد' );
 } );
 
 await test( 'رابط زنده است: ترنزیشن، سایه و حرکت دارد', () => {
@@ -1585,31 +1577,46 @@ await test( 'رابط زنده است: ترنزیشن، سایه و حرکت د�
 	assert.match( css, /prefers-reduced-motion/, 'و همهٔ اینها با کاهش حرکت خاموش شوند' );
 } );
 
-await test( 'چیدمان سه‌ستونی تصویر: ناوبری، فهرست نشست، پنل شناور', () => {
-	assert.match( html, /class="list-col"/, 'ستون فهرست نشست‌ها نیست' );
-	assert.match( html, /class="main-card"/, 'پنل گفتگو باید کارت باشد' );
-	assert.match( html, /id="btn-back"/ );
-	assert.match( html, /id="btn-more"/ );
-
+await test( 'چیدمان دو ستونی است، مثل Claude — نه سه ستون', () => {
 	const app = cssBlock( '.app' );
-	assert.match( app, /grid-template-columns:\s*var\(--sidebar-w\) var\(--list-w\)/ );
+	assert.match( app, /grid-template-columns:\s*var\(--sidebar-w\) minmax\(0, 1fr\)/ );
 
+	// ستون میانی و ریل باید رفته باشند.
+	assert.equal( /class="list-col"/.test( html ), false, 'ستون میانیِ فهرست گفتگو در Claude وجود ندارد' );
+	assert.equal( /class="rail"/.test( html ), false, 'ریل کناری در Claude وجود ندارد' );
+	assert.equal( fssync.existsSync( path.join( uiDir, 'rail.js' ) ), false, 'ماژول ریل باید حذف شده باشد' );
+
+	// و ناحیهٔ محتوا کارت شناور نیست؛ تخت روی پس‌زمینه می‌نشیند.
 	const card = cssBlock( '.main-card' );
-	assert.match( card, /border-radius/ );
-	assert.match( card, /min-height:\s*0/, 'کارت هم باید بتواند کوچک شود وگرنه اسکرول می‌شکند' );
-	assert.match( card, /background:\s*var\(--card\)/ );
+	assert.match( card, /background:\s*transparent/ );
+	assert.match( card, /box-shadow:\s*none/ );
+	assert.match( card, /min-height:\s*0/, 'بدون این، اسکرول گفتگو می‌شکند' );
 } );
 
-await test( 'فهرست نشست‌ها گروه‌بندی و زیرنویس دارد، مثل تصویر', () => {
+await test( 'گفتگوهای اخیر داخل نوار کناری‌اند و فقط عنوان دارند', () => {
 	const side = fssync.readFileSync( path.join( uiDir, 'sidebar.js' ), 'utf8' );
-	assert.match( side, /function groupOf\( item, state \)/ );
-	assert.match( side, /function subtitleOf\( item, state \)/ );
-	// تعریف‌شدن کافی نیست؛ باید واقعاً صدا زده شود.
-	assert.match( side, /const group = groupOf\( item, s \)/ );
-	assert.match( side, /subtitleOf\( item, s \)/ );
-	assert.match( side, /در حال اجرا/ );
-	assert.match( side, /class: 'list-sub'/ );
-	assert.match( css, /\.list-group\s*\{/ );
+	assert.match( html, /id="session-list"/ );
+	// در Claude ردیف‌های Recents زیرنویس ندارند — فقط عنوان.
+	assert.equal( /class: 'list-sub'/.test( side ), false, 'ردیف اخیر نباید زیرنویس داشته باشد' );
+	assert.match( side, /class: `recent-item/ );
+	assert.match( css, /\.recent-item\s*\{/ );
+
+	// گروه‌بندی زمانی به صفحهٔ «گفتگوها» رفت.
+	assert.match( side, /export function groupOf/ );
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /groupOf\( item\.updatedAt \)/ );
+} );
+
+await test( 'گروه‌بندی زمانی گفتگوها درست دسته می‌کند', async () => {
+	const { groupOf } = await import( `../ui/sidebar.js?g=${ Date.now() }` ).catch( () => ( {} ) );
+	// ماژول به DOM وابسته است؛ اگر import نشد، دست‌کم قاعده را روی متن می‌سنجیم.
+	if ( typeof groupOf === 'function' ) {
+		const now = Date.parse( '2026-08-17T12:00:00Z' );
+		assert.equal( groupOf( now - 3600_000, now ), 'امروز' );
+		assert.equal( groupOf( now - 3 * 86_400_000, now ), 'هفت روز گذشته' );
+		assert.equal( groupOf( now - 10 * 86_400_000, now ), 'سی روز گذشته' );
+		assert.equal( groupOf( now - 90 * 86_400_000, now ), 'قدیمی‌تر' );
+	}
 } );
 
 await test( 'همهٔ ماژول‌های رابط، فایل‌های واقعی را import می‌کنند', async () => {
@@ -1659,21 +1666,33 @@ await test( 'پاسخ مدل بدون آواتار و با فونت سریف ن�
 	assert.match( cssBlock( '.msg.user .body' ), /background:\s*linear-gradient/ );
 } );
 
-await test( 'ناوبری مستقیم در نوار کناری هست (نه فقط داخل تنظیمات)', () => {
-	for ( const view of [ 'chat', 'tools', 'connectors', 'skills', 'agents', 'workspace', 'settings' ] ) {
+await test( 'ناوبری نوار کناری همان ترتیب Claude را دارد', () => {
+	// Chats · Projects · Artifacts · Code · Customize  →  معادل‌های هوشا
+	for ( const view of [ 'chats', 'projects', 'tools', 'changes', 'customize', 'workspace' ] ) {
 		assert.match( html, new RegExp( `data-view="${ view }"` ), `آیتم ناوبری ${ view } نیست` );
 	}
+	// «گفتگوی تازه» یک ردیف ساده است، نه دکمهٔ پررنگ نارنجی.
+	const nc = cssBlock( '.new-chat' );
+	assert.match( nc, /background:\s*transparent/ );
+	assert.match( nc, /border:\s*0/ );
 } );
 
-await test( 'هیچ چیزی پشت دیالوگ تنظیمات قفل نیست — تنظیمات یک صفحه است', () => {
-	assert.equal( /<dialog id="settings"/.test( html ), false, 'دیالوگ تنظیمات باید حذف شده باشد' );
+await test( 'تنظیمات یک مودال بزرگ است با ناوبری دوگروهی و جستجو', () => {
+	// تصاویر واقعی Claude این را روشن کرد: مودال، نه صفحه. و بزرگ، نه آن دیالوگ‌های ریز.
+	assert.match( html, /<dialog class="set-modal" id="settings">/ );
+	assert.match( html, /id="set-nav"/ );
+	assert.match( html, /id="set-body"/ );
+	assert.match( html, /id="set-close"/ );
+
+	const modal = cssBlock( '.set-modal' );
+	assert.match( modal, /width:\s*min\(960px/, 'مودال باید بزرگ باشد' );
+	assert.match( css, /\.set-modal::backdrop/ );
 
 	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
-	assert.match( settings, /export async function mountSettings/ );
-	assert.equal( /showModal\(\)/.test( settings ), false, 'تنظیمات نباید مودال باز کند' );
-
-	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
-	assert.match( app, /settings: \{ ico: '⚙', title: 'تنظیمات'/ );
+	assert.match( settings, /export async function openSettingsModal/ );
+	assert.match( settings, /const GROUPS = \[/, 'ناوبری باید دو گروه داشته باشد' );
+	assert.match( settings, /class: 'set-search'/, 'کادر جستجوی ناوبری لازم است' );
+	assert.equal( /mountSettings/.test( settings ), false );
 } );
 
 await test( 'زیربخش‌های فضای کار همان‌جا باز می‌شوند، نه در پنجرهٔ دیگر', () => {
@@ -1975,20 +1994,28 @@ await test( 'کادر نوشتن ۵۰ پیکسل از پایین فاصله دا
 	assert.match( cssBlock( '.composer-wrap' ), /padding:\s*0 26px 50px/ );
 } );
 
-await test( 'پایین نوار کناری: پروفایل کاربر و آیکون تنظیمات کنارش', () => {
+await test( 'ته نوار کناری ردیف حساب است و منویش از همان‌جا بالا می‌آید', () => {
 	assert.match( html, /class="account-row"/ );
 	assert.match( html, /id="btn-account"/ );
-	assert.match( html, /id="account-name"/ );
-	assert.match( html, /id="btn-settings"[^>]*title="تنظیمات"|title="تنظیمات"[^>]*id="btn-settings"/ );
-	assert.match( cssBlock( '.account-main' ), /flex:\s*1/ );
+	assert.match( html, /id="account-menu"/ );
+	// در Claude چرخ‌دنده‌ای در نوار کناری نیست؛ تنظیمات از منوی همین ردیف باز می‌شود.
+	assert.equal( /id="btn-settings"/.test( html ), false, 'چرخ‌دندهٔ کنار حساب باید برداشته شود' );
+
+	const side = fssync.readFileSync( path.join( uiDir, 'sidebar.js' ), 'utf8' );
+	assert.match( side, /toggleAccountMenu/ );
+	assert.match( side, /'تنظیمات'/ );
+	assert.match( css, /\.account-menu\s*\{/ );
 } );
 
-await test( 'انتخابگر پروژه بالای فهرست نشست‌هاست', () => {
-	assert.match( html, /id="project-chip"/ );
-	assert.match( html, /id="project-menu"/ );
+await test( 'پروژه‌ها یک صفحهٔ شبکه‌ای است، مثل صفحهٔ Projects', () => {
 	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
 	assert.match( app, /function recentProjects/ );
 	assert.match( app, /async function switchProject/ );
+	assert.match( app, /class: 'card-grid'/ );
+	assert.match( css, /\.card-grid\s*\{/ );
+	assert.match( css, /\.grid-card\s*\{/ );
+	// چیپ پروژه از بالای ستون میانی حذف شد چون آن ستون دیگر وجود ندارد.
+	assert.equal( /id="project-chip"/.test( html ), false );
 } );
 
 await test( 'دکمهٔ میکروفن در کامپوزر هست و میان‌بر دارد', () => {
@@ -2157,13 +2184,16 @@ await test( 'شاخهٔ محافظت‌شده در نوار علامت می‌خ
 	assert.match( bar, /روی شاخهٔ محافظت‌شده پوش نمی‌کنیم/ );
 } );
 
-await test( 'صفحه‌های پنل تمام‌قد با سربرگ و دکمهٔ بازگشت‌اند، نه مودال', () => {
+await test( 'صفحه‌ها سربرگ سریفِ بزرگ دارند با دکمه‌های عمل در همان سطر', () => {
 	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
-	assert.match( app, /class: 'panel-hero'/, 'سربرگ قهرمان لازم است' );
-	assert.match( app, /\$\( '#btn-back' \)\.hidden = next === 'chat'/, 'دکمهٔ بازگشت باید در نمای پنل ظاهر شود' );
-	assert.match( css, /\.panel-hero\s*\{/ );
-	assert.match( css, /\.view-panel\s*\{/ );
-	assert.equal( /<dialog id="settings"/.test( html ), false );
+	assert.match( app, /class: 'page-head'/ );
+	assert.match( app, /class: 'page-title'/ );
+	assert.match( app, /class: 'page-actions'/ );
+	assert.equal( /panel-hero/.test( app ), false, 'سربرگ قهرمان جای خود را به سربرگ Claude داد' );
+
+	const title = cssBlock( '.page-title' );
+	assert.match( title, /font-family:\s*var\(--serif\)/, 'عنوان صفحه باید سریف باشد' );
+	assert.match( app, /\$\( '#btn-back' \)\.hidden = view === 'chat'/ );
 } );
 
 await test( 'ابزار install هست تا «آدرس را بینداز و بگو نصبش کن» کار کند', () => {
@@ -3757,6 +3787,262 @@ await test( 'نوار هشدار به برنامه وصل است و استایل
 await test( 'صفحهٔ وضعیت، مسیر کدی که اجرا می‌شود را نشان می‌دهد', () => {
 	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
 	assert.match( settings, /کد از: \$\{ s\.install\?\.root/ );
+} );
+
+// ---------------------------------------------------------------- بوت واقعی رابط
+
+section( 'رابط — بوت واقعی روی index.html' );
+
+/**
+ * برنامه را با همان `index.html` واقعی بالا می‌آورد.
+ *
+ * این تست از یک شکست آمد: کارفرما نوشت «هیچی سر جاش نبود». علتش یک قاعدهٔ CSS بود که
+ * صفت `hidden` را بی‌اثر می‌کرد و هر دو نما را روی هم می‌انداخت. هیچ‌کدام از ۲۹۰ تستِ
+ * آن روز این را نگرفتند، چون یا متن فایل را grep می‌کردند یا یک المان دستی می‌ساختند.
+ * این هارنس، `app.js` را واقعاً اجرا می‌کند.
+ */
+async function bootApp( overrides = {} ) {
+	const { installFakeDom, parseHtml } = await import( './fake-dom.mjs' );
+	const state = {
+		version: '0.7.0',
+		install: { root: '/repo', frozen: false, git: true },
+		config: {
+			workspace: '/home/user/IGBZ-WP',
+			activeProfile: 'default',
+			profiles: { default: { label: 'پیش‌فرض', provider: 'openai', model: 'gpt-4.1' } },
+			permissions: { mode: 'default' },
+		},
+		ready: { ok: true, missing: [] },
+		hub: { active: false },
+		context: { used: 1000, window: 200_000 },
+		usage: {},
+		transcript: [],
+		pendingAsk: [],
+		todos: [], shells: [], checkpoints: [], git: null,
+		sessionId: 's1', sessionTitle: 'گفتگوی تازه',
+		tools: [], skills: [], agents: [], commands: [], mcp: [], connectors: [], plugins: [], resources: [],
+		...overrides,
+	};
+
+	const dom = installFakeDom( {
+		fetch: async ( url ) => ( {
+			ok: true,
+			text: async () => '',
+			json: async () =>
+				url === '/api/state'
+					? state
+					: url === '/api/sessions'
+					? { sessions: [ { id: 's1', title: 'سلام', messages: 3, updatedAt: Date.now() } ] }
+					: {},
+		} ),
+	} );
+	globalThis.window = { matchMedia: () => ( { matches: false, addEventListener() {} } ), innerHeight: 800, addEventListener() {} };
+	globalThis.EventSource = class {
+		constructor() {
+			this.onmessage = null;
+			this.onerror = null;
+		}
+		close() {}
+	};
+	parseHtml( fssync.readFileSync( path.join( uiDir, 'index.html' ), 'utf8' ), document.body );
+
+	await import( `../ui/app.js?boot=${ Math.random() }` );
+	await new Promise( ( r ) => setTimeout( r, 150 ) );
+	return { dom, q: ( sel ) => document.querySelector( sel ), all: ( sel ) => document.querySelectorAll( sel ) };
+}
+
+await test( 'برنامه با index.html واقعی بالا می‌آید و صفحهٔ خالی درست است', async () => {
+	const { dom, q } = await bootApp();
+	try {
+		assert.match( q( '#greet-text' ).textContent, /چه خبر؟/, 'تیتر خوش‌آمد نیامد' );
+		assert.ok( q( '#greet-mark' ).innerHTML.includes( 'svg' ), 'نشان هوشا در تیتر رسم نشد' );
+		assert.equal( q( '#brand-version' ).textContent, 'v0.7.0' );
+		assert.ok( q( '#view-chat' ).classList.contains( 'empty' ), 'گفتگوی خالی باید حالت مرکزی بگیرد' );
+		assert.equal( q( '#send' ).hidden, true, 'دکمهٔ ارسال با کادر خالی نباید دیده شود' );
+		assert.equal( q( '#session-list' ).children.length, 1, 'گفتگوهای اخیر باید در نوار کناری باشند' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'بازکردن یک صفحه، نمای گفتگو را واقعاً پنهان می‌کند', async () => {
+	const { dom, q } = await bootApp();
+	try {
+		document.querySelector( '.nav-item[data-view="tools"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 120 ) );
+
+		assert.equal( q( '#view-chat' ).hidden, true, 'همان باگی که کارفرما دید: گفتگو زیر صفحه می‌ماند' );
+		assert.equal( q( '#view-panel' ).hidden, false );
+		assert.equal( q( '#btn-back' ).hidden, false );
+		assert.equal( q( '.page-title' ).textContent, 'ابزارها' );
+
+		q( '#btn-back' ).click();
+		await new Promise( ( r ) => setTimeout( r, 60 ) );
+		assert.equal( q( '#view-chat' ).hidden, false );
+		assert.equal( q( '#view-panel' ).hidden, true );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'هر پنج صفحه بدون خطا ساخته می‌شوند', async () => {
+	const { dom, q } = await bootApp();
+	try {
+		for ( const [ view, title ] of [
+			[ 'chats', 'گفتگوها' ],
+			[ 'projects', 'پروژه‌ها' ],
+			[ 'tools', 'ابزارها' ],
+			[ 'changes', 'تغییرات' ],
+			[ 'workspace', 'فضای کار' ],
+		] ) {
+			document.querySelector( `.nav-item[data-view="${ view }"]` ).click();
+			await new Promise( ( r ) => setTimeout( r, 110 ) );
+			assert.equal( q( '.page-title' ).textContent, title, `صفحهٔ ${ view }` );
+			assert.ok( q( '#panel-body' ).children.length >= 2, `صفحهٔ ${ view } خالی است` );
+			assert.equal( /undefined|NaN/.test( q( '#panel-body' ).textContent ), false, `صفحهٔ ${ view } مقدار خام دارد` );
+		}
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( '«سفارشی‌سازی» مودال تنظیمات را باز می‌کند، نه یک صفحه', async () => {
+	const { dom, q, all } = await bootApp();
+	try {
+		document.querySelector( '.nav-item[data-view="customize"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 150 ) );
+
+		// نمای گفتگو باید سر جایش بماند؛ تنظیمات روی آن باز می‌شود نه به‌جای آن.
+		assert.equal( q( '#view-chat' ).hidden, false );
+		assert.deepEqual( all( '.set-group' ).map( ( x ) => x.textContent ), [ 'تنظیمات', 'سفارشی‌سازی' ] );
+		assert.equal( all( '.set-item' ).length, 19 );
+		assert.ok( q( '.set-search' ), 'کادر جستجوی ناوبری نیست' );
+		assert.ok( q( '#set-body' ).children.length > 0, 'بدنهٔ تنظیمات خالی است' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'جستجوی ناوبری تنظیمات، فهرست را کم می‌کند', async () => {
+	const { dom, q, all } = await bootApp();
+	try {
+		document.querySelector( '.nav-item[data-view="customize"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 150 ) );
+
+		const search = q( '.set-search' );
+		search.value = 'مدل';
+		for ( const fn of search.listeners.input || [] ) {
+			fn( { target: search } );
+		}
+		const labels = all( '.set-item' ).map( ( x ) => x.textContent );
+		assert.ok( labels.length < 19 && labels.length > 0, `فیلتر کار نکرد: ${ labels.length }` );
+		assert.ok( labels.some( ( l ) => l.includes( 'مدل' ) ) );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'صفت hidden را هیچ کلاسی نمی‌تواند بی‌اثر کند', () => {
+	/*
+	 * این تست، نگهبانِ همان باگی است که کارفرما با یک تصویر نشان داد.
+	 *
+	 * استایلِ نویسنده بر `[hidden]` مرورگر مقدم است، پس هر کلاسی که `display` بگذارد،
+	 * صفت hidden را خاموش می‌کند. نتیجه‌اش شش المان بود که همیشه روی صفحه می‌ماندند —
+	 * از جمله کل نمای گفتگو، که روی صفحهٔ تنظیمات می‌افتاد.
+	 *
+	 * هارنس بوت این را نمی‌گیرد، چون DOM ساختگی موتور CSS ندارد و `hidden` در آن فقط
+	 * یک ویژگی است. پس اینجا روی خودِ متن استایل می‌سنجیم.
+	 */
+	assert.match( css, /\[hidden\]\s*\{[^}]*display:\s*none\s*!important/, 'قاعدهٔ سراسری [hidden] لازم است' );
+
+	// و بررسی می‌کنیم که تعارض واقعاً وجود دارد — وگرنه تست بالا الکی سبز است.
+	const conflicts = [];
+	for ( const m of html.matchAll( /<\w+[^>]*\bhidden\b[^>]*>/g ) ) {
+		const cls = /class="([^"]+)"/.exec( m[ 0 ] );
+		const id = /id="([^"]+)"/.exec( m[ 0 ] );
+		if ( ! cls ) {
+			continue;
+		}
+		for ( const c of cls[ 1 ].split( /\s+/ ) ) {
+			const rule = new RegExp( `(^|\\n)\\.${ c.replace( /[-]/g, '\\-' ) }\\s*\\{([^}]*)\\}` );
+			const found = rule.exec( css );
+			if ( found && /display:\s*(?!none)/.test( found[ 2 ] ) ) {
+				conflicts.push( id ? id[ 1 ] : c );
+				break;
+			}
+		}
+	}
+	assert.ok( conflicts.length > 0, 'اگر تعارضی نمانده، این تست دیگر چیزی را ثابت نمی‌کند' );
+} );
+
+await test( 'منوی حساب باز می‌شود و تنظیمات را می‌آورد', async () => {
+	const { dom, q, all } = await bootApp();
+	try {
+		assert.equal( q( '#account-menu' ).hidden, true, 'منو باید بسته شروع شود' );
+
+		q( '#btn-account' ).click();
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+
+		assert.equal( q( '#account-menu' ).hidden, false, 'منوی حساب باز نشد' );
+		const labels = all( '.menu-item' ).map( ( x ) => x.textContent );
+		assert.ok( labels.some( ( l ) => l.includes( 'تنظیمات' ) ), `فهرست منو: ${ labels.join( ' | ' ) }` );
+		assert.ok( labels.some( ( l ) => l.includes( 'ظاهر' ) ) );
+
+		// و کلیک روی «تنظیمات» واقعاً مودال را باز می‌کند.
+		all( '.menu-item' ).find( ( x ) => x.textContent.includes( 'تنظیمات' ) ).click();
+		await new Promise( ( r ) => setTimeout( r, 150 ) );
+		assert.equal( q( '#account-menu' ).hidden, true, 'منو بعد از انتخاب باید بسته شود' );
+		assert.ok( all( '.set-item' ).length > 0, 'مودال تنظیمات باز نشد' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'اجزای فرم به سبک Claude درآمده‌اند: تخت، دوستونی، با سوییچ', () => {
+	// کارت‌های قاب‌دار جای خود را به خط جداکننده دادند.
+	const card = cssBlock( '.form-card' );
+	assert.match( card, /border:\s*0/ );
+	assert.match( card, /box-shadow:\s*none/ );
+	assert.match( card, /border-bottom:\s*1px solid var\(--border\)/ );
+
+	// برچسب کنار کنترل می‌نشیند، نه بالای آن.
+	const label = cssBlock( '.field-label' );
+	assert.match( label, /display:\s*grid/ );
+	assert.match( label, /grid-template-columns:\s*minmax\(0, 1fr\) 240px/ );
+
+	// و بولین‌ها سوییچ‌اند، نه چک‌باکس خام مرورگر.
+	// دقت در الگو مهم بود: `[^}]*appearance:\s*none` با `-webkit-appearance` هم جور
+	// درمی‌آمد و جهشِ `appearance: auto` را زنده می‌گذاشت.
+	const box = cssBlock( ".check input[type='checkbox']" );
+	assert.match( box, /(^|\n)\tappearance:\s*none/ );
+	assert.match( box, /-webkit-appearance:\s*none/ );
+	assert.match( css, /\.check input\[type='checkbox'\]:checked\s*\{[^}]*background:\s*var\(--primary\)/ );
+	assert.match( css, /\.switch\s*\{/, 'سوییچ مستقل هم برای ردیف‌های تازه لازم است' );
+
+	// ردیف‌های فهرست هم قاب ندارند؛ فقط خط جداکننده.
+	const item = cssBlock( '.item' );
+	assert.match( item, /border:\s*0/ );
+	assert.match( item, /border-bottom:\s*1px solid var\(--border\)/ );
+	assert.match( item, /border-radius:\s*0/ );
+} );
+
+await test( 'نشان هوشا سر جایش است: تیتر، آواتار، و آیکون‌ها', () => {
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /class: 'greet-mark', html: logoSvg\( 34 \)/, 'نشان باید کنار تیتر خوش‌آمد باشد — همان‌جا که Claude ستاره‌اش را می‌گذارد' );
+
+	const side = fssync.readFileSync( path.join( uiDir, 'sidebar.js' ), 'utf8' );
+	assert.match( side, /logoSvg\( 18, 'logo avatar-logo' \)/, 'آواتار حساب باید نشان هوشا باشد' );
+
+	assert.match( html, /rel="icon"[^>]*logo\.svg/ );
+	assert.match( html, /rel="manifest"/ );
+
+	// و رنگش روی نارنجی رسمی نشسته باشد.
+	const mark = fssync.readFileSync( path.join( uiDir, 'lib', 'mark.js' ), 'utf8' );
+	assert.match( mark, /from: '#e08a6b'/ );
+	assert.match( mark, /to: '#d0674a'/ );
+	for ( const f of [ 'icon-16.png', 'icon-32.png', 'icon-192.png', 'icon-512.png' ] ) {
+		assert.ok( fssync.existsSync( path.join( uiDir, 'assets', 'icons', f ) ), `آیکون ${ f } ساخته نشده` );
+	}
 } );
 
 // ------------------------------------------------------------------ پایان

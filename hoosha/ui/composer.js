@@ -11,7 +11,7 @@
 import { $, h, toast } from './lib/dom.js';
 import { api, post, getState, refreshState } from './lib/api.js';
 import { showWorking, hideWorking } from './thread.js';
-import { speechSupported, startDictation } from './lib/voice.js';
+import { speechSupported, startDictation, speak, stopSpeaking, isSpeaking } from './lib/voice.js';
 
 const MODES = [ 'plan', 'default', 'auto' ];
 const MODE_LABEL = { plan: 'پلن', default: 'عادی', auto: 'خودکار' };
@@ -61,9 +61,22 @@ export function initComposer( deps ) {
 	$( '#btn-plus' ).onclick = () => togglePlusMenu();
 	$( '#file-input' ).onchange = ( e ) => addFiles( e.target.files );
 	$( '#btn-mic' ).onclick = () => toggleDictation();
+	$( '#btn-voice' ).onclick = () => {
+		if ( isSpeaking() ) {
+			stopSpeaking();
+			return;
+		}
+		const last = [ ...document.querySelectorAll( '.msg.assistant .md' ) ].pop();
+		if ( ! last ) {
+			toast( 'هنوز پاسخی برای خواندن نیست.' );
+			return;
+		}
+		speak( last.textContent || '' );
+	};
 
 	input.addEventListener( 'input', () => {
 		autoGrow();
+		syncSendButton();
 		refreshMenu();
 	} );
 	input.addEventListener( 'keydown', onKeyDown );
@@ -134,8 +147,8 @@ export async function cycleMode() {
 
 export function setBusy( value ) {
 	busy = value;
-	$( '#send' ).hidden = value;
 	$( '#stop' ).hidden = ! value;
+	syncSendButton();
 	document.body.classList.toggle( 'busy', value );
 
 	if ( value ) {
@@ -157,7 +170,23 @@ export function focusComposer() {
 
 // ──────────────────────────────────────────────────────────── ارسال
 
+/**
+ * دکمهٔ ارسال فقط وقتی هست که چیزی برای فرستادن باشد.
+ *
+ * در تصویر کامپوزرِ خالیِ Claude هیچ دکمهٔ ارسالی دیده نمی‌شود — فقط «+» و میکروفون و
+ * موج صدا. دکمه به‌محض تایپ ظاهر می‌شود.
+ */
+export function syncSendButton() {
+	const send = $( '#send' );
+	if ( ! send ) {
+		return;
+	}
+	const hasText = Boolean( $( '#input' )?.value.trim() ) || attachments.length > 0;
+	send.hidden = busy || ! hasText;
+}
+
 function autoGrow() {
+	syncSendButton();
 	input.style.height = 'auto';
 	input.style.height = Math.min( input.scrollHeight, window.innerHeight * 0.4 ) + 'px';
 }

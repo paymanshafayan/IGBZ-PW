@@ -1,13 +1,16 @@
 /**
  * نقطهٔ شروع رابط کاربری هوشا.
  *
- * دو نما دارد: «گفتگو» و «پنل». نوار کناری بینشان جابه‌جا می‌کند — همان‌طور که در Claude
- * با Chats / Projects / Artifacts / Code جابه‌جا می‌شوی. هیچ‌کدام از این‌ها پشت یک دیالوگ
- * تنظیمات پنهان نیست.
+ * چیدمان و رفتار، کپی از رابط Claude است: یک نوار کناری و یک ناحیهٔ محتوا؛ صفحه‌ها
+ * (گفتگوها، پروژه‌ها، ابزارها، تغییرات، فضای کار) سربرگ سریفِ بزرگ دارند با دکمه‌های
+ * عمل در انتهای همان سطر؛ و تنظیمات یک **مودال بزرگ** است، نه یک صفحه.
+ *
+ * تنها چیزی که در Claude نیست و عمداً ماند، نوار گیت زیر کامپوزر است — خواستهٔ صریح
+ * کارفرما.
  */
 
-import { $, h, toast, promptDialog, fmtTokens } from './lib/dom.js';
-import { post, refreshState, subscribe, getState } from './lib/api.js';
+import { $, h, toast, promptDialog, fmtTokens, timeAgo } from './lib/dom.js';
+import { post, refreshState, subscribe, getState, api } from './lib/api.js';
 import { paintStaleBar } from './lib/stale.js';
 import {
 	mountThread,
@@ -15,13 +18,10 @@ import {
 	renderTranscript,
 	clearThread,
 	addError,
-	showWorking,
-	hideWorking,
 } from './thread.js';
 import { initComposer, setBusy, setMode, fillComposer, composerIsEmpty, focusComposer, toggleDictation } from './composer.js';
-import { initSidebar, refreshSessions, paintSidebarState, markActiveView } from './sidebar.js';
-import { initRail, paintRail } from './rail.js';
-import { mountSettings, renderSection, SETTINGS_TABS } from './settings.js';
+import { initSidebar, refreshSessions, paintSidebarState, markActiveView, allSessions, groupOf } from './sidebar.js';
+import { openSettingsModal, renderSection, initSettings } from './settings.js';
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 import { logoSvg } from './lib/logo.js';
 import { initGitBar, paintGitBar, renderChanges } from './gitbar.js';
@@ -36,118 +36,246 @@ systemDark?.addEventListener?.( 'change', ( e ) => {
 	}
 } );
 
-// نشان، همان یک جا تعریف می‌شود و همه‌جا از همان می‌آید.
-$( '#brand-mark' ).innerHTML = logoSvg( 20 );
-
 /*
  * حالتِ کهنهٔ رابط را یک بار دور می‌ریزیم.
  *
- * چیدمان عوض شده و کلیدهای قدیمی localStorage می‌توانستند نوار کناری را جمع و ریلِ خالی
- * را باز نگه دارند — یعنی کاربر یک پنل خالی می‌دید و منویی نمی‌دید. این دقیقاً همان چیزی
- * بود که کارفرما گزارش کرد.
+ * چیدمان از سه ستون به دو ستون رفت و ریل حذف شد. کلید `hoosha-rail` در localStorage
+ * می‌توانست کلاسی را نگه دارد که دیگر هیچ استایلی ندارد.
  */
-const UI_STATE_VERSION = '3';
+const UI_STATE_VERSION = '4';
 if ( localStorage.getItem( 'hoosha-ui-version' ) !== UI_STATE_VERSION ) {
 	for ( const key of [ 'hoosha-sidebar', 'hoosha-rail', 'hoosha-density', 'hoosha-fontsize' ] ) {
 		localStorage.removeItem( key );
 	}
+	document.body.classList.remove( 'rail-open', 'sidebar-collapsed' );
 	localStorage.setItem( 'hoosha-ui-version', UI_STATE_VERSION );
 }
 
-// ───────────────────────────────────────────────────────── نماها
+// ───────────────────────────────────────────────────────── صفحه‌ها
 
-const PANELS = {
-	tools: { ico: '⚒', title: 'ابزارها', sub: 'هرچه مدل می‌تواند صدا بزند. آنچه کنترل می‌شود دسترسی است، نه توانایی.', section: 'tools' },
-	connectors: { ico: '⇄', title: 'کانکتورها', sub: 'سرورهای MCP: ابزارهای سرویس‌های بیرونی را داخل هوشا می‌آورند.', section: 'connectors' },
-	skills: { ico: '◆', title: 'اسکیل‌ها', sub: 'دانش رویه‌ای آماده، با فرمت استاندارد SKILL.md. آدرس یک اسکیل را در همان کادر گفتگو بینداز و بگو نصبش کن.', section: 'skills' },
-	agents: { ico: '⌗', title: 'زیرعامل‌ها', sub: 'هر زیرعامل یک متخصص است با پرامپت، مدل و ابزارهای خودش.', section: 'agents' },
-	workspace: { ico: '▤', title: 'فضای کار', sub: 'پوشهٔ کاری، حافظهٔ پروژه، مجوزها و سندباکس — همه در همین صفحه.', section: 'workspace' },
-	changes: { ico: '±', title: 'تغییرات', sub: 'فایل‌های تغییرکرده، دیف هرکدام، و راه بستن کار: ثبت، فرستادن، ادغام.', section: 'changes' },
-	settings: { ico: '⚙', title: 'تنظیمات', sub: 'هر چیزی که در فایل تنظیمات هست، اینجا فرم دارد.', section: 'settings' },
+/**
+ * هر صفحه یک عنوان دارد و چند دکمهٔ عمل — همان الگوی «Chats / Projects / Artifacts».
+ * @type {Record<string, {title:string, actions?:(host:HTMLElement)=>Node[], render:(host:HTMLElement)=>any}>}
+ */
+const PAGES = {
+	chats: { title: 'گفتگوها', render: renderChatsPage, actions: chatsActions },
+	projects: { title: 'پروژه‌ها', render: renderProjectsPage, actions: projectsActions },
+	tools: { title: 'ابزارها', render: ( host ) => renderSection( 'tools', host ) },
+	changes: { title: 'تغییرات', render: ( host ) => renderChanges( host ) },
+	workspace: { title: 'فضای کار', render: renderWorkspacePage },
 };
 
 let view = 'chat';
-let settingsTab = 'provider';
-
-/** میان‌بر: باز کردن صفحهٔ تنظیمات روی یک تب مشخص. */
-function openSettings( tab ) {
-	settingsTab = tab || settingsTab;
-	showView( 'settings' );
-}
 
 async function showView( next ) {
-	view = next;
-	markActiveView( next );
+	// «سفارشی‌سازی» صفحه نیست؛ مثل Claude مودال تنظیمات را باز می‌کند.
+	if ( next === 'customize' || next === 'settings' ) {
+		openSettings( next === 'settings' ? undefined : 'skills' );
+		return;
+	}
+
+	view = PAGES[ next ] ? next : 'chat';
+	markActiveView( view );
 
 	const chat = $( '#view-chat' );
 	const panel = $( '#view-panel' );
+	$( '#btn-back' ).hidden = view === 'chat';
 
-	$( '#btn-back' ).hidden = next === 'chat';
-
-	if ( next === 'chat' ) {
+	if ( view === 'chat' ) {
 		chat.hidden = false;
 		panel.hidden = true;
-		$( '#session-title-text' ).textContent = getState()?.sessionTitle || 'گفتگوی تازه';
 		focusComposer();
 		return;
 	}
 
 	chat.hidden = true;
 	panel.hidden = false;
-	$( '#session-title-text' ).textContent = PANELS[ next ].title;
 
-	const meta = PANELS[ next ];
+	const meta = PAGES[ view ];
 	const box = $( '#panel-body' );
-
-	// سربرگ «قهرمان»: نشان، عنوان و یک جملهٔ توضیح — تا صفحه باز و خوانا باشد،
-	// نه یک پنجرهٔ کوچک روی گفتگو.
-	box.replaceChildren(
-		h( 'div', { class: 'panel-hero' }, [
-			h( 'span', { class: 'hero-ico', text: meta.ico } ),
-			h( 'div', {}, [
-				h( 'h1', { class: 'panel-title', text: meta.title } ),
-				h( 'p', { class: 'panel-sub', text: meta.sub } ),
-			] ),
-		] )
-	);
-
 	const host = h( 'div', {} );
-	box.appendChild( host );
 
-	if ( next === 'settings' ) {
-		await mountSettings( host, settingsTab );
-		return;
-	}
-	if ( next === 'workspace' ) {
-		await renderWorkspacePanel( host );
-		return;
-	}
-	if ( next === 'changes' ) {
-		await renderChanges( host );
-		return;
-	}
-	await renderSection( meta.section, host );
+	box.replaceChildren(
+		h( 'div', { class: 'page-head' }, [
+			h( 'h1', { class: 'page-title', text: meta.title } ),
+			h( 'div', { class: 'page-actions' }, meta.actions ? meta.actions( host ) : [] ),
+		] ),
+		host
+	);
+	box.scrollTop = 0;
+	await meta.render( host );
 }
+
+/** میان‌بر: مودال تنظیمات روی یک تب مشخص. */
+function openSettings( tab ) {
+	openSettingsModal( tab );
+}
+
+// ───────────────────────────────────────────────── صفحهٔ گفتگوها
+
+let chatFilter = '';
+
+function chatsActions( host ) {
+	const search = h( 'input', {
+		class: 'field',
+		placeholder: 'جستجو در گفتگوها…',
+		value: chatFilter,
+		style: 'width:220px;margin:0;',
+		onInput: ( e ) => {
+			chatFilter = e.target.value;
+			renderChatsPage( host );
+		},
+	} );
+	return [
+		search,
+		h( 'button', {
+			class: 'pill primary',
+			text: 'گفتگوی تازه',
+			onClick: () => $( '#btn-new' ).click(),
+		} ),
+	];
+}
+
+async function renderChatsPage( host ) {
+	const list = allSessions();
+	const s = getState();
+	const q = chatFilter.trim().toLowerCase();
+	const rows = list.filter( ( x ) => ! q || String( x.title || '' ).toLowerCase().includes( q ) );
+
+	host.replaceChildren();
+	if ( ! rows.length ) {
+		host.appendChild( emptyState( 'هنوز گفتگویی نیست', 'از «گفتگوی تازه» شروع کن؛ هر گفتگو خودش ذخیره می‌شود.' ) );
+		return;
+	}
+
+	const box = h( 'div', { class: 'row-list' } );
+	let group = '';
+	for ( const item of rows ) {
+		const g = groupOf( item.updatedAt );
+		if ( g !== group ) {
+			box.appendChild( h( 'div', { class: 'side-label', text: g } ) );
+			group = g;
+		}
+		box.appendChild(
+			h( 'div', { class: 'row-item', onClick: () => resumeSession( item.id ) }, [
+				h( 'div', { class: 'row-main' }, [
+					h( 'span', { class: 'row-title', text: item.title || 'بدون عنوان' } ),
+				] ),
+				h( 'div', { class: 'row-meta' }, [
+					s?.sessionId === item.id ? h( 'span', { class: 'tag ok', text: 'باز' } ) : null,
+					h( 'span', { text: `${ item.messages } پیام` } ),
+					h( 'span', { text: timeAgo( item.updatedAt ) } ),
+				] ),
+				h( 'button', {
+					class: 'row-menu',
+					text: '⋯',
+					title: 'تغییر نام یا حذف',
+					onClick: async ( e ) => {
+						e.stopPropagation();
+						const title = await promptDialog( 'نام تازه (خالی = حذف):', item.title || '' );
+						if ( title === null ) {
+							return;
+						}
+						await post( '/api/sessions', title.trim() ? { action: 'rename', id: item.id, title } : { action: 'delete', id: item.id } );
+						await refreshSessions();
+						renderChatsPage( host );
+					},
+				} ),
+			] )
+		);
+	}
+	host.appendChild( box );
+}
+
+// ───────────────────────────────────────────────── صفحهٔ پروژه‌ها
+
+/** پروژه‌های اخیر را در همین مرورگر نگه می‌داریم؛ سرور فقط یکی را می‌شناسد. */
+function recentProjects() {
+	try {
+		return JSON.parse( localStorage.getItem( 'hoosha-projects' ) || '[]' );
+	} catch {
+		return [];
+	}
+}
+
+/** @param {string} dir */
+function rememberProject( dir ) {
+	const list = [ dir, ...recentProjects().filter( ( p ) => p !== dir ) ].slice( 0, 12 );
+	localStorage.setItem( 'hoosha-projects', JSON.stringify( list ) );
+}
+
+async function switchProject( dir ) {
+	const out = await post( '/api/workspace', { path: dir } );
+	if ( out.error ) {
+		toast( out.error, 'error' );
+		return;
+	}
+	rememberProject( dir );
+	await refreshState();
+	toast( `پروژه شد: ${ dir }` );
+}
+
+function projectsActions( host ) {
+	return [
+		h( 'button', {
+			class: 'pill primary',
+			text: 'پروژهٔ تازه',
+			onClick: async () => {
+				const next = await promptDialog( 'مسیر پروژه:', getState()?.config?.workspace || '' );
+				if ( next ) {
+					await switchProject( next );
+					renderProjectsPage( host );
+				}
+			},
+		} ),
+	];
+}
+
+async function renderProjectsPage( host ) {
+	const current = getState()?.config?.workspace || '';
+	rememberProject( current );
+	const list = recentProjects();
+
+	host.replaceChildren();
+	const grid = h( 'div', { class: 'card-grid' } );
+	for ( const p of list ) {
+		grid.appendChild(
+			h( 'div', { class: 'grid-card', onClick: () => switchProject( p ).then( () => renderProjectsPage( host ) ) }, [
+				h( 'b', { text: p.split( /[\\/]/ ).filter( Boolean ).pop() || p } ),
+				h( 'p', { class: 'mono', text: p } ),
+				h( 'span', { class: 'gc-date', text: p === current ? 'پروژهٔ فعلی' : 'باز کن' } ),
+			] )
+		);
+	}
+	host.appendChild( grid );
+}
+
+// ───────────────────────────────────────────────── صفحهٔ فضای کار
 
 const WORKSPACE_TABS = [
 	{ id: 'memory', label: 'حافظهٔ پروژه' },
 	{ id: 'permissions', label: 'مجوزها' },
 	{ id: 'sandbox', label: 'سندباکس' },
+	{ id: 'todos', label: 'فهرست کار' },
+	{ id: 'shells', label: 'شل‌های پس‌زمینه' },
+	{ id: 'checkpoints', label: 'چک‌پوینت‌ها' },
 	{ id: 'usage', label: 'مصرف و هزینه' },
 	{ id: 'status', label: 'وضعیت' },
 ];
 let workspaceTab = 'memory';
 
-async function renderWorkspacePanel( host ) {
+async function renderWorkspacePage( host ) {
 	const s = getState();
 
 	host.appendChild(
-		h( 'div', { class: 'form-card' }, [
-			h( 'h4', { text: 'پوشهٔ کاری' } ),
-			h( 'p', { class: 'mono note', text: s.config.workspace } ),
-			h( 'div', { class: 'row' }, [
+		h( 'div', { class: 'set-row' }, [
+			h( 'div', { class: 'set-row-label' }, [
+				h( 'b', { text: 'پوشهٔ کاری' } ),
+				h( 'p', { class: 'set-row-desc mono', text: s.config.workspace } ),
+			] ),
+			h( 'div', { class: 'set-row-control' }, [
 				h( 'button', {
-					class: 'pill primary',
+					class: 'pill',
 					text: 'تغییر پوشه',
 					onClick: async () => {
 						const next = await promptDialog( 'مسیر پوشهٔ کاری:', s.config.workspace );
@@ -167,7 +295,6 @@ async function renderWorkspacePanel( host ) {
 		] )
 	);
 
-	// زیربخش‌ها همین‌جا باز می‌شوند — هیچ‌کدام دیالوگ باز نمی‌کنند.
 	const tabs = h( 'nav', { class: 'tab-row' } );
 	const body = h( 'div', {} );
 	host.append( tabs, body );
@@ -186,6 +313,15 @@ async function renderWorkspacePanel( host ) {
 		);
 	}
 	await paint( workspaceTab );
+}
+
+/** @param {string} title @param {string} text */
+function emptyState( title, text ) {
+	return h( 'div', { class: 'empty-state' }, [
+		h( 'span', { html: logoSvg( 44 ) } ),
+		h( 'h2', { text: title } ),
+		h( 'p', { text } ),
+	] );
 }
 
 // ───────────────────────────────────────────────────────── راه‌اندازی
@@ -213,9 +349,29 @@ initComposer( {
 	onView: ( v ) => showView( v ),
 } );
 
-initSidebar( { onResume: resumeSession, onView: showView } );
+initSidebar( {
+	onResume: resumeSession,
+	onView: showView,
+	onCommand: ( name ) => {
+		if ( name === 'settings' ) {
+			openSettings();
+		} else if ( name === 'theme' ) {
+			const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+			document.documentElement.dataset.theme = next;
+			localStorage.setItem( 'hoosha-theme', next );
+		} else if ( name === 'shortcuts' ) {
+			openShortcuts();
+		} else if ( name === 'usage' ) {
+			openSettings( 'usage' );
+		} else if ( name === 'status' ) {
+			openSettings( 'status' );
+		} else if ( name === 'reload' ) {
+			location.reload();
+		}
+	},
+} );
 initGitBar( { onView: showView } );
-initRail( { onRewind: ( id ) => openRewind( doRewind, id ) } );
+initSettings();
 
 // ───────────────────────────────────────────────────────── وضعیت
 
@@ -225,21 +381,16 @@ subscribe( ( s ) => {
 	paintStaleBar( $( '#stale-bar' ), s );
 
 	paintSidebarState( s );
-	paintRail( s );
 	paintGitBar( s );
 	setMode( s.config.permissions?.mode || 'default' );
 
 	const ws = String( s.config.workspace || '' );
-	$( '#project-name' ).textContent = ws.split( /[\\/]/ ).filter( Boolean ).pop() || 'پروژه';
-	$( '#project-chip' ).title = ws;
+	$( '#plan-text' ).textContent = ws.split( /[\\/]/ ).filter( Boolean ).pop() || 'بدون پروژه';
+	$( '#plan-chip' ).title = ws;
 
 	const p = s.config.profiles?.[ s.config.activeProfile ] || {};
-	$( '#model-name' ).textContent = p.model || 'مدل تنظیم نشده';
-	$( '#pill-model' ).title = `${ p.provider || '' } · ${ p.model || '' }`;
-
-	if ( view === 'chat' ) {
-		$( '#session-title-text' ).textContent = s.sessionTitle || 'گفتگوی تازه';
-	}
+	$( '#model-name' ).textContent = s.hub?.active ? 'خودکار' : p.model || 'مدل تنظیم نشده';
+	$( '#pill-model' ).title = s.hub?.active ? 'هاب پرووایدر — مدل را خودش انتخاب می‌کند' : `${ p.provider || '' } · ${ p.model || '' }`;
 
 	const used = s.context?.used || 0;
 	const win = s.context?.window || 200_000;
@@ -251,6 +402,7 @@ subscribe( ( s ) => {
 	$( '#context-meter' ).classList.toggle( 'high', pct > 75 );
 
 	setBusy( Boolean( s.busy ) );
+	syncEmptyState();
 
 	if ( ! s.ready?.ok ) {
 		showSetupBanner( s );
@@ -259,6 +411,15 @@ subscribe( ( s ) => {
 	}
 } );
 
+/**
+ * وقتی گفتگو خالی است، تیتر و کامپوزر با هم وسط صفحه می‌نشینند — مثل صفحهٔ گفتگوی
+ * تازهٔ Claude. به‌محض آمدن اولین پیام، کامپوزر به کف برمی‌گردد.
+ */
+export function syncEmptyState() {
+	const empty = Boolean( $( '#welcome' ) );
+	$( '#view-chat' ).classList.toggle( 'empty', empty );
+}
+
 function showSetupBanner( s ) {
 	if ( $( '#setup-banner' ) ) {
 		return;
@@ -266,9 +427,9 @@ function showSetupBanner( s ) {
 	const banner = h( 'div', { class: 'banner danger', id: 'setup-banner' }, [
 		h( 'b', { text: 'هنوز آمادهٔ کار نیست' } ),
 		h( 'span', { text: `کم است: ${ ( s.ready?.missing || [] ).join( '، ' ) }` } ),
-		h( 'button', { class: 'pill primary', text: 'تنظیم پرووایدر', onClick: () => openSettings( 'provider' ) } ),
+		h( 'button', { class: 'pill primary', text: 'تنظیم پرووایدر', onClick: () => openSettings( 'hub' ) } ),
 	] );
-	$( '.main' ).insertBefore( banner, $( '#view-chat' ) );
+	$( '.main-card' ).insertBefore( banner, $( '#view-chat' ) );
 }
 
 // ─────────────────────────────────────────────────── جریان رویدادها
@@ -315,6 +476,7 @@ function connectEvents() {
 			case 'shell_start':
 			case 'shell_exit':
 			case 'usage':
+			case 'hub':
 				refreshState();
 				return;
 
@@ -345,6 +507,12 @@ function connectEvents() {
 				return;
 
 			case 'hello':
+			case 'hub-route':
+			case 'hub-repair':
+			case 'hub-diagnose':
+			case 'hub-failover':
+			case 'hub-cache-hit':
+			case 'hub-budget-warn':
 				return;
 
 			default:
@@ -352,6 +520,7 @@ function connectEvents() {
 					showView( 'chat' );
 				}
 				handleEvent( ev );
+				syncEmptyState();
 		}
 	};
 
@@ -418,23 +587,24 @@ function showWelcome() {
 			] ),
 		] )
 	);
+	syncEmptyState();
 }
 
-function greeting() {
-	const hour = new Date().getHours();
+/** سلامِ وابسته به ساعت — همان «Evening, how are things?» در تصویر. */
+export function greeting( hour = new Date().getHours() ) {
 	if ( hour < 5 ) {
-		return 'شب‌بخیر — چه کاری انجام بدهم؟';
+		return 'شب‌بخیر، چه خبر؟';
 	}
 	if ( hour < 12 ) {
-		return 'صبح‌بخیر — چه کاری انجام بدهم؟';
+		return 'صبح‌بخیر، چه خبر؟';
 	}
 	if ( hour < 17 ) {
-		return 'ظهر بخیر — چه کاری انجام بدهم؟';
+		return 'ظهر بخیر، چه خبر؟';
 	}
-	return 'عصر بخیر — چه کاری انجام بدهم؟';
+	return 'عصر بخیر، چه خبر؟';
 }
 
-// ─────────────────────────────────────────────────── دکمه‌های بالا
+// ─────────────────────────────────────────────────── دکمه‌ها و منوها
 
 $( '#btn-new' ).onclick = async () => {
 	showView( 'chat' );
@@ -446,12 +616,9 @@ $( '#btn-new' ).onclick = async () => {
 	focusComposer();
 };
 
-$( '#btn-settings' ).onclick = () => showView( 'settings' );
-
-// دکمهٔ «‹» بالای پنل: از هر صفحه‌ای به گفتگو برمی‌گردد — مثل تصویر.
 $( '#btn-back' ).onclick = () => showView( 'chat' );
+$( '#btn-search' ).onclick = () => openPalette( paletteDeps() );
 
-// منوی «⋯» — جایی که در Claude هم کارهای همین گفتگو می‌نشیند.
 $( '#btn-more' ).onclick = ( e ) => {
 	e.stopPropagation();
 	const box = $( '#more-menu' );
@@ -466,7 +633,7 @@ $( '#btn-more' ).onclick = ( e ) => {
 		} }, [ h( 'span', { class: 'm-ico', text: ico } ), h( 'b', { text: label } ) ] );
 
 	box.replaceChildren(
-		item( '✎', 'تغییر نام گفتگو', () => $( '#session-title' ).click() ),
+		item( '✎', 'تغییر نام گفتگو', renameSession ),
 		item( '⤓', 'خروجی مارک‌داون', () => doExport( 'md' ) ),
 		item( '⤓', 'خروجی JSON', () => doExport( 'json' ) ),
 		h( 'div', { class: 'menu-sep' } ),
@@ -478,28 +645,7 @@ $( '#btn-more' ).onclick = ( e ) => {
 	box.hidden = false;
 };
 
-document.addEventListener( 'click', ( e ) => {
-	const box = $( '#more-menu' );
-	if ( box && ! box.hidden && ! box.contains( e.target ) ) {
-		box.hidden = true;
-	}
-} );
-
-document.addEventListener( 'hoosha:rail', ( e ) => {
-	document.body.classList.add( 'rail-open' );
-	localStorage.setItem( 'hoosha-rail', '1' );
-	document.querySelector( `.rail-tab[data-tab="${ e.detail }"]` )?.click();
-} );
-$( '#btn-account' ).onclick = () => openSettings( 'provider' );
-$( '#btn-search' ).onclick = () => openPalette( paletteDeps() );
-$( '#btn-menu' ).onclick = () => document.body.classList.toggle( 'sidebar-open' );
-
-$( '#btn-rail' ).onclick = () => {
-	document.body.classList.toggle( 'rail-open' );
-	localStorage.setItem( 'hoosha-rail', document.body.classList.contains( 'rail-open' ) ? '1' : '' );
-};
-
-$( '#session-title' ).onclick = async () => {
+async function renameSession() {
 	const s = getState();
 	const title = await promptDialog( 'نام گفتگو:', s?.sessionTitle || '' );
 	if ( title === null ) {
@@ -508,78 +654,11 @@ $( '#session-title' ).onclick = async () => {
 	await post( '/api/sessions', { action: 'rename', id: s.sessionId, title } );
 	await refreshState();
 	await refreshSessions();
-};
-
-// ─────────────────────────────────────────────── انتخابگر پروژه
-
-/** پروژه‌های اخیر را در همین مرورگر نگه می‌داریم؛ سرور فقط یکی را می‌شناسد. */
-function recentProjects() {
-	try {
-		return JSON.parse( localStorage.getItem( 'hoosha-projects' ) || '[]' );
-	} catch {
-		return [];
-	}
 }
-
-/** @param {string} dir */
-function rememberProject( dir ) {
-	const list = [ dir, ...recentProjects().filter( ( p ) => p !== dir ) ].slice( 0, 8 );
-	localStorage.setItem( 'hoosha-projects', JSON.stringify( list ) );
-}
-
-async function switchProject( dir ) {
-	const out = await post( '/api/workspace', { path: dir } );
-	if ( out.error ) {
-		toast( out.error, 'error' );
-		return;
-	}
-	rememberProject( dir );
-	await refreshState();
-	toast( `پروژه شد: ${ dir }` );
-}
-
-$( '#project-chip' ).onclick = ( e ) => {
-	e.stopPropagation();
-	const box = $( '#project-menu' );
-	if ( ! box.hidden ) {
-		box.hidden = true;
-		return;
-	}
-
-	const current = getState()?.config?.workspace || '';
-	rememberProject( current );
-
-	const row = ( label, sub, onClick, active ) =>
-		h( 'div', { class: `menu-item ${ active ? 'active' : '' }`, onClick: () => {
-			box.hidden = true;
-			onClick();
-		} }, [
-			h( 'span', { class: 'm-ico', text: '▤' } ),
-			h( 'b', { text: label } ),
-			sub ? h( 'span', { class: 'm-desc', text: sub } ) : null,
-			active ? h( 'span', { class: 'm-check', text: '✓' } ) : null,
-		] );
-
-	box.replaceChildren(
-		h( 'div', { class: 'menu-label', text: 'پروژه‌های اخیر' } ),
-		...recentProjects().map( ( p ) =>
-			row( p.split( /[\\/]/ ).filter( Boolean ).pop() || p, p, () => switchProject( p ), p === current )
-		),
-		h( 'div', { class: 'menu-sep' } ),
-		h( 'div', { class: 'menu-item', onClick: async () => {
-			box.hidden = true;
-			const next = await promptDialog( 'مسیر پروژه:', current );
-			if ( next ) {
-				switchProject( next );
-			}
-		} }, [ h( 'span', { class: 'm-ico', text: '+' } ), h( 'b', { text: 'پروژهٔ دیگر…' } ) ] )
-	);
-	box.hidden = false;
-};
 
 document.addEventListener( 'click', ( e ) => {
-	const box = $( '#project-menu' );
-	if ( box && ! box.hidden && ! box.contains( e.target ) && ! $( '#project-chip' ).contains( e.target ) ) {
+	const box = $( '#more-menu' );
+	if ( box && ! box.hidden && ! box.contains( e.target ) ) {
 		box.hidden = true;
 	}
 } );
@@ -605,11 +684,6 @@ document.addEventListener( 'keydown', ( e ) => {
 		$( '#btn-new' ).click();
 		return;
 	}
-	if ( ( e.ctrlKey || e.metaKey ) && e.key.toLowerCase() === 'b' ) {
-		e.preventDefault();
-		$( '#btn-rail' ).click();
-		return;
-	}
 	if ( ( e.ctrlKey || e.metaKey ) && e.key.toLowerCase() === 'm' ) {
 		e.preventDefault();
 		toggleDictation();
@@ -617,7 +691,7 @@ document.addEventListener( 'keydown', ( e ) => {
 	}
 	if ( ( e.ctrlKey || e.metaKey ) && e.key === ',' ) {
 		e.preventDefault();
-		showView( 'settings' );
+		openSettings();
 		return;
 	}
 
@@ -648,10 +722,6 @@ async function boot() {
 	const s = await refreshState();
 	await refreshSessions();
 
-	if ( localStorage.getItem( 'hoosha-rail' ) ) {
-		document.body.classList.add( 'rail-open' );
-	}
-
 	if ( s.transcript?.length ) {
 		renderTranscript( s.transcript );
 	} else {
@@ -665,12 +735,16 @@ async function boot() {
 			gm.innerHTML = logoSvg( 34 );
 		}
 	}
+	syncEmptyState();
 	for ( const ask of s.pendingAsk || [] ) {
 		handleEvent( ask );
 	}
 
+	markActiveView( 'chat' );
 	connectEvents();
 	focusComposer();
 }
 
 boot();
+
+export { api };

@@ -7,8 +7,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="در حال کار">
 	<defs>
 		<linearGradient id="hoosha-live" x1="4" y1="3" x2="28" y2="29" gradientUnits="userSpaceOnUse">
-			<stop offset="0" stop-color="#e8895f" />
-			<stop offset="1" stop-color="#c2593a" />
+			<stop offset="0" stop-color="#e08a6b" />
+			<stop offset="1" stop-color="#d0674a" />
 		</linearGradient>
 	</defs>
 	<g fill="url(#hoosha-live)">

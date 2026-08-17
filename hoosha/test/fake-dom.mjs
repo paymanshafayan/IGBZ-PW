@@ -55,6 +55,52 @@ class FakeNode {
 		this.classList = new FakeClassList( this );
 	}
 
+	get parentElement() {
+		return this.parentNode;
+	}
+	get firstChild() {
+		return this.children[ 0 ] || null;
+	}
+	get lastElementChild() {
+		return this.children[ this.children.length - 1 ] || null;
+	}
+	get childElementCount() {
+		return this.children.length;
+	}
+	get scrollHeight() {
+		return 100;
+	}
+	get offsetHeight() {
+		return 100;
+	}
+	getBoundingClientRect() {
+		return { top: 0, left: 0, right: 0, bottom: 0, width: 100, height: 100 };
+	}
+	/** @param {string} sel */
+	closest( sel ) {
+		let n = this;
+		while ( n ) {
+			if ( matches( n, sel ) ) {
+				return n;
+			}
+			n = n.parentNode;
+		}
+		return null;
+	}
+	/** @param {string} sel */
+	matches( sel ) {
+		return matches( this, sel );
+	}
+	insertBefore( node, before ) {
+		const i = this.children.indexOf( before );
+		node.parentNode = this;
+		this.children.splice( i < 0 ? this.children.length : i, 0, node );
+		return node;
+	}
+	scrollTo() {}
+	blur() {}
+	select() {}
+
 	get textContent() {
 		return this.textValue || this.children.map( ( c ) => c.textContent ).join( '' );
 	}
@@ -64,6 +110,10 @@ class FakeNode {
 	}
 	set innerHTML( value ) {
 		this.textValue = String( value ?? '' );
+		this.children = [];
+	}
+	get innerHTML() {
+		return this.textValue;
 	}
 
 	appendChild( child ) {
@@ -115,24 +165,72 @@ class FakeNode {
 		return this.all().filter( ( n ) => matches( n, sel ) );
 	}
 
-	/** شبیه‌سازی کلیک. */
+	/**
+	 * شبیه‌سازی کلیک.
+	 *
+	 * هم `addEventListener('click')` و هم ویژگی `onclick` را صدا می‌زند. نسخهٔ اول فقط
+	 * اولی را می‌زد و نتیجه‌اش این بود که کلیک روی ناوبری «هیچ کاری نمی‌کرد» — در حالی
+	 * که کد سالم بود و هارنس ناقص.
+	 */
 	click() {
+		const ev = { preventDefault() {}, stopPropagation() {}, target: this };
 		for ( const fn of this.listeners.click || [] ) {
-			fn( { preventDefault() {}, stopPropagation() {}, target: this } );
+			fn( ev );
+		}
+		if ( typeof this.onclick === 'function' ) {
+			this.onclick( ev );
 		}
 	}
 }
 
-/** @param {FakeNode} node */
+/**
+ * تطبیق سلکتور — عمداً کوچک: تگ، کلاس، شناسه، و ویژگی. همین‌ها را رابط ما استفاده
+ * می‌کند و بیشتر از این یعنی نوشتن یک مرورگر.
+ *
+ * @param {FakeNode} node
+ * @param {string} sel
+ */
 function matches( node, sel ) {
-	const s = String( sel ).trim();
-	if ( s.startsWith( '#' ) ) {
-		return node.id === s.slice( 1 );
+	let s = String( sel ).trim();
+
+	// بخش ویژگی: [data-view="tools"] یا [hidden]
+	const attrs = [ ...s.matchAll( /\[([\w-]+)(?:=["']?([^\]"']*)["']?)?\]/g ) ];
+	s = s.replace( /\[[^\]]*\]/g, '' );
+	for ( const [ , name, value ] of attrs ) {
+		const have = name === 'hidden' ? ( node.hidden ? '' : null ) : node.dataset[ camel( name ) ] ?? node.attributes[ name ];
+		if ( have === undefined || have === null ) {
+			return false;
+		}
+		if ( value !== undefined && String( have ) !== value ) {
+			return false;
+		}
 	}
-	if ( s.startsWith( '.' ) ) {
-		return node.classList.contains( s.slice( 1 ) );
+
+	if ( ! s ) {
+		return true;
 	}
-	return node.tagName === s.toUpperCase();
+
+	// بخش کلاس‌ها و شناسه
+	const id = /#([\w-]+)/.exec( s )?.[ 1 ];
+	if ( id && node.id !== id ) {
+		return false;
+	}
+	for ( const cls of s.match( /\.[\w-]+/g ) || [] ) {
+		if ( ! node.classList.contains( cls.slice( 1 ) ) ) {
+			return false;
+		}
+	}
+
+	const tag = /^[a-zA-Z][\w-]*/.exec( s )?.[ 0 ];
+	if ( tag && node.tagName !== tag.toUpperCase() ) {
+		return false;
+	}
+	return true;
+}
+
+/** data-view → view */
+function camel( name ) {
+	return String( name ).replace( /^data-/, '' ).replace( /-([a-z])/g, ( _, c ) => c.toUpperCase() );
 }
 
 /**
@@ -193,6 +291,103 @@ export function installFakeDom( opts = {} ) {
 			globalThis.CustomEvent = previous.CustomEvent;
 		},
 	};
+}
+
+/**
+ * یک تجزیه‌گر HTML کوچک.
+ *
+ * چرا: تا امروز تست‌های رابط یا متن فایل را grep می‌کردند یا یک المان دستی می‌ساختند.
+ * هیچ‌کدام ثابت نمی‌کرد که برنامه با `index.html` واقعی بالا می‌آید. این تجزیه‌گر فقط
+ * همان HTML خودمان را می‌فهمد — نه یک مرورگر است و نه ادعایش را دارد — ولی همین‌قدر
+ * کافی است که `app.js` را واقعاً بوت کنیم و ببینیم چیزی نمی‌شکند.
+ *
+ * @param {string} html
+ * @param {FakeNode} root
+ */
+export function parseHtml( html, root ) {
+	const VOID = new Set( [ 'br', 'hr', 'img', 'input', 'meta', 'link', 'source', 'path', 'circle', 'rect', 'line', 'use' ] );
+	const stack = [ root ];
+	let i = 0;
+
+	while ( i < html.length ) {
+		const lt = html.indexOf( '<', i );
+		if ( lt === -1 ) {
+			break;
+		}
+		const text = html.slice( i, lt ).trim();
+		if ( text && stack.length > 1 ) {
+			const t = new FakeNode( 'text' );
+			t.textContent = text;
+			stack[ stack.length - 1 ].appendChild( t );
+		}
+
+		if ( html.startsWith( '<!--', lt ) ) {
+			i = html.indexOf( '-->', lt ) + 3;
+			continue;
+		}
+		if ( html.startsWith( '<!', lt ) ) {
+			i = html.indexOf( '>', lt ) + 1;
+			continue;
+		}
+
+		const gt = findTagEnd( html, lt );
+		const raw = html.slice( lt + 1, gt );
+		i = gt + 1;
+
+		if ( raw.startsWith( '/' ) ) {
+			if ( stack.length > 1 ) {
+				stack.pop();
+			}
+			continue;
+		}
+
+		const name = ( /^[\w-]+/.exec( raw ) || [ 'div' ] )[ 0 ].toLowerCase();
+		const node = new FakeNode( name );
+		for ( const m of raw.slice( name.length ).matchAll( /([:\w-]+)(?:="([^"]*)")?/g ) ) {
+			const key = m[ 1 ];
+			const value = m[ 2 ] ?? '';
+			if ( key === 'class' ) {
+				node.className = value;
+			} else if ( key === 'id' ) {
+				node.id = value;
+				node.attributes.id = value;
+			} else if ( key === 'hidden' ) {
+				node.hidden = true;
+			} else if ( key.startsWith( 'data-' ) ) {
+				node.dataset[ camel( key ) ] = value;
+				node.attributes[ key ] = value;
+			} else {
+				node.attributes[ key ] = value;
+			}
+		}
+		stack[ stack.length - 1 ].appendChild( node );
+
+		const selfClosing = raw.endsWith( '/' ) || VOID.has( name );
+		if ( ! selfClosing ) {
+			stack.push( node );
+		}
+		// محتوای script و style را نمی‌خواهیم.
+		if ( name === 'script' || name === 'style' ) {
+			const close = html.indexOf( `</${ name }>`, i );
+			i = close === -1 ? html.length : close + name.length + 3;
+			stack.pop();
+		}
+	}
+	return root;
+}
+
+/** پایان یک تگ، با احترام به `>` داخل مقدار ویژگی. */
+function findTagEnd( html, start ) {
+	let quoted = false;
+	for ( let k = start + 1; k < html.length; k++ ) {
+		const ch = html[ k ];
+		if ( ch === '"' ) {
+			quoted = ! quoted;
+		} else if ( ch === '>' && ! quoted ) {
+			return k;
+		}
+	}
+	return html.length;
 }
 
 export { FakeNode };

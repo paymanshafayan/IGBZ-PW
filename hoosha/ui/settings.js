@@ -10,60 +10,112 @@ import { $, el, h, toast, confirmDialog } from './lib/dom.js';
 import { api, post, refreshState, getState } from './lib/api.js';
 import { mountHub } from './hub.js';
 
-const TABS = [
-	{ id: 'hub', label: 'پرووایدرهای استاندارد', ico: '◈' },
-	{ id: 'hub-compat', label: 'پرووایدرهای سازگار', ico: '◇' },
-	{ id: 'hub-models', label: 'مدل‌ها', ico: '⬡' },
-	{ id: 'hub-routing', label: 'هاب و مسیریابی', ico: '⇶' },
-	{ id: 'hub-health', label: 'سلامت، مصرف و عیب‌یاب', ico: '✚' },
-	{ id: 'provider', label: 'پروفایل تک‌نفره', ico: '◉' },
-	{ id: 'connectors', label: 'کانکتورها (MCP)', ico: '⇄' },
-	{ id: 'skills', label: 'اسکیل‌ها', ico: '◆' },
-	{ id: 'plugins', label: 'پلاگین‌ها', ico: '▣' },
-	{ id: 'agents', label: 'زیرعامل‌ها', ico: '⌗' },
-	{ id: 'commands', label: 'دستورها', ico: '/' },
-	{ id: 'hooks', label: 'هوک‌ها', ico: '⚑' },
-	{ id: 'permissions', label: 'مجوزها', ico: '⛨' },
-	{ id: 'sandbox', label: 'سندباکس', ico: '▢' },
-	{ id: 'memory', label: 'حافظهٔ پروژه', ico: '❒' },
-	{ id: 'tools', label: 'ابزارها', ico: '⚒' },
-	{ id: 'usage', label: 'مصرف و هزینه', ico: '⌁' },
-	{ id: 'status', label: 'وضعیت و تشخیص', ico: '✚' },
-	{ id: 'appearance', label: 'ظاهر', ico: '◐' },
+/**
+ * دو گروه، دقیقاً مثل ناوبری داخل مودال تنظیمات Claude: «Settings» و «Customize».
+ * نوزده بخش بدون گروه‌بندی، همان دیوار متنی بود که کارفرما در تصویر دید.
+ */
+const GROUPS = [
+	{
+		label: 'تنظیمات',
+		items: [
+			{ id: 'hub', label: 'پرووایدرهای استاندارد', ico: '◈' },
+			{ id: 'hub-compat', label: 'پرووایدرهای سازگار', ico: '◇' },
+			{ id: 'hub-models', label: 'مدل‌ها', ico: '⬡' },
+			{ id: 'hub-routing', label: 'هاب و مسیریابی', ico: '⇶' },
+			{ id: 'hub-health', label: 'سلامت و عیب‌یاب', ico: '✚' },
+			{ id: 'provider', label: 'پروفایل تک‌نفره', ico: '◉' },
+			{ id: 'permissions', label: 'مجوزها', ico: '⛨' },
+			{ id: 'sandbox', label: 'سندباکس', ico: '▢' },
+			{ id: 'usage', label: 'مصرف و هزینه', ico: '⌁' },
+			{ id: 'status', label: 'وضعیت و تشخیص', ico: '✚' },
+			{ id: 'appearance', label: 'ظاهر', ico: '◐' },
+		],
+	},
+	{
+		label: 'سفارشی‌سازی',
+		items: [
+			{ id: 'skills', label: 'اسکیل‌ها', ico: '◆' },
+			{ id: 'connectors', label: 'کانکتورها', ico: '⇄' },
+			{ id: 'plugins', label: 'پلاگین‌ها', ico: '▣' },
+			{ id: 'agents', label: 'زیرعامل‌ها', ico: '⌗' },
+			{ id: 'commands', label: 'دستورها', ico: '/' },
+			{ id: 'hooks', label: 'هوک‌ها', ico: '⚑' },
+			{ id: 'memory', label: 'حافظهٔ پروژه', ico: '❒' },
+			{ id: 'tools', label: 'ابزارها', ico: '⚒' },
+		],
+	},
 ];
 
+const TABS = GROUPS.flatMap( ( g ) => g.items );
+
 let currentTab = 'hub';
+let navFilter = '';
 
 export const SETTINGS_TABS = TABS;
+export const SETTINGS_GROUPS = GROUPS;
 
 /**
- * تنظیمات، **یک صفحه است نه یک پنجره**.
+ * تنظیمات یک **مودال بزرگ** است.
  *
- * شکایت کارفرما دقیقاً همین بود: «برای هر چیزی باید تنظیمات را باز کنی». حالا مثل خود
- * Claude، تنظیمات یک صفحهٔ عادی در ناحیهٔ اصلی است با ستون کناری خودش، و از نوار کناری
- * مستقیم باز می‌شود — نه یک دیالوگ که روی همه‌چیز بیفتد.
+ * تاریخچه‌اش ارزش نوشتن دارد: اول دیالوگ‌های ریز بود و کارفرما درست شکایت کرد. بعد
+ * صفحهٔ تمام‌قد شد. بعد تصاویر واقعی Claude رسید و معلوم شد آنجا یک مودالِ بزرگ است با
+ * ناوبری دوگروهی و یک کادر جستجو. شکایت اصلی از **کوچکی** آن دیالوگ‌ها بود، نه از
+ * مودال‌بودنشان.
  *
- * @param {HTMLElement} host
  * @param {string} [tab]
  */
-export async function mountSettings( host, tab ) {
-	currentTab = tab || currentTab;
+export async function openSettingsModal( tab ) {
+	currentTab = tab && TABS.some( ( t ) => t.id === tab ) ? tab : currentTab;
 
-	host.replaceChildren();
-	const nav = h( 'nav', { class: 'sub-nav' } );
-	const body = h( 'div', { class: 'sub-body' } );
-	host.append( h( 'div', { class: 'sub-shell' }, [ nav, body ] ) );
-
-	for ( const t of TABS ) {
-		nav.appendChild(
-			h( 'button', {
-				class: `snav-item ${ t.id === currentTab ? 'active' : '' }`,
-				dataset: { tab: t.id },
-				onClick: () => mountSettings( host, t.id ),
-			}, [ h( 'span', { class: 'snav-ico', text: t.ico } ), h( 'span', { text: t.label } ) ] )
-		);
+	const dlg = $( '#settings' );
+	if ( ! dlg.open ) {
+		dlg.showModal();
 	}
+	paintSettingsNav();
+	await paintSettingsBody();
+}
 
+function paintSettingsNav() {
+	const nav = $( '#set-nav' );
+	nav.replaceChildren();
+
+	const search = h( 'input', {
+		class: 'set-search',
+		placeholder: 'جستجو…',
+		value: navFilter,
+		onInput: ( e ) => {
+			navFilter = e.target.value;
+			paintSettingsNav();
+		},
+	} );
+	nav.appendChild( search );
+
+	const q = navFilter.trim().toLowerCase();
+	for ( const group of GROUPS ) {
+		const items = group.items.filter( ( t ) => ! q || t.label.toLowerCase().includes( q ) );
+		if ( ! items.length ) {
+			continue;
+		}
+		nav.appendChild( h( 'div', { class: 'set-group', text: group.label } ) );
+		for ( const t of items ) {
+			nav.appendChild(
+				h( 'button', {
+					class: `set-item ${ t.id === currentTab ? 'active' : '' }`,
+					dataset: { tab: t.id },
+					onClick: async () => {
+						currentTab = t.id;
+						paintSettingsNav();
+						await paintSettingsBody();
+					},
+				}, [ h( 'span', { class: 'si-ico', text: t.ico } ), h( 'span', { text: t.label } ) ] )
+			);
+		}
+	}
+}
+
+async function paintSettingsBody() {
+	const body = $( '#set-body' );
+	$( '#set-title' ).textContent = TABS.find( ( t ) => t.id === currentTab )?.label || 'تنظیمات';
 	body.replaceChildren( el( 'div', 'loading', 'در حال بارگذاری…' ) );
 	await refreshState();
 	body.replaceChildren();
@@ -71,16 +123,41 @@ export async function mountSettings( host, tab ) {
 	body.scrollTop = 0;
 }
 
-/** میان‌بر: از هرجای برنامه، صفحهٔ تنظیمات را روی یک تب باز کن. */
+/** میان‌بر: از هرجای برنامه، تنظیمات را روی یک تب باز کن. */
 export function openSettings( tab ) {
 	document.dispatchEvent( new CustomEvent( 'hoosha:settings', { detail: tab } ) );
 }
 
 export function initSettings() {
-	// چیزی برای راه‌اندازی نمانده؛ تنظیمات دیگر دیالوگ نیست.
+	const dlg = $( '#settings' );
+	$( '#set-close' ).onclick = () => dlg.close();
+	// کلیک روی پس‌زمینهٔ مودال، مثل Claude، می‌بنددش.
+	dlg.addEventListener( 'click', ( e ) => {
+		if ( e.target === dlg ) {
+			dlg.close();
+		}
+	} );
+}
+
+/** یک ردیف تنظیم: برچسب و توضیح در ابتدا، کنترل در انتها — چیدمان Claude. */
+export function setRow( label, control, desc, opts = {} ) {
+	return h( 'div', { class: `set-row ${ opts.stack ? 'stack' : '' }` }, [
+		h( 'div', { class: 'set-row-label' }, [
+			h( 'b', { text: label } ),
+			desc ? h( 'p', { class: 'set-row-desc', text: desc } ) : null,
+		] ),
+		h( 'div', { class: 'set-row-control' }, Array.isArray( control ) ? control : [ control ] ),
+	] );
+}
+
+/** کلید سوییچ — Claude برای بولین‌ها چک‌باکس خام نشان نمی‌دهد. */
+export function toggle( checked, onChange ) {
+	const input = h( 'input', { type: 'checkbox', checked: Boolean( checked ), onChange: ( e ) => onChange?.( e.target.checked ) } );
+	return h( 'label', { class: 'switch' }, [ input, h( 'i', {} ) ] );
 }
 
 function section( title, hint ) {
+
 	return h( 'div', { class: 'sec-head' }, [ h( 'h3', { text: title } ), hint ? h( 'p', { class: 'note', text: hint } ) : null ] );
 }
 

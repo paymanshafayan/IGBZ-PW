@@ -1,144 +1,172 @@
 /*
- * ظاهر هوشا.
+ * ظاهر هوشا — کپی برابر اصل از رابط Claude.
  *
- * ساختار توکن‌ها از `@sunpix/claude-code-web` گرفته شده — همان نام‌های معنایی
- * (`background`، `sidebar`، `muted`، `card`، `popover`، `ring`) و همان فضای رنگی oklch.
+ * پالت، رنگ‌های **رسمی** آنتروپیک است، نه حدس و نه سلیقهٔ من:
  *
- * ولی یک تفاوت عمدی: پالت آن‌ها **خاکستری خالص** است (کروما صفر). کارفرما درست گفت که
- * چنین رابطی بعد از چند ساعت کار، آدم را خسته می‌کند. پس:
+ *   Crail Orange  #d97757   تنها جایی که رنگ دارد: خودِ نشان
+ *   Dark          #141413   متن، و پس‌زمینهٔ دکمه‌های اصلی
+ *   Light         #faf9f5   پس‌زمینهٔ صفحه
+ *   Mid Gray      #b0aea5   عناصر ثانویه
+ *   Light Gray    #e8e6dc   خط‌ها و سطح‌های ملایم
+ *   Slate Blue    #6a9bcc   لهجهٔ دوم
  *
- *   • خاکستری‌ها **گرم** شده‌اند — کروما ۰٫۰۰۵ تا ۰٫۰۱۵ روی زاویهٔ ۶۰ (کهربایی)
- *   • رنگ برند (نارنجیِ شمسه) و رنگ دوم (فیروزهٔ ایرانی) واقعاً استفاده می‌شوند
- *   • ارتفاع با سایه و گرادیان نشان داده می‌شود، نه فقط با خط
- *   • هر چیزی که کلیک‌پذیر است، وقتی نزدیکش می‌شوی واکنش نشان می‌دهد
+ * درس گران‌قیمت این دور: در نسخهٔ قبل نارنجی را رنگ **اصلی** کردم و دکمه‌ها نارنجی شدند.
+ * در خود Claude دکمه‌های اصلی **مشکی**اند و تنها نارنجیِ صفحه، ستارهٔ لوگوست. حالا
+ * `--primary` مشکی است و نارنجی یک متغیر جداست به نام `--brand` که فقط نشان از آن
+ * استفاده می‌کند.
  */
 
 :root {
-	--radius: 0.625rem;
-	--radius-sm: 0.4rem;
+	--radius: 0.75rem;
+	--radius-sm: 0.5rem;
 	--radius-lg: 1rem;
-	--radius-xl: 1.5rem;
+	--radius-xl: 1.75rem;
 
-	--fs: 15.5px;
+	--fs: 15px;
 
 	--sans: 'Vazirmatn', 'Segoe UI', Tahoma, -apple-system, BlinkMacSystemFont, sans-serif;
-	--serif: 'Noto Naskh Arabic', 'Times New Roman', Georgia, serif;
+	/*
+	 * فونت نمایشی. در Claude تیترها با یک سریفِ اختصاصی‌اند و همان تضادِ سریف/سنس، نیمی
+	 * از حسِ آن رابط است. برای فارسی سریفِ قابل‌اتکایی روی همهٔ سیستم‌ها نیست، پس:
+	 * نویسه‌های لاتین به Georgia/Lora می‌افتند و فارسی به نستعلیق/نسخ سیستم، و اگر
+	 * هیچ‌کدام نبود به همان سنس با وزن سبک‌تر و فاصلهٔ بازتر.
+	 */
+	--serif: 'Lora', 'Noto Naskh Arabic', 'Times New Roman', Georgia, 'Vazirmatn', serif;
 	--mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, Menlo, monospace;
 
-	--sidebar-w: 250px;
-	--list-w: 236px;
-	--rail-w: 300px;
-	--col: 48rem;
+	--sidebar-w: 272px;
+	--col: 46rem;
 
 	--ease: cubic-bezier(0.22, 0.9, 0.32, 1);
 }
 
-/* ─────────────────────────────────────────────────────── تم تیرهٔ گرم */
-
-html[data-theme='dark'] {
-	--background: oklch(16% 0.006 60);
-	--foreground: oklch(96% 0.006 70);
-
-	--card: oklch(20% 0.007 60);
-	--card-foreground: oklch(96% 0.006 70);
-
-	--popover: oklch(22% 0.008 60);
-	--popover-foreground: oklch(96% 0.006 70);
-
-	--sidebar: oklch(13.5% 0.006 60);
-	--sidebar-foreground: oklch(92% 0.006 70);
-
-	--muted: oklch(26% 0.008 60);
-	--muted-foreground: oklch(72% 0.012 65);
-
-	--accent: oklch(27.5% 0.012 60);
-	--accent-foreground: oklch(97% 0.006 70);
-
-	--border: oklch(28% 0.008 60);
-	--border-soft: oklch(23% 0.007 60);
-	--input: oklch(26% 0.008 60);
-	--ring: oklch(60% 0.14 45);
-
-	--primary: oklch(66% 0.15 42);
-	--primary-hover: oklch(70% 0.16 42);
-	--primary-foreground: oklch(99% 0 0);
-	--primary-soft: oklch(66% 0.15 42 / 0.14);
-	--primary-line: oklch(66% 0.15 42 / 0.36);
-
-	--second: oklch(66% 0.1 190);
-	--second-soft: oklch(66% 0.1 190 / 0.14);
-
-	--ok: oklch(72% 0.14 150);
-	--ok-soft: oklch(72% 0.14 150 / 0.14);
-	--warn: oklch(78% 0.14 80);
-	--warn-soft: oklch(78% 0.14 80 / 0.14);
-	--destructive: oklch(66% 0.19 25);
-	--destructive-soft: oklch(66% 0.19 25 / 0.14);
-
-	--code-keyword: oklch(74% 0.14 300);
-	--code-string: oklch(76% 0.13 150);
-	--code-number: oklch(78% 0.14 60);
-	--code-function: oklch(76% 0.12 230);
-	--code-comment: oklch(58% 0.01 60);
-
-	--shadow-1: 0 1px 2px oklch(0% 0 0 / 0.3);
-	--shadow-2: 0 4px 14px oklch(0% 0 0 / 0.35);
-	--shadow-3: 0 16px 44px oklch(0% 0 0 / 0.5);
-	--glow: 0 0 0 3px var(--primary-soft);
-}
-
-/* ────────────────────────────────────────────────────── تم روشن کرم */
+/* ───────────────────────────────────────────── تم روشن (پیش‌فرض Claude) */
 
 html[data-theme='light'] {
-	--background: oklch(97.5% 0.008 75);
-	--foreground: oklch(22% 0.012 60);
+	--background: #faf9f5;
+	--foreground: #141413;
 
-	--card: oklch(100% 0 0);
-	--card-foreground: oklch(22% 0.012 60);
+	--card: #ffffff;
+	--card-foreground: #141413;
 
-	--popover: oklch(100% 0 0);
-	--popover-foreground: oklch(22% 0.012 60);
+	--popover: #ffffff;
+	--popover-foreground: #141413;
 
-	--sidebar: oklch(95% 0.011 75);
-	--sidebar-foreground: oklch(25% 0.012 60);
+	--sidebar: #f5f4ee;
+	--sidebar-foreground: #141413;
 
-	--muted: oklch(94.5% 0.009 75);
-	--muted-foreground: oklch(50% 0.015 60);
+	--muted: #f0eee5;
+	--muted-foreground: #83827d;
 
-	--accent: oklch(93% 0.012 70);
-	--accent-foreground: oklch(22% 0.012 60);
+	--accent: #ebe9df;
+	--accent-foreground: #141413;
 
-	--border: oklch(89% 0.012 75);
-	--border-soft: oklch(93% 0.01 75);
-	--input: oklch(91% 0.012 75);
-	--ring: oklch(58% 0.15 42);
+	--border: #e8e6dc;
+	--border-soft: #f0eee7;
+	--input: #e8e6dc;
+	--ring: #d97757;
 
-	--primary: oklch(57% 0.16 40);
-	--primary-hover: oklch(53% 0.17 40);
-	--primary-foreground: oklch(99% 0 0);
-	--primary-soft: oklch(57% 0.16 40 / 0.1);
-	--primary-line: oklch(57% 0.16 40 / 0.3);
+	/* دکمهٔ اصلی: مشکی. همان چیزی که در «New chat» و «New project» می‌بینی. */
+	--primary: #141413;
+	--primary-hover: #2b2a27;
+	--primary-foreground: #faf9f5;
+	--primary-soft: rgba(20, 20, 19, 0.06);
+	--primary-line: rgba(20, 20, 19, 0.16);
 
-	--second: oklch(52% 0.1 190);
-	--second-soft: oklch(52% 0.1 190 / 0.1);
+	/* نشان — تنها رنگ گرم صفحه. */
+	--brand: #d97757;
+	--brand-soft: rgba(217, 119, 87, 0.12);
 
-	--ok: oklch(52% 0.14 150);
-	--ok-soft: oklch(52% 0.14 150 / 0.12);
-	--warn: oklch(62% 0.14 75);
-	--warn-soft: oklch(62% 0.14 75 / 0.14);
-	--destructive: oklch(55% 0.2 25);
-	--destructive-soft: oklch(55% 0.2 25 / 0.1);
+	--second: #6a9bcc;
+	--second-soft: rgba(106, 155, 204, 0.14);
 
-	--code-keyword: oklch(45% 0.16 300);
-	--code-string: oklch(45% 0.13 150);
-	--code-number: oklch(52% 0.15 50);
-	--code-function: oklch(48% 0.14 240);
-	--code-comment: oklch(60% 0.01 60);
+	--ok: #788c5d;
+	--ok-soft: rgba(120, 140, 93, 0.14);
+	--warn: #c1873c;
+	--warn-soft: rgba(193, 135, 60, 0.14);
+	--destructive: #bc4c3b;
+	--destructive-soft: rgba(188, 76, 59, 0.1);
 
-	--shadow-1: 0 1px 2px oklch(30% 0.02 60 / 0.06);
-	--shadow-2: 0 4px 16px oklch(30% 0.02 60 / 0.09);
-	--shadow-3: 0 18px 48px oklch(30% 0.02 60 / 0.16);
-	--glow: 0 0 0 3px var(--primary-soft);
+	--code-keyword: #8250df;
+	--code-string: #0a7c46;
+	--code-number: #b35309;
+	--code-function: #2d68c4;
+	--code-comment: #8b8a83;
+
+	--shadow-1: 0 1px 2px rgba(20, 20, 19, 0.05);
+	--shadow-2: 0 2px 10px rgba(20, 20, 19, 0.07);
+	--shadow-3: 0 16px 44px rgba(20, 20, 19, 0.12);
+	--glow: 0 0 0 3px rgba(217, 119, 87, 0.22);
+}
+
+/* ─────────────────────────────────────────────────── تم تیرهٔ همان پالت */
+
+html[data-theme='dark'] {
+	--background: #262624;
+	--foreground: #faf9f5;
+
+	--card: #30302e;
+	--card-foreground: #faf9f5;
+
+	--popover: #333331;
+	--popover-foreground: #faf9f5;
+
+	--sidebar: #1f1e1d;
+	--sidebar-foreground: #f5f4ee;
+
+	--muted: #35352f;
+	--muted-foreground: #b0aea5;
+
+	--accent: #3a3a35;
+	--accent-foreground: #faf9f5;
+
+	--border: #3e3e39;
+	--border-soft: #333330;
+	--input: #3e3e39;
+	--ring: #d97757;
+
+	--primary: #faf9f5;
+	--primary-hover: #ffffff;
+	--primary-foreground: #141413;
+	--primary-soft: rgba(250, 249, 245, 0.08);
+	--primary-line: rgba(250, 249, 245, 0.2);
+
+	--brand: #d97757;
+	--brand-soft: rgba(217, 119, 87, 0.16);
+
+	--second: #6a9bcc;
+	--second-soft: rgba(106, 155, 204, 0.16);
+
+	--ok: #9bb07c;
+	--ok-soft: rgba(155, 176, 124, 0.16);
+	--warn: #d9a35a;
+	--warn-soft: rgba(217, 163, 90, 0.16);
+	--destructive: #e0705c;
+	--destructive-soft: rgba(224, 112, 92, 0.14);
+
+	--code-keyword: #c9a0ff;
+	--code-string: #8fd9a8;
+	--code-number: #f0b072;
+	--code-function: #8fbcf0;
+	--code-comment: #8b8a83;
+
+	--shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+	--shadow-2: 0 4px 14px rgba(0, 0, 0, 0.35);
+	--shadow-3: 0 16px 44px rgba(0, 0, 0, 0.5);
+	--glow: 0 0 0 3px rgba(217, 119, 87, 0.3);
+}
+
+/*
+ * صفت hidden باید همیشه برنده باشد.
+ *
+ * این یک خط، شش باگ را با هم می‌بندد. استایلِ نویسنده بر `[hidden]` مرورگر مقدم است،
+ * پس هر کلاسی که `display` بگذارد (`.view`، `.git-bar`، `.round-btn`، `.queue`،
+ * `.attachments`، `.stale-bar`) صفت hidden را بی‌اثر می‌کرد. نتیجه‌اش این بود که با
+ * بازکردن تنظیمات، نمای گفتگو هم روی صفحه می‌ماند و همه‌چیز روی هم می‌افتاد — دقیقاً
+ * همان «هیچی سر جاش نبود».
+ */
+[hidden] {
+	display: none !important;
 }
 
 * {
@@ -200,51 +228,27 @@ textarea {
 
 /* ══════════════════════════════════════════════════════ چیدمان کلی */
 
+/*
+ * دو ستون، نه بیشتر.
+ *
+ * Claude فقط یک نوار کناری دارد و یک ناحیهٔ محتوا. ستون میانیِ «فهرست گفتگو» که قبلاً
+ * داشتیم، در Claude اصلاً وجود ندارد — گفتگوهای اخیر داخل همان نوار کناری‌اند، زیر
+ * عنوان Recents. ریل سمت دیگر هم وجود ندارد.
+ */
 .app {
 	display: grid;
-	grid-template-columns: var(--sidebar-w) var(--list-w) minmax(0, 1fr) 0;
+	grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
 	height: 100dvh;
 	overflow: hidden;
 	transition: grid-template-columns 0.22s var(--ease);
 }
-body.rail-open .app {
-	grid-template-columns: var(--sidebar-w) var(--list-w) minmax(0, 1fr) var(--rail-w);
-}
 body.sidebar-collapsed .app {
-	grid-template-columns: 0 0 minmax(0, 1fr) 0;
-}
-body.sidebar-collapsed.rail-open .app {
-	grid-template-columns: 0 0 minmax(0, 1fr) var(--rail-w);
+	grid-template-columns: 0 minmax(0, 1fr);
 }
 
 /* ══════════════════════════════════════════════════════ نوار کناری */
 
-.sidebar {
-	background: var(--sidebar);
-	color: var(--sidebar-foreground);
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
-	min-height: 0;
-	overflow: hidden;
-	padding: 10px 8px;
-	gap: 3px;
-}
 
-.side-top {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	padding: 4px 8px 12px;
-}
-.wordmark {
-	font-family: var(--serif);
-	font-size: 1.45rem;
-	display: flex;
-	align-items: center;
-	gap: 9px;
-	letter-spacing: 0.2px;
-}
 .wordmark .mark {
 	display: inline-flex;
 	filter: drop-shadow(0 2px 6px var(--primary-soft));
@@ -282,40 +286,8 @@ body.sidebar-collapsed.rail-open .app {
 	color: var(--foreground);
 }
 
-.new-chat {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	background: linear-gradient(135deg, var(--primary-soft), transparent 70%);
-	border: 1px solid var(--primary-line);
-	color: var(--primary);
-	padding: 10px 12px;
-	border-radius: var(--radius);
-	cursor: pointer;
-	font-weight: 500;
-	text-align: start;
-	transition: 0.18s var(--ease);
-}
-.new-chat:hover {
-	background: linear-gradient(135deg, var(--primary-soft), var(--primary-soft));
-	transform: translateY(-1px);
-	box-shadow: var(--shadow-2);
-}
 .new-chat:active {
 	transform: translateY(0);
-}
-.nc-plus {
-	width: 22px;
-	height: 22px;
-	border-radius: 50%;
-	background: var(--primary);
-	color: var(--primary-foreground);
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 15px;
-	line-height: 1;
-	box-shadow: 0 2px 8px var(--primary-soft);
 }
 
 .side-nav {
@@ -325,45 +297,14 @@ body.sidebar-collapsed.rail-open .app {
 	margin-top: 8px;
 }
 
-.nav-item {
-	display: flex;
-	align-items: center;
-	gap: 11px;
-	width: 100%;
-	background: transparent;
-	border: 0;
-	color: var(--muted-foreground);
-	padding: 8px 10px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	text-align: start;
-	font-size: 0.93rem;
-	transition: 0.15s var(--ease);
-	min-width: 0;
-	position: relative;
-}
-.nav-item svg {
-	flex: none;
-	opacity: 0.9;
-	transition: 0.15s var(--ease);
-}
 .nav-item span {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.nav-item:hover {
-	background: var(--accent);
-	color: var(--foreground);
-}
 .nav-item:hover svg {
 	transform: scale(1.08);
 	color: var(--primary);
-}
-.nav-item.active {
-	background: var(--accent);
-	color: var(--foreground);
-	font-weight: 500;
 }
 .nav-item.active::before {
 	content: '';
@@ -376,23 +317,12 @@ body.sidebar-collapsed.rail-open .app {
 	border-radius: 3px;
 	background: var(--primary);
 }
-.nav-item.active svg {
-	color: var(--primary);
-}
 
 .side-recents {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
 	margin-top: 14px;
-}
-.side-label {
-	color: var(--muted-foreground);
-	font-size: 0.71rem;
-	font-weight: 600;
-	letter-spacing: 0.06em;
-	padding: 6px 10px;
-	text-transform: uppercase;
 }
 .session-list {
 	display: flex;
@@ -409,69 +339,10 @@ body.sidebar-collapsed.rail-open .app {
 	font-weight: 600;
 }
 
-.side-bottom {
-	border-top: 1px solid var(--border-soft);
-	padding-top: 8px;
-	margin-top: 4px;
-}
 .account-row {
 	display: flex;
 	align-items: center;
 	gap: 4px;
-}
-.account-main {
-	flex: 1;
-	min-width: 0;
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	background: transparent;
-	border: 0;
-	color: var(--muted-foreground);
-	padding: 8px 10px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	text-align: start;
-	transition: 0.15s var(--ease);
-}
-.account-main:hover {
-	background: var(--accent);
-	color: var(--foreground);
-}
-.acc-lines {
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
-	line-height: 1.35;
-}
-.acc-lines b {
-	font-weight: 500;
-	font-size: 0.88rem;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	color: var(--foreground);
-}
-.acc-text {
-	font-size: 0.74rem;
-	color: var(--muted-foreground);
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.avatar-dot {
-	width: 26px;
-	height: 26px;
-	border-radius: 50%;
-	background: linear-gradient(135deg, var(--primary), oklch(from var(--primary) calc(l - 0.1) c h));
-	color: var(--primary-foreground);
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 0.76rem;
-	font-weight: 600;
-	flex: none;
-	box-shadow: 0 2px 8px var(--primary-soft);
 }
 
 /* ══════════════════════════════════════════════ ستون فهرست نشست‌ها */
@@ -622,34 +493,38 @@ body.sidebar-collapsed.rail-open .app {
 	/* بدون این، ناحیهٔ گفتگو به‌جای اسکرول‌خوردن بزرگ می‌شود و کامپوزر از صفحه بیرون می‌زند. */
 	min-height: 0;
 	overflow: hidden;
-	padding: 8px 8px 8px 0;
+	background: var(--background);
 }
 
+/*
+ * در Claude ناحیهٔ محتوا **کارت نیست**: نه قاب دارد، نه سایه، نه گوشهٔ گرد. مستقیم روی
+ * پس‌زمینهٔ کرم می‌نشیند و تنها مرزش، اختلاف رنگ ملایم با نوار کناری است.
+ */
 .main-card {
 	flex: 1;
 	min-height: 0;
 	display: flex;
 	flex-direction: column;
-	background: var(--card);
-	border: 1px solid var(--border-soft);
-	border-radius: var(--radius-lg);
-	box-shadow: var(--shadow-2);
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
 	overflow: hidden;
 	position: relative;
 }
 
 .topbar {
-	height: 56px;
+	height: 52px;
 	flex: none;
 	display: flex;
 	align-items: center;
 	gap: 6px;
-	padding: 0 14px;
+	padding: 0 16px;
 	border-bottom: 1px solid transparent;
 	transition: border-color 0.2s;
 }
 .main-card.scrolled .topbar {
-	border-bottom-color: var(--border-soft);
+	border-bottom-color: var(--border);
 }
 .chat-title {
 	flex: 1;
@@ -727,9 +602,27 @@ body.sidebar-collapsed.rail-open .app {
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	min-height: 46vh;
+	min-height: 0;
 	gap: 22px;
+	padding-bottom: 8px;
 	animation: rise 0.5s var(--ease);
+}
+
+/*
+ * وقتی گفتگو خالی است، تیتر خوش‌آمد و کامپوزر **با هم** در مرکز عمودی می‌نشینند و
+ * کامپوزر به کف نمی‌چسبد. این دقیقاً کاری است که Claude در صفحهٔ گفتگوی تازه می‌کند و
+ * یکی از واضح‌ترین تفاوت‌هایی بود که کارفرما دید.
+ */
+.view-chat.empty {
+	justify-content: center;
+}
+.view-chat.empty .thread {
+	flex: 0 0 auto;
+	overflow: visible;
+	padding-bottom: 0;
+}
+.view-chat.empty .disclaimer {
+	opacity: 0;
 }
 @keyframes rise {
 	from {
@@ -740,9 +633,12 @@ body.sidebar-collapsed.rail-open .app {
 .greet {
 	display: flex;
 	align-items: center;
-	gap: 16px;
+	gap: 14px;
 	font-family: var(--serif);
-	font-size: 2.1rem;
+	font-size: 2.35rem;
+	font-weight: 400;
+	line-height: 1.35;
+	letter-spacing: -0.01em;
 	text-align: center;
 }
 .greet-mark {
@@ -1427,78 +1323,12 @@ code .f {
 	position: relative;
 }
 
-.composer {
-	background: var(--muted);
-	border: 1px solid var(--border);
-	border-radius: var(--radius-xl);
-	padding: 14px 16px 10px;
-	transition: 0.2s var(--ease);
-	box-shadow: var(--shadow-1);
-}
-.composer:focus-within {
-	border-color: var(--primary-line);
-	box-shadow: var(--glow), var(--shadow-2);
-}
 .composer.dropping {
 	border-color: var(--primary);
 	background: var(--primary-soft);
 }
-.composer textarea {
-	width: 100%;
-	background: transparent;
-	border: 0;
-	outline: none;
-	resize: none;
-	max-height: 38vh;
-	line-height: 1.65;
-	font-size: 1rem;
-}
-.composer textarea::placeholder {
-	color: var(--muted-foreground);
-}
 
-.composer-bar {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	margin-top: 8px;
-}
 
-.round-btn {
-	width: 32px;
-	height: 32px;
-	border-radius: var(--radius-sm);
-	border: 0;
-	background: transparent;
-	color: var(--muted-foreground);
-	cursor: pointer;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	font-size: 18px;
-	transition: 0.15s var(--ease);
-	flex: none;
-}
-.round-btn:hover {
-	background: var(--accent);
-	color: var(--foreground);
-}
-.round-btn.send {
-	background: var(--primary);
-	color: var(--primary-foreground);
-	border-radius: 50%;
-	box-shadow: 0 2px 10px var(--primary-soft);
-}
-.round-btn.send:hover {
-	background: var(--primary-hover);
-	transform: translateY(-1px) scale(1.04);
-}
-.round-btn.stop {
-	background: var(--foreground);
-	color: var(--background);
-	border-radius: 50%;
-	font-size: 12px;
-}
 .round-btn.recording {
 	color: var(--destructive);
 	background: var(--destructive-soft);
@@ -1511,28 +1341,7 @@ code .f {
 }
 
 .model-chip,
-.mode-chip {
-	display: inline-flex;
-	align-items: center;
-	gap: 5px;
-	background: transparent;
-	border: 1px solid transparent;
-	color: var(--muted-foreground);
-	padding: 5px 9px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	font-size: 0.85rem;
-	white-space: nowrap;
-	max-width: 22ch;
-	overflow: hidden;
-	transition: 0.15s var(--ease);
-}
 .model-chip:hover,
-.mode-chip:hover {
-	background: var(--accent);
-	border-color: var(--border);
-	color: var(--foreground);
-}
 .model-chip #model-name {
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -1640,13 +1449,6 @@ code .f {
 	border-color: var(--muted-foreground);
 }
 
-.disclaimer {
-	text-align: center;
-	color: var(--muted-foreground);
-	font-size: 0.71rem;
-	margin: 10px 0 0;
-	opacity: 0.7;
-}
 
 .attachments {
 	display: flex;
@@ -1762,17 +1564,6 @@ code .f {
 .pop-menu.cmd {
 	inset-inline: 26px;
 }
-.menu-item {
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	padding: 8px 10px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	font-size: 0.92rem;
-	color: var(--muted-foreground);
-	transition: 0.12s;
-}
 .menu-item:hover,
 .menu-item.active {
 	background: var(--accent);
@@ -1801,11 +1592,6 @@ code .f {
 }
 .menu-item .m-check {
 	color: var(--primary);
-}
-.menu-sep {
-	height: 1px;
-	background: var(--border-soft);
-	margin: 5px 4px;
 }
 .menu-label {
 	color: var(--muted-foreground);
@@ -2112,33 +1898,10 @@ code .f {
 
 /* ══════════════════════════════════════════════ اجزای مشترک فرم */
 
-.pill {
-	background: transparent;
-	border: 1px solid var(--border);
-	color: var(--muted-foreground);
-	border-radius: 20px;
-	padding: 6px 14px;
-	cursor: pointer;
-	font-size: 0.85rem;
-	white-space: nowrap;
-	transition: 0.16s var(--ease);
-}
 .pill:hover {
 	border-color: var(--muted-foreground);
 	color: var(--foreground);
 	transform: translateY(-1px);
-}
-.pill.primary {
-	background: var(--primary);
-	border-color: var(--primary);
-	color: var(--primary-foreground);
-	box-shadow: 0 2px 8px var(--primary-soft);
-}
-.pill.primary:hover {
-	background: var(--primary-hover);
-}
-.pill.ghost {
-	border-color: transparent;
 }
 .pill.danger,
 .pill.ghost.danger {
@@ -2158,30 +1921,6 @@ code .f {
 	transform: none;
 }
 
-.card-list {
-	display: flex;
-	flex-direction: column;
-	gap: 9px;
-	margin-bottom: 14px;
-}
-.item {
-	display: flex;
-	align-items: center;
-	gap: 11px;
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	padding: 13px 15px;
-	background: var(--card);
-	transition: 0.16s var(--ease);
-}
-.item:hover {
-	border-color: var(--muted-foreground);
-	box-shadow: var(--shadow-1);
-}
-.item.active {
-	border-color: var(--primary-line);
-	background: linear-gradient(135deg, var(--primary-soft), transparent 70%);
-}
 .item-main {
 	flex: 1;
 	min-width: 0;
@@ -2231,25 +1970,6 @@ code .f {
 	background: var(--primary-soft);
 }
 
-.form-card {
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	padding: 18px;
-	background: var(--card);
-	margin: 14px 0;
-	box-shadow: var(--shadow-1);
-}
-.form-card h4 {
-	margin: 0 0 13px;
-	font-size: 0.98rem;
-	font-weight: 600;
-}
-.field-label {
-	display: block;
-	margin-bottom: 14px;
-	font-size: 0.87rem;
-	color: var(--muted-foreground);
-}
 .field-label > span {
 	display: block;
 	margin-bottom: 5px;
@@ -2330,15 +2050,6 @@ code .f {
 	border-color: var(--primary-line);
 	color: var(--primary);
 }
-.check {
-	display: inline-flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 0.9rem;
-	color: var(--muted-foreground);
-	margin-bottom: 10px;
-	cursor: pointer;
-}
 .note {
 	color: var(--muted-foreground);
 	font-size: 0.85rem;
@@ -2384,11 +2095,6 @@ code .f {
 }
 .sec-head {
 	margin-bottom: 16px;
-}
-.sec-head h3 {
-	margin: 0 0 4px;
-	font-size: 1.02rem;
-	font-weight: 600;
 }
 .stat-row {
 	display: grid;
@@ -2827,4 +2533,1046 @@ kbd {
 /* نوار که باشد، برنامه باید کوتاه‌تر شود وگرنه ته گفتگو زیر لبهٔ صفحه می‌رود. */
 .stale-bar:not([hidden]) ~ .app {
 	height: calc(100dvh - 40px);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   کپی برابر اصل — لایهٔ آخر
+   ══════════════════════════════════════════════════════════════════════
+
+   هرچه اینجاست، از روی تصاویر رابط Claude درآمده و عمداً آخرِ فایل است تا بر
+   قاعده‌های قدیمی بچربد. ترتیبِ بخش‌ها همان ترتیبی است که چشم روی صفحه می‌رود:
+   نوار کناری، سربرگ صفحه، فهرست، شبکه، حالت خالی، کامپوزر، و تنظیمات. */
+
+/* ───────────────────────────────────────────────── نوار کناری */
+
+.sidebar {
+	background: var(--sidebar);
+	color: var(--sidebar-foreground);
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	padding: 12px 10px 10px;
+	gap: 2px;
+	border-inline-end: 1px solid var(--border);
+}
+
+.side-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 2px 6px 14px;
+}
+
+/* در Claude، «Claude» یک واژه‌نشانِ ساده است: بدون آیکون، بدون شمارهٔ نسخه. */
+.wordmark {
+	display: flex;
+	align-items: center;
+	font-family: var(--serif);
+	font-size: 1.3rem;
+	font-weight: 400;
+	gap: 8px;
+	letter-spacing: 0.2px;
+	color: var(--foreground);
+}
+.wordmark .ver {
+	font-family: var(--sans);
+	font-size: 0.62rem;
+	color: var(--muted-foreground);
+	opacity: 0.75;
+	letter-spacing: 0;
+}
+.side-top-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+}
+
+/*
+ * «گفتگوی تازه» یک ردیف ساده است، نه دکمهٔ پررنگ.
+ *
+ * در نسخهٔ قبل این را یک دکمهٔ نارنجیِ توپر کرده بودم و همان اولین چیزی بود که در تصویر
+ * توی چشم می‌زد. در Claude همان اندازه و همان وزنِ بقیهٔ ردیف‌های ناوبری است.
+ */
+.new-chat {
+	display: flex;
+	align-items: center;
+	background: transparent;
+	border: 0;
+	color: var(--foreground);
+	padding: 8px 10px;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	font-weight: 500;
+	font-size: 0.95rem;
+	gap: 11px;
+	text-align: start;
+	box-shadow: none;
+	transition: background 0.15s var(--ease);
+}
+.new-chat:hover {
+	background: var(--accent);
+	transform: none;
+	box-shadow: none;
+}
+.nc-plus {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 18px;
+	height: 18px;
+	text-align: center;
+	font-size: 1.15rem;
+	line-height: 1;
+	color: var(--foreground);
+}
+
+.nav-item {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	width: 100%;
+	min-width: 0;
+	position: relative;
+	background: transparent;
+	border: 0;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	text-align: start;
+	transition: background 0.15s var(--ease);
+	color: var(--foreground);
+	font-size: 0.93rem;
+	padding: 7px 10px;
+	font-weight: 400;
+}
+.nav-item:hover {
+	background: var(--accent);
+}
+.nav-item.active {
+	background: var(--accent);
+	font-weight: 500;
+}
+.nav-item svg {
+	color: var(--muted-foreground);
+	flex: none;
+}
+.nav-item.active svg {
+	color: var(--foreground);
+}
+.nav-badge {
+	margin-inline-start: auto;
+	font-size: 0.68rem;
+	font-weight: 600;
+	color: var(--muted-foreground);
+	background: var(--muted);
+	border-radius: 20px;
+	padding: 1px 7px;
+}
+
+.side-label {
+	color: var(--muted-foreground);
+	text-transform: none;
+	letter-spacing: 0;
+	font-size: 0.78rem;
+	font-weight: 400;
+	padding: 14px 10px 4px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+.side-label .grow {
+	flex: 1;
+}
+
+/* گفتگوهای اخیر: فقط متن. نه کارت، نه قاب، نه زیرنویس. */
+.side-scroll {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	overflow-x: hidden;
+	margin-inline: -2px;
+	padding-inline: 2px;
+}
+.recent-item {
+	display: flex;
+	align-items: center;
+	width: 100%;
+	background: transparent;
+	border: 0;
+	color: var(--foreground);
+	padding: 6px 10px;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	text-align: start;
+	font-size: 0.88rem;
+	transition: background 0.14s var(--ease);
+	position: relative;
+}
+.recent-item:hover {
+	background: var(--accent);
+}
+.recent-item.active {
+	background: var(--accent);
+	font-weight: 500;
+}
+.recent-item .rt {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.recent-item .row-menu {
+	opacity: 0;
+}
+.recent-item:hover .row-menu,
+.recent-item:focus-within .row-menu {
+	opacity: 1;
+}
+
+/* ردیف حساب، ته نوار کناری */
+.side-bottom {
+	margin-top: auto;
+	padding-top: 6px;
+	border-top: 1px solid var(--border);
+}
+.account-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	background: transparent;
+	border: 0;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	text-align: start;
+	transition: background 0.15s var(--ease);
+	color: var(--foreground);
+	padding: 7px 8px;
+}
+.account-main:hover {
+	background: var(--accent);
+}
+.avatar-dot {
+	box-shadow: var(--shadow-1);
+	width: 26px;
+	height: 26px;
+	border-radius: 50%;
+	background: var(--brand-soft);
+	color: var(--brand);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 0.78rem;
+	font-weight: 600;
+	flex: none;
+}
+.acc-lines {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	line-height: 1.3;
+}
+.acc-lines b {
+	font-size: 0.87rem;
+	font-weight: 500;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.acc-text {
+	font-size: 0.75rem;
+	color: var(--muted-foreground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* منوی حساب — همان چیزی که در Claude از روی همین ردیف بالا می‌آید. */
+.account-menu {
+	position: absolute;
+	inset-inline-start: 10px;
+	bottom: 62px;
+	width: 258px;
+	background: var(--popover);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	box-shadow: var(--shadow-3);
+	padding: 6px;
+	z-index: 60;
+	animation: rise 0.14s var(--ease);
+}
+.account-menu .menu-mail {
+	font-size: 0.76rem;
+	color: var(--muted-foreground);
+	padding: 8px 10px 10px;
+	direction: ltr;
+	text-align: start;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.menu-item {
+	display: flex;
+	align-items: center;
+	transition: background 0.14s var(--ease);
+	gap: 10px;
+	width: 100%;
+	background: transparent;
+	border: 0;
+	color: var(--foreground);
+	padding: 8px 10px;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	text-align: start;
+	font-size: 0.89rem;
+}
+.menu-item:hover {
+	background: var(--accent);
+}
+.menu-item .mi-ico {
+	width: 17px;
+	text-align: center;
+	color: var(--muted-foreground);
+	flex: none;
+}
+.menu-item .mi-end {
+	margin-inline-start: auto;
+	color: var(--muted-foreground);
+	font-size: 0.75rem;
+}
+.menu-sep {
+	height: 1px;
+	background: var(--border);
+	margin: 5px 4px;
+}
+
+/* ───────────────────────────────────────────────── نوار بالای محتوا */
+
+.topbar .plan-chip {
+	margin-inline: auto;
+	font-size: 0.8rem;
+	color: var(--muted-foreground);
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	background: transparent;
+	border: 0;
+	cursor: default;
+	max-width: 60%;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+}
+.topbar .plan-chip .sep {
+	opacity: 0.5;
+}
+
+/* ───────────────────────────────────────────────── سربرگ صفحه‌ها */
+
+.page {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+}
+.page-inner {
+	max-width: 54rem;
+	margin-inline: auto;
+	padding: 26px 26px 60px;
+}
+.page-head {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-bottom: 26px;
+}
+.page-title {
+	font-family: var(--serif);
+	font-size: 2rem;
+	font-weight: 400;
+	letter-spacing: -0.01em;
+	margin: 0;
+	flex: 1;
+	min-width: 0;
+}
+.page-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: none;
+}
+
+/* ───────────────────────────────────────────────── فهرست‌ها */
+
+/*
+ * ردیف‌های Claude قاب ندارند: فقط یک خط جداکنندهٔ نازک، عنوان در ابتدا و اطلاعات
+ * فرعی در انتها. نسخهٔ قبلی ما همه‌چیز را کارت کرده بود و همان، صفحه را شلوغ می‌کرد.
+ */
+.row-list {
+	display: flex;
+	flex-direction: column;
+}
+.row-item {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 12px;
+	border-bottom: 1px solid var(--border);
+	cursor: pointer;
+	border-radius: var(--radius-sm);
+	transition: background 0.14s var(--ease);
+}
+.row-item:first-child {
+	border-top: 1px solid var(--border);
+}
+.row-item:hover {
+	background: var(--muted);
+}
+.row-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+.row-title {
+	font-size: 0.96rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.row-sub {
+	font-size: 0.79rem;
+	color: var(--muted-foreground);
+}
+.row-meta {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	font-size: 0.82rem;
+	color: var(--muted-foreground);
+	flex: none;
+}
+.row-menu {
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	border: 0;
+	background: transparent;
+	color: var(--muted-foreground);
+	cursor: pointer;
+	opacity: 0;
+	transition: 0.14s var(--ease);
+	flex: none;
+}
+.row-item:hover .row-menu {
+	opacity: 1;
+}
+.row-menu:hover {
+	background: var(--accent);
+	color: var(--foreground);
+}
+
+/* ───────────────────────────────────────────────── شبکهٔ کارت (پروژه‌ها) */
+
+.card-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 14px;
+}
+@media (max-width: 860px) {
+	.card-grid {
+		grid-template-columns: 1fr;
+	}
+}
+.grid-card {
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 18px 20px;
+	cursor: pointer;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-height: 104px;
+	transition: 0.16s var(--ease);
+}
+.grid-card:hover {
+	border-color: var(--muted-foreground);
+}
+.grid-card b {
+	font-size: 1rem;
+	font-weight: 500;
+}
+.grid-card p {
+	margin: 0;
+	font-size: 0.86rem;
+	color: var(--muted-foreground);
+}
+.grid-card .gc-date {
+	margin-top: auto;
+	font-size: 0.78rem;
+	color: var(--muted-foreground);
+}
+
+/* ───────────────────────────────────────────────── حالت خالی */
+
+.empty-state {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 14px;
+	padding: 70px 20px;
+	text-align: center;
+}
+.empty-state svg {
+	color: var(--muted-foreground);
+	opacity: 0.6;
+}
+.empty-state h2 {
+	font-size: 1.02rem;
+	font-weight: 500;
+	margin: 6px 0 0;
+}
+.empty-state p {
+	margin: 0;
+	max-width: 30rem;
+	color: var(--muted-foreground);
+	font-size: 0.89rem;
+	line-height: 1.75;
+}
+
+/* ───────────────────────────────────────────────── دکمه‌ها */
+
+/* دکمهٔ اصلی در Claude مشکیِ توپر است، بدون سایهٔ رنگی. */
+.pill.primary {
+	box-shadow: none;
+	font-weight: 500;
+}
+.pill.primary:hover {
+	background: var(--primary-hover);
+	border-color: var(--primary-hover);
+}
+.pill {
+	background: transparent;
+	border: 1px solid var(--border);
+	border-radius: 20px;
+	cursor: pointer;
+	white-space: nowrap;
+	transition: 0.16s var(--ease);
+	color: var(--foreground);
+	padding: 7px 15px;
+	font-size: 0.86rem;
+}
+.pill.ghost {
+	border-color: transparent;
+}
+.icon-btn {
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	border: 1px solid var(--border);
+	background: transparent;
+	color: var(--foreground);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	transition: 0.15s var(--ease);
+}
+.icon-btn:hover {
+	background: var(--accent);
+}
+
+/* ───────────────────────────────────────────────── کامپوزر */
+
+.composer {
+	padding: 0;
+	transition: border-color 0.16s var(--ease), box-shadow 0.16s var(--ease);
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 20px;
+	box-shadow: var(--shadow-1);
+}
+.composer:focus-within {
+	border-color: var(--muted-foreground);
+	box-shadow: var(--shadow-2);
+}
+.composer textarea {
+	width: 100%;
+	background: transparent;
+	border: 0;
+	outline: none;
+	resize: none;
+	line-height: 1.7;
+	max-height: 40vh;
+	font-size: 1rem;
+	padding: 14px 18px 4px;
+}
+.composer textarea::placeholder {
+	color: var(--muted-foreground);
+}
+.composer-bar {
+	display: flex;
+	align-items: center;
+	margin-top: 0;
+	padding: 6px 10px 10px;
+	gap: 4px;
+}
+.round-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	cursor: pointer;
+	font-size: 1rem;
+	transition: 0.15s var(--ease);
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	border: 1px solid var(--border);
+	background: transparent;
+	color: var(--foreground);
+}
+.round-btn:hover {
+	background: var(--accent);
+}
+.round-btn.send {
+	background: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-foreground);
+}
+.round-btn.send:hover {
+	background: var(--primary-hover);
+}
+.round-btn.stop {
+	background: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-foreground);
+}
+/* میکروفون و موج صدا در Claude قاب ندارند. */
+#btn-mic,
+#btn-voice {
+	border-color: transparent;
+	color: var(--muted-foreground);
+}
+#btn-mic:hover,
+#btn-voice:hover {
+	color: var(--foreground);
+}
+
+/* نام مدل: متنِ ساده، نه چیپِ قاب‌دار. */
+.model-chip {
+	background: transparent;
+	border: 0;
+	color: var(--foreground);
+	font-size: 0.86rem;
+	font-weight: 500;
+	padding: 6px 8px;
+	border-radius: var(--radius-sm);
+}
+.model-chip:hover {
+	background: var(--accent);
+}
+.mode-chip {
+	background: transparent;
+	border: 0;
+	color: var(--muted-foreground);
+	font-size: 0.84rem;
+	font-weight: 400;
+	padding: 6px 8px;
+	border-radius: var(--radius-sm);
+}
+.mode-chip:hover {
+	background: var(--accent);
+}
+
+.disclaimer {
+	opacity: 0.9;
+	transition: opacity 0.2s var(--ease);
+	font-size: 0.74rem;
+	color: var(--muted-foreground);
+	text-align: center;
+	margin: 8px 0 0;
+}
+
+/* ───────────────────────────────────────────────── تنظیمات: مودال */
+
+/*
+ * در Claude تنظیمات یک **مودال بزرگ** است، نه یک صفحه — و نه آن دیالوگ‌های ریزی که
+ * قبلاً داشتیم و کارفرما درست از آن‌ها شکایت کرد. ناوبری‌اش دو گروه دارد و بالای آن یک
+ * کادر جستجو.
+ */
+.set-modal {
+	width: min(960px, 94vw);
+	height: min(640px, 88vh);
+	padding: 0;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	background: var(--popover);
+	color: var(--popover-foreground);
+	box-shadow: var(--shadow-3);
+	overflow: hidden;
+}
+.set-modal::backdrop {
+	background: rgba(20, 20, 19, 0.35);
+	backdrop-filter: blur(2px);
+}
+.set-shell {
+	display: grid;
+	grid-template-columns: 196px minmax(0, 1fr);
+	height: 100%;
+	min-height: 0;
+}
+.set-nav {
+	background: var(--sidebar);
+	border-inline-end: 1px solid var(--border);
+	padding: 14px 10px;
+	overflow-y: auto;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+.set-search {
+	width: 100%;
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	padding: 7px 11px;
+	font-size: 0.85rem;
+	margin-bottom: 12px;
+}
+.set-group {
+	font-size: 0.72rem;
+	color: var(--muted-foreground);
+	padding: 12px 10px 4px;
+}
+.set-item {
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	width: 100%;
+	background: transparent;
+	border: 0;
+	color: var(--foreground);
+	padding: 7px 10px;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	text-align: start;
+	font-size: 0.87rem;
+	transition: background 0.14s var(--ease);
+}
+.set-item:hover {
+	background: var(--accent);
+}
+.set-item.active {
+	background: var(--accent);
+	font-weight: 500;
+}
+.set-item .si-ico {
+	width: 16px;
+	text-align: center;
+	color: var(--muted-foreground);
+	flex: none;
+}
+.set-main {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+}
+.set-head {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 16px 20px 12px;
+	flex: none;
+}
+.set-head h2 {
+	font-size: 1.05rem;
+	font-weight: 600;
+	margin: 0;
+	flex: 1;
+	min-width: 0;
+}
+.set-body {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding: 4px 20px 24px;
+}
+
+/* یک ردیف تنظیم: برچسب و توضیح در ابتدا، کنترل در انتها. */
+.set-row {
+	display: flex;
+	align-items: center;
+	gap: 20px;
+	padding: 14px 0;
+	border-bottom: 1px solid var(--border-soft);
+}
+.set-row:last-child {
+	border-bottom: 0;
+}
+.set-row-label {
+	flex: 1;
+	min-width: 0;
+}
+.set-row-label b {
+	font-weight: 400;
+	font-size: 0.94rem;
+	display: block;
+}
+.set-row-desc {
+	margin: 3px 0 0;
+	font-size: 0.82rem;
+	color: var(--muted-foreground);
+	line-height: 1.65;
+}
+.set-row-control {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.set-row-control .field {
+	width: 220px;
+	margin: 0;
+}
+.set-row.stack {
+	display: block;
+}
+.set-row.stack .set-row-control {
+	margin-top: 10px;
+}
+.set-row.stack .set-row-control .field {
+	width: 100%;
+}
+.set-section {
+	font-size: 1.02rem;
+	font-weight: 600;
+	margin: 22px 0 2px;
+}
+.set-section:first-child {
+	margin-top: 4px;
+}
+
+/* کلید سوییچ — Claude برای بولین‌ها چک‌باکس نشان نمی‌دهد. */
+.switch {
+	position: relative;
+	width: 40px;
+	height: 23px;
+	flex: none;
+	display: inline-block;
+}
+.switch input {
+	position: absolute;
+	opacity: 0;
+	width: 100%;
+	height: 100%;
+	margin: 0;
+	cursor: pointer;
+	z-index: 1;
+}
+.switch i {
+	position: absolute;
+	inset: 0;
+	background: var(--border);
+	border-radius: 20px;
+	transition: background 0.18s var(--ease);
+}
+.switch i::after {
+	content: '';
+	position: absolute;
+	top: 2.5px;
+	inset-inline-start: 2.5px;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: var(--shadow-1);
+	transition: transform 0.18s var(--ease);
+}
+.switch input:checked + i {
+	background: var(--primary);
+}
+.switch input:checked + i::after {
+	transform: translateX(-17px);
+}
+html[dir='ltr'] .switch input:checked + i::after {
+	transform: translateX(17px);
+}
+.switch input:focus-visible + i {
+	box-shadow: var(--glow);
+}
+
+/* جدول ساده — «Skill | Last updated | Author» */
+.set-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 0.87rem;
+}
+.set-table th {
+	text-align: start;
+	font-weight: 400;
+	color: var(--muted-foreground);
+	font-size: 0.8rem;
+	padding: 8px 10px;
+	border-bottom: 1px solid var(--border);
+}
+.set-table td {
+	padding: 12px 10px;
+	border-bottom: 1px solid var(--border-soft);
+}
+
+/* نشان هوشا داخل دایرهٔ حساب. */
+.avatar-dot svg {
+	display: block;
+}
+
+/* ───────────────────────── اجزای مشترک فرم‌ها، به سبک Claude
+   این چهار قاعده، بدون دست‌زدن به دو هزار خط جاوااسکریپتِ صفحه‌های تنظیمات، ظاهرشان را
+   با تصاویر یکی می‌کند: کارت‌ها تخت می‌شوند، برچسب‌ها کنار کنترل می‌نشینند، و چک‌باکس‌ها
+   سوییچ می‌شوند. */
+
+/* کارت‌ها تخت: در Claude هر گروه تنظیم فقط با یک خط از بعدی جدا می‌شود. */
+.form-card {
+	background: transparent;
+	border: 0;
+	border-bottom: 1px solid var(--border);
+	border-radius: 0;
+	box-shadow: none;
+	padding: 18px 0;
+	margin: 0;
+}
+.form-card:last-child {
+	border-bottom: 0;
+}
+.form-card h4 {
+	font-size: 0.98rem;
+	font-weight: 600;
+	margin: 0 0 12px;
+}
+
+/* برچسب کنار کنترل، نه بالای آن. */
+.field-label {
+	color: var(--muted-foreground);
+	font-size: 0.87rem;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) 240px;
+	align-items: center;
+	gap: 10px 20px;
+	margin-bottom: 0;
+	padding: 12px 0;
+	border-bottom: 1px solid var(--border-soft);
+}
+.field-label:last-child {
+	border-bottom: 0;
+}
+.field-label > span {
+	margin-bottom: 0;
+	color: var(--foreground);
+	font-size: 0.94rem;
+}
+.field-label > small {
+	grid-column: 1;
+	grid-row: 2;
+	margin-top: -6px;
+}
+.field-label > :not(span):not(small) {
+	grid-column: 2;
+	grid-row: 1 / span 2;
+	width: 100%;
+}
+.field-label textarea {
+	min-height: 90px;
+}
+@media (max-width: 720px) {
+	.field-label {
+		grid-template-columns: 1fr;
+	}
+	.field-label > :not(span):not(small) {
+		grid-column: 1;
+		grid-row: auto;
+	}
+}
+
+/* ردیف‌های فهرست: خط جداکننده، نه قاب. */
+.item {
+	display: flex;
+	align-items: center;
+	gap: 11px;
+	transition: background 0.14s var(--ease);
+	border: 0;
+	border-bottom: 1px solid var(--border);
+	border-radius: 0;
+	background: transparent;
+	padding: 13px 4px;
+}
+.item:hover {
+	background: var(--muted);
+	transform: none;
+}
+.item.active {
+	background: transparent;
+}
+.card-list {
+	display: flex;
+	flex-direction: column;
+	gap: 0;
+	margin-bottom: 14px;
+}
+
+/* چک‌باکس‌های موجود، بدون تغییر جاوااسکریپت، سوییچ می‌شوند. */
+.check input[type='checkbox'] {
+	appearance: none;
+	-webkit-appearance: none;
+	position: relative;
+	width: 38px;
+	height: 22px;
+	margin: 0;
+	border-radius: 20px;
+	background: var(--border);
+	cursor: pointer;
+	flex: none;
+	transition: background 0.18s var(--ease);
+}
+.check input[type='checkbox']::after {
+	content: '';
+	position: absolute;
+	top: 2.5px;
+	inset-inline-start: 2.5px;
+	width: 17px;
+	height: 17px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: var(--shadow-1);
+	transition: transform 0.18s var(--ease);
+}
+.check input[type='checkbox']:checked {
+	background: var(--primary);
+}
+.check input[type='checkbox']:checked::after {
+	transform: translateX(-16px);
+}
+.check input[type='checkbox']:focus-visible {
+	box-shadow: var(--glow);
+}
+.check {
+	display: inline-flex;
+	align-items: center;
+	cursor: pointer;
+	font-size: 0.9rem;
+	margin-bottom: 10px;
+	color: var(--foreground);
+	gap: 10px;
+}
+
+/* عنوان بخش‌ها داخل تنظیمات */
+.sec-head h3 {
+	font-size: 1.05rem;
+	font-weight: 600;
+	margin: 0 0 4px;
 }

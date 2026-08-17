@@ -1,16 +1,28 @@
-/** نوار کناری: ناوبری مستقیم + فهرست گفتگوهای اخیر. */
+/**
+ * نوار کناری — همان شکلی که در تصاویر Claude هست.
+ *
+ * ترتیب از بالا: واژه‌نشان، «گفتگوی تازه»، ناوبری، یک گروه امکانات، «اخیر» با فهرست
+ * گفتگوها، و ته نوار ردیف حساب که منویش از همان‌جا بالا می‌آید.
+ *
+ * دو چیز عمداً عوض شد نسبت به نسخهٔ قبل:
+ *   ۱) گفتگوهای اخیر از ستون میانی به همین‌جا آمدند — Claude ستون میانی ندارد.
+ *   ۲) ردیف‌های اخیر فقط **عنوان**اند؛ نه کارت، نه قاب، نه زیرنویس.
+ */
 
 import { $, h, timeAgo, toast, confirmDialog, promptDialog } from './lib/dom.js';
 import { api, post, getState } from './lib/api.js';
+import { logoSvg } from './lib/logo.js';
 
 let onResume = () => {};
 let onView = () => {};
+let onCommand = () => {};
 let sessions = [];
 
-/** @param {{onResume:(id:string)=>void, onView:(view:string)=>void}} opts */
+/** @param {{onResume:(id:string)=>void, onView:(view:string)=>void, onCommand:(name:string)=>void}} opts */
 export function initSidebar( opts ) {
 	onResume = opts.onResume;
 	onView = opts.onView;
+	onCommand = opts.onCommand || ( () => {} );
 
 	for ( const b of document.querySelectorAll( '.nav-item[data-view]' ) ) {
 		b.onclick = () => onView( b.dataset.view );
@@ -23,6 +35,19 @@ export function initSidebar( opts ) {
 	if ( localStorage.getItem( 'hoosha-sidebar' ) ) {
 		document.body.classList.add( 'sidebar-collapsed' );
 	}
+
+	$( '#btn-recents-more' ).onclick = () => onView( 'chats' );
+	$( '#btn-account' ).onclick = ( e ) => {
+		e.stopPropagation();
+		toggleAccountMenu();
+	};
+
+	document.addEventListener( 'click', ( e ) => {
+		const menu = $( '#account-menu' );
+		if ( ! menu.hidden && ! menu.contains( e.target ) ) {
+			menu.hidden = true;
+		}
+	} );
 }
 
 /** @param {string} view */
@@ -39,31 +64,24 @@ export async function refreshSessions() {
 	return sessions;
 }
 
-/**
- * گروه‌بندی مثل تصویر: نشست باز بالا، بعد امروز و این هفته و قدیمی‌تر.
- * @param {any} item
- * @param {any} state
- */
-function groupOf( item, state ) {
-	if ( state?.sessionId === item.id ) {
-		return state?.busy ? 'در حال اجرا' : 'باز';
-	}
+export function allSessions() {
+	return sessions;
+}
+
+/** گروه‌بندی زمانی، همان‌طور که Claude گفتگوها را دسته می‌کند. */
+export function groupOf( updatedAt, now = Date.now() ) {
 	const day = 86_400_000;
-	const diff = Date.now() - Number( item.updatedAt || 0 );
+	const diff = now - Number( updatedAt || 0 );
 	if ( diff < day ) {
 		return 'امروز';
 	}
 	if ( diff < 7 * day ) {
-		return 'این هفته';
+		return 'هفت روز گذشته';
+	}
+	if ( diff < 30 * day ) {
+		return 'سی روز گذشته';
 	}
 	return 'قدیمی‌تر';
-}
-
-/** زیرنویس هر ردیف — جای همان `simonw/research` در تصویر. */
-function subtitleOf( item, state ) {
-	const ws = String( state?.config?.workspace || '' );
-	const name = ws.split( /[\\/]/ ).filter( Boolean ).slice( -2 ).join( '/' );
-	return `${ name || 'بدون پروژه' } · ${ item.messages } پیام`;
 }
 
 function paint() {
@@ -79,97 +97,104 @@ function paint() {
 		return;
 	}
 
-	let lastGroup = '';
-	for ( const item of sessions.slice( 0, 60 ) ) {
-		const active = s?.sessionId === item.id;
-		const group = groupOf( item, s );
-		if ( group !== lastGroup ) {
-			box.appendChild( h( 'div', { class: 'list-group', text: group } ) );
-			lastGroup = group;
-		}
-
+	// در نوار کناری فقط چند تای آخر؛ بقیه در صفحهٔ «گفتگوها».
+	for ( const item of sessions.slice( 0, 14 ) ) {
 		box.appendChild(
-			h( 'div', { class: `list-item ${ active ? 'active' : '' }` }, [
+			h( 'div', { class: `recent-item ${ s?.sessionId === item.id ? 'active' : '' }`, title: `${ item.title }\n${ timeAgo( item.updatedAt ) }` }, [
 				h( 'button', {
-					class: 'list-main',
-					title: `${ item.title }\n${ timeAgo( item.updatedAt ) }`,
+					class: 'rt',
+					text: item.title || 'بدون عنوان',
 					onClick: () => onResume( item.id ),
-				}, [
-					h( 'span', { class: 'list-title', text: item.title || 'بدون عنوان' } ),
-					h( 'span', { class: 'list-sub', text: subtitleOf( item, s ) } ),
-				] ),
-				h( 'div', { class: 'list-actions' }, [
-					h( 'button', {
-						class: 'round-ghost',
-						title: 'تغییر نام',
-						text: '✎',
-						onClick: async ( e ) => {
-							e.stopPropagation();
-							const title = await promptDialog( 'نام تازهٔ گفتگو:', item.title || '' );
-							if ( title === null ) {
-								return;
-							}
-							await post( '/api/sessions', { action: 'rename', id: item.id, title } );
-							await refreshSessions();
-						},
-					} ),
-					h( 'button', {
-						class: 'round-ghost',
-						title: 'حذف',
-						text: '×',
-						onClick: async ( e ) => {
-							e.stopPropagation();
-							if ( ! ( await confirmDialog( 'این گفتگو حذف شود؟', { danger: true } ) ) ) {
-								return;
-							}
-							const out = await post( '/api/sessions', { action: 'delete', id: item.id } );
-							if ( out.error ) {
-								toast( out.error, 'error' );
-							}
-							await refreshSessions();
-						},
-					} ),
-				] ),
+					style: 'background:none;border:0;color:inherit;font:inherit;text-align:start;cursor:pointer;padding:0;',
+				} ),
+				h( 'button', {
+					class: 'row-menu',
+					title: 'گزینه‌ها',
+					text: '⋯',
+					onClick: async ( e ) => {
+						e.stopPropagation();
+						await rowMenu( item );
+					},
+				} ),
 			] )
 		);
 	}
 }
 
-/**
- * «نشان‌شده» در نوار کناری — جای همان فهرست Starred در تصویر، ولی با چیزهایی که در یک
- * ابزار عامل واقعاً هر روز لازم می‌شوند.
- */
-function paintPinned( s ) {
-	const box = $( '#pinned-list' );
-	if ( ! box ) {
+/** منوی سه‌نقطهٔ هر گفتگو. */
+async function rowMenu( item ) {
+	const title = await promptDialog( 'نام تازهٔ گفتگو (خالی = حذف گفتگو):', item.title || '' );
+	if ( title === null ) {
 		return;
 	}
-	const open = ( tab ) => () => document.dispatchEvent( new CustomEvent( 'hoosha:rail', { detail: tab } ) );
-	const items = [
-		[ '⌗', 'فهرست کار', open( 'todos' ), ( s.todos || [] ).filter( ( t ) => t.status !== 'completed' ).length ],
-		[ '❯', 'شل‌های پس‌زمینه', open( 'shells' ), ( s.shells || [] ).filter( ( x ) => x.status === 'running' ).length ],
-		[ '↶', 'چک‌پوینت‌ها', open( 'checkpoints' ), ( s.checkpoints || [] ).length ],
-		[ '±', 'تغییرات گیت', open( 'git' ), 0 ],
-	];
-
-	box.replaceChildren();
-	for ( const [ ico, label, onClick, count ] of items ) {
-		box.appendChild(
-			h( 'button', { class: 'nav-item pinned', onClick }, [
-				h( 'span', { class: 'si-ico', text: ico } ),
-				h( 'span', { text: label } ),
-				count ? h( 'b', { class: 'pin-count', text: String( count ) } ) : null,
-			] )
-		);
+	if ( title.trim() === '' ) {
+		if ( ! ( await confirmDialog( 'این گفتگو حذف شود؟', { danger: true } ) ) ) {
+			return;
+		}
+		const out = await post( '/api/sessions', { action: 'delete', id: item.id } );
+		if ( out.error ) {
+			toast( out.error, 'error' );
+		}
+	} else {
+		await post( '/api/sessions', { action: 'rename', id: item.id, title } );
 	}
+	await refreshSessions();
+}
+
+/**
+ * منوی حساب — نظیر همان منویی که در Claude از روی ردیف پایین باز می‌شود.
+ * @returns {void}
+ */
+function toggleAccountMenu() {
+	const menu = $( '#account-menu' );
+	if ( ! menu.hidden ) {
+		menu.hidden = true;
+		return;
+	}
+
+	const s = getState() || {};
+	const item = ( ico, label, end, onClick ) =>
+		h( 'button', { class: 'menu-item', onClick: () => {
+			menu.hidden = true;
+			onClick();
+		} }, [
+			h( 'span', { class: 'mi-ico', text: ico } ),
+			h( 'span', { text: label } ),
+			end ? h( 'span', { class: 'mi-end', text: end } ) : null,
+		] );
+
+	menu.replaceChildren(
+		h( 'div', { class: 'menu-mail', text: String( s.config?.workspace || '' ) } ),
+		item( '⚙', 'تنظیمات', 'Ctrl+,', () => onCommand( 'settings' ) ),
+		item( '◐', 'ظاهر', '', () => onCommand( 'theme' ) ),
+		item( '?', 'راهنما و میان‌برها', '?', () => onCommand( 'shortcuts' ) ),
+		h( 'div', { class: 'menu-sep' } ),
+		item( '⌁', 'مصرف و هزینه', '', () => onCommand( 'usage' ) ),
+		item( '✚', 'وضعیت و تشخیص', '', () => onCommand( 'status' ) ),
+		h( 'div', { class: 'menu-sep' } ),
+		item( '↺', 'بارگذاری دوباره', '', () => onCommand( 'reload' ) )
+	);
+	menu.hidden = false;
 }
 
 /** @param {any} s */
 export function paintSidebarState( s ) {
 	const p = s.config.profiles?.[ s.config.activeProfile ] || {};
-	$( '#account-name' ).textContent = p.label || s.config.activeProfile || 'پروفایل';
-	$( '#chip-provider' ).textContent = `${ p.provider || '—' }${ p.model ? ` · ${ p.model }` : '' }`;
-	$( '#account-initial' ).textContent = ( p.label || p.provider || 'ه' ).slice( 0, 1 ).toUpperCase();
-	paintPinned( s );
+	const hub = s.hub?.active;
+	$( '#account-name' ).textContent = hub ? 'هاب پرووایدر' : p.label || s.config.activeProfile || 'پروفایل';
+	$( '#chip-provider' ).textContent = hub
+		? 'مسیریابی خودکار'
+		: `${ p.provider || '—' }${ p.model ? ` · ${ p.model }` : '' }`;
+	// آواتار، نشان خودِ هوشاست — همان‌جایی که در Claude دایرهٔ حساب می‌نشیند.
+	const dot = $( '#account-initial' );
+	if ( ! dot.innerHTML.includes( 'svg' ) ) {
+		dot.innerHTML = logoSvg( 18, 'logo avatar-logo' );
+	}
+
+	const changed = ( s.git?.files || [] ).length;
+	const badge = $( '#nav-changes-count' );
+	badge.hidden = ! changed;
+	badge.textContent = String( changed );
+
 	paint();
 }
