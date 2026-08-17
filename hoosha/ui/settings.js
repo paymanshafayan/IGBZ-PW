@@ -16,7 +16,9 @@ import { mountHub } from './hub.js';
  */
 const GROUPS = [
 	{
-		label: 'تنظیمات',
+		// طرحِ تأییدشده این گروه را ندارد، چون Claude پرووایدر ندارد. کارفرما خواست
+		// اضافه شود، و اول می‌آید چون اولین کاری است که مدیر روی نصب تازه می‌کند.
+		label: 'پرووایدر و مدل',
 		items: [
 			{ id: 'hub', label: 'پرووایدرهای استاندارد', ico: '◈' },
 			{ id: 'hub-compat', label: 'پرووایدرهای سازگار', ico: '◇' },
@@ -24,6 +26,11 @@ const GROUPS = [
 			{ id: 'hub-routing', label: 'هاب و مسیریابی', ico: '⇶' },
 			{ id: 'hub-health', label: 'سلامت و عیب‌یاب', ico: '✚' },
 			{ id: 'provider', label: 'پروفایل تک‌نفره', ico: '◉' },
+		],
+	},
+	{
+		label: 'تنظیمات',
+		items: [
 			{ id: 'permissions', label: 'مجوزها', ico: '⛨' },
 			{ id: 'sandbox', label: 'سندباکس', ico: '▢' },
 			{ id: 'usage', label: 'مصرف و هزینه', ico: '⌁' },

@@ -1549,27 +1549,30 @@ await test( 'نوار کناری و ریل هم قابل اسکرول‌اند �
 	assert.match( cssBlock( '.rail-body' ), /overflow-y:\s*auto/ );
 } );
 
-await test( 'پالت، رنگ‌های رسمی آنتروپیک است — نه چیزی که خودم پسندیدم', () => {
+await test( 'پالت دقیقاً از طرح تأییدشدهٔ کارفرما درآمده', () => {
 	for ( const token of [ '--background', '--foreground', '--card', '--popover', '--sidebar', '--muted', '--accent', '--border', '--input', '--ring', '--primary', '--destructive' ] ) {
 		assert.ok( css.includes( `${ token }:` ), `توکن ${ token } نیست` );
 	}
 
-	// خنثی‌های Claude عیناً سر جایشان‌اند.
-	for ( const hex of [ '#faf9f5', '#141413', '#e8e6dc', '#b0aea5' ] ) {
-		assert.ok( css.toLowerCase().includes( hex ), `رنگ رسمی ${ hex } در پالت نیست` );
+	// اعداد از `_bin/claude-ui.zip`. هرکدام نباشد یعنی از روی چشم رنگ گذاشته‌ام.
+	for ( const hex of [ '#faf9f7', '#efece5', '#2c2c2c', '#e5e5e5', '#f3f2ef', '#e5e0d8', '#f5f5f5' ] ) {
+		assert.ok( css.toLowerCase().includes( hex ), `رنگ طرح ${ hex } در پالت نیست` );
 	}
 
 	const light = css.slice( css.indexOf( "html[data-theme='light']" ), css.indexOf( "html[data-theme='dark']" ) );
-	assert.match( light, /--background:\s*#faf9f5/, 'پس‌زمینهٔ روشن باید همان کرم رسمی باشد' );
-	assert.match( light, /--foreground:\s*#141413/ );
+	assert.match( light, /--background:\s*#ffffff/, 'در طرح، نوار کناری و محتوا هر دو سفیدند' );
+	assert.match( light, /--sidebar:\s*#ffffff/ );
+	assert.match( light, /--foreground:\s*#2c2c2c/ );
+	assert.match( light, /--bubble:\s*#f3f2ef/, 'حباب پیام کاربر' );
 
-	// ولی رنگ برند مالِ خودمان است: فیروزهٔ ایرانی، نه نارنجیِ آنتروپیک.
-	assert.match( light, /--primary:\s*#2f9e9b/, 'رنگ اصلی باید فیروزهٔ ایرانی باشد' );
-	assert.match( light, /--brand:\s*#2f9e9b/ );
-	assert.equal( /--primary:\s*#d97757/.test( css ), false, 'نارنجی نباید رنگ اصلی باشد' );
+	// تنها تغییر نسبت به طرح: نارنجی جایش را به فیروزهٔ آبی داد.
+	assert.match( light, /--primary:\s*#2a9db5/, 'رنگ برند باید فیروزهٔ آبی باشد' );
+	assert.match( light, /--brand:\s*#2a9db5/ );
+	assert.equal( /#d97757/i.test( css.replace( /\/\*[\s\S]*?\*\//g, '' ) ), false, 'نارنجی طرح نباید در هیچ قاعده‌ای مانده باشد' );
 
-	// و میکروفنِ در حال ضبط، همان فیروزه — نه قرمزِ Claude.
-	assert.match( cssBlock( '.round-btn.recording' ), /background:\s*var\(--primary\)/ );
+	// و دکمهٔ عمل صفحه‌ها در طرح مشکیِ توپر است، نه رنگ برند.
+	assert.match( light, /--solid:\s*#000000/ );
+	assert.match( cssBlock( '.pill.primary' ), /background:\s*var\(--solid\)/ );
 } );
 
 await test( 'رابط زنده است: ترنزیشن، سایه و حرکت دارد', () => {
@@ -1670,7 +1673,7 @@ await test( 'پیام کاربر حباب جمع است و پاسخ مدل مت�
 	// حباب کاربر به اندازهٔ محتوا و چسبیده به ابتدای سطر.
 	const user = cssBlock( '.msg.user .body' );
 	assert.match( user, /width:\s*fit-content/ );
-	assert.match( user, /max-width:\s*min\(75%/ );
+	assert.match( user, /max-width:\s*80%/, 'در طرح، سقف عرض حباب ۸۰٪ است' );
 	assert.match( cssBlock( '.msg.user' ), /justify-content:\s*flex-end/ );
 
 	// و پاسخ، متن ساده است: نه حباب، نه قاب، نه سریف.
@@ -1679,13 +1682,27 @@ await test( 'پیام کاربر حباب جمع است و پاسخ مدل مت�
 	assert.equal( /font-family:/.test( bot ), false, 'در تصویر، متن پاسخ همان سنس رابط است' );
 } );
 
-await test( 'نوار کناریِ جمع‌شده ریل آیکونی می‌شود، نه هیچ', () => {
-	// در تصویر، بعد از جمع‌کردن همهٔ آیکون‌ها عمودی می‌مانند و آواتار هم ته آن است.
-	const rule = cssBlock( 'body.sidebar-collapsed .app' );
-	assert.match( rule, /grid-template-columns:\s*var\(--rail-w\)/ );
-	assert.match( css, /--rail-w:\s*\d+px/ );
-	assert.equal( /grid-template-columns:\s*0 minmax/.test( css ), false, 'نوار نباید کاملاً ناپدید شود' );
-	assert.match( css, /body\.sidebar-collapsed \.nav-item > span/, 'در حالت ریل فقط متن‌ها پنهان می‌شوند' );
+await test( 'نوار جمع‌شده کنار می‌رود و دکمهٔ شناور بازکردنش می‌ماند', () => {
+	/*
+	 * اینجا از حدس خودم برگشتم. از روی تصویر فکر کردم نوار به ریل آیکونی تبدیل می‌شود؛
+	 * طرحی که کارفرما امتحان کرده و پذیرفته، عرض را صفر می‌کند و یک دکمهٔ شناور
+	 * بالای محتوا می‌گذارد. طرحِ تأییدشده حرف آخر است.
+	 */
+	assert.match( cssBlock( 'body.sidebar-collapsed .app' ), /grid-template-columns:\s*0 minmax/ );
+	assert.match( html, /id="btn-reopen"/, 'بدون این دکمه، کاربر راهی برای برگرداندن نوار ندارد' );
+	assert.match( cssBlock( '#btn-reopen' ), /position:\s*absolute/ );
+	assert.match( css, /body:not\(\.sidebar-collapsed\) #btn-reopen/, 'وقتی نوار باز است این دکمه نباید باشد' );
+
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /#btn-reopen' \)\.onclick/ );
+} );
+
+await test( 'پاسخ مدل نشان کنارش دارد، مثل طرح', () => {
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.match( thread, /class: 'msg-mark', html: logoSvg\( 24 \)/ );
+	assert.match( thread, /if \( role === 'assistant' \) \{/ );
+	assert.match( cssBlock( '.msg-mark' ), /flex:\s*none/ );
+	assert.match( cssBlock( '.msg.assistant' ), /display:\s*flex/ );
 } );
 
 await test( 'ناوبری نوار کناری همان ترتیب Claude را دارد', () => {
@@ -1707,7 +1724,8 @@ await test( 'تنظیمات یک مودال بزرگ است با ناوبری د
 	assert.match( html, /id="set-close"/ );
 
 	const modal = cssBlock( '.set-modal' );
-	assert.match( modal, /width:\s*min\(960px/, 'مودال باید بزرگ باشد' );
+	assert.match( modal, /width:\s*960px/, 'مودال باید بزرگ باشد' );
+	assert.match( modal, /max-height:\s*750px/ );
 	assert.match( css, /\.set-modal::backdrop/ );
 
 	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
@@ -3823,8 +3841,12 @@ section( 'رابط — بوت واقعی روی index.html' );
  * آن روز این را نگرفتند، چون یا متن فایل را grep می‌کردند یا یک المان دستی می‌ساختند.
  * این هارنس، `app.js` را واقعاً اجرا می‌کند.
  */
+/** @type {string[]} همهٔ درخواست‌هایی که رابط در آخرین بوت زده است. */
+let fetchLog = [];
+
 async function bootApp( overrides = {} ) {
 	const { installFakeDom, parseHtml } = await import( './fake-dom.mjs' );
+	fetchLog = [];
 	const state = {
 		version: '0.7.0',
 		install: { root: '/repo', frozen: false, git: true },
@@ -3847,16 +3869,27 @@ async function bootApp( overrides = {} ) {
 	};
 
 	const dom = installFakeDom( {
-		fetch: async ( url ) => ( {
-			ok: true,
-			text: async () => '',
-			json: async () =>
-				url === '/api/state'
-					? state
-					: url === '/api/sessions'
-					? { sessions: [ { id: 's1', title: 'سلام', messages: 3, updatedAt: Date.now() } ] }
-					: {},
-		} ),
+		fetch: async ( url, options ) => {
+			fetchLog.push( `${ options?.method || 'GET' } ${ url }` );
+			return {
+				ok: true,
+				text: async () => '',
+				json: async () =>
+					url === '/api/state'
+						? state
+						: url === '/api/sessions'
+						? { sessions: [ { id: 's1', title: 'سلام', messages: 3, updatedAt: Date.now() } ] }
+						: url === '/api/hub'
+						? {
+								active: false,
+								ready: { ok: false, reason: '—' },
+								catalog: [], strategies: [], categories: [], authStyles: [],
+								hub: { enabled: false, connections: {}, models: {}, combos: {}, categoryCombo: {}, routing: {}, budget: {}, cache: {}, diagnoser: {} },
+								health: {}, learning: {}, budget: {}, cache: {}, ledger: [], diagnoser: {}, recent: [],
+						  }
+						: {},
+			};
+		},
 	} );
 	globalThis.window = { matchMedia: () => ( { matches: false, addEventListener() {} } ), innerHeight: 800, addEventListener() {} };
 	globalThis.EventSource = class {
@@ -3936,8 +3969,12 @@ await test( '«سفارشی‌سازی» مودال تنظیمات را باز �
 
 		// نمای گفتگو باید سر جایش بماند؛ تنظیمات روی آن باز می‌شود نه به‌جای آن.
 		assert.equal( q( '#view-chat' ).hidden, false );
-		assert.deepEqual( all( '.set-group' ).map( ( x ) => x.textContent ), [ 'تنظیمات', 'سفارشی‌سازی' ] );
+		// سه گروه: «پرووایدر و مدل» به خواستهٔ کارفرما اضافه شد — طرح اصلی نداشتش.
+		assert.deepEqual( all( '.set-group' ).map( ( x ) => x.textContent ), [ 'پرووایدر و مدل', 'تنظیمات', 'سفارشی‌سازی' ] );
 		assert.equal( all( '.set-item' ).length, 19 );
+		const labels = all( '.set-item' ).map( ( x ) => x.textContent );
+		assert.ok( labels.some( ( l ) => l.includes( 'پرووایدرهای استاندارد' ) ), 'صفحهٔ پرووایدر باید در منو باشد' );
+		assert.ok( labels.some( ( l ) => l.includes( 'پروفایل تک‌نفره' ) ) );
 		assert.ok( q( '.set-search' ), 'کادر جستجوی ناوبری نیست' );
 		assert.ok( q( '#set-body' ).children.length > 0, 'بدنهٔ تنظیمات خالی است' );
 	} finally {
@@ -4065,8 +4102,8 @@ await test( 'نشان هوشا سر جایش است و فیروزه‌ای اس�
 
 	// و رنگش روی نارنجی رسمی نشسته باشد.
 	const mark = fssync.readFileSync( path.join( uiDir, 'lib', 'mark.js' ), 'utf8' );
-	assert.match( mark, /from: '#3ab3af'/, 'نشان باید فیروزه باشد' );
-	assert.match( mark, /to: '#26837f'/ );
+	assert.match( mark, /from: '#39b0c7'/, 'نشان باید همان فیروزهٔ آبیِ رنگ برند باشد' );
+	assert.match( mark, /to: '#227f92'/ );
 	assert.equal( /from: '#e0|from: '#d9/.test( mark ), false, 'رنگ نارنجی نباید در نشان بماند' );
 	for ( const f of [ 'icon-16.png', 'icon-32.png', 'icon-192.png', 'icon-512.png' ] ) {
 		assert.ok( fssync.existsSync( path.join( uiDir, 'assets', 'icons', f ) ), `آیکون ${ f } ساخته نشده` );
@@ -4198,6 +4235,81 @@ await test( 'ارسال بلافاصله بعد از موج صدا در چیدم
 	const bar = /<div class="composer-bar">([\s\S]*?)<\/div>\s*\n/.exec( html )?.[ 1 ] || html;
 	const order = [ ...bar.matchAll( /id="(btn-mic|btn-voice|stop|send)"/g ) ].map( ( m ) => m[ 1 ] );
 	assert.deepEqual( order, [ 'btn-mic', 'btn-voice', 'stop', 'send' ], `ترتیب: ${ order.join( ' → ' ) }` );
+} );
+
+await test( 'هر کنترلِ کلیک‌پذیر واقعاً کاری می‌کند — هیچ دکمهٔ مرده‌ای نیست', async () => {
+	/*
+	 * خواستهٔ صریح کارفرما: «تمام منوها و آیتم‌ها کار کنند».
+	 *
+	 * پس به‌جای اینکه ادعا کنم، همه را می‌زنیم و می‌سنجیم: یا درخواستی به سرور رفت، یا
+	 * DOM عوض شد. اولین بار که این را زدم سه قلمِ منوی «+» مرده بودند —
+	 * `showView('skills')` صدا می‌زدند و چون «skills» صفحه نبود، بی‌صدا به گفتگو
+	 * برمی‌گشت.
+	 */
+	const { dom, q, all } = await bootApp();
+	globalThis.location = { reload() {} };
+	try {
+		const seen = () => [
+			document.body.textContent.length,
+			document.body.all().length,
+			document.body.className,
+			document.documentElement.dataset.theme,
+			document.querySelectorAll( '[hidden]' ).length,
+		].join( '|' );
+
+		/** @type {string[]} */
+		const dead = [];
+		const probe = async ( label, node ) => {
+			if ( ! node ) {
+				dead.push( `${ label } (وجود ندارد)` );
+				return;
+			}
+			const before = seen();
+			const calls = fetchLog.length;
+			node.click();
+			await new Promise( ( r ) => setTimeout( r, 80 ) );
+			if ( seen() === before && fetchLog.length === calls ) {
+				dead.push( label );
+			}
+		};
+
+		for ( const b of all( '.nav-item[data-view]' ) ) {
+			await probe( `ناوبری «${ b.textContent.trim() }»`, b );
+		}
+		await probe( 'گفتگوی تازه', q( '#btn-new' ) );
+		await probe( 'جستجو', q( '#btn-search' ) );
+		await probe( 'جمع‌کردن نوار', q( '#btn-collapse' ) );
+		await probe( 'خروجی', q( '#btn-export' ) );
+
+		q( '#btn-account' ).click();
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+		for ( const b of all( '#account-menu .menu-item' ) ) {
+			if ( b.textContent.includes( 'بارگذاری دوباره' ) ) {
+				continue; // صفحه را نو می‌کند؛ در DOM ساختگی اثری ندارد.
+			}
+			await probe( `منوی حساب «${ b.textContent.trim() }»`, b );
+			q( '#btn-account' ).click();
+			await new Promise( ( r ) => setTimeout( r, 30 ) );
+		}
+
+		q( '#btn-plus' ).click();
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+		for ( const b of all( '#plus-menu .menu-item' ) ) {
+			await probe( `منوی + «${ b.textContent.trim().slice( 0, 20 ) }»`, b );
+			q( '#btn-plus' ).click();
+			await new Promise( ( r ) => setTimeout( r, 30 ) );
+		}
+
+		document.querySelector( '.nav-item[data-view="customize"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 150 ) );
+		for ( const b of all( '.set-item' ) ) {
+			await probe( `تب تنظیمات «${ b.textContent.trim().slice( 1 ) }»`, b );
+		}
+
+		assert.deepEqual( dead, [], `کنترل‌های بی‌اثر:\n      ${ dead.join( '\n      ' ) }` );
+	} finally {
+		dom.restore();
+	}
 } );
 
 // ------------------------------------------------------------------ پایان

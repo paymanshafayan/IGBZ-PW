@@ -7,7 +7,7 @@
 
 import { $, el, h, esc, copyText, promptDialog } from './lib/dom.js';
 import { markdown, wireCodeCopy } from './lib/markdown.js';
-import { logoLiveSvg } from './lib/logo.js';
+import { logoLiveSvg, logoSvg } from './lib/logo.js';
 import { speak, stopSpeaking, isSpeaking, ttsSupported } from './lib/voice.js';
 import { post } from './lib/api.js';
 
@@ -95,7 +95,21 @@ function append( node ) {
 export function addMessage( role, text, asMarkdown = true, images = [] ) {
 
 	const wrap = el( 'div', `msg ${ role }` );
-	const col = wrap;
+
+	/*
+	 * پاسخ مدل، نشان کنارش دارد.
+	 *
+	 * در نسخهٔ قبل حذفش کرده بودم چون در تصویر صفحهٔ خالی دیده نمی‌شد. طرحی که کارفرما
+	 * پذیرفت آن را دارد: یک ستارهٔ کوچک در ابتدای هر پاسخ، هم‌راستا با خط اول متن.
+	 */
+	if ( role === 'assistant' ) {
+		wrap.appendChild( h( 'span', { class: 'msg-mark', html: logoSvg( 24 ) } ) );
+	}
+
+	const col = role === 'assistant' ? el( 'div', 'msg-col' ) : wrap;
+	if ( col !== wrap ) {
+		wrap.appendChild( col );
+	}
 	const body = el( 'div', 'body' );
 	if ( asMarkdown ) {
 		body.innerHTML = markdown( text );

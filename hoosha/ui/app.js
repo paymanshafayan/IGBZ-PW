@@ -21,7 +21,7 @@ import {
 } from './thread.js';
 import { initComposer, setBusy, setMode, fillComposer, composerIsEmpty, focusComposer, toggleDictation } from './composer.js';
 import { initSidebar, refreshSessions, paintSidebarState, markActiveView, allSessions, groupOf } from './sidebar.js';
-import { openSettingsModal, renderSection, initSettings } from './settings.js';
+import { openSettingsModal, renderSection, initSettings, SETTINGS_TABS } from './settings.js';
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 import { logoSvg } from './lib/logo.js';
 import { initGitBar, paintGitBar, renderChanges } from './gitbar.js';
@@ -71,6 +71,18 @@ async function showView( next ) {
 	// «سفارشی‌سازی» صفحه نیست؛ مثل Claude مودال تنظیمات را باز می‌کند.
 	if ( next === 'customize' || next === 'settings' ) {
 		openSettings( next === 'settings' ? undefined : 'skills' );
+		return;
+	}
+
+	/*
+	 * هر مقصدی که صفحه نیست ولی تبِ تنظیمات هست، همان تب را باز می‌کند.
+	 *
+	 * این یک باگ واقعی را بست: منوی «+» برای اسکیل‌ها و کانکتورها و زیرعامل‌ها
+	 * `showView('skills')` صدا می‌زد، و چون «skills» صفحه نبود بی‌سروصدا به گفتگو
+	 * برمی‌گشت — کلیک می‌کردی و هیچ اتفاقی نمی‌افتاد.
+	 */
+	if ( ! PAGES[ next ] && SETTINGS_TABS.some( ( t ) => t.id === next ) ) {
+		openSettings( next );
 		return;
 	}
 
@@ -628,6 +640,8 @@ $( '#btn-new' ).onclick = async () => {
 
 $( '#btn-back' ).onclick = () => showView( 'chat' );
 $( '#btn-search' ).onclick = () => openPalette( paletteDeps() );
+$( '#btn-export' ).onclick = () => doExport( 'md' );
+$( '#btn-reopen' ).onclick = () => $( '#btn-collapse' ).click();
 $( '#session-title' ).onclick = renameSession;
 $( '#btn-share' ).onclick = () => doExport( 'md' );
 

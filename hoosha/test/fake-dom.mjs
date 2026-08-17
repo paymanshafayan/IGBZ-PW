@@ -24,12 +24,21 @@ class FakeClassList {
 		names.forEach( ( n ) => set.delete( n ) );
 		this.node.className = [ ...set ].join( ' ' );
 	}
+	/**
+	 * با یک آرگومان **برعکس می‌کند**، با دو آرگومان تحمیل می‌کند.
+	 *
+	 * نسخهٔ اول همیشه حذف می‌کرد، چون `on` تعریف‌نشده را دروغ می‌گرفت. نتیجه‌اش این بود
+	 * که در بازرسی، «جمع‌کردن نوار کناری» به‌نظر می‌رسید کار نمی‌کند در حالی که کد
+	 * سالم بود. هارنسِ غلط، بدتر از نبودِ هارنس است.
+	 */
 	toggle( name, on ) {
-		if ( on ) {
+		const next = on === undefined ? ! this.contains( name ) : Boolean( on );
+		if ( next ) {
 			this.add( name );
 		} else {
 			this.remove( name );
 		}
+		return next;
 	}
 	contains( name ) {
 		return String( this.node.className || '' ).split( /\s+/ ).includes( name );
@@ -273,8 +282,26 @@ export function installFakeDom( opts = {} ) {
 		querySelectorAll( sel ) {
 			return this.body.querySelectorAll( sel );
 		},
-		addEventListener() {},
-		dispatchEvent() {},
+		/*
+		 * رویدادهای سراسری واقعاً کار می‌کنند.
+		 *
+		 * قبلاً هر دو تهی بودند و نتیجه‌اش این بود که کل کانال `hoosha:*` — تنظیمات،
+		 * تغییر نما، بازگشت به چک‌پوینت — از دید تست نامرئی بود و «کار نمی‌کند» به‌نظر
+		 * می‌رسید.
+		 */
+		listeners: {},
+		addEventListener( type, fn ) {
+			( this.listeners[ type ] = this.listeners[ type ] || [] ).push( fn );
+		},
+		removeEventListener( type, fn ) {
+			this.listeners[ type ] = ( this.listeners[ type ] || [] ).filter( ( f ) => f !== fn );
+		},
+		dispatchEvent( ev ) {
+			for ( const fn of this.listeners[ ev?.type ] || [] ) {
+				fn( ev );
+			}
+			return true;
+		},
 	};
 
 	const previous = {

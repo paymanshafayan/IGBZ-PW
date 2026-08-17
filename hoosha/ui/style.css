@@ -4,7 +4,6 @@
  * پالت، رنگ‌های **رسمی** آنتروپیک است، نه حدس و نه سلیقهٔ من:
  *
  *   فیروزهٔ ایرانی #2f9e9b   رنگ برند هوشا: نشان، دکمهٔ اصلی، و حالت‌های فعال
- *   Crail Orange  #d97757   رنگ برند Claude — فقط به‌عنوان مرجع نگه داشته شده
  *   Dark          #141413   متن، و پس‌زمینهٔ دکمه‌های اصلی
  *   Light         #faf9f5   پس‌زمینهٔ صفحه
  *   Mid Gray      #b0aea5   عناصر ثانویه
@@ -24,66 +23,73 @@
 	--radius-sm: 0.5rem;
 	--radius-lg: 1rem;
 	--radius-xl: 1.75rem;
-
 	--fs: 15px;
-
 	--sans: 'Vazirmatn', 'Segoe UI', Tahoma, -apple-system, BlinkMacSystemFont, sans-serif;
-	/*
-	 * فونت نمایشی. در Claude تیترها با یک سریفِ اختصاصی‌اند و همان تضادِ سریف/سنس، نیمی
-	 * از حسِ آن رابط است. برای فارسی سریفِ قابل‌اتکایی روی همهٔ سیستم‌ها نیست، پس:
-	 * نویسه‌های لاتین به Georgia/Lora می‌افتند و فارسی به نستعلیق/نسخ سیستم، و اگر
-	 * هیچ‌کدام نبود به همان سنس با وزن سبک‌تر و فاصلهٔ بازتر.
-	 */
 	--serif: 'Lora', 'Noto Naskh Arabic', 'Times New Roman', Georgia, 'Vazirmatn', serif;
 	--mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, Menlo, monospace;
-
-	--sidebar-w: 272px;
-	/* عرض ریل وقتی نوار کناری جمع می‌شود — در Claude آیکون‌ها می‌مانند. */
-	--rail-w: 52px;
+	--sidebar-w: 280px;
 	--col: 46rem;
-
 	--ease: cubic-bezier(0.22, 0.9, 0.32, 1);
 }
 
-/* ───────────────────────────────────────────── تم روشن (پیش‌فرض Claude) */
+/* ───────────────────────────────────────────── تم روشن (طرح تأییدشده)
+
+   مقادیر از فایل `_bin/claude-ui.zip` درآمده — طرحی که کارفرما امتحان کرده و پذیرفته.
+   عمداً همان اعداد است، نه چیزی نزدیک به آن:
+
+     سطح‌ها      #ffffff (نوار کناری و محتوا هر دو سفیدند)
+     سطح ملایم   #faf9f7   ·  هاور قوی‌تر #efece5  ·  هاور منو #f5f5f5
+     متن         #2c2c2c   ·  خط‌ها #e5e5e5  ·  خط ملایم (gray-100) #f3f4f6
+     حباب کاربر  #f3f2ef   ·  دایرهٔ آواتار #e5e0d8
+     دکمهٔ اصلی   مشکی توپر (bg-black)
+
+   و تنها تغییری که کارفرما خواست: هرجا در آن طرح نارنجیِ #D97757 بود — نشان، ستارهٔ
+   کنار پاسخ، و دکمهٔ ارسال — حالا فیروزهٔ آبی است. */
 
 html[data-theme='light'] {
-	--background: #faf9f5;
-	--foreground: #141413;
+	--background: #ffffff;
+	--foreground: #2c2c2c;
 
 	--card: #ffffff;
-	--card-foreground: #141413;
+	--card-foreground: #2c2c2c;
 
 	--popover: #ffffff;
-	--popover-foreground: #141413;
+	--popover-foreground: #2c2c2c;
 
-	--sidebar: #f5f4ee;
-	--sidebar-foreground: #141413;
+	--sidebar: #ffffff;
+	--sidebar-foreground: #2c2c2c;
 
-	--muted: #f0eee5;
-	--muted-foreground: #83827d;
+	/* سطح ملایم: پس‌زمینهٔ هاور روی سفید، و کف صفحه‌های خالی. */
+	--muted: #faf9f7;
+	--muted-foreground: #6b6b6b;
 
-	--accent: #ebe9df;
-	--accent-foreground: #141413;
+	/* هاور و حالت فعالِ ناوبری. */
+	--accent: #efece5;
+	--accent-foreground: #2c2c2c;
 
-	--border: #e8e6dc;
-	--border-soft: #f0eee7;
-	--input: #e8e6dc;
-	--ring: #2f9e9b;
+	--menu-hover: #f5f5f5;
+	--bubble: #f3f2ef;
+	--avatar: #e5e0d8;
 
-	/* رنگ اصلی: فیروزهٔ ایرانی. */
-	--primary: #2f9e9b;
-	--primary-hover: #268582;
+	--border: #e5e5e5;
+	--border-soft: #f0f0ee;
+	--input: #e5e5e5;
+	--ring: #efece5;
+
+	/* رنگ برند: فیروزهٔ آبی — جای نارنجیِ طرح. */
+	--primary: #2a9db5;
+	--primary-hover: #23879c;
 	--primary-foreground: #ffffff;
-	--primary-soft: rgba(47, 158, 155, 0.1);
-	--primary-line: rgba(47, 158, 155, 0.28);
+	--primary-soft: rgba(42, 157, 181, 0.1);
+	--primary-line: rgba(42, 157, 181, 0.3);
 
-	/* نشان — همان فیروزه. */
-	--brand: #2f9e9b;
-	--brand-soft: rgba(47, 158, 155, 0.12);
+	--brand: #2a9db5;
+	--brand-soft: rgba(42, 157, 181, 0.12);
 
-	/* نارنجی Crail فقط برای ارجاع می‌ماند؛ در رابط استفاده نمی‌شود. */
-	--claude-orange: #d97757;
+	/* دکمهٔ عملِ صفحه‌ها در طرح، مشکیِ توپر است — نه رنگ برند. */
+	--solid: #000000;
+	--solid-hover: #1f2937;
+	--solid-foreground: #ffffff;
 
 	--second: #6a9bcc;
 	--second-soft: rgba(106, 155, 204, 0.14);
@@ -101,47 +107,54 @@ html[data-theme='light'] {
 	--code-function: #2d68c4;
 	--code-comment: #8b8a83;
 
-	--shadow-1: 0 1px 2px rgba(20, 20, 19, 0.05);
-	--shadow-2: 0 2px 10px rgba(20, 20, 19, 0.07);
-	--shadow-3: 0 16px 44px rgba(20, 20, 19, 0.12);
-	--glow: 0 0 0 3px rgba(47, 158, 155, 0.25);
+	--shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04);
+	--shadow-2: 0 2px 12px rgba(0, 0, 0, 0.04);
+	--shadow-3: 0 8px 30px rgba(0, 0, 0, 0.12);
+	--glow: 0 0 0 3px var(--ring);
 }
 
-/* ─────────────────────────────────────────────────── تم تیرهٔ همان پالت */
+/* ─────────────────────────────────────────────────── تم تیرهٔ همان طرح */
 
 html[data-theme='dark'] {
-	--background: #262624;
-	--foreground: #faf9f5;
+	--background: #1b1b19;
+	--foreground: #ececea;
 
-	--card: #30302e;
-	--card-foreground: #faf9f5;
+	--card: #232321;
+	--card-foreground: #ececea;
 
-	--popover: #333331;
-	--popover-foreground: #faf9f5;
+	--popover: #262624;
+	--popover-foreground: #ececea;
 
-	--sidebar: #1f1e1d;
-	--sidebar-foreground: #f5f4ee;
+	--sidebar: #1b1b19;
+	--sidebar-foreground: #ececea;
 
-	--muted: #35352f;
-	--muted-foreground: #b0aea5;
+	--muted: #232321;
+	--muted-foreground: #9c9c96;
 
-	--accent: #3a3a35;
-	--accent-foreground: #faf9f5;
+	--accent: #2f2f2c;
+	--accent-foreground: #ececea;
 
-	--border: #3e3e39;
-	--border-soft: #333330;
-	--input: #3e3e39;
-	--ring: #3fb5b1;
+	--menu-hover: #2a2a27;
+	--bubble: #2b2b28;
+	--avatar: #3a3a35;
 
-	--primary: #3fb5b1;
-	--primary-hover: #4cc4c0;
-	--primary-foreground: #10201f;
-	--primary-soft: rgba(63, 181, 177, 0.14);
-	--primary-line: rgba(63, 181, 177, 0.32);
+	--border: #34342f;
+	--border-soft: #2a2a27;
+	--input: #34342f;
+	--ring: #2f2f2c;
 
-	--brand: #3fb5b1;
-	--brand-soft: rgba(63, 181, 177, 0.16);
-	--claude-orange: #d97757;
+	--primary: #38b0c9;
+	--primary-hover: #45bed6;
+	--primary-foreground: #0d1f24;
+	--primary-soft: rgba(56, 176, 201, 0.14);
+	--primary-line: rgba(56, 176, 201, 0.32);
+
+	--brand: #38b0c9;
+	--brand-soft: rgba(56, 176, 201, 0.16);
+
+	--solid: #ececea;
+	--solid-hover: #ffffff;
+	--solid-foreground: #1b1b19;
 
 	--second: #6a9bcc;
 	--second-soft: rgba(106, 155, 204, 0.16);
@@ -162,18 +175,9 @@ html[data-theme='dark'] {
 	--shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
 	--shadow-2: 0 4px 14px rgba(0, 0, 0, 0.35);
 	--shadow-3: 0 16px 44px rgba(0, 0, 0, 0.5);
-	--glow: 0 0 0 3px rgba(63, 181, 177, 0.3);
+	--glow: 0 0 0 3px rgba(56, 176, 201, 0.3);
 }
 
-/*
- * صفت hidden باید همیشه برنده باشد.
- *
- * این یک خط، شش باگ را با هم می‌بندد. استایلِ نویسنده بر `[hidden]` مرورگر مقدم است،
- * پس هر کلاسی که `display` بگذارد (`.view`، `.git-bar`، `.round-btn`، `.queue`،
- * `.attachments`، `.stale-bar`) صفت hidden را بی‌اثر می‌کرد. نتیجه‌اش این بود که با
- * بازکردن تنظیمات، نمای گفتگو هم روی صفحه می‌ماند و همه‌چیز روی هم می‌افتاد — دقیقاً
- * همان «هیچی سر جاش نبود».
- */
 [hidden] {
 	display: none !important;
 }
@@ -252,49 +256,11 @@ textarea {
 	transition: grid-template-columns 0.22s var(--ease);
 }
 /*
- * نوار جمع‌شده **ناپدید نمی‌شود**؛ به یک ریل آیکونی باریک تبدیل می‌شود.
+ * نوار جمع‌شده کنار می‌رود و یک دکمهٔ شناور جایش را می‌گیرد.
  *
- * در تصویر، Claude بعد از جمع‌کردن هنوز همهٔ آیکون‌های ناوبری را عمودی نگه می‌دارد و
- * ته آن هم آواتار را. نسخهٔ قبلی ما عرض را صفر می‌کرد و کاربر یک‌باره هیچ منویی نداشت.
+ * از روی تصویر حدس زده بودم که به ریل آیکونی تبدیل می‌شود؛ طرحی که کارفرما امتحان
+ * کرده و پذیرفته، عرض را صفر می‌کند و دکمهٔ بازکردن را روی محتوا می‌گذارد.
  */
-body.sidebar-collapsed .app {
-	grid-template-columns: var(--rail-w) minmax(0, 1fr);
-}
-body.sidebar-collapsed .sidebar {
-	padding: 12px 6px 10px;
-	align-items: center;
-}
-body.sidebar-collapsed .wordmark,
-body.sidebar-collapsed .side-label,
-body.sidebar-collapsed .side-scroll,
-body.sidebar-collapsed .acc-lines,
-body.sidebar-collapsed .nav-item > span,
-body.sidebar-collapsed .new-chat > span:not(.nc-plus),
-body.sidebar-collapsed #btn-search {
-	display: none;
-}
-body.sidebar-collapsed .side-top {
-	justify-content: center;
-	padding: 2px 0 10px;
-}
-body.sidebar-collapsed .nav-item,
-body.sidebar-collapsed .new-chat,
-body.sidebar-collapsed .account-main {
-	justify-content: center;
-	padding-inline: 0;
-	width: 36px;
-	margin-inline: auto;
-}
-body.sidebar-collapsed .nav-badge {
-	position: absolute;
-	top: 1px;
-	inset-inline-end: -2px;
-	margin: 0;
-}
-body.sidebar-collapsed .account-menu {
-	inset-inline-start: 8px;
-	width: 240px;
-}
 
 /* ══════════════════════════════════════════════════════ نوار کناری */
 
@@ -393,6 +359,8 @@ body.sidebar-collapsed .account-menu {
 	display: flex;
 	align-items: center;
 	gap: 4px;
+	border-top: 1px solid var(--border-soft);
+	padding-top: 8px;
 }
 
 /* ══════════════════════════════════════════════ ستون فهرست نشست‌ها */
@@ -540,10 +508,10 @@ body.sidebar-collapsed .account-menu {
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
-	/* بدون این، ناحیهٔ گفتگو به‌جای اسکرول‌خوردن بزرگ می‌شود و کامپوزر از صفحه بیرون می‌زند. */
 	min-height: 0;
 	overflow: hidden;
 	background: var(--background);
+	border-inline-start: 1px solid var(--border);
 }
 
 /*
@@ -642,9 +610,9 @@ body.sidebar-collapsed .account-menu {
 	overscroll-behavior: contain;
 }
 .thread > * {
-	max-width: var(--col);
+	max-width: 50rem;
 	margin-inline: auto;
-	padding-inline: 26px;
+	padding-inline: 16px;
 }
 
 .welcome {
@@ -683,13 +651,14 @@ body.sidebar-collapsed .account-menu {
 .greet {
 	display: flex;
 	align-items: center;
-	gap: 14px;
+	gap: 12px;
 	font-family: var(--serif);
-	font-size: 2.35rem;
+	font-size: clamp(2.5rem, 4vw, 3.25rem);
 	font-weight: 400;
 	line-height: 1.35;
 	letter-spacing: -0.01em;
 	text-align: center;
+	margin-bottom: 32px;
 }
 .greet-mark {
 	display: inline-flex;
@@ -758,18 +727,20 @@ body.sidebar-collapsed .account-menu {
 	justify-content: flex-end;
 }
 .msg.user .body {
-	background: var(--muted);
+	background: var(--bubble);
 	border: 0;
-	border-radius: var(--radius-lg);
-	padding: 11px 17px;
+	border-radius: 16px;
+	padding: 14px 20px;
 	white-space: pre-wrap;
-	font-size: 0.97rem;
-	max-width: min(75%, 34rem);
+	font-size: 15.5px;
+	max-width: 80%;
 	width: fit-content;
 }
 .msg.assistant .body {
-	font-size: 1rem;
-	line-height: 1.9;
+	font-size: 16px;
+	line-height: 1.8;
+	flex: none;
+	min-width: 0;
 }
 .msg.system .body {
 	color: var(--muted-foreground);
@@ -2039,7 +2010,9 @@ code .f {
 
 .field-label > span {
 	display: block;
-	margin-bottom: 5px;
+	margin-bottom: 0;
+	color: var(--foreground);
+	font-size: 0.94rem;
 }
 .field {
 	width: 100%;
@@ -2422,29 +2395,20 @@ kbd {
 	}
 }
 
-@media (max-width: 1240px) {
-	body.rail-open .app {
-		grid-template-columns: var(--sidebar-w) 0 minmax(0, 1fr) 260px;
-	}
-	body.rail-open .list-col {
-		display: none;
-	}
-}
-
-@media (max-width: 1000px) {
-	.app {
-		grid-template-columns: var(--sidebar-w) 0 minmax(0, 1fr) 0;
-	}
-	.list-col {
-		display: none;
-	}
+/*
+ * نوار جمع‌شده: عرض صفر، و دکمهٔ شناور رویش. (طرح تأییدشده)
+ *
+ * این قاعده در یک بازآرایی از فایل افتاد و مدیاکوئری‌های زیرش هنوز چیدمان چهارستونیِ
+ * قدیمی را توصیف می‌کردند — یعنی روی نمایشگر کوچک، ستون‌هایی که دیگر وجود ندارند.
+ */
+body.sidebar-collapsed .app {
+	grid-template-columns: 0 minmax(0, 1fr);
 }
 
 @media (max-width: 860px) {
 	.app,
-	body.rail-open .app,
 	body.sidebar-collapsed .app {
-		grid-template-columns: 0 0 minmax(0, 1fr) 0;
+		grid-template-columns: 0 minmax(0, 1fr);
 	}
 	.sidebar {
 		position: fixed;
@@ -2620,16 +2584,16 @@ kbd {
 	min-width: 0;
 	min-height: 0;
 	overflow: hidden;
-	padding: 12px 10px 10px;
-	gap: 2px;
-	border-inline-end: 1px solid var(--border);
+	padding: 0;
+	gap: 0;
+	border-inline-end: 0;
 }
 
 .side-top {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 2px 6px 14px;
+	padding: 16px 16px 8px;
 }
 
 /* در Claude، «Claude» یک واژه‌نشانِ ساده است: بدون آیکون، بدون شمارهٔ نسخه. */
@@ -2637,10 +2601,10 @@ kbd {
 	display: flex;
 	align-items: center;
 	font-family: var(--serif);
-	font-size: 1.3rem;
-	font-weight: 400;
+	font-size: 22px;
+	font-weight: 500;
 	gap: 8px;
-	letter-spacing: 0.2px;
+	letter-spacing: -0.01em;
 	color: var(--foreground);
 }
 .wordmark .ver {
@@ -2668,15 +2632,17 @@ kbd {
 	background: transparent;
 	border: 0;
 	color: var(--foreground);
-	padding: 8px 10px;
+	padding: 6px 8px;
 	border-radius: var(--radius-sm);
 	cursor: pointer;
 	font-weight: 500;
-	font-size: 0.95rem;
-	gap: 11px;
+	font-size: 14.5px;
+	gap: 8px;
 	text-align: start;
 	box-shadow: none;
 	transition: background 0.15s var(--ease);
+	margin: 8px 12px 16px;
+	width: auto;
 }
 .new-chat:hover {
 	background: var(--accent);
@@ -2698,20 +2664,21 @@ kbd {
 .nav-item {
 	display: flex;
 	align-items: center;
-	gap: 11px;
-	width: 100%;
+	gap: 10px;
+	width: auto;
 	min-width: 0;
 	position: relative;
 	background: transparent;
 	border: 0;
-	border-radius: var(--radius-sm);
+	border-radius: 8px;
 	cursor: pointer;
 	text-align: start;
 	transition: background 0.15s var(--ease);
 	color: var(--foreground);
-	font-size: 0.93rem;
-	padding: 7px 10px;
+	font-size: 14px;
+	padding: 6px 8px;
 	font-weight: 400;
+	margin-inline: 12px;
 }
 .nav-item:hover {
 	background: var(--accent);
@@ -2738,12 +2705,12 @@ kbd {
 }
 
 .side-label {
-	color: var(--muted-foreground);
-	text-transform: none;
-	letter-spacing: 0;
-	font-size: 0.78rem;
-	font-weight: 400;
-	padding: 14px 10px 4px;
+	color: #9ca3af;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	font-size: 11px;
+	font-weight: 500;
+	padding: 24px 20px 4px;
 	display: flex;
 	align-items: center;
 	gap: 6px;
@@ -2759,22 +2726,23 @@ kbd {
 	overflow-y: auto;
 	overflow-x: hidden;
 	margin-inline: -2px;
-	padding-inline: 2px;
+	padding-inline: 12px;
 }
 .recent-item {
 	display: flex;
 	align-items: center;
-	width: 100%;
+	width: auto;
 	background: transparent;
 	border: 0;
 	color: var(--foreground);
-	padding: 6px 10px;
-	border-radius: var(--radius-sm);
+	padding: 6px 8px;
+	border-radius: 8px;
 	cursor: pointer;
 	text-align: start;
-	font-size: 0.88rem;
+	font-size: 13.5px;
 	transition: background 0.14s var(--ease);
 	position: relative;
+	margin-inline: 12px;
 }
 .recent-item:hover {
 	background: var(--accent);
@@ -2802,7 +2770,8 @@ kbd {
 .side-bottom {
 	margin-top: auto;
 	padding-top: 6px;
-	border-top: 1px solid var(--border);
+	border-top: 0;
+	padding: 4px 12px 12px;
 }
 .account-main {
 	flex: 1;
@@ -2812,27 +2781,27 @@ kbd {
 	gap: 10px;
 	background: transparent;
 	border: 0;
-	border-radius: var(--radius-sm);
+	border-radius: 12px;
 	cursor: pointer;
 	text-align: start;
 	transition: background 0.15s var(--ease);
 	color: var(--foreground);
-	padding: 7px 8px;
+	padding: 8px;
 }
 .account-main:hover {
 	background: var(--accent);
 }
 .avatar-dot {
 	box-shadow: var(--shadow-1);
-	width: 26px;
-	height: 26px;
+	width: 28px;
+	height: 28px;
 	border-radius: 50%;
-	background: var(--brand-soft);
-	color: var(--brand);
+	background: var(--avatar);
+	color: var(--foreground);
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	font-size: 0.78rem;
+	font-size: 12px;
 	font-weight: 600;
 	flex: none;
 }
@@ -2843,14 +2812,14 @@ kbd {
 	line-height: 1.3;
 }
 .acc-lines b {
-	font-size: 0.87rem;
+	font-size: 13.5px;
 	font-weight: 500;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 .acc-text {
-	font-size: 0.75rem;
+	font-size: 11.5px;
 	color: var(--muted-foreground);
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -2862,19 +2831,19 @@ kbd {
 	position: absolute;
 	inset-inline-start: 10px;
 	bottom: 62px;
-	width: 258px;
+	width: 240px;
 	background: var(--popover);
 	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	box-shadow: var(--shadow-3);
-	padding: 6px;
+	border-radius: 16px;
+	box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+	padding: 6px 0;
 	z-index: 60;
 	animation: rise 0.14s var(--ease);
 }
 .account-menu .menu-mail {
-	font-size: 0.76rem;
+	font-size: 13px;
 	color: var(--muted-foreground);
-	padding: 8px 10px 10px;
+	padding: 10px 14px;
 	direction: ltr;
 	text-align: start;
 	overflow: hidden;
@@ -2889,14 +2858,14 @@ kbd {
 	background: transparent;
 	border: 0;
 	color: var(--foreground);
-	padding: 8px 10px;
-	border-radius: var(--radius-sm);
+	padding: 6px 14px;
+	border-radius: 0;
 	cursor: pointer;
 	text-align: start;
-	font-size: 0.89rem;
+	font-size: 14px;
 }
 .menu-item:hover {
-	background: var(--accent);
+	background: var(--menu-hover);
 }
 .menu-item .mi-ico {
 	width: 17px;
@@ -2944,20 +2913,20 @@ kbd {
 	overflow-y: auto;
 }
 .page-inner {
-	max-width: 54rem;
+	max-width: 56rem;
 	margin-inline: auto;
-	padding: 26px 26px 60px;
+	padding: 64px 32px;
 }
 .page-head {
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	margin-bottom: 26px;
+	margin-bottom: 48px;
 }
 .page-title {
 	font-family: var(--serif);
-	font-size: 2rem;
-	font-weight: 400;
+	font-size: 32px;
+	font-weight: 500;
 	letter-spacing: -0.01em;
 	margin: 0;
 	flex: 1;
@@ -2984,14 +2953,16 @@ kbd {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	padding: 14px 12px;
-	border-bottom: 1px solid var(--border);
+	padding: 14px 16px;
+	border-bottom: 1px solid var(--border-soft);
 	cursor: pointer;
-	border-radius: var(--radius-sm);
+	border-radius: 12px;
 	transition: background 0.14s var(--ease);
+	margin-inline: -16px;
+	border-top: 0;
 }
 .row-item:first-child {
-	border-top: 1px solid var(--border);
+	border-top: 0;
 }
 .row-item:hover {
 	background: var(--muted);
@@ -3004,10 +2975,11 @@ kbd {
 	gap: 2px;
 }
 .row-title {
-	font-size: 0.96rem;
+	font-size: 15px;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
+	font-weight: 500;
 }
 .row-sub {
 	font-size: 0.79rem;
@@ -3016,8 +2988,8 @@ kbd {
 .row-meta {
 	display: flex;
 	align-items: center;
-	gap: 12px;
-	font-size: 0.82rem;
+	gap: 24px;
+	font-size: 13px;
 	color: var(--muted-foreground);
 	flex: none;
 }
@@ -3046,7 +3018,7 @@ kbd {
 .card-grid {
 	display: grid;
 	grid-template-columns: 1fr 1fr;
-	gap: 14px;
+	gap: 20px;
 }
 @media (max-width: 860px) {
 	.card-grid {
@@ -3056,30 +3028,31 @@ kbd {
 .grid-card {
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	padding: 18px 20px;
+	border-radius: 16px;
+	padding: 24px;
 	cursor: pointer;
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
-	min-height: 104px;
+	min-height: 144px;
 	transition: 0.16s var(--ease);
 }
 .grid-card:hover {
-	border-color: var(--muted-foreground);
+	border-color: #d1d5db;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 .grid-card b {
-	font-size: 1rem;
+	font-size: 16px;
 	font-weight: 500;
 }
 .grid-card p {
 	margin: 0;
-	font-size: 0.86rem;
+	font-size: 13px;
 	color: var(--muted-foreground);
 }
 .grid-card .gc-date {
 	margin-top: auto;
-	font-size: 0.78rem;
+	font-size: 13px;
 	color: var(--muted-foreground);
 }
 
@@ -3117,10 +3090,13 @@ kbd {
 .pill.primary {
 	box-shadow: none;
 	font-weight: 500;
+	background: var(--solid);
+	border-color: var(--solid);
+	color: var(--solid-foreground);
 }
 .pill.primary:hover {
-	background: var(--primary-hover);
-	border-color: var(--primary-hover);
+	background: var(--solid-hover);
+	border-color: var(--solid-hover);
 }
 .pill {
 	background: transparent;
@@ -3157,16 +3133,16 @@ kbd {
 /* ───────────────────────────────────────────────── کامپوزر */
 
 .composer {
-	padding: 0;
+	padding: 12px;
 	transition: border-color 0.16s var(--ease), box-shadow 0.16s var(--ease);
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: 20px;
-	box-shadow: var(--shadow-1);
+	border-radius: 24px;
+	box-shadow: var(--shadow-2);
 }
 .composer:focus-within {
-	border-color: var(--muted-foreground);
-	box-shadow: var(--shadow-2);
+	border-color: transparent;
+	box-shadow: 0 0 0 3px var(--ring);
 }
 .composer textarea {
 	width: 100%;
@@ -3176,8 +3152,9 @@ kbd {
 	resize: none;
 	line-height: 1.7;
 	max-height: 40vh;
-	font-size: 1rem;
-	padding: 14px 18px 4px;
+	font-size: 17px;
+	padding: 4px 4px 0;
+	min-height: 50px;
 }
 .composer textarea::placeholder {
 	color: var(--muted-foreground);
@@ -3185,8 +3162,8 @@ kbd {
 .composer-bar {
 	display: flex;
 	align-items: center;
-	margin-top: 0;
-	padding: 6px 10px 10px;
+	margin-top: 8px;
+	padding: 0;
 	gap: 4px;
 }
 .round-btn {
@@ -3197,28 +3174,35 @@ kbd {
 	cursor: pointer;
 	font-size: 1rem;
 	transition: 0.15s var(--ease);
-	width: 32px;
-	height: 32px;
-	border-radius: 50%;
+	width: 36px;
+	height: 36px;
+	border-radius: 12px;
 	border: 1px solid var(--border);
 	background: transparent;
-	color: var(--foreground);
+	color: #4b5563;
+	border-color: transparent;
 }
 .round-btn:hover {
-	background: var(--accent);
+	background: var(--muted);
+	border-color: #e5e7eb;
 }
 .round-btn.send {
 	background: var(--primary);
 	border-color: var(--primary);
 	color: var(--primary-foreground);
+	width: 32px;
+	height: 32px;
+	border-radius: 8px;
+	box-shadow: var(--shadow-1);
 }
 .round-btn.send:hover {
 	background: var(--primary-hover);
 }
 .round-btn.stop {
-	background: var(--primary);
-	border-color: var(--primary);
-	color: var(--primary-foreground);
+	background: var(--solid);
+	border-color: var(--solid);
+	color: var(--solid-foreground);
+	border-radius: 8px;
 }
 /* میکروفون و موج صدا در Claude قاب ندارند. */
 #btn-mic,
@@ -3234,15 +3218,16 @@ kbd {
 /* نام مدل: متنِ ساده، نه چیپِ قاب‌دار. */
 .model-chip {
 	background: transparent;
-	border: 0;
-	color: var(--foreground);
-	font-size: 0.86rem;
+	border: 1px solid transparent;
+	color: #4b5563;
+	font-size: 14px;
 	font-weight: 500;
-	padding: 6px 8px;
-	border-radius: var(--radius-sm);
+	padding: 6px 12px;
+	border-radius: 12px;
 }
 .model-chip:hover {
-	background: var(--accent);
+	background: var(--muted);
+	border-color: #e5e7eb;
 }
 .mode-chip {
 	background: transparent;
@@ -3274,30 +3259,32 @@ kbd {
  * کادر جستجو.
  */
 .set-modal {
-	width: min(960px, 94vw);
-	height: min(640px, 88vh);
+	width: 960px;
+	height: 90vh;
 	padding: 0;
-	border: 1px solid var(--border);
-	border-radius: var(--radius-lg);
+	border: 0;
+	border-radius: 24px;
 	background: var(--popover);
 	color: var(--popover-foreground);
-	box-shadow: var(--shadow-3);
+	box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
 	overflow: hidden;
+	max-width: 100%;
+	max-height: 750px;
 }
 .set-modal::backdrop {
-	background: rgba(20, 20, 19, 0.35);
-	backdrop-filter: blur(2px);
+	background: rgba(0, 0, 0, 0.4);
+	backdrop-filter: blur(4px);
 }
 .set-shell {
 	display: grid;
-	grid-template-columns: 196px minmax(0, 1fr);
+	grid-template-columns: 260px minmax(0, 1fr);
 	height: 100%;
 	min-height: 0;
 }
 .set-nav {
-	background: var(--sidebar);
+	background: var(--muted);
 	border-inline-end: 1px solid var(--border);
-	padding: 14px 10px;
+	padding: 12px 14px;
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
@@ -3307,29 +3294,34 @@ kbd {
 	width: 100%;
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: var(--radius-sm);
-	padding: 7px 11px;
-	font-size: 0.85rem;
-	margin-bottom: 12px;
+	border-radius: 10px;
+	padding: 6px 12px;
+	font-size: 14px;
+	margin-bottom: 24px;
+	box-shadow: var(--shadow-1);
+	margin-top: 8px;
 }
 .set-group {
-	font-size: 0.72rem;
-	color: var(--muted-foreground);
-	padding: 12px 10px 4px;
+	font-size: 11.5px;
+	color: #9ca3af;
+	padding: 10px 8px;
+	font-weight: 500;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
 }
 .set-item {
 	display: flex;
 	align-items: center;
-	gap: 9px;
+	gap: 12px;
 	width: 100%;
 	background: transparent;
 	border: 0;
 	color: var(--foreground);
-	padding: 7px 10px;
-	border-radius: var(--radius-sm);
+	padding: 6px 12px;
+	border-radius: 12px;
 	cursor: pointer;
 	text-align: start;
-	font-size: 0.87rem;
+	font-size: 14px;
 	transition: background 0.14s var(--ease);
 }
 .set-item:hover {
@@ -3355,7 +3347,7 @@ kbd {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	padding: 16px 20px 12px;
+	padding: 20px 48px 0;
 	flex: none;
 }
 .set-head h2 {
@@ -3369,7 +3361,8 @@ kbd {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
-	padding: 4px 20px 24px;
+	padding: 8px 48px 40px;
+	font-size: 15px;
 }
 
 /* یک ردیف تنظیم: برچسب و توضیح در ابتدا، کنترل در انتها. */
@@ -3377,7 +3370,7 @@ kbd {
 	display: flex;
 	align-items: center;
 	gap: 20px;
-	padding: 14px 0;
+	padding: 16px 0;
 	border-bottom: 1px solid var(--border-soft);
 }
 .set-row:last-child {
@@ -3391,6 +3384,7 @@ kbd {
 	font-weight: 400;
 	font-size: 0.94rem;
 	display: block;
+	color: #374151;
 }
 .set-row-desc {
 	margin: 3px 0 0;
@@ -3405,8 +3399,11 @@ kbd {
 	gap: 8px;
 }
 .set-row-control .field {
-	width: 220px;
+	width: 280px;
 	margin: 0;
+	border-radius: 8px;
+	padding: 6px 12px;
+	font-size: 14px;
 }
 .set-row.stack {
 	display: block;
@@ -3429,8 +3426,8 @@ kbd {
 /* کلید سوییچ — Claude برای بولین‌ها چک‌باکس نشان نمی‌دهد. */
 .switch {
 	position: relative;
-	width: 40px;
-	height: 23px;
+	width: 44px;
+	height: 24px;
 	flex: none;
 	display: inline-block;
 }
@@ -3453,10 +3450,10 @@ kbd {
 .switch i::after {
 	content: '';
 	position: absolute;
-	top: 2.5px;
-	inset-inline-start: 2.5px;
-	width: 18px;
-	height: 18px;
+	top: 4px;
+	inset-inline-start: 4px;
+	width: 16px;
+	height: 16px;
 	border-radius: 50%;
 	background: #fff;
 	box-shadow: var(--shadow-1);
@@ -3466,7 +3463,7 @@ kbd {
 	background: var(--primary);
 }
 .switch input:checked + i::after {
-	transform: translateX(-17px);
+	transform: translateX(-20px);
 }
 html[dir='ltr'] .switch input:checked + i::after {
 	transform: translateX(17px);
@@ -3538,11 +3535,7 @@ html[dir='ltr'] .switch input:checked + i::after {
 .field-label:last-child {
 	border-bottom: 0;
 }
-.field-label > span {
-	margin-bottom: 0;
-	color: var(--foreground);
-	font-size: 0.94rem;
-}
+
 .field-label > small {
 	grid-column: 1;
 	grid-row: 2;
@@ -3597,8 +3590,8 @@ html[dir='ltr'] .switch input:checked + i::after {
 	appearance: none;
 	-webkit-appearance: none;
 	position: relative;
-	width: 38px;
-	height: 22px;
+	width: 44px;
+	height: 24px;
 	margin: 0;
 	border-radius: 20px;
 	background: var(--border);
@@ -3609,10 +3602,10 @@ html[dir='ltr'] .switch input:checked + i::after {
 .check input[type='checkbox']::after {
 	content: '';
 	position: absolute;
-	top: 2.5px;
-	inset-inline-start: 2.5px;
-	width: 17px;
-	height: 17px;
+	top: 4px;
+	inset-inline-start: 4px;
+	width: 16px;
+	height: 16px;
 	border-radius: 50%;
 	background: #fff;
 	box-shadow: var(--shadow-1);
@@ -3622,7 +3615,7 @@ html[dir='ltr'] .switch input:checked + i::after {
 	background: var(--primary);
 }
 .check input[type='checkbox']:checked::after {
-	transform: translateX(-16px);
+	transform: translateX(-20px);
 }
 .check input[type='checkbox']:focus-visible {
 	box-shadow: var(--glow);
@@ -3698,4 +3691,71 @@ html[dir='ltr'] .switch input:checked + i::after {
 }
 .set-box .set-row {
 	border-bottom: 0;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════
+   اندازه‌ها و ساختار از طرح تأییدشده (_bin/claude-ui.zip)
+   ══════════════════════════════════════════════════════════════════════ */
+
+#btn-reopen {
+	position: absolute;
+	top: 16px;
+	inset-inline-start: 16px;
+	z-index: 10;
+}
+
+.page-actions .pill {
+	border-radius: 12px;
+	padding: 8px 16px;
+	font-size: 14px;
+	font-weight: 500;
+	box-shadow: var(--shadow-1);
+}
+
+.page-actions .icon-btn {
+	border-radius: 12px;
+	width: 36px;
+	height: 36px;
+	box-shadow: var(--shadow-1);
+}
+
+.msg.assistant {
+	display: flex;
+	gap: 16px;
+	align-items: flex-start;
+}
+
+.msg-mark {
+	width: 28px;
+	height: 28px;
+	flex: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-top: 2px;
+}
+
+.set-body > * {
+	max-width: 640px;
+}
+
+.acc-chev {
+	margin-inline-start: auto;
+	color: #9ca3af;
+	flex: none;
+}
+
+.msg-col {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	flex-direction: column;
+}
+
+
+
+/* دکمهٔ شناور، فقط وقتی نوار کناری جمع است. */
+body:not(.sidebar-collapsed) #btn-reopen {
+	display: none;
 }

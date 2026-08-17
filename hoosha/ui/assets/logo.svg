@@ -7,8 +7,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="هوشا">
 	<defs>
 		<linearGradient id="hoosha-mark" x1="4" y1="3" x2="28" y2="29" gradientUnits="userSpaceOnUse">
-			<stop offset="0" stop-color="#3ab3af" />
-			<stop offset="1" stop-color="#26837f" />
+			<stop offset="0" stop-color="#39b0c7" />
+			<stop offset="1" stop-color="#227f92" />
 		</linearGradient>
 	</defs>
 	<path d="M16.00 1.40 L20.28 5.68 L26.32 5.68 L26.32 11.72 L30.60 16.00 L26.32 20.28 L26.32 26.32 L20.28 26.32 L16.00 30.60 L11.72 26.32 L5.68 26.32 L5.68 20.28 L1.40 16.00 L5.68 11.72 L5.68 5.68 L11.72 5.68 Z M19.10 8.52 L23.48 12.90 L23.48 19.10 L19.10 23.48 L12.90 23.48 L8.52 19.10 L8.52 12.90 L12.90 8.52 Z" fill="url(#hoosha-mark)" fill-rule="evenodd" />
