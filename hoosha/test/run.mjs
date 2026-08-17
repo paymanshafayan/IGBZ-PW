@@ -1549,15 +1549,43 @@ await test( 'نوار کناری و ریل هم قابل اسکرول‌اند �
 	assert.match( cssBlock( '.rail-body' ), /overflow-y:\s*auto/ );
 } );
 
-await test( 'رنگ‌های Claude دقیقاً همان‌اند', () => {
+await test( 'رنگ‌های Claude دقیقاً همان‌اند و لایه‌بندی درست است', () => {
+	// در تصویر، پنل گفتگو یک سطح روشن‌تر است که روی صفحهٔ تیره‌تر/کرم شناور است.
 	const root = cssBlock( ':root' );
-	assert.match( root, /--bg:\s*#262624/ );
-	assert.match( root, /--bg-side:\s*#1f1e1d/ );
+	assert.match( root, /--card:\s*#262624/, 'پنل گفتگو باید #262624 باشد' );
+	assert.match( root, /--bg:\s*#1a1918/, 'صفحهٔ پشت کارت باید تیره‌تر باشد' );
 	assert.match( root, /--bg-raise:\s*#30302e/ );
 	assert.match( root, /--accent:\s*#d97757/ );
 
-	assert.ok( css.includes( '--bg: #faf9f5' ), 'تم روشن باید کرمِ #faf9f5 باشد' );
-	assert.ok( css.includes( '--bg-side: #f0efe6' ) );
+	assert.ok( css.includes( '--card: #faf9f5' ), 'تم روشن: پنل گفتگو #faf9f5' );
+	assert.ok( css.includes( '--bg: #eeece2' ), 'تم روشن: صفحه کرمِ #eeece2' );
+} );
+
+await test( 'چیدمان سه‌ستونی تصویر: ناوبری، فهرست نشست، پنل شناور', () => {
+	assert.match( html, /class="list-col"/, 'ستون فهرست نشست‌ها نیست' );
+	assert.match( html, /class="main-card"/, 'پنل گفتگو باید کارت باشد' );
+	assert.match( html, /id="btn-back"/ );
+	assert.match( html, /id="btn-more"/ );
+
+	const app = cssBlock( '.app' );
+	assert.match( app, /grid-template-columns:\s*var\(--sidebar-w\) var\(--list-w\)/ );
+
+	const card = cssBlock( '.main-card' );
+	assert.match( card, /border-radius/ );
+	assert.match( card, /min-height:\s*0/, 'کارت هم باید بتواند کوچک شود وگرنه اسکرول می‌شکند' );
+	assert.match( card, /background:\s*var\(--card\)/ );
+} );
+
+await test( 'فهرست نشست‌ها گروه‌بندی و زیرنویس دارد، مثل تصویر', () => {
+	const side = fssync.readFileSync( path.join( uiDir, 'sidebar.js' ), 'utf8' );
+	assert.match( side, /function groupOf\( item, state \)/ );
+	assert.match( side, /function subtitleOf\( item, state \)/ );
+	// تعریف‌شدن کافی نیست؛ باید واقعاً صدا زده شود.
+	assert.match( side, /const group = groupOf\( item, s \)/ );
+	assert.match( side, /subtitleOf\( item, s \)/ );
+	assert.match( side, /در حال اجرا/ );
+	assert.match( side, /class: 'list-sub'/ );
+	assert.match( css, /\.list-group\s*\{/ );
 } );
 
 await test( 'همهٔ ماژول‌های رابط، فایل‌های واقعی را import می‌کنند', async () => {

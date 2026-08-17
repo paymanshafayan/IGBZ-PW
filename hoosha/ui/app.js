@@ -400,8 +400,50 @@ $( '#btn-new' ).onclick = async () => {
 };
 
 $( '#btn-settings' ).onclick = () => showView( 'settings' );
+
+// دکمهٔ «‹» بالای پنل: از هر صفحه‌ای به گفتگو برمی‌گردد — مثل تصویر.
+$( '#btn-back' ).onclick = () => showView( 'chat' );
+
+// منوی «⋯» — جایی که در Claude هم کارهای همین گفتگو می‌نشیند.
+$( '#btn-more' ).onclick = ( e ) => {
+	e.stopPropagation();
+	const box = $( '#more-menu' );
+	if ( ! box.hidden ) {
+		box.hidden = true;
+		return;
+	}
+	const item = ( ico, label, onClick ) =>
+		h( 'div', { class: 'menu-item', onClick: () => {
+			box.hidden = true;
+			onClick();
+		} }, [ h( 'span', { class: 'm-ico', text: ico } ), h( 'b', { text: label } ) ] );
+
+	box.replaceChildren(
+		item( '✎', 'تغییر نام گفتگو', () => $( '#session-title' ).click() ),
+		item( '⤓', 'خروجی مارک‌داون', () => doExport( 'md' ) ),
+		item( '⤓', 'خروجی JSON', () => doExport( 'json' ) ),
+		h( 'div', { class: 'menu-sep' } ),
+		item( '↶', 'بازگشت به چک‌پوینت', () => openRewind( doRewind ) ),
+		item( '⌫', 'پاک‌کردن گفتگو', () => post( '/api/message', { text: '/clear' } ) ),
+		h( 'div', { class: 'menu-sep' } ),
+		item( '?', 'میان‌برها', () => openShortcuts() )
+	);
+	box.hidden = false;
+};
+
+document.addEventListener( 'click', ( e ) => {
+	const box = $( '#more-menu' );
+	if ( box && ! box.hidden && ! box.contains( e.target ) ) {
+		box.hidden = true;
+	}
+} );
+
+document.addEventListener( 'hoosha:rail', ( e ) => {
+	document.body.classList.add( 'rail-open' );
+	localStorage.setItem( 'hoosha-rail', '1' );
+	document.querySelector( `.rail-tab[data-tab="${ e.detail }"]` )?.click();
+} );
 $( '#btn-account' ).onclick = () => openSettings( 'provider' );
-$( '#btn-export' ).onclick = () => doExport( 'md' );
 $( '#btn-search' ).onclick = () => openPalette( paletteDeps() );
 $( '#btn-menu' ).onclick = () => document.body.classList.toggle( 'sidebar-open' );
 

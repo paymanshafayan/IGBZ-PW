@@ -12,9 +12,10 @@
 :root {
 	--fs: 16px;
 
-	/* تیره */
-	--bg: #262624;
-	--bg-side: #1f1e1d;
+	/* تیره — صفحه تیره‌تر است و پنل گفتگو رویش می‌نشیند */
+	--bg: #1a1918;
+	--bg-side: #1a1918;
+	--card: #262624;
 	--bg-raise: #30302e;
 	--bg-hover: #35353293;
 	--line: #3e3d3a;
@@ -45,14 +46,16 @@
 	--serif: 'Noto Naskh Arabic', 'Times New Roman', Georgia, 'Iranian Serif', serif;
 	--mono: ui-monospace, 'SF Mono', 'Cascadia Mono', 'Consolas', Menlo, monospace;
 
-	--sidebar-w: 252px;
+	--sidebar-w: 248px;
+	--list-w: 232px;
 	--rail-w: 300px;
 	--col: 46rem;
 }
 
 html[data-theme='light'] {
-	--bg: #faf9f5;
-	--bg-side: #f0efe6;
+	--bg: #eeece2;
+	--bg-side: #eeece2;
+	--card: #faf9f5;
 	--bg-raise: #ffffff;
 	--bg-hover: #e9e7dc;
 	--line: #e0ddd0;
@@ -125,24 +128,24 @@ textarea {
 
 .app {
 	display: grid;
-	grid-template-columns: var(--sidebar-w) minmax(0, 1fr) 0;
+	grid-template-columns: var(--sidebar-w) var(--list-w) minmax(0, 1fr) 0;
 	height: 100dvh;
 	overflow: hidden;
 }
 body.rail-open .app {
-	grid-template-columns: var(--sidebar-w) minmax(0, 1fr) var(--rail-w);
+	grid-template-columns: var(--sidebar-w) var(--list-w) minmax(0, 1fr) var(--rail-w);
 }
 body.sidebar-collapsed .app {
-	grid-template-columns: 0 minmax(0, 1fr) 0;
+	grid-template-columns: 0 0 minmax(0, 1fr) 0;
 }
 body.sidebar-collapsed.rail-open .app {
-	grid-template-columns: 0 minmax(0, 1fr) var(--rail-w);
+	grid-template-columns: 0 0 minmax(0, 1fr) var(--rail-w);
 }
 
 /* ══════════════════════════════════════════════════════ نوار کناری */
 
 .sidebar {
-	background: var(--bg-side);
+	background: transparent;
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
@@ -340,6 +343,109 @@ body.sidebar-collapsed.rail-open .app {
 	color: var(--fg-mute);
 }
 
+/* ══════════════════════════════════════════════ ستون فهرست نشست‌ها */
+
+.list-col {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	overflow: hidden;
+	padding: 10px 6px;
+}
+.list-head {
+	display: flex;
+	align-items: center;
+	padding: 4px 6px 10px;
+	flex: none;
+}
+.list-scroll {
+	flex: 1;
+	min-height: 0;
+	overflow-y: auto;
+	padding-inline: 2px;
+}
+.list-group {
+	color: var(--fg-mute);
+	font-size: 0.82rem;
+	padding: 14px 10px 6px;
+}
+.list-item {
+	display: flex;
+	align-items: center;
+	border-radius: var(--r-sm);
+}
+.list-item:hover {
+	background: var(--bg-hover);
+}
+.list-item.active {
+	background: var(--bg-hover);
+}
+.list-main {
+	flex: 1;
+	min-width: 0;
+	background: transparent;
+	border: 0;
+	text-align: start;
+	cursor: pointer;
+	padding: 8px 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 1px;
+}
+.list-title {
+	color: var(--fg-dim);
+	font-size: 1.02rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.list-item.active .list-title,
+.list-item:hover .list-title {
+	color: var(--fg);
+}
+.list-sub {
+	color: var(--fg-mute);
+	font-size: 0.8rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.list-actions {
+	display: none;
+	padding-inline-end: 4px;
+}
+.list-item:hover .list-actions {
+	display: flex;
+}
+
+.round-ghost {
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	border: 0;
+	background: transparent;
+	color: var(--fg-dim);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	flex: none;
+	transition: 0.12s;
+}
+.round-ghost:hover {
+	background: var(--bg-hover);
+	color: var(--fg);
+}
+.round-ghost.raised {
+	background: var(--bg-raise);
+	box-shadow: 0 1px 3px #0000001a;
+}
+.round-ghost.raised:hover {
+	color: var(--fg);
+	filter: brightness(1.05);
+}
+
 /* ══════════════════════════════════════════════════════ ناحیهٔ اصلی */
 
 .main {
@@ -351,28 +457,42 @@ body.sidebar-collapsed.rail-open .app {
 	min-height: 0;
 	overflow: hidden;
 	background: var(--bg);
+	padding: 8px 8px 8px 0;
+}
+
+/* گفتگو داخل یک کارت گرد می‌نشیند، مثل تصویر — نه چسبیده به لبهٔ پنجره. */
+.main-card {
+	flex: 1;
+	min-height: 0;
+	display: flex;
+	flex-direction: column;
+	background: var(--card);
+	border-radius: 18px;
+	overflow: hidden;
 }
 
 .topbar {
-	height: 52px;
+	height: 58px;
 	flex: none;
 	display: flex;
 	align-items: center;
-	gap: 4px;
-	padding: 0 12px;
+	gap: 6px;
+	padding: 0 14px;
 }
 .chat-title {
+	flex: 1;
 	display: flex;
 	align-items: center;
+	justify-content: center;
 	gap: 6px;
 	background: transparent;
 	border: 0;
-	color: var(--fg-dim);
+	color: var(--fg);
 	padding: 5px 10px;
 	border-radius: var(--r-sm);
 	cursor: pointer;
-	font-size: 0.94rem;
-	max-width: 44ch;
+	font-size: 1.02rem;
+	font-weight: 600;
 	min-width: 0;
 	transition: 0.12s;
 }
@@ -386,10 +506,17 @@ body.sidebar-collapsed.rail-open .app {
 	color: var(--fg);
 }
 .top-right {
-	margin-inline-start: auto;
 	display: flex;
 	align-items: center;
-	gap: 2px;
+	gap: 4px;
+	position: relative;
+}
+.more-menu {
+	bottom: auto;
+	top: 40px;
+	inset-inline-start: auto;
+	inset-inline-end: 0;
+	min-width: 220px;
 }
 .ctx-chip {
 	font-size: 0.74rem;
@@ -1298,7 +1425,9 @@ html[data-theme='light'] .diff .del {
 /* ══════════════════════════════════════════════════════ ریل کناری */
 
 .rail {
-	background: var(--bg-side);
+	background: var(--card);
+	border-radius: 18px;
+	margin: 8px 0 8px 8px;
 	display: flex;
 	flex-direction: column;
 	min-width: 0;
@@ -1947,9 +2076,21 @@ kbd {
 	display: none;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1240px) {
 	body.rail-open .app {
-		grid-template-columns: var(--sidebar-w) minmax(0, 1fr) 260px;
+		grid-template-columns: var(--sidebar-w) 0 minmax(0, 1fr) 260px;
+	}
+	body.rail-open .list-col {
+		display: none;
+	}
+}
+
+@media (max-width: 1000px) {
+	.app {
+		grid-template-columns: var(--sidebar-w) 0 minmax(0, 1fr) 0;
+	}
+	.list-col {
+		display: none;
 	}
 }
 
@@ -1957,7 +2098,7 @@ kbd {
 	.app,
 	body.rail-open .app,
 	body.sidebar-collapsed .app {
-		grid-template-columns: 0 minmax(0, 1fr) 0;
+		grid-template-columns: 0 0 minmax(0, 1fr) 0;
 	}
 	.sidebar {
 		position: fixed;
@@ -2128,4 +2269,14 @@ kbd {
 	border-radius: 5px;
 	padding: 1px 7px;
 	color: var(--warn);
+}
+
+.nav-item.pinned .pin-count {
+	margin-inline-start: auto;
+	font-size: 0.74rem;
+	color: var(--accent);
+	background: var(--accent-soft);
+	border-radius: 20px;
+	padding: 0 6px;
+	font-weight: 500;
 }

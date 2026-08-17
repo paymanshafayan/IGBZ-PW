@@ -39,6 +39,33 @@ export async function refreshSessions() {
 	return sessions;
 }
 
+/**
+ * گروه‌بندی مثل تصویر: نشست باز بالا، بعد امروز و این هفته و قدیمی‌تر.
+ * @param {any} item
+ * @param {any} state
+ */
+function groupOf( item, state ) {
+	if ( state?.sessionId === item.id ) {
+		return state?.busy ? 'در حال اجرا' : 'باز';
+	}
+	const day = 86_400_000;
+	const diff = Date.now() - Number( item.updatedAt || 0 );
+	if ( diff < day ) {
+		return 'امروز';
+	}
+	if ( diff < 7 * day ) {
+		return 'این هفته';
+	}
+	return 'قدیمی‌تر';
+}
+
+/** زیرنویس هر ردیف — جای همان `simonw/research` در تصویر. */
+function subtitleOf( item, state ) {
+	const ws = String( state?.config?.workspace || '' );
+	const name = ws.split( /[\\/]/ ).filter( Boolean ).slice( -2 ).join( '/' );
+	return `${ name || 'بدون پروژه' } · ${ item.messages } پیام`;
+}
+
 function paint() {
 	const box = $( '#session-list' );
 	if ( ! box ) {
@@ -52,19 +79,28 @@ function paint() {
 		return;
 	}
 
-	for ( const item of sessions.slice( 0, 40 ) ) {
+	let lastGroup = '';
+	for ( const item of sessions.slice( 0, 60 ) ) {
 		const active = s?.sessionId === item.id;
+		const group = groupOf( item, s );
+		if ( group !== lastGroup ) {
+			box.appendChild( h( 'div', { class: 'list-group', text: group } ) );
+			lastGroup = group;
+		}
+
 		box.appendChild(
-			h( 'div', { class: `session ${ active ? 'active' : '' }` }, [
+			h( 'div', { class: `list-item ${ active ? 'active' : '' }` }, [
 				h( 'button', {
-					class: 'session-main',
-					title: `${ item.title }\n${ timeAgo( item.updatedAt ) } · ${ item.messages } پیام`,
-					text: item.title || 'بدون عنوان',
+					class: 'list-main',
+					title: `${ item.title }\n${ timeAgo( item.updatedAt ) }`,
 					onClick: () => onResume( item.id ),
-				} ),
-				h( 'div', { class: 'session-actions' }, [
+				}, [
+					h( 'span', { class: 'list-title', text: item.title || 'بدون عنوان' } ),
+					h( 'span', { class: 'list-sub', text: subtitleOf( item, s ) } ),
+				] ),
+				h( 'div', { class: 'list-actions' }, [
 					h( 'button', {
-						class: 'ghost-icon',
+						class: 'round-ghost',
 						title: 'تغییر نام',
 						text: '✎',
 						onClick: async ( e ) => {
@@ -78,7 +114,7 @@ function paint() {
 						},
 					} ),
 					h( 'button', {
-						class: 'ghost-icon',
+						class: 'round-ghost',
 						title: 'حذف',
 						text: '×',
 						onClick: async ( e ) => {
@@ -99,10 +135,40 @@ function paint() {
 	}
 }
 
+/**
+ * «نشان‌شده» در نوار کناری — جای همان فهرست Starred در تصویر، ولی با چیزهایی که در یک
+ * ابزار عامل واقعاً هر روز لازم می‌شوند.
+ */
+function paintPinned( s ) {
+	const box = $( '#pinned-list' );
+	if ( ! box ) {
+		return;
+	}
+	const open = ( tab ) => () => document.dispatchEvent( new CustomEvent( 'hoosha:rail', { detail: tab } ) );
+	const items = [
+		[ '⌗', 'فهرست کار', open( 'todos' ), ( s.todos || [] ).filter( ( t ) => t.status !== 'completed' ).length ],
+		[ '❯', 'شل‌های پس‌زمینه', open( 'shells' ), ( s.shells || [] ).filter( ( x ) => x.status === 'running' ).length ],
+		[ '↶', 'چک‌پوینت‌ها', open( 'checkpoints' ), ( s.checkpoints || [] ).length ],
+		[ '±', 'تغییرات گیت', open( 'git' ), 0 ],
+	];
+
+	box.replaceChildren();
+	for ( const [ ico, label, onClick, count ] of items ) {
+		box.appendChild(
+			h( 'button', { class: 'nav-item pinned', onClick }, [
+				h( 'span', { class: 'si-ico', text: ico } ),
+				h( 'span', { text: label } ),
+				count ? h( 'b', { class: 'pin-count', text: String( count ) } ) : null,
+			] )
+		);
+	}
+}
+
 /** @param {any} s */
 export function paintSidebarState( s ) {
 	const p = s.config.profiles?.[ s.config.activeProfile ] || {};
 	$( '#chip-provider' ).textContent = p.provider || '—';
 	$( '#account-initial' ).textContent = ( p.provider || 'ه' ).slice( 0, 1 ).toUpperCase();
+	paintPinned( s );
 	paint();
 }
