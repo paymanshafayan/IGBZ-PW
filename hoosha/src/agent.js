@@ -1,17 +1,19 @@
 /**
  * حلقهٔ عامل هوشا.
  *
- * الگو همان چیزی است که در عمل جواب داده: مدل حرف می‌زند و ابزار می‌خواهد → دروازهٔ
+ * الگو همان چیزی است که در عمل جواب داده: مدل حرف می‌زند و ابزار می‌خواهد → هوک و دروازهٔ
  * مجوز → اجرای ابزار → نتیجه برمی‌گردد به مدل → تکرار تا وقتی مدل دیگر ابزاری نخواهد.
  *
- * دو تصمیم که عمدی‌اند:
+ * چند تصمیم که عمدی‌اند:
  *   ۱) نتیجهٔ ابزار **همیشه** به مدل برمی‌گردد، حتی وقتی رد شده — وگرنه مدل نمی‌فهمد چرا
  *      کارش پیش نرفت و همان درخواست را تکرار می‌کند.
  *   ۲) سقف گام دارد. یک عامل بی‌سقف، یک قبض بی‌سقف است.
+ *   ۳) رجیستری ابزار **پویاست** (تابع است، نه فهرست ثابت)، چون MCP و پلاگین‌ها وسط کار
+ *      ابزار اضافه و کم می‌کنند.
  */
 
-import { TOOLS, toolSpecs } from './tools.js';
 import { decide, describeCall } from './permissions.js';
+import { shouldCompact, compact } from './subagent.js';
 
 const DEFAULT_MAX_STEPS = 24;
 
@@ -22,8 +24,12 @@ export class Agent {
 	 *   model: string,
 	 *   workspace: string,
 	 *   rules: {mode:string, allow?:string[], ask?:string[], deny?:string[]},
+	 *   getTools: () => Record<string, any>,
 	 *   systemPrompt?: string,
+	 *   extraPrompt?: string,
 	 *   maxSteps?: number,
+	 *   hooks?: import('./hooks.js').HookRunner,
+	 *   autoCompact?: boolean,
 	 *   emit: (ev: any) => void,
 	 * }} opts
 	 */
@@ -32,8 +38,12 @@ export class Agent {
 		this.model = opts.model;
 		this.workspace = opts.workspace;
 		this.rules = opts.rules;
-		this.systemPrompt = opts.systemPrompt || defaultSystemPrompt( opts.workspace );
+		this.getTools = opts.getTools;
+		this.baseSystemPrompt = opts.systemPrompt || defaultSystemPrompt( opts.workspace );
+		this.extraPrompt = opts.extraPrompt || '';
 		this.maxSteps = opts.maxSteps || DEFAULT_MAX_STEPS;
+		this.hooks = opts.hooks || null;
+		this.autoCompact = opts.autoCompact !== false;
 		this.emit = opts.emit;
 
 		/** @type {import('./providers/types.js').Message[]} */
@@ -44,6 +54,10 @@ export class Agent {
 		/** @type {AbortController|null} */
 		this.controller = null;
 		this.usage = { inputTokens: 0, outputTokens: 0 };
+	}
+
+	get systemPrompt() {
+		return [ this.baseSystemPrompt, this.extraPrompt ].filter( Boolean ).join( '\n' );
 	}
 
 	/** پاسخ کاربر به یک دروازهٔ تأیید. */
@@ -65,6 +79,18 @@ export class Agent {
 		}
 	}
 
+	/** فشرده‌سازی دستی (دستور /compact). */
+	async compactNow() {
+		const before = this.messages.length;
+		this.messages = await compact( {
+			provider: this.provider,
+			model: this.model,
+			messages: this.messages,
+		} );
+		this.emit( { type: 'compacted', before, after: this.messages.length } );
+		return { before, after: this.messages.length };
+	}
+
 	/** @param {string} text */
 	async run( text ) {
 		if ( this.busy ) {
@@ -72,10 +98,27 @@ export class Agent {
 		}
 		this.busy = true;
 		this.controller = new AbortController();
-		this.messages.push( { role: 'user', content: text } );
-		this.emit( { type: 'user', text } );
 
 		try {
+			if ( this.hooks ) {
+				const res = await this.hooks.run( 'UserPromptSubmit', { prompt: text } );
+				if ( res.blocked ) {
+					this.emit( { type: 'notice', text: `هوک جلوی این پیام را گرفت: ${ res.reason }` } );
+					return;
+				}
+				if ( res.context.length ) {
+					text = `${ text }\n\n[کانتکست از هوک]\n${ res.context.join( '\n' ) }`;
+				}
+			}
+
+			this.messages.push( { role: 'user', content: text } );
+			this.emit( { type: 'user', text } );
+
+			if ( this.autoCompact && shouldCompact( this.messages ) ) {
+				this.emit( { type: 'notice', text: 'گفتگو طولانی شد؛ خلاصه‌اش می‌کنم.' } );
+				await this.compactNow();
+			}
+
 			for ( let step = 0; step < this.maxSteps; step++ ) {
 				const turn = await this.#oneTurn();
 				if ( ! turn.toolCalls.length ) {
@@ -85,6 +128,8 @@ export class Agent {
 					this.emit( { type: 'notice', text: `به سقف ${ this.maxSteps } گام رسیدیم و متوقف شدم.` } );
 				}
 			}
+
+			await this.hooks?.run( 'Stop', {} );
 		} catch ( e ) {
 			this.emit( { type: 'error', error: e?.message || String( e ) } );
 		} finally {
@@ -101,11 +146,14 @@ export class Agent {
 		/** @type {import('./providers/types.js').ToolCall[]} */
 		const toolCalls = [];
 
+		const tools = this.getTools();
+		const specs = Object.values( tools ).map( ( t ) => t.spec );
+
 		const stream = this.provider.stream( {
 			model: this.model,
 			system: this.systemPrompt,
 			messages: this.messages,
-			tools: toolSpecs(),
+			tools: specs,
 			signal: this.controller?.signal,
 		} );
 
@@ -131,21 +179,41 @@ export class Agent {
 		this.emit( { type: 'assistant_end', text, toolCalls } );
 
 		for ( const call of toolCalls ) {
-			const result = await this.#runTool( call );
+			const result = await this.#runTool( call, tools );
 			this.messages.push( { role: 'tool', toolCallId: call.id, content: result } );
 		}
 
 		return { text, toolCalls };
 	}
 
-	/** @param {import('./providers/types.js').ToolCall} call */
-	async #runTool( call ) {
+	/**
+	 * @param {import('./providers/types.js').ToolCall} call
+	 * @param {Record<string,any>} tools
+	 */
+	async #runTool( call, tools ) {
+		const tool = tools[ call.name ];
 		const summary = describeCall( call.name, call.input );
-		const verdict = decide( call.name, call.input, this.rules );
+
+		if ( ! tool ) {
+			this.emit( { type: 'tool_error', id: call.id, name: call.name, error: 'ابزار ناشناخته' } );
+			return `ابزار «${ call.name }» وجود ندارد. ابزارهای موجود: ${ Object.keys( tools ).join( ', ' ) }`;
+		}
+
+		const verdict = decide( call.name, call.input, this.rules, tools );
 
 		if ( verdict.decision === 'deny' ) {
 			this.emit( { type: 'tool_denied', id: call.id, name: call.name, summary, reason: verdict.reason } );
 			return `اجرا نشد. ${ verdict.reason || 'اجازه داده نشد.' }`;
+		}
+
+		// هوک PreToolUse حتی جلوی ابزار «مجاز» را هم می‌تواند بگیرد — این نقطه، جای
+		// سیاست‌های سازمانی است.
+		if ( this.hooks ) {
+			const res = await this.hooks.run( 'PreToolUse', { tool: call.name, input: call.input, summary } );
+			if ( res.blocked ) {
+				this.emit( { type: 'tool_denied', id: call.id, name: call.name, summary, reason: res.reason } );
+				return `اجرا نشد. هوک جلویش را گرفت: ${ res.reason }`;
+			}
 		}
 
 		if ( verdict.decision === 'ask' ) {
@@ -160,12 +228,12 @@ export class Agent {
 		this.emit( { type: 'tool_start', id: call.id, name: call.name, summary, input: call.input } );
 
 		try {
-			const tool = TOOLS[ call.name ];
 			const out = await tool.run( call.input || {}, {
 				workspace: this.workspace,
 				log: ( t ) => this.emit( { type: 'tool_log', id: call.id, text: t } ),
 			} );
 			this.emit( { type: 'tool_result', id: call.id, name: call.name, output: out } );
+			await this.hooks?.run( 'PostToolUse', { tool: call.name, input: call.input, output: out } );
 			return out;
 		} catch ( e ) {
 			const msg = e?.message || String( e );
@@ -186,6 +254,7 @@ export function defaultSystemPrompt( workspace ) {
 		'- به فارسی جواب بده مگر کاربر زبان دیگری بخواهد.',
 		'- قبل از حدس‌زدن، با ابزارها واقعیت را ببین (list_dir، read_file، grep).',
 		'- کار چندمرحله‌ای را با todo_write ثبت کن تا چیزی گم نشود.',
+		'- برای کاوش‌های طولانی که فقط جوابِ کوتاهش لازم است، از ابزار task استفاده کن.',
 		'- برای تغییر فایل از edit_file استفاده کن، نه بازنویسی کامل، مگر فایل تازه باشد.',
 		'- هر فرمان مخرب یا پرریسک را اول توضیح بده؛ کاربر باید بفهمد چه چیزی را تأیید می‌کند.',
 		'- اگر کاربر اجازه نداد، اصرار نکن؛ راه دیگری پیشنهاد بده.',

@@ -63,9 +63,12 @@ function addNotice( text, isError ) {
 	append( el( 'div', `notice${ isError ? ' error' : '' }`, text ) );
 }
 
-function toolCard( id, name, summary ) {
+function toolCard( id, name, summary, sub ) {
 	const card = el( 'div', 'tool' );
 	const head = el( 'div', 'tool-head' );
+	if ( sub ) {
+		head.appendChild( el( 'span', 'sub-tag', `زیرعامل: ${ sub }` ) );
+	}
 	head.appendChild( el( 'span', 'tool-name', name ) );
 	head.appendChild( el( 'span', 'tool-sum', summary || '' ) );
 	const badge = el( 'span', 'state run', 'در حال اجرا' );
@@ -163,7 +166,7 @@ function handle( ev ) {
 			break;
 
 		case 'tool_start':
-			toolCard( ev.id, ev.name, ev.summary );
+			toolCard( ev.id, ev.name, ev.summary, ev.sub );
 			break;
 
 		case 'tool_result':
@@ -176,9 +179,29 @@ function handle( ev ) {
 
 		case 'tool_denied':
 			if ( ! toolEls.has( ev.id ) ) {
-				toolCard( ev.id, ev.name, ev.summary );
+				toolCard( ev.id, ev.name, ev.summary, ev.sub );
 			}
 			finishTool( ev.id, { denied: true, reason: ev.reason } );
+			break;
+
+		case 'system':
+			addMessage( 'هوشا', ev.text, 'system' );
+			break;
+
+		case 'subagent_start':
+			append( el( 'div', 'notice', `زیرعامل شروع شد: ${ ev.label }` ) );
+			break;
+
+		case 'subagent_end':
+			append( el( 'div', 'notice', `زیرعامل تمام شد: ${ ev.label }` ) );
+			break;
+
+		case 'compacted':
+			addNotice( `گفتگو فشرده شد (${ ev.before } → ${ ev.after } پیام).` );
+			break;
+
+		case 'hook':
+			addNotice( `هوک ${ ev.event } اجرا شد.` );
 			break;
 
 		case 'notice':
@@ -383,6 +406,9 @@ $( '#composer' ).onsubmit = async ( e ) => {
 	if ( out.error ) {
 		addNotice( out.error, true );
 		setBusy( false );
+	} else if ( out.handled ) {
+		setBusy( false );
+		refreshState();
 	}
 };
 
@@ -399,3 +425,234 @@ input.addEventListener( 'keydown', ( e ) => {
 } );
 
 boot();
+
+// ------------------------------------------------- پنل افزونه‌ها و دستورها
+
+async function refreshState() {
+	state = await api( '/api/state' );
+	renderProviderChip();
+	$( '#mode' ).value = state.config.permissions.mode;
+	$( '#btn-workspace' ).textContent = shortPath( state.config.workspace );
+	return state;
+}
+
+function itemRow( name, desc, tags = [] ) {
+	const row = el( 'div', 'item' );
+	row.appendChild( el( 'b', null, name ) );
+	row.appendChild( el( 'p', null, desc || '' ) );
+	for ( const t of tags ) {
+		row.appendChild( el( 'span', `tag ${ t.kind || '' }`, t.text ) );
+	}
+	return row;
+}
+
+function renderPanel( tab ) {
+	for ( const t of document.querySelectorAll( '.tab' ) ) {
+		t.classList.toggle( 'active', t.dataset.tab === tab );
+	}
+	for ( const id of [ 'tools', 'skills', 'mcp', 'plugins', 'commands' ] ) {
+		$( `#tab-${ id }` ).hidden = id !== tab;
+	}
+
+	if ( tab === 'tools' ) {
+		const box = $( '#tab-tools' );
+		box.replaceChildren();
+		for ( const t of state.tools ) {
+			box.appendChild(
+				itemRow( t.name, t.description, [
+					{ text: t.risk },
+					...( t.name.startsWith( 'mcp__' ) ? [ { text: 'MCP', kind: 'mcp' } ] : [] ),
+				] )
+			);
+		}
+	}
+
+	if ( tab === 'skills' ) {
+		const box = $( '#tab-skills' );
+		box.replaceChildren();
+		if ( ! state.skills.length ) {
+			box.appendChild(
+				el(
+					'div',
+					'empty',
+					'هیچ اسکیلی نصب نیست.\n\nیک اسکیل آماده را در این مسیر بگذار:\n~/.hoosha/skills/<نام>/SKILL.md\n\nیا با نصب یک پلاگین، اسکیل‌هایش را بیاور.'
+				)
+			);
+		}
+		for ( const s of state.skills ) {
+			box.appendChild( itemRow( s.name, s.description, [ { text: s.source } ] ) );
+		}
+	}
+
+	if ( tab === 'mcp' ) {
+		const box = $( '#tab-mcp' );
+		box.replaceChildren();
+		if ( ! state.mcp.length ) {
+			box.appendChild(
+				el(
+					'div',
+					'empty',
+					'سرور MCP تنظیم نشده.\n\nدر ~/.hoosha/config.json کلید mcpServers را پر کن، یا در پوشهٔ پروژه فایل .hoosha/mcp.json بساز:\n\n{ "mcpServers": { "files": { "command": "npx", "args": ["-y","@modelcontextprotocol/server-filesystem","."] } } }'
+				)
+			);
+		}
+		for ( const s of state.mcp ) {
+			box.appendChild(
+				itemRow( s.name, s.status === 'connected' ? `${ s.tools.length } ابزار: ${ s.tools.join( '، ' ) }` : s.error || '', [
+					{ text: s.status, kind: s.status === 'connected' ? 'ok' : 'err' },
+				] )
+			);
+		}
+	}
+
+	if ( tab === 'plugins' ) {
+		const box = $( '#plugin-list' );
+		box.replaceChildren();
+		if ( ! state.plugins.length ) {
+			box.appendChild( el( 'div', 'empty', 'پلاگینی نصب نیست. بالا یک منبع بده و نصب کن.' ) );
+		}
+		for ( const p of state.plugins ) {
+			const row = itemRow(
+				p.name,
+				`اسکیل: ${ p.has.skills } · دستور: ${ p.has.commands }${ p.has.mcp ? ' · MCP' : '' }${ p.has.hooks ? ' · هوک' : '' }`,
+				[ { text: p.enabled ? 'فعال' : 'خاموش', kind: p.enabled ? 'ok' : '' } ]
+			);
+			const toggle = el( 'button', 'chip', p.enabled ? 'خاموش کن' : 'روشن کن' );
+			toggle.onclick = async () => {
+				await api( '/api/plugins', {
+					method: 'POST',
+					body: JSON.stringify( { action: 'toggle', name: p.name, enabled: ! p.enabled } ),
+				} );
+				await refreshState();
+				renderPanel( 'plugins' );
+			};
+			const del = el( 'button', 'chip', 'حذف' );
+			del.onclick = async () => {
+				if ( ! confirm( `پلاگین «${ p.name }» حذف شود؟` ) ) {
+					return;
+				}
+				await api( '/api/plugins', { method: 'POST', body: JSON.stringify( { action: 'remove', name: p.name } ) } );
+				await refreshState();
+				renderPanel( 'plugins' );
+			};
+			row.appendChild( toggle );
+			row.appendChild( del );
+			box.appendChild( row );
+		}
+	}
+
+	if ( tab === 'commands' ) {
+		const box = $( '#tab-commands' );
+		box.replaceChildren();
+		for ( const c of state.commands ) {
+			box.appendChild( itemRow( `/${ c.name }`, c.description, [ { text: c.source } ] ) );
+		}
+	}
+}
+
+$( '#btn-panel' ).onclick = async () => {
+	await refreshState();
+	renderPanel( 'tools' );
+	$( '#panel' ).showModal();
+};
+$( '#panel-close' ).onclick = () => $( '#panel' ).close();
+for ( const t of document.querySelectorAll( '.tab' ) ) {
+	t.onclick = () => renderPanel( t.dataset.tab );
+}
+
+$( '#btn-reload' ).onclick = async () => {
+	const out = await api( '/api/reload', { method: 'POST' } );
+	await refreshState();
+	renderPanel( document.querySelector( '.tab.active' )?.dataset.tab || 'tools' );
+	if ( out.mcp?.some( ( s ) => s.status === 'failed' ) ) {
+		addNotice( 'بعضی سرورهای MCP وصل نشدند — تب MCP را ببین.', true );
+	}
+};
+
+$( '#btn-install-plugin' ).onclick = async () => {
+	const source = $( '#plugin-source' ).value.trim();
+	const note = $( '#plugin-note' );
+	if ( ! source ) {
+		return;
+	}
+	note.className = 'note';
+	note.textContent = 'در حال نصب…';
+	const out = await api( '/api/plugins', { method: 'POST', body: JSON.stringify( { action: 'install', source } ) } );
+	if ( out.error ) {
+		note.className = 'note error';
+		note.textContent = out.error;
+		return;
+	}
+	note.textContent = `«${ out.plugin.name }» نصب شد.`;
+	$( '#plugin-source' ).value = '';
+	await refreshState();
+	renderPanel( 'plugins' );
+};
+
+// ------------------------------------------------ تکمیل خودکار دستورها
+
+const cmdMenu = $( '#cmd-menu' );
+let cmdIndex = 0;
+
+function commandMatches() {
+	const text = input.value;
+	if ( ! text.startsWith( '/' ) || text.includes( '\n' ) ) {
+		return null;
+	}
+	const q = text.slice( 1 ).split( /\s/ )[ 0 ].toLowerCase();
+	if ( text.slice( 1 ).includes( ' ' ) ) {
+		return null;
+	}
+	return ( state?.commands || [] ).filter( ( c ) => c.name.toLowerCase().startsWith( q ) ).slice( 0, 8 );
+}
+
+function renderCmdMenu() {
+	const list = commandMatches();
+	if ( ! list || ! list.length ) {
+		cmdMenu.hidden = true;
+		return;
+	}
+	cmdIndex = Math.min( cmdIndex, list.length - 1 );
+	cmdMenu.replaceChildren();
+	list.forEach( ( c, i ) => {
+		const row = el( 'div', `cmd-item${ i === cmdIndex ? ' active' : '' }` );
+		row.appendChild( el( 'b', null, `/${ c.name }` ) );
+		row.appendChild( el( 'span', null, c.description || '' ) );
+		row.appendChild( el( 'em', null, c.source ) );
+		row.onclick = () => {
+			input.value = `/${ c.name } `;
+			cmdMenu.hidden = true;
+			input.focus();
+		};
+		cmdMenu.appendChild( row );
+	} );
+	cmdMenu.hidden = false;
+}
+
+input.addEventListener( 'input', renderCmdMenu );
+
+input.addEventListener( 'keydown', ( e ) => {
+	if ( cmdMenu.hidden ) {
+		return;
+	}
+	const list = commandMatches() || [];
+	if ( e.key === 'ArrowDown' ) {
+		e.preventDefault();
+		cmdIndex = ( cmdIndex + 1 ) % list.length;
+		renderCmdMenu();
+	} else if ( e.key === 'ArrowUp' ) {
+		e.preventDefault();
+		cmdIndex = ( cmdIndex - 1 + list.length ) % list.length;
+		renderCmdMenu();
+	} else if ( e.key === 'Tab' && list.length ) {
+		e.preventDefault();
+		input.value = `/${ list[ cmdIndex ].name } `;
+		cmdMenu.hidden = true;
+	} else if ( e.key === 'Escape' ) {
+		cmdMenu.hidden = true;
+	}
+}, true );
+
+$( '#composer' ).addEventListener( 'submit', () => {
+	cmdMenu.hidden = true;
+} );

@@ -18,10 +18,11 @@ export const MODES = /** @type {const} */ ( [ 'plan', 'default', 'auto' ] );
  * @param {string} toolName
  * @param {any} input
  * @param {{mode:string, allow?:string[], ask?:string[], deny?:string[]}} rules
+ * @param {Record<string,any>} [registry] رجیستری کامل (ابزار داخلی + MCP + پلاگین)
  * @returns {{decision:'allow'|'ask'|'deny', reason?:string}}
  */
-export function decide( toolName, input, rules ) {
-	const tool = TOOLS[ toolName ];
+export function decide( toolName, input, rules, registry ) {
+	const tool = ( registry || TOOLS )[ toolName ];
 	if ( ! tool ) {
 		return { decision: 'deny', reason: `ابزار ناشناخته: ${ toolName }` };
 	}
@@ -100,7 +101,15 @@ export function describeCall( toolName, input ) {
 			return `جستجوی متن «${ input?.pattern }»`;
 		case 'web_fetch':
 			return input?.url || '';
+		case 'skill':
+			return `باز کردن اسکیل «${ input?.name }»`;
+		case 'task':
+			return input?.description || String( input?.prompt || '' ).slice( 0, 80 );
 		default:
+			if ( toolName.startsWith( 'mcp__' ) ) {
+				const [ , server, tool ] = toolName.split( '__' );
+				return `${ server } → ${ tool }: ${ JSON.stringify( input ?? {} ).slice( 0, 160 ) }`;
+			}
 			return JSON.stringify( input ?? {} ).slice( 0, 200 );
 	}
 }

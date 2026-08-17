@@ -11,11 +11,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { loadConfig, saveConfig, publicConfig, activeProfile } from './config.js';
+import { loadConfig, saveConfig, publicConfig, activeProfile, HOME } from './config.js';
 import { PROVIDERS, createProvider, validateProfile, providerInfo } from './providers/index.js';
-import { Agent } from './agent.js';
 import { MODES } from './permissions.js';
 import { saveSession, listSessions, loadSession } from './session.js';
+import { Runtime } from './runtime.js';
+import { parseInput, BUILTIN_COMMANDS } from './commands.js';
+import { listPlugins, installPlugin, removePlugin, setPluginEnabled, fetchMarketplace } from './plugins.js';
 
 const __dirname = path.dirname( fileURLToPath( import.meta.url ) );
 const UI_DIR = path.join( __dirname, '..', 'ui' );
@@ -29,19 +31,17 @@ const MIME = {
 	'.ico': 'image/x-icon',
 };
 
-export async function startServer( { port = 7788, host = '0.0.0.0', workspace } = {} ) {
-	const cfg = await loadConfig();
+export async function startServer( { port = 7788, host = '127.0.0.1', workspace } = {} ) {
+	const boot = await loadConfig();
 	if ( workspace ) {
-		cfg.workspace = path.resolve( workspace );
-		await saveConfig( cfg );
+		boot.workspace = path.resolve( workspace );
+		await saveConfig( boot );
 	}
 
 	/** @type {Set<import('node:http').ServerResponse>} */
 	const clients = new Set();
 	/** @type {any[]} */
 	let transcript = [];
-	/** @type {Agent|null} */
-	let agent = null;
 	let sessionId = `s_${ Date.now().toString( 36 ) }`;
 
 	const broadcast = ( ev ) => {
@@ -54,38 +54,16 @@ export async function startServer( { port = 7788, host = '0.0.0.0', workspace } 
 		}
 	};
 
-	async function buildAgent() {
-		const fresh = await loadConfig();
-		const profile = activeProfile( fresh );
-		if ( ! profile ) {
-			throw new Error( 'هیچ پروفایلی تنظیم نشده است.' );
-		}
-		const check = validateProfile( profile );
-		if ( ! check.ok ) {
-			throw new Error( `تنظیمات ناقص است: ${ check.missing.join( '، ' ) }` );
-		}
-		const info = providerInfo( profile.provider );
-		const provider = createProvider( profile );
-		const next = new Agent( {
-			provider,
-			model: profile.model || info?.defaultModel || '',
-			workspace: fresh.workspace,
-			rules: fresh.permissions,
-			emit: broadcast,
-		} );
-		if ( agent ) {
-			next.messages = agent.messages;
-			next.usage = agent.usage;
-		}
-		agent = next;
-		return agent;
-	}
+	const runtime = new Runtime( broadcast );
+	await runtime.reload();
+	await runtime.loadProjectMemory();
+	await runtime.hooks.run( 'SessionStart', { sessionId } );
 
 	const server = http.createServer( async ( req, res ) => {
 		const url = new URL( req.url || '/', `http://${ req.headers.host || 'localhost' }` );
 		const send = ( code, body, type = 'application/json; charset=utf-8' ) => {
 			res.writeHead( code, { 'Content-Type': type, 'Cache-Control': 'no-store' } );
-			res.end( typeof body === 'string' ? body : JSON.stringify( body ) );
+			res.end( typeof body === 'string' || Buffer.isBuffer( body ) ? body : JSON.stringify( body ) );
 		};
 
 		try {
@@ -109,51 +87,63 @@ export async function startServer( { port = 7788, host = '0.0.0.0', workspace } 
 
 			// ------------------------------------------------------------ وضعیت
 			if ( url.pathname === '/api/state' && req.method === 'GET' ) {
-				const fresh = await loadConfig();
-				const profile = activeProfile( fresh );
+				const cfg = runtime.config;
 				return send( 200, {
-					config: publicConfig( fresh ),
+					config: publicConfig( cfg ),
 					providers: PROVIDERS,
 					modes: MODES,
-					ready: profile ? validateProfile( profile ) : { ok: false, missing: [ 'پروفایل' ] },
-					busy: Boolean( agent?.busy ),
+					ready: runtime.ready,
+					busy: Boolean( runtime.agent?.busy ),
 					transcript,
 					sessionId,
-					usage: agent?.usage || { inputTokens: 0, outputTokens: 0 },
+					usage: runtime.agent?.usage || { inputTokens: 0, outputTokens: 0 },
+					tools: Object.values( runtime.tools() ).map( ( t ) => ( {
+						name: t.spec.name,
+						description: t.spec.description,
+						risk: t.risk,
+					} ) ),
+					skills: runtime.skills.map( ( s ) => ( { name: s.name, description: s.description, source: s.source } ) ),
+					commands: [
+						...BUILTIN_COMMANDS.map( ( c ) => ( { ...c, source: 'builtin' } ) ),
+						...runtime.commands.map( ( c ) => ( { name: c.name, description: c.description, source: c.source } ) ),
+					],
+					mcp: runtime.mcp.status,
+					plugins: await listPlugins( HOME ),
+					memory: Boolean( runtime.projectMemory ),
 				} );
 			}
 
 			// ----------------------------------------------------------- تنظیمات
 			if ( url.pathname === '/api/profile' && req.method === 'POST' ) {
 				const body = await readJson( req );
-				const fresh = await loadConfig();
+				const cfg = await loadConfig();
 				const id = body.id || 'default';
-				const prev = fresh.profiles[ id ] || {};
+				const prev = cfg.profiles[ id ] || {};
 				const info = providerInfo( body.provider );
-				fresh.profiles[ id ] = {
+				cfg.profiles[ id ] = {
 					label: body.label || prev.label || id,
 					provider: body.provider,
 					baseUrl: body.baseUrl ?? ( info?.editableBaseUrl ? prev.baseUrl : '' ) ?? '',
-					// کلید خالی یعنی «دست نزن» تا ماسک باعث پاک‌شدن کلید نشود.
 					apiKey: body.apiKey ? body.apiKey : prev.apiKey || '',
 					model: body.model || info?.defaultModel || '',
 				};
-				fresh.activeProfile = id;
-				await saveConfig( fresh );
-				await buildAgent().catch( () => {} );
-				return send( 200, { ok: true, config: publicConfig( fresh ) } );
+				cfg.activeProfile = id;
+				await saveConfig( cfg );
+				await runtime.reload();
+				return send( 200, { ok: true, config: publicConfig( runtime.config ), ready: runtime.ready } );
 			}
 
 			if ( url.pathname === '/api/mode' && req.method === 'POST' ) {
 				const body = await readJson( req );
-				const fresh = await loadConfig();
 				if ( ! MODES.includes( body.mode ) ) {
 					return send( 400, { error: 'حالت نامعتبر' } );
 				}
-				fresh.permissions.mode = body.mode;
-				await saveConfig( fresh );
-				if ( agent ) {
-					agent.rules = fresh.permissions;
+				const cfg = await loadConfig();
+				cfg.permissions.mode = body.mode;
+				await saveConfig( cfg );
+				runtime.config = cfg;
+				if ( runtime.agent ) {
+					runtime.agent.rules = cfg.permissions;
 				}
 				broadcast( { type: 'mode', mode: body.mode } );
 				return send( 200, { ok: true } );
@@ -166,26 +156,58 @@ export async function startServer( { port = 7788, host = '0.0.0.0', workspace } 
 				if ( ! stat?.isDirectory() ) {
 					return send( 400, { error: 'این مسیر یک پوشه نیست.' } );
 				}
-				const fresh = await loadConfig();
-				fresh.workspace = dir;
-				await saveConfig( fresh );
-				if ( agent ) {
-					agent.workspace = dir;
-				}
+				const cfg = await loadConfig();
+				cfg.workspace = dir;
+				await saveConfig( cfg );
+				await runtime.reload();
+				await runtime.loadProjectMemory();
 				broadcast( { type: 'workspace', path: dir } );
 				return send( 200, { ok: true, path: dir } );
 			}
 
 			if ( url.pathname === '/api/models' && req.method === 'GET' ) {
-				const fresh = await loadConfig();
-				const profile = activeProfile( fresh );
+				const cfg = await loadConfig();
 				try {
-					const provider = createProvider( profile );
-					const models = await provider.listModels();
-					return send( 200, { models } );
+					const provider = createProvider( activeProfile( cfg ) );
+					return send( 200, { models: await provider.listModels() } );
 				} catch ( e ) {
 					return send( 200, { models: [], error: e?.message || String( e ) } );
 				}
+			}
+
+			// ------------------------------------------------------------ پلاگین
+			if ( url.pathname === '/api/plugins' && req.method === 'POST' ) {
+				const body = await readJson( req );
+				try {
+					if ( body.action === 'install' ) {
+						const out = await installPlugin( HOME, String( body.source || '' ), body.name );
+						await runtime.reload();
+						return send( 200, { ok: true, plugin: out } );
+					}
+					if ( body.action === 'remove' ) {
+						await removePlugin( HOME, String( body.name || '' ) );
+						await runtime.reload();
+						return send( 200, { ok: true } );
+					}
+					if ( body.action === 'toggle' ) {
+						await setPluginEnabled( HOME, String( body.name || '' ), Boolean( body.enabled ) );
+						await runtime.reload();
+						return send( 200, { ok: true } );
+					}
+					if ( body.action === 'marketplace' ) {
+						return send( 200, { ok: true, marketplace: await fetchMarketplace( String( body.source || '' ) ) } );
+					}
+					return send( 400, { error: 'کنش ناشناخته' } );
+				} catch ( e ) {
+					return send( 400, { error: e?.message || String( e ) } );
+				}
+			}
+
+			if ( url.pathname === '/api/reload' && req.method === 'POST' ) {
+				await runtime.reload();
+				await runtime.loadProjectMemory();
+				broadcast( { type: 'notice', text: 'اسکیل‌ها، پلاگین‌ها و سرورهای MCP دوباره بارگذاری شدند.' } );
+				return send( 200, { ok: true, mcp: runtime.mcp.status } );
 			}
 
 			// -------------------------------------------------------------- چت
@@ -195,32 +217,41 @@ export async function startServer( { port = 7788, host = '0.0.0.0', workspace } 
 				if ( ! text ) {
 					return send( 400, { error: 'متن خالی است.' } );
 				}
-				const a = await buildAgent();
-				if ( a.busy ) {
+
+				const intent = parseInput( text, runtime.commands );
+				if ( intent.kind === 'builtin' ) {
+					const out = await handleBuiltin( intent.name, intent.args );
+					return send( 200, { ok: true, handled: true, ...out } );
+				}
+
+				if ( ! runtime.ready.ok ) {
+					return send( 400, { error: `تنظیمات ناقص است: ${ runtime.ready.missing.join( '، ' ) }` } );
+				}
+				const agent = runtime.agent;
+				if ( agent.busy ) {
 					return send( 409, { error: 'یک درخواست در حال اجراست.' } );
 				}
-				a.run( text ).then( () => saveSession( sessionId, { messages: a.messages, transcript } ) );
+				agent.run( intent.text ).then( () => saveSession( sessionId, { messages: agent.messages, transcript } ) );
 				return send( 202, { ok: true } );
 			}
 
 			if ( url.pathname === '/api/permission' && req.method === 'POST' ) {
 				const body = await readJson( req );
-				const ok = agent?.resolvePermission( body.id, body.decision );
-				return send( 200, { ok: Boolean( ok ) } );
+				return send( 200, { ok: Boolean( runtime.agent?.resolvePermission( body.id, body.decision ) ) } );
 			}
 
 			if ( url.pathname === '/api/stop' && req.method === 'POST' ) {
-				agent?.stop();
+				runtime.agent?.stop();
 				return send( 200, { ok: true } );
 			}
 
 			if ( url.pathname === '/api/new' && req.method === 'POST' ) {
-				if ( agent ) {
-					await saveSession( sessionId, { messages: agent.messages, transcript } );
+				if ( runtime.agent ) {
+					await saveSession( sessionId, { messages: runtime.agent.messages, transcript } );
 				}
-				agent = null;
 				transcript = [];
 				sessionId = `s_${ Date.now().toString( 36 ) }`;
+				await runtime.reload( { keepHistory: false } );
 				broadcast( { type: 'reset', sessionId } );
 				return send( 200, { ok: true, sessionId } );
 			}
@@ -250,8 +281,211 @@ export async function startServer( { port = 7788, host = '0.0.0.0', workspace } 
 		}
 	} );
 
+	/**
+	 * دستورهای داخلی — این‌ها اصلاً به مدل نمی‌رسند.
+	 * @param {string} name
+	 * @param {string} args
+	 */
+	async function handleBuiltin( name, args ) {
+		const say = ( text ) => {
+			broadcast( { type: 'system', text } );
+			return { text };
+		};
+
+		switch ( name ) {
+			case 'help': {
+				const lines = [
+					'**دستورهای داخلی**',
+					...BUILTIN_COMMANDS.map( ( c ) => `/${ c.name } — ${ c.description }` ),
+				];
+				if ( runtime.commands.length ) {
+					lines.push( '', '**دستورهای خودت**' );
+					lines.push( ...runtime.commands.map( ( c ) => `/${ c.name } — ${ c.description || '' } (${ c.source })` ) );
+				}
+				return say( lines.join( '\n' ) );
+			}
+
+			case 'clear': {
+				transcript = [];
+				sessionId = `s_${ Date.now().toString( 36 ) }`;
+				await runtime.reload( { keepHistory: false } );
+				broadcast( { type: 'reset', sessionId } );
+				return { ok: true };
+			}
+
+			case 'compact': {
+				if ( ! runtime.agent?.messages.length ) {
+					return say( 'چیزی برای فشرده‌کردن نیست.' );
+				}
+				const r = await runtime.agent.compactNow();
+				return say( `گفتگو فشرده شد: ${ r.before } پیام → ${ r.after } پیام.` );
+			}
+
+			case 'mode': {
+				if ( ! args ) {
+					return say( `حالت فعلی: ${ runtime.config.permissions.mode }` );
+				}
+				if ( ! MODES.includes( args ) ) {
+					return say( `حالت نامعتبر. یکی از این‌ها: ${ MODES.join( ' | ' ) }` );
+				}
+				const cfg = await loadConfig();
+				cfg.permissions.mode = args;
+				await saveConfig( cfg );
+				runtime.config = cfg;
+				if ( runtime.agent ) {
+					runtime.agent.rules = cfg.permissions;
+				}
+				broadcast( { type: 'mode', mode: args } );
+				return say( `حالت شد: ${ args }` );
+			}
+
+			case 'model': {
+				const cfg = await loadConfig();
+				const profile = activeProfile( cfg );
+				if ( ! args ) {
+					return say( `پرووایدر: ${ profile.provider }\nمدل: ${ profile.model }` );
+				}
+				profile.model = args;
+				await saveConfig( cfg );
+				await runtime.reload();
+				broadcast( { type: 'profile' } );
+				return say( `مدل شد: ${ args }` );
+			}
+
+			case 'tools': {
+				const tools = Object.values( runtime.tools() );
+				return say(
+					[ `${ tools.length } ابزار در دسترس:`, ...tools.map( ( t ) => `• ${ t.spec.name } (${ t.risk })` ) ].join( '\n' )
+				);
+			}
+
+			case 'skills': {
+				if ( ! runtime.skills.length ) {
+					return say( 'هیچ اسکیلی نصب نیست.\nپوشهٔ اسکیل‌ها: ~/.hoosha/skills/<name>/SKILL.md' );
+				}
+				return say(
+					[
+						`${ runtime.skills.length } اسکیل:`,
+						...runtime.skills.map( ( s ) => `• ${ s.name } — ${ s.description } [${ s.source }]` ),
+					].join( '\n' )
+				);
+			}
+
+			case 'mcp': {
+				if ( ! runtime.mcp.status.length ) {
+					return say( 'هیچ سرور MCP تنظیم نشده.\nدر config.json کلید mcpServers را پر کن یا .hoosha/mcp.json بساز.' );
+				}
+				return say(
+					runtime.mcp.status
+						.map( ( s ) =>
+							s.status === 'connected'
+								? `✓ ${ s.name } — ${ s.tools.length } ابزار: ${ s.tools.join( ', ' ) }`
+								: `✗ ${ s.name } — ${ s.status }${ s.error ? `: ${ s.error }` : '' }`
+						)
+						.join( '\n' )
+				);
+			}
+
+			case 'plugin': {
+				const [ sub, ...rest ] = args.split( /\s+/ ).filter( Boolean );
+				const value = rest.join( ' ' );
+				try {
+					if ( ! sub || sub === 'list' ) {
+						const list = await listPlugins( HOME );
+						return say(
+							list.length
+								? list
+										.map(
+											( p ) =>
+												`${ p.enabled ? '✓' : '✗' } ${ p.name } — اسکیل: ${ p.has.skills }، دستور: ${ p.has.commands }${
+													p.has.mcp ? '، MCP' : ''
+												}${ p.has.hooks ? '، هوک' : '' }`
+										)
+										.join( '\n' )
+								: 'هیچ پلاگینی نصب نیست.'
+						);
+					}
+					if ( sub === 'install' ) {
+						const out = await installPlugin( HOME, value );
+						await runtime.reload();
+						return say( `پلاگین «${ out.name }» نصب شد.` );
+					}
+					if ( sub === 'remove' ) {
+						await removePlugin( HOME, value );
+						await runtime.reload();
+						return say( `پلاگین «${ value }» حذف شد.` );
+					}
+					return say( 'کاربرد: /plugin list | install <منبع> | remove <نام>' );
+				} catch ( e ) {
+					return say( `خطا: ${ e?.message || e }` );
+				}
+			}
+
+			case 'permissions': {
+				const p = runtime.config.permissions;
+				return say(
+					[
+						`حالت: ${ p.mode }`,
+						`مجاز: ${ ( p.allow || [] ).join( '، ' ) || '—' }`,
+						`با پرسش: ${ ( p.ask || [] ).join( '، ' ) || '—' }`,
+						`ممنوع: ${ ( p.deny || [] ).join( '، ' ) || '—' }`,
+					].join( '\n' )
+				);
+			}
+
+			case 'cost': {
+				const u = runtime.agent?.usage || { inputTokens: 0, outputTokens: 0 };
+				return say( `توکن ورودی: ${ u.inputTokens }\nتوکن خروجی: ${ u.outputTokens }` );
+			}
+
+			case 'workspace': {
+				if ( ! args ) {
+					return say( `پوشهٔ کاری: ${ runtime.config.workspace }` );
+				}
+				const dir = path.resolve( args );
+				const stat = await fs.stat( dir ).catch( () => null );
+				if ( ! stat?.isDirectory() ) {
+					return say( 'این مسیر یک پوشه نیست.' );
+				}
+				const cfg = await loadConfig();
+				cfg.workspace = dir;
+				await saveConfig( cfg );
+				await runtime.reload();
+				await runtime.loadProjectMemory();
+				broadcast( { type: 'workspace', path: dir } );
+				return say( `پوشهٔ کاری شد: ${ dir }` );
+			}
+
+			case 'sessions': {
+				const list = await listSessions();
+				return say(
+					list.length
+						? list.map( ( s ) => `• ${ s.id } — ${ s.title }` ).join( '\n' )
+						: 'نشست ذخیره‌شده‌ای نیست.'
+				);
+			}
+
+			default:
+				return say( `دستور ناشناخته: /${ name }\nبرای فهرست دستورها /help را بزن.` );
+		}
+	}
+
 	await new Promise( ( resolve ) => server.listen( port, host, resolve ) );
-	return { server, port, host, config: cfg };
+
+	const shutdown = async () => {
+		await runtime.hooks.run( 'SessionEnd', { sessionId } ).catch( () => {} );
+		await runtime.close();
+	};
+	process.on( 'SIGINT', async () => {
+		await shutdown();
+		process.exit( 0 );
+	} );
+	process.on( 'SIGTERM', async () => {
+		await shutdown();
+		process.exit( 0 );
+	} );
+
+	return { server, port, host, config: runtime.config, runtime };
 }
 
 /** @param {import('node:http').IncomingMessage} req */

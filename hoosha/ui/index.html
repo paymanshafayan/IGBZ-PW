@@ -29,6 +29,7 @@
 
 	<div class="bar-end">
 		<span id="usage" class="usage"></span>
+		<button id="btn-panel" class="chip" title="ابزارها، اسکیل‌ها، MCP، پلاگین‌ها">افزونه‌ها</button>
 		<button id="btn-new" class="chip">گفتگوی تازه</button>
 	</div>
 </header>
@@ -55,10 +56,47 @@
 </main>
 
 <form id="composer" class="composer">
-	<textarea id="input" rows="1" placeholder="چه کاری انجام بدهم؟  (Enter برای ارسال، Shift+Enter خط جدید)"></textarea>
+	<div class="composer-wrap">
+		<div id="cmd-menu" class="cmd-menu" hidden></div>
+		<textarea id="input" rows="1" placeholder="چه کاری انجام بدهم؟  (Enter برای ارسال، Shift+Enter خط جدید، / برای دستورها)"></textarea>
+	</div>
 	<button id="send" type="submit" class="send">ارسال</button>
 	<button id="stop" type="button" class="stop" hidden>توقف</button>
 </form>
+
+<!-- ------------------------------------------------------- پنل افزونه‌ها -->
+<dialog id="panel" class="modal wide">
+	<div class="modal-body">
+		<div class="panel-head">
+			<h2>افزونه‌ها</h2>
+			<div class="tabs">
+				<button class="tab active" data-tab="tools">ابزارها</button>
+				<button class="tab" data-tab="skills">اسکیل‌ها</button>
+				<button class="tab" data-tab="mcp">MCP</button>
+				<button class="tab" data-tab="plugins">پلاگین‌ها</button>
+				<button class="tab" data-tab="commands">دستورها</button>
+			</div>
+		</div>
+
+		<div id="tab-tools" class="tab-body"></div>
+		<div id="tab-skills" class="tab-body" hidden></div>
+		<div id="tab-mcp" class="tab-body" hidden></div>
+		<div id="tab-plugins" class="tab-body" hidden>
+			<div class="row install-row">
+				<input id="plugin-source" type="text" dir="ltr" placeholder="owner/repo یا مسیر محلی" />
+				<button type="button" id="btn-install-plugin" class="chip primary">نصب</button>
+			</div>
+			<p id="plugin-note" class="note"></p>
+			<div id="plugin-list"></div>
+		</div>
+		<div id="tab-commands" class="tab-body" hidden></div>
+
+		<div class="modal-actions">
+			<button type="button" id="btn-reload" class="chip">بارگذاری دوباره</button>
+			<button type="button" id="panel-close" class="chip">بستن</button>
+		</div>
+	</div>
+</dialog>
 
 <!-- ------------------------------------------------------------ تنظیمات -->
 <dialog id="settings" class="modal">

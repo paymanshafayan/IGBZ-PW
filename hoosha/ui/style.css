@@ -229,3 +229,61 @@ body {
 .note { color: var(--muted); font-size: 12px; margin: -4px 0 0; line-height: 1.7; }
 .note.error { color: var(--danger); }
 .modal-actions { display: flex; justify-content: flex-start; gap: 8px; margin-top: 6px; }
+
+/* ------------------------------------------------- دستورها و پنل افزونه‌ها */
+
+.composer-wrap { position: relative; flex: 1; display: flex; }
+.composer-wrap textarea { width: 100%; }
+
+.cmd-menu {
+	position: absolute;
+	bottom: calc(100% + 8px);
+	inset-inline: 0;
+	background: var(--panel-2);
+	border: 1px solid var(--line);
+	border-radius: var(--radius);
+	max-height: 260px;
+	overflow-y: auto;
+	z-index: 20;
+	box-shadow: 0 12px 32px rgba(0,0,0,.45);
+}
+.cmd-item { padding: 9px 12px; cursor: pointer; display: flex; gap: 10px; align-items: baseline; }
+.cmd-item:hover, .cmd-item.active { background: #223049; }
+.cmd-item b { font-family: var(--mono); direction: ltr; color: var(--accent); font-size: 13px; }
+.cmd-item span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmd-item em { color: var(--muted); font-size: 11px; font-style: normal; margin-inline-start: auto; }
+
+.modal.wide { width: min(760px, 94vw); }
+.panel-head { display: flex; flex-direction: column; gap: 10px; }
+.tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.tab {
+	background: transparent; color: var(--muted);
+	border: 1px solid var(--line); border-radius: 999px;
+	padding: 5px 12px; font-family: inherit; font-size: 13px; cursor: pointer;
+}
+.tab.active { background: var(--panel-2); color: var(--text); border-color: var(--accent); }
+.tab-body { min-height: 220px; max-height: 52vh; overflow-y: auto; }
+
+.item {
+	display: flex; gap: 10px; align-items: baseline;
+	padding: 9px 4px; border-bottom: 1px solid var(--line);
+}
+.item:last-child { border-bottom: none; }
+.item b { font-family: var(--mono); direction: ltr; font-size: 13px; }
+.item p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.7; flex: 1; }
+.tag {
+	font-size: 11px; padding: 2px 8px; border-radius: 999px;
+	background: var(--panel-2); border: 1px solid var(--line); color: var(--muted);
+}
+.tag.ok { color: var(--ok); border-color: #1d4427; }
+.tag.err { color: var(--danger); border-color: #4a2220; }
+.tag.mcp { color: #b48cff; border-color: #3a2d55; }
+.install-row { margin-bottom: 6px; }
+.install-row input { flex: 1; }
+.empty { color: var(--muted); font-size: 13px; padding: 18px 4px; line-height: 1.9; }
+
+.msg.system .body { background: #131a17; border-color: #22352a; }
+.sub-tag {
+	font-size: 11px; color: #b48cff; border: 1px solid #3a2d55;
+	border-radius: 999px; padding: 1px 8px; margin-inline-end: 6px;
+}
