@@ -539,6 +539,81 @@ await step( 'قاعدهٔ یک فرمان، به فرمان مرکب سرایت 
 } );
 
 
+
+await step( 'وضعیت گیت در state هست تا نوار کامپوزر بتواند نشانش دهد', async () => {
+	// فضای کاری آزمون مخزن نیست؛ باید null بدهد نه اینکه بترکد.
+	let s = await get( '/api/state' );
+	assert.equal( s.git, null );
+
+	// حالا یک مخزن واقعی بساز و فضای کاری را رویش ببر.
+	const { execFile } = await import( 'node:child_process' );
+	const run = ( args, cwd ) =>
+		new Promise( ( r ) => execFile( 'git', args, { cwd }, () => r() ) );
+
+	const repo = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-live-repo-' ) );
+	await run( [ 'init', '-b', 'main' ], repo );
+	await run( [ 'config', 'user.email', 't@t.local' ], repo );
+	await run( [ 'config', 'user.name', 'T' ], repo );
+	await fs.writeFile( path.join( repo, 'x.txt' ), 'یک\n' );
+	await run( [ 'add', '-A' ], repo );
+	await run( [ 'commit', '-m', 'first' ], repo );
+
+	await post( '/api/workspace', { path: repo } );
+	s = await get( '/api/state' );
+	assert.equal( s.git.branch, 'main' );
+	assert.equal( s.git.protected, true );
+	assert.equal( s.git.dirty, false );
+
+	// تغییر بده و ببین شمار به‌روز می‌شود
+	await fs.writeFile( path.join( repo, 'x.txt' ), 'یک\nدو\n' );
+	s = await get( '/api/state' );
+	assert.equal( s.git.added, 1 );
+	assert.equal( s.git.files.length, 1 );
+
+	// کامیت از راه API — باید شاخهٔ تازه بسازد چون main محافظت‌شده است
+	const out = await post( '/api/git', { action: 'commit', message: 'change from api' } );
+	assert.ok( out.ok, out.error );
+	assert.ok( out.movedTo, 'باید از main منشعب شده باشد' );
+
+	s = await get( '/api/state' );
+	assert.equal( s.git.dirty, false );
+	assert.notEqual( s.git.branch, 'main' );
+
+	// پوش روی شاخهٔ کاری بدون ریموت شکست می‌خورد، ولی با پیام روشن نه با ترکیدن
+	const pushed = await post( '/api/git', { action: 'push' } );
+	assert.ok( pushed.error, 'باید خطا بدهد چون ریموتی نیست' );
+
+	await post( '/api/workspace', { path: WORK } );
+	await fs.rm( repo, { recursive: true, force: true } );
+} );
+
+await step( 'ابزار install از راه گفتگو، یک اسکیل محلی را نصب می‌کند', async () => {
+	// همان چیزی که کارفرما خواست: آدرس را بده و بگو نصبش کن.
+	const src = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-skill-src-' ) );
+	const dir = path.join( src, 'fa-seo' );
+	await fs.mkdir( dir, { recursive: true } );
+	await fs.writeFile(
+		path.join( dir, 'SKILL.md' ),
+		'---\nname: fa-seo\ndescription: بهینه‌سازی عنوان فارسی\n---\nیک: کلیدواژه در ۶۰ نویسهٔ اول.\n'
+	);
+
+	const before = ( await get( '/api/state' ) ).skills.length;
+
+	const { TOOLS } = await import( '../src/tools.js' );
+	assert.equal( TOOLS.install, undefined, 'install ابزار ثابت نیست، از runtime می‌آید' );
+
+	const out = await post( '/api/message', { text: `/install ${ dir }` } );
+	assert.ok( ! out.error, out.error );
+
+	const after = await get( '/api/state' );
+	assert.equal( after.skills.length, before + 1 );
+	assert.ok( after.skills.some( ( s ) => s.name === 'fa-seo' ) );
+
+	await post( '/api/skills', { action: 'remove', name: 'fa-seo' } );
+	await fs.rm( src, { recursive: true, force: true } );
+} );
+
+
 // ------------------------------------------------------------------- پایان
 
 reader.cancel().catch( () => {} );

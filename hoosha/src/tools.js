@@ -17,6 +17,7 @@ import { unifiedDiff } from './diff.js';
 import { shells } from './background.js';
 import { spawnShell } from './sandbox.js';
 import { render as renderNotebook, apply as applyNotebookEdit, readNotebook, serialize as serializeNotebook } from './notebook.js';
+import * as vcs from './git.js';
 
 const MAX_READ_BYTES = 400 * 1024;
 const MAX_OUTPUT_CHARS = 30_000;
@@ -458,6 +459,125 @@ export const TOOLS = {
 					resolve( clip( `exit=${ code }${ where }\n${ body || '(بدون خروجی)' }` ) );
 				} );
 			} );
+		},
+	},
+
+	git_status: {
+		risk: 'read',
+		spec: {
+			name: 'git_status',
+			description: 'وضعیت مخزن: شاخهٔ جاری، فایل‌های تغییرکرده، و شمار خط‌های اضافه/کم‌شده.',
+			parameters: { type: 'object', properties: {} },
+		},
+		async run( _input, ctx ) {
+			const st = await vcs.status( ctx.workspace );
+			if ( ! st ) {
+				return 'این پوشه مخزن گیت نیست.';
+			}
+			const files = st.files.map( ( f ) => `  ${ f.state.padEnd( 2 ) } ${ f.path }` ).join( '\n' );
+			return clip(
+				[
+					`مخزن: ${ st.name }`,
+					`شاخه: ${ st.branch }${ st.protected ? ' (محافظت‌شده — روی این شاخه نمی‌نویسیم)' : '' }`,
+					`جلوتر: ${ st.ahead } · عقب‌تر: ${ st.behind }`,
+					`تغییر: +${ st.added } −${ st.removed } در ${ st.files.length } فایل`,
+					files || '  (چیزی تغییر نکرده)',
+				].join( '\n' )
+			);
+		},
+	},
+
+	git_diff: {
+		risk: 'read',
+		spec: {
+			name: 'git_diff',
+			description: 'دیف تغییرات. بدون پارامتر یعنی تغییرات ذخیره‌نشده؛ با base یعنی نسبت به آن شاخه.',
+			parameters: {
+				type: 'object',
+				properties: {
+					base: { type: 'string', description: 'مثلاً origin/main' },
+					file: { type: 'string' },
+				},
+			},
+		},
+		async run( input, ctx ) {
+			const out = await vcs.diff( ctx.workspace, { base: input.base, file: input.file } );
+			return clip( out || '(بدون تغییر)' );
+		},
+	},
+
+	git_branch: {
+		risk: 'write',
+		spec: {
+			name: 'git_branch',
+			description: 'ساخت یا تعویض شاخه. بدون پارامتر، فهرست شاخه‌ها را می‌دهد.',
+			parameters: {
+				type: 'object',
+				properties: {
+					name: { type: 'string' },
+					create: { type: 'boolean', description: 'شاخهٔ تازه بساز' },
+				},
+			},
+		},
+		async run( input, ctx ) {
+			if ( ! input.name ) {
+				const list = await vcs.branches( ctx.workspace );
+				return list.map( ( b ) => `${ b.protected ? '⛨' : ' ' } ${ b.name }  (${ b.when })` ).join( '\n' );
+			}
+			const out = await vcs.branch( ctx.workspace, input.name, { create: Boolean( input.create ) } );
+			return `روی شاخهٔ «${ out.branch }» هستیم.`;
+		},
+	},
+
+	git_commit: {
+		risk: 'write',
+		spec: {
+			name: 'git_commit',
+			description:
+				'ثبت تغییرات. اگر روی شاخهٔ محافظت‌شده باشیم، اول یک شاخهٔ کاری ساخته می‌شود — هیچ‌وقت مستقیم روی main کامیت نمی‌کنیم.',
+			parameters: {
+				type: 'object',
+				properties: {
+					message: { type: 'string' },
+					paths: { type: 'array', items: { type: 'string' }, description: 'خالی یعنی همه' },
+					branch: { type: 'string', description: 'اگر می‌خواهی روی شاخهٔ مشخصی برود' },
+				},
+				required: [ 'message' ],
+			},
+		},
+		async run( input, ctx ) {
+			const out = await vcs.commit( ctx.workspace, {
+				message: input.message,
+				paths: input.paths,
+				branch: input.branch,
+			} );
+			return `${ out.sha } روی «${ out.branch }»${ out.movedTo ? ' (شاخهٔ تازه ساخته شد)' : '' }: ${ out.message }`;
+		},
+	},
+
+	git_push: {
+		risk: 'network',
+		spec: {
+			name: 'git_push',
+			description: 'فرستادن شاخهٔ جاری به ریموت. روی شاخهٔ محافظت‌شده کار نمی‌کند.',
+			parameters: { type: 'object', properties: { branch: { type: 'string' } } },
+		},
+		async run( input, ctx ) {
+			const out = await vcs.push( ctx.workspace, { branch: input.branch, token: await ctx.secret?.( 'git.token' ) } );
+			return `شاخهٔ «${ out.branch }» فرستاده شد.\n${ out.output || '' }`.trim();
+		},
+	},
+
+	git_log: {
+		risk: 'read',
+		spec: {
+			name: 'git_log',
+			description: 'آخرین کامیت‌ها.',
+			parameters: { type: 'object', properties: { limit: { type: 'integer' } } },
+		},
+		async run( input, ctx ) {
+			const list = await vcs.log( ctx.workspace, Math.min( input.limit || 20, 100 ) );
+			return list.map( ( c ) => `${ c.sha }  ${ c.when.padEnd( 16 ) } ${ c.author }  ${ c.subject }` ).join( '\n' ) || '(بدون کامیت)';
 		},
 	},
 

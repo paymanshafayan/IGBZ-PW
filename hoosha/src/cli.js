@@ -18,7 +18,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startServer } from './server.js';
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 const SELF = fileURLToPath( import.meta.url );
 const ROOT = path.resolve( path.dirname( SELF ), '..' );
 

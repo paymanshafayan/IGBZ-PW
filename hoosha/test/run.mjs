@@ -1549,16 +1549,40 @@ await test( 'نوار کناری و ریل هم قابل اسکرول‌اند �
 	assert.match( cssBlock( '.rail-body' ), /overflow-y:\s*auto/ );
 } );
 
-await test( 'رنگ‌های Claude دقیقاً همان‌اند و لایه‌بندی درست است', () => {
-	// در تصویر، پنل گفتگو یک سطح روشن‌تر است که روی صفحهٔ تیره‌تر/کرم شناور است.
-	const root = cssBlock( ':root' );
-	assert.match( root, /--card:\s*#262624/, 'پنل گفتگو باید #262624 باشد' );
-	assert.match( root, /--bg:\s*#1a1918/, 'صفحهٔ پشت کارت باید تیره‌تر باشد' );
-	assert.match( root, /--bg-raise:\s*#30302e/ );
-	assert.match( root, /--accent:\s*#d97757/ );
+await test( 'سامانهٔ توکن معنایی مخزن دوم پیاده شده و پالت مرده نیست', () => {
+	// ساختار توکن‌ها از @sunpix/claude-code-web است: نام‌های معنایی در فضای oklch.
+	for ( const token of [
+		'--background',
+		'--foreground',
+		'--card',
+		'--popover',
+		'--sidebar',
+		'--muted',
+		'--accent',
+		'--border',
+		'--input',
+		'--ring',
+		'--primary',
+		'--destructive',
+	] ) {
+		assert.ok( css.includes( `${ token }:` ), `توکن ${ token } نیست` );
+	}
 
-	assert.ok( css.includes( '--card: #faf9f5' ), 'تم روشن: پنل گفتگو #faf9f5' );
-	assert.ok( css.includes( '--bg: #eeece2' ), 'تم روشن: صفحه کرمِ #eeece2' );
+	assert.ok( css.includes( 'oklch(' ), 'باید در فضای رنگی oklch باشد' );
+
+	// و تفاوت عمدی با آن‌ها: خاکستری خالص نداریم. کارفرما گفت رابط بی‌روح خسته‌کننده است.
+	assert.match( css, /--background:\s*oklch\(16%\s+0\.006\s+60\)/, 'خاکستری باید گرم باشد نه خنثی' );
+	assert.match( css, /--primary:\s*oklch\(66%\s+0\.15\s+42\)/, 'رنگ برند باید واقعاً رنگ باشد' );
+	assert.ok( css.includes( '--second:' ), 'رنگ دوم (فیروزه) برای تنوع لازم است' );
+} );
+
+await test( 'رابط زنده است: ترنزیشن، سایه و حرکت دارد', () => {
+	// شکایت کارفرما: «یک رابط با ظاهر بی‌روح و مرده کاربر را خسته می‌کند.»
+	assert.ok( ( css.match( /transition:/g ) || [] ).length > 25, 'ترنزیشن کم است' );
+	assert.ok( ( css.match( /@keyframes/g ) || [] ).length >= 6, 'انیمیشن کم است' );
+	assert.ok( css.includes( '--shadow-1' ) && css.includes( '--shadow-3' ), 'سطح‌بندی سایه لازم است' );
+	assert.match( css, /translateY\(-1px\)|translateY\(-2px\)/, 'بلندشدن هنگام هاور' );
+	assert.match( css, /prefers-reduced-motion/, 'و همهٔ اینها با کاهش حرکت خاموش شوند' );
 } );
 
 await test( 'چیدمان سه‌ستونی تصویر: ناوبری، فهرست نشست، پنل شناور', () => {
@@ -1632,7 +1656,7 @@ await test( 'پاسخ مدل بدون آواتار و با فونت سریف ن�
 	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
 	assert.equal( /class="avatar"|'avatar'/.test( thread ), false, 'آواتار باید حذف شده باشد' );
 	assert.match( cssBlock( '.msg.assistant .body' ), /font-family:\s*var\(--serif\)/ );
-	assert.match( cssBlock( '.msg.user .body' ), /background:\s*var\(--user-bubble\)/ );
+	assert.match( cssBlock( '.msg.user .body' ), /background:\s*linear-gradient/ );
 } );
 
 await test( 'ناوبری مستقیم در نوار کناری هست (نه فقط داخل تنظیمات)', () => {
@@ -1649,7 +1673,7 @@ await test( 'هیچ چیزی پشت دیالوگ تنظیمات قفل نیست 
 	assert.equal( /showModal\(\)/.test( settings ), false, 'تنظیمات نباید مودال باز کند' );
 
 	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
-	assert.match( app, /settings: \{ title: 'تنظیمات'/ );
+	assert.match( app, /settings: \{ ico: '⚙', title: 'تنظیمات'/ );
 } );
 
 await test( 'زیربخش‌های فضای کار همان‌جا باز می‌شوند، نه در پنجرهٔ دیگر', () => {
@@ -1944,7 +1968,7 @@ await test( 'خطاهای میکروفن پیام فارسی دارند، نه �
 section( 'خواسته‌های چیدمان' );
 
 await test( 'کادر نوشتن ۵۰ پیکسل از پایین فاصله دارد', () => {
-	assert.match( cssBlock( '.composer-wrap' ), /padding:\s*0 24px 50px/ );
+	assert.match( cssBlock( '.composer-wrap' ), /padding:\s*0 26px 50px/ );
 } );
 
 await test( 'پایین نوار کناری: پروفایل کاربر و آیکون تنظیمات کنارش', () => {
@@ -1976,6 +2000,174 @@ await test( 'حالت کهنهٔ رابط یک بار پاک می‌شود تا 
 	assert.match( app, /UI_STATE_VERSION/ );
 	assert.match( app, /removeItem\( key \)/ );
 	assert.match( app, /'hoosha-sidebar', 'hoosha-rail'/ );
+} );
+
+
+
+// ------------------------------------------------------------------ گیت
+
+section( 'گیت' );
+
+const vcs = await import( '../src/git.js' );
+
+/** یک مخزن کوچک واقعی می‌سازیم — تست گیت با گیت جعلی، چیزی ثابت نمی‌کند. */
+async function makeRepo() {
+	const dir = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-git-' ) );
+	await vcs.git( [ 'init', '-b', 'main' ], { cwd: dir } );
+	await vcs.git( [ 'config', 'user.email', 't@t.local' ], { cwd: dir } );
+	await vcs.git( [ 'config', 'user.name', 'Test' ], { cwd: dir } );
+	await fs.writeFile( path.join( dir, 'a.txt' ), 'یک\n' );
+	await vcs.git( [ 'add', '-A' ], { cwd: dir } );
+	await vcs.git( [ 'commit', '-m', 'اول' ], { cwd: dir } );
+	return dir;
+}
+
+await test( 'وضعیت مخزن: شاخه، فایل‌های تغییرکرده و شمار خط', async () => {
+	const dir = await makeRepo();
+	await fs.writeFile( path.join( dir, 'a.txt' ), 'یک\nدو\nسه\n' );
+	await fs.writeFile( path.join( dir, 'b.txt' ), 'تازه\n' );
+
+	const st = await vcs.status( dir );
+	assert.equal( st.branch, 'main' );
+	assert.equal( st.protected, true, 'main باید محافظت‌شده باشد' );
+	assert.equal( st.files.length, 2 );
+	assert.equal( st.added, 2, 'دو خط به a.txt اضافه شده' );
+	assert.equal( st.dirty, true );
+
+	await fs.rm( dir, { recursive: true, force: true } );
+} );
+
+await test( 'کامیت روی شاخهٔ محافظت‌شده، اول شاخه می‌سازد', async () => {
+	// قاعدهٔ سند: هوشا هیچ‌وقت مستقیم روی main نمی‌نویسد.
+	const dir = await makeRepo();
+	await fs.writeFile( path.join( dir, 'a.txt' ), 'عوض شد\n' );
+
+	const out = await vcs.commit( dir, { message: 'تغییر آزمایشی' } );
+	assert.ok( out.movedTo, 'باید شاخهٔ تازه ساخته باشد' );
+	assert.notEqual( out.branch, 'main' );
+	assert.match( out.branch, /^hoosha\// );
+
+	const st = await vcs.status( dir );
+	assert.equal( st.dirty, false, 'بعد از کامیت باید تمیز باشد' );
+	assert.equal( st.branch, out.branch );
+
+	await fs.rm( dir, { recursive: true, force: true } );
+} );
+
+await test( 'روی شاخهٔ کاری، کامیت شاخهٔ تازه نمی‌سازد', async () => {
+	const dir = await makeRepo();
+	await vcs.branch( dir, 'kar/yek', { create: true } );
+	await fs.writeFile( path.join( dir, 'a.txt' ), 'دو\n' );
+
+	const out = await vcs.commit( dir, { message: 'روی شاخهٔ کاری' } );
+	assert.equal( out.movedTo, null );
+	assert.equal( out.branch, 'kar/yek' );
+
+	await fs.rm( dir, { recursive: true, force: true } );
+} );
+
+await test( 'پوش روی شاخهٔ محافظت‌شده رد می‌شود', async () => {
+	const dir = await makeRepo();
+	await assert.rejects( () => vcs.push( dir, {} ), /مجاز نیست/ );
+	await fs.rm( dir, { recursive: true, force: true } );
+} );
+
+await test( 'دیف و آمار به تفکیک فایل درست است', async () => {
+	const dir = await makeRepo();
+	await fs.writeFile( path.join( dir, 'a.txt' ), 'یک\nدو\n' );
+	await fs.writeFile( path.join( dir, 'c.txt' ), 'سه\n' );
+	await vcs.git( [ 'add', '-A' ], { cwd: dir } );
+
+	const stat = await vcs.diffStat( dir );
+	const byPath = Object.fromEntries( stat.map( ( f ) => [ f.path, f ] ) );
+	assert.equal( byPath[ 'a.txt' ].added, 1 );
+	assert.equal( byPath[ 'c.txt' ].added, 1 );
+
+	const text = await vcs.diff( dir );
+	assert.match( text, /\+دو/ );
+
+	await fs.rm( dir, { recursive: true, force: true } );
+} );
+
+await test( 'توکن در خروجی گیت ماسک می‌شود', () => {
+	// تور آخر: پیام خطای گیت گاهی آدرسِ حاوی توکن را بازتاب می‌دهد.
+	assert.equal(
+		vcs.redact( 'https://u:ghp_abcdefghijklmnopqrst@github.com/x/y.git' ),
+		'https://•••:•••@github.com/x/y.git'
+	);
+	assert.equal( vcs.redact( 'token ghp_abcdefghijklmnopqrstuv here' ), 'token ••• here' );
+	assert.equal( vcs.redact( 'sk-abcdefghijklmnopqrstuvwx' ), '•••' );
+	assert.equal( vcs.redact( 'بدون راز' ), 'بدون راز' );
+} );
+
+await test( 'نام مخزن از آدرس درمی‌آید', () => {
+	assert.equal( vcs.repoName( 'https://github.com/paymanshafayan/IGBZ-WP.git' ), 'paymanshafayan/IGBZ-WP' );
+	assert.equal( vcs.repoName( 'git@github.com:owner/repo.git' ), 'owner/repo' );
+} );
+
+await test( 'نام شاخهٔ نامعتبر رد می‌شود', async () => {
+	const dir = await makeRepo();
+	await assert.rejects( () => vcs.branch( dir, 'شاخه با فاصله و ; خطرناک', { create: true } ), /معتبر نیست/ );
+	await fs.rm( dir, { recursive: true, force: true } );
+} );
+
+await test( 'ابزارهای گیت در رجیستری هستند و git_status واقعاً کار می‌کند', async () => {
+	for ( const name of [ 'git_status', 'git_diff', 'git_branch', 'git_commit', 'git_push', 'git_log' ] ) {
+		assert.ok( TOOLS[ name ], `ابزار ${ name } نیست` );
+	}
+	assert.equal( TOOLS.git_commit.risk, 'write' );
+	assert.equal( TOOLS.git_push.risk, 'network' );
+	assert.equal( TOOLS.git_status.risk, 'read' );
+
+	const dir = await makeRepo();
+	const out = await TOOLS.git_status.run( {}, { workspace: dir } );
+	assert.match( out, /شاخه: main/ );
+	assert.match( out, /محافظت‌شده/ );
+	await fs.rm( dir, { recursive: true, force: true } );
+} );
+
+// --------------------------------------------------- نوار گیت در رابط
+
+section( 'نوار گیت و صفحه‌های تمام‌قد' );
+
+await test( 'نوار گیت زیر کامپوزر است با مخزن، شاخه، شمار تغییر و دکمهٔ اقدام', () => {
+	assert.match( html, /id="git-bar"/ );
+	assert.match( html, /id="git-repo-name"/ );
+	assert.match( html, /id="git-branch-name"/ );
+	assert.match( html, /id="git-plus"/ );
+	assert.match( html, /id="git-minus"/ );
+	assert.match( html, /id="git-action"/ );
+	assert.match( css, /\.git-bar\s*\{/ );
+} );
+
+await test( 'وقتی مخزنی وصل نیست، نوار پنهان نمی‌شود بلکه راه اتصال را نشان می‌دهد', () => {
+	const bar = fssync.readFileSync( path.join( uiDir, 'gitbar.js' ), 'utf8' );
+	assert.match( bar, /مخزنی وصل نیست/ );
+	assert.match( bar, /اتصال مخزن/ );
+	assert.equal( /bar\.hidden = true/.test( bar ), false, 'نباید کلاً پنهان شود' );
+} );
+
+await test( 'شاخهٔ محافظت‌شده در نوار علامت می‌خورد و پوش را رد می‌کند', () => {
+	const bar = fssync.readFileSync( path.join( uiDir, 'gitbar.js' ), 'utf8' );
+	assert.match( bar, /classList\.toggle\( 'protected', git\.protected \)/ );
+	assert.match( bar, /روی شاخهٔ محافظت‌شده پوش نمی‌کنیم/ );
+} );
+
+await test( 'صفحه‌های پنل تمام‌قد با سربرگ و دکمهٔ بازگشت‌اند، نه مودال', () => {
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /class: 'panel-hero'/, 'سربرگ قهرمان لازم است' );
+	assert.match( app, /\$\( '#btn-back' \)\.hidden = next === 'chat'/, 'دکمهٔ بازگشت باید در نمای پنل ظاهر شود' );
+	assert.match( css, /\.panel-hero\s*\{/ );
+	assert.match( css, /\.view-panel\s*\{/ );
+	assert.equal( /<dialog id="settings"/.test( html ), false );
+} );
+
+await test( 'ابزار install هست تا «آدرس را بینداز و بگو نصبش کن» کار کند', () => {
+	const rt = fssync.readFileSync( path.resolve( 'src/runtime.js' ), 'utf8' );
+	assert.match( rt, /#installTool\(\)/ );
+	assert.match( rt, /name: 'install'/ );
+	assert.match( rt, /#guessInstallKind/ );
+	assert.match( rt, /install: this\.#installTool\(\)/ );
 } );
 
 

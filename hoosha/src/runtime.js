@@ -18,7 +18,8 @@ import { HookRunner } from './hooks.js';
 import { collectSkills, makeSkillTool, skillsPromptSection } from './skills.js';
 import { collectCommands } from './commands.js';
 import { collectAgents } from './agents.js';
-import { activePlugins } from './plugins.js';
+import { activePlugins, installPlugin } from './plugins.js';
+import { installSkill, findSkillDirs } from './skillstore.js';
 import { makeTaskTool } from './subagent.js';
 
 export class Runtime {
@@ -121,6 +122,7 @@ export class Runtime {
 				: {} ),
 			...this.mcp.toolEntries(),
 			...( this.mcp.resourceEntries().length ? { read_mcp_resource: this.#resourceTool() } : {} ),
+			install: this.#installTool(),
 		};
 
 		if ( ! allowedTools?.length ) {
@@ -137,6 +139,77 @@ export class Runtime {
 			}
 		}
 		return Object.keys( picked ).length ? picked : all;
+	}
+
+	/**
+	 * ابزار `install` — «آدرسش را بینداز و بگو نصبش کن».
+	 *
+	 * کارفرما روی همین انگشت گذاشت: کادر گفتگو باید درِ ورودی همه‌چیز باشد، نه اینکه برای
+	 * هر کاری باید جای درستش را در منوها پیدا کنی. با این ابزار، «این را نصب کن» به‌علاوهٔ
+	 * یک آدرس، کافی است.
+	 *
+	 * نوع را خودش تشخیص می‌دهد: اگر منبع `plugin.json` داشت پلاگین است، اگر `SKILL.md`
+	 * داشت اسکیل.
+	 */
+	#installTool() {
+		return {
+			risk: /** @type {const} */ ( 'write' ),
+			spec: {
+				name: 'install',
+				description:
+					'نصب یک اسکیل یا پلاگین از آدرس گیت‌هاب (`owner/repo`)، آدرس کامل گیت، یا مسیر محلی. نوع را خودش تشخیص می‌دهد. وقتی کاربر آدرسی می‌دهد و می‌گوید «نصبش کن»، همین را صدا بزن.',
+				parameters: {
+					type: 'object',
+					properties: {
+						source: { type: 'string', description: 'owner/repo یا آدرس گیت یا مسیر محلی' },
+						kind: { type: 'string', enum: [ 'auto', 'skill', 'plugin' ], description: 'پیش‌فرض auto' },
+						name: { type: 'string', description: 'نام دلخواه' },
+					},
+					required: [ 'source' ],
+				},
+			},
+			run: async ( input ) => {
+				const source = String( input.source || '' ).trim();
+				if ( ! source ) {
+					throw new Error( 'آدرس خالی است.' );
+				}
+
+				const kind = input.kind && input.kind !== 'auto' ? input.kind : await this.#guessInstallKind( source );
+
+				if ( kind === 'plugin' ) {
+					const out = await installPlugin( HOME, source, input.name );
+					await this.reload();
+					return `پلاگین «${ out.name }» نصب شد. حالا ${ this.skills.length } اسکیل و ${ this.commands.length } دستور داریم.`;
+				}
+
+				const out = await installSkill( HOME, source, input.name );
+				await this.reload();
+				return `نصب شد: ${ out.installed.join( '، ' ) }\nحالا ${ this.skills.length } اسکیل در دسترس است.`;
+			},
+		};
+	}
+
+	/**
+	 * پلاگین است یا اسکیل؟ برای مسیر محلی می‌شود نگاه کرد؛ برای آدرس گیت، از روی نام حدس
+	 * می‌زنیم و اگر اشتباه بود، نصب اسکیل خودش خطای روشن می‌دهد.
+	 *
+	 * @param {string} source
+	 */
+	async #guessInstallKind( source ) {
+		const isLocal = source.startsWith( '.' ) || source.startsWith( '/' ) || /^[A-Za-z]:\\/.test( source );
+		if ( isLocal ) {
+			const dir = path.resolve( source );
+			const hasManifest = await fs
+				.access( path.join( dir, 'plugin.json' ) )
+				.then( () => true )
+				.catch( () => false );
+			if ( hasManifest ) {
+				return 'plugin';
+			}
+			const skills = await findSkillDirs( dir );
+			return skills.length ? 'skill' : 'plugin';
+		}
+		return /plugin/i.test( source ) ? 'plugin' : 'skill';
 	}
 
 	/** ابزار خواندن منابع MCP — فقط وقتی ساخته می‌شود که سروری منبع داشته باشد. */

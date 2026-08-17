@@ -1,0 +1,379 @@
+/**
+ * نوار گیت زیر کامپوزر.
+ *
+ * خواستهٔ کارفرما (`DESIGN-HUSHVARE.md` §۱۶): مدیری که وسط خرابی نشسته باید بدون کلیک
+ * بداند **روی کدام مخزن، کدام شاخه، و چقدر عوض شده** — و یک راه برای بستن کار داشته باشد.
+ *
+ * سه نشان و یک دکمه:
+ *   مخزن  → تعویض یا اتصال مخزن تازه
+ *   شاخه  → تعویض یا ساخت شاخه
+ *   +n −m → دیدن دیف کامل
+ *   دکمه  → ثبت، فرستادن، درخواست ادغام
+ *
+ * هیچ‌کدام خودکار نیست: کامیت، پوش و ادغام هر سه از مدیر تأیید می‌گیرند.
+ */
+
+import { $, h, toast, promptDialog, confirmDialog } from './lib/dom.js';
+import { api, post, getState, refreshState } from './lib/api.js';
+
+/** @type {(view:string)=>void} */
+let openView = () => {};
+
+/** @param {{onView:(v:string)=>void}} deps */
+export function initGitBar( deps ) {
+	openView = deps.onView;
+
+	$( '#git-repo' ).onclick = ( e ) => {
+		e.stopPropagation();
+		repoMenu();
+	};
+	$( '#git-branch' ).onclick = ( e ) => {
+		e.stopPropagation();
+		branchMenu();
+	};
+	$( '#git-stat' ).onclick = () => openView( 'changes' );
+	$( '#git-action' ).onclick = ( e ) => {
+		e.stopPropagation();
+		actionMenu();
+	};
+
+	document.addEventListener( 'click', ( e ) => {
+		const box = $( '#git-menu' );
+		if ( box && ! box.hidden && ! box.contains( e.target ) && ! e.target.closest( '.git-bar' ) ) {
+			box.hidden = true;
+		}
+	} );
+}
+
+/** @param {any} s */
+export function paintGitBar( s ) {
+	const bar = $( '#git-bar' );
+	const git = s?.git;
+
+	if ( ! git ) {
+		// مخزن نیست: به‌جای پنهان‌کردن، راه وصل‌شدن را نشان بده.
+		bar.hidden = false;
+		$( '#git-repo-name' ).textContent = 'مخزنی وصل نیست';
+		$( '#git-branch' ).hidden = true;
+		$( '#git-stat' ).hidden = true;
+		$( '#git-action' ).textContent = 'اتصال مخزن';
+		$( '#git-action' ).className = 'git-action quiet';
+		return;
+	}
+
+	bar.hidden = false;
+	$( '#git-branch' ).hidden = false;
+	$( '#git-stat' ).hidden = false;
+
+	$( '#git-repo-name' ).textContent = git.name;
+	$( '#git-repo' ).title = git.remote || git.name;
+
+	$( '#git-branch-name' ).textContent = git.branch;
+	$( '#git-branch' ).classList.toggle( 'protected', git.protected );
+	$( '#git-branch' ).title = git.protected
+		? `${ git.branch } — شاخهٔ محافظت‌شده؛ هوشا رویش نمی‌نویسد`
+		: git.branch;
+
+	$( '#git-plus' ).textContent = `+${ git.added }`;
+	$( '#git-minus' ).textContent = `−${ git.removed }`;
+	$( '#git-stat' ).title = `${ git.files.length } فایل تغییرکرده`;
+
+	const action = $( '#git-action' );
+	if ( git.dirty ) {
+		action.textContent = `ثبت ${ git.files.length } تغییر`;
+		action.className = 'git-action';
+	} else if ( git.ahead > 0 ) {
+		action.textContent = `فرستادن ${ git.ahead } کامیت`;
+		action.className = 'git-action';
+	} else {
+		action.textContent = 'درخواست ادغام';
+		action.className = 'git-action quiet';
+	}
+}
+
+// ─────────────────────────────────────────────────────────── منوها
+
+function menu( children ) {
+	const box = $( '#git-menu' );
+	box.replaceChildren( ...children.filter( Boolean ) );
+	box.hidden = false;
+	return box;
+}
+
+function close() {
+	$( '#git-menu' ).hidden = true;
+}
+
+function row( ico, label, desc, onClick, checked ) {
+	return h( 'div', { class: `menu-item ${ checked ? 'active' : '' }`, onClick }, [
+		h( 'span', { class: 'm-ico', text: ico } ),
+		h( 'b', { text: label } ),
+		desc ? h( 'span', { class: 'm-desc', text: desc } ) : null,
+		checked ? h( 'span', { class: 'm-check', text: '✓' } ) : null,
+	] );
+}
+
+function repoMenu() {
+	const s = getState();
+	const git = s?.git;
+
+	menu( [
+		h( 'div', { class: 'menu-label', text: 'مخزن' } ),
+		git ? h( 'div', { class: 'menu-item' }, [ h( 'span', { class: 'm-ico', text: '⌗' } ), h( 'b', { text: git.name } ), h( 'span', { class: 'm-desc', text: git.remote } ) ] ) : null,
+		h( 'div', { class: 'menu-sep' } ),
+		row( '+', 'اتصال مخزن تازه', 'کلون از آدرس گیت', async () => {
+			close();
+			await connectRepo();
+		} ),
+		row( '▤', 'تغییر پوشهٔ کاری', 'بدون کلون', async () => {
+			close();
+			const next = await promptDialog( 'مسیر پوشه:', s?.config?.workspace || '' );
+			if ( ! next ) {
+				return;
+			}
+			const out = await post( '/api/workspace', { path: next } );
+			toast( out.error || 'پوشهٔ کاری عوض شد.', out.error ? 'error' : '' );
+			await refreshState();
+		} ),
+		git ? row( '±', 'دیدن همهٔ تغییرات', '', () => {
+			close();
+			openView( 'changes' );
+		} ) : null,
+	] );
+}
+
+async function connectRepo() {
+	const url = await promptDialog( 'آدرس مخزن (https یا git@):', '' );
+	if ( ! url ) {
+		return;
+	}
+	const token = await promptDialog( 'توکن دسترسی (اگر مخزن خصوصی است؛ وگرنه خالی بگذار):', '' );
+
+	toast( 'در حال کلون…' );
+	const out = await post( '/api/git', { action: 'clone', url, token: token || undefined } );
+	if ( out.error ) {
+		toast( out.error, 'error' );
+		return;
+	}
+	toast( `«${ out.name }» وصل شد.` );
+	await refreshState();
+}
+
+async function branchMenu() {
+	menu( [ h( 'div', { class: 'menu-item', text: 'در حال خواندن شاخه‌ها…' } ) ] );
+
+	const out = await api( '/api/git' );
+	const git = out.git;
+	if ( ! git ) {
+		close();
+		return;
+	}
+
+	menu( [
+		h( 'div', { class: 'menu-label', text: 'شاخه' } ),
+		...( out.branches || [] ).slice( 0, 12 ).map( ( b ) =>
+			row(
+				b.protected ? '⛨' : '⑂',
+				b.name,
+				b.when,
+				async () => {
+					close();
+					const res = await post( '/api/git', { action: 'branch', name: b.name } );
+					toast( res.error || `روی «${ b.name }» هستیم.`, res.error ? 'error' : '' );
+					await refreshState();
+				},
+				b.name === git.branch
+			)
+		),
+		h( 'div', { class: 'menu-sep' } ),
+		row( '+', 'شاخهٔ تازه', 'از همین‌جا منشعب می‌شود', async () => {
+			close();
+			const name = await promptDialog( 'نام شاخهٔ تازه:', `hoosha/${ Date.now().toString( 36 ) }` );
+			if ( ! name ) {
+				return;
+			}
+			const res = await post( '/api/git', { action: 'branch', name, create: true } );
+			toast( res.error || `شاخهٔ «${ name }» ساخته شد.`, res.error ? 'error' : '' );
+			await refreshState();
+		} ),
+	] );
+}
+
+function actionMenu() {
+	const git = getState()?.git;
+
+	if ( ! git ) {
+		connectRepo();
+		return;
+	}
+
+	menu( [
+		h( 'div', { class: 'menu-label', text: 'بستن کار' } ),
+		row( '✓', `ثبت ${ git.files.length } تغییر`, git.protected ? 'شاخهٔ تازه ساخته می‌شود' : git.branch, async () => {
+			close();
+			await doCommit();
+		} ),
+		row( '↑', 'فرستادن به ریموت', git.ahead ? `${ git.ahead } کامیت آماده` : 'چیزی برای فرستادن نیست', async () => {
+			close();
+			await doPush();
+		} ),
+		row( '⇄', 'درخواست ادغام', 'با gh ساخته می‌شود', async () => {
+			close();
+			await doPr();
+		} ),
+		h( 'div', { class: 'menu-sep' } ),
+		row( '±', 'دیدن تغییرات', '', () => {
+			close();
+			openView( 'changes' );
+		} ),
+	] );
+}
+
+async function doCommit() {
+	const git = getState()?.git;
+	if ( ! git?.dirty ) {
+		toast( 'چیزی برای ثبت نیست.' );
+		return;
+	}
+
+	const message = await promptDialog( `پیام کامیت (${ git.files.length } فایل):`, '' );
+	if ( ! message ) {
+		return;
+	}
+
+	const out = await post( '/api/git', { action: 'commit', message } );
+	if ( out.error ) {
+		toast( out.error, 'error' );
+		return;
+	}
+	toast( `${ out.sha } ثبت شد${ out.movedTo ? ` روی شاخهٔ تازهٔ «${ out.movedTo }»` : '' }.` );
+	await refreshState();
+}
+
+async function doPush() {
+	const git = getState()?.git;
+	if ( git?.protected ) {
+		toast( 'روی شاخهٔ محافظت‌شده پوش نمی‌کنیم.', 'error' );
+		return;
+	}
+	if ( ! ( await confirmDialog( `شاخهٔ «${ git?.branch }» به ریموت فرستاده شود؟` ) ) ) {
+		return;
+	}
+
+	const token = await promptDialog( 'توکن (اگر لازم است؛ وگرنه خالی):', '' );
+	const out = await post( '/api/git', { action: 'push', token: token || undefined } );
+	toast( out.error || `شاخهٔ «${ out.branch }» فرستاده شد.`, out.error ? 'error' : '' );
+	await refreshState();
+}
+
+async function doPr() {
+	const title = await promptDialog( 'عنوان درخواست ادغام:', '' );
+	if ( ! title ) {
+		return;
+	}
+	const out = await post( '/api/git', { action: 'pr', title } );
+	if ( out.error ) {
+		toast( out.error, 'error' );
+		return;
+	}
+	toast( 'درخواست ادغام ساخته شد.' );
+	window.open( out.url, '_blank', 'noreferrer' );
+}
+
+/**
+ * صفحهٔ «تغییرات» — فهرست فایل‌ها با شمار خط و دیف هرکدام.
+ * @param {HTMLElement} host
+ */
+export async function renderChanges( host ) {
+	host.replaceChildren( h( 'div', { class: 'loading', text: 'در حال خواندن تغییرات…' } ) );
+
+	const out = await api( '/api/git' );
+	host.replaceChildren();
+
+	if ( ! out.git ) {
+		host.appendChild(
+			h( 'div', { class: 'empty' }, [
+				h( 'p', { text: 'این پوشه مخزن گیت نیست.' } ),
+				h( 'button', { class: 'pill primary', text: 'اتصال مخزن', onClick: () => connectRepo() } ),
+			] )
+		);
+		return;
+	}
+
+	const git = out.git;
+
+	host.appendChild(
+		h( 'div', { class: 'stat-row' }, [
+			stat( 'مخزن', git.name ),
+			stat( 'شاخه', git.branch + ( git.protected ? ' ⛨' : '' ) ),
+			stat( 'تغییر', `+${ git.added } −${ git.removed }` ),
+			stat( 'جلوتر از ریموت', String( git.ahead ) ),
+		] )
+	);
+
+	host.appendChild(
+		h( 'div', { class: 'row' }, [
+			h( 'button', { class: 'pill primary', text: 'ثبت تغییرات', onClick: doCommit } ),
+			h( 'button', { class: 'pill', text: 'فرستادن', onClick: doPush } ),
+			h( 'button', { class: 'pill', text: 'درخواست ادغام', onClick: doPr } ),
+		] )
+	);
+
+	if ( ! git.files.length ) {
+		host.appendChild( h( 'div', { class: 'empty', text: 'چیزی تغییر نکرده.' } ) );
+	} else {
+		const list = h( 'div', { class: 'card-list' } );
+		for ( const f of git.files ) {
+			const num = ( out.stat || [] ).find( ( x ) => x.path === f.path );
+			const body = h( 'pre', { class: 'tool-body diff mono', hidden: true } );
+
+			list.appendChild(
+				h( 'div', { class: 'item', style: 'flex-direction:column;align-items:stretch' }, [
+					h( 'div', { class: 'git-row', onClick: async () => {
+						if ( ! body.hidden ) {
+							body.hidden = true;
+							return;
+						}
+						const d = await api( `/api/git?diff=${ encodeURIComponent( f.path ) }` );
+						body.replaceChildren();
+						for ( const line of String( d.diff || '(بدون دیف)' ).split( '\n' ) ) {
+							const cls = line.startsWith( '+' ) ? 'add' : line.startsWith( '-' ) ? 'del' : line.startsWith( '@@' ) ? 'meta' : '';
+							body.appendChild( h( 'div', { class: cls, text: line } ) );
+						}
+						body.hidden = false;
+					} }, [
+						h( 'span', { class: `git-state s-${ f.state.replace( /[^A-Z]/g, '' ) || 'M' }`, text: f.state } ),
+						h( 'span', { class: 'mono small', text: f.path } ),
+						num ? h( 'span', { class: 'git-num' }, [
+							h( 'span', { class: 'plus', text: `+${ num.added } ` } ),
+							h( 'span', { class: 'minus', text: `−${ num.removed }` } ),
+						] ) : null,
+					] ),
+					body,
+				] )
+			);
+		}
+		host.appendChild( list );
+	}
+
+	if ( ( out.log || [] ).length ) {
+		host.appendChild( h( 'h4', { text: 'کامیت‌های اخیر', style: 'margin-top:26px' } ) );
+		const table = h( 'table', { class: 'table' }, [
+			h( 'tbody', {}, out.log.map( ( c ) =>
+				h( 'tr', {}, [
+					h( 'td', { class: 'mono', text: c.sha } ),
+					h( 'td', { text: c.subject } ),
+					h( 'td', { class: 'note', text: `${ c.author } · ${ c.when }` } ),
+				] )
+			) ),
+		] );
+		host.appendChild( table );
+	}
+}
+
+function stat( label, value ) {
+	return h( 'div', { class: 'stat' }, [
+		h( 'span', { class: 'stat-label', text: label } ),
+		h( 'b', { class: 'stat-value', text: value } ),
+	] );
+}

@@ -25,7 +25,8 @@ import { listConnectors, saveConnector, removeConnector, setConnectorEnabled, te
 import { saveAgent, removeAgent } from './agents.js';
 import { CheckpointStore } from './checkpoints.js';
 import { shells } from './background.js';
-import { listFiles, fuzzyFilter, readWorkspaceFile, gitStatus, gitDiff } from './workspace.js';
+import { listFiles, fuzzyFilter, readWorkspaceFile } from './workspace.js';
+import * as vcs from './git.js';
 import { estimateCost, estimateContextTokens, recordUsage, readUsage } from './usage.js';
 import { toMarkdown, toJson } from './export.js';
 import { diagnose } from './doctor.js';
@@ -210,8 +211,9 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			checkpoints: await runtime.checkpoints.list(),
 			memory: Boolean( runtime.projectMemory ),
 			sandbox: await sandboxStatus( cfg ),
+			git: await vcs.status( cfg.workspace ).catch( () => null ),
 			providerInfo: info || null,
-			version: '0.5.0',
+			version: '0.6.0',
 		};
 	}
 
@@ -491,10 +493,79 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 		},
 
 		'GET /api/git': async ( { url } ) => {
-			const status = await gitStatus( runtime.config.workspace );
-			const file = url.searchParams.get( 'diff' );
-			const diff = file !== null ? await gitDiff( runtime.config.workspace, file || undefined ) : undefined;
-			return { status: 200, body: { git: status, diff } };
+			const dir = runtime.config.workspace;
+			const base = url.searchParams.get( 'base' ) || undefined;
+			const wantDiff = url.searchParams.get( 'diff' );
+
+			const st = await vcs.status( dir );
+			if ( ! st ) {
+				return { status: 200, body: { git: null } };
+			}
+
+			const [ stat, list, history ] = await Promise.all( [
+				vcs.diffStat( dir, base ),
+				vcs.branches( dir ),
+				vcs.log( dir, 15 ),
+			] );
+
+			const diff = wantDiff !== null ? await vcs.diff( dir, { base, file: wantDiff || undefined } ) : undefined;
+			return { status: 200, body: { git: st, stat, branches: list, log: history, diff } };
+		},
+
+		'POST /api/git': async ( { body } ) => {
+			const dir = runtime.config.workspace;
+			try {
+				if ( body.action === 'branch' ) {
+					const out = await vcs.branch( dir, String( body.name || '' ), { create: Boolean( body.create ) } );
+					broadcast( { type: 'git', branch: out.branch } );
+					return { status: 200, body: { ok: true, ...out } };
+				}
+				if ( body.action === 'commit' ) {
+					const out = await vcs.commit( dir, {
+						message: String( body.message || '' ),
+						paths: Array.isArray( body.paths ) ? body.paths : undefined,
+						branch: body.branch,
+					} );
+					broadcast( { type: 'notice', text: `کامیت ${ out.sha } روی «${ out.branch }»` } );
+					broadcast( { type: 'git' } );
+					return { status: 200, body: { ok: true, ...out } };
+				}
+				if ( body.action === 'push' ) {
+					const out = await vcs.push( dir, { branch: body.branch, token: body.token } );
+					broadcast( { type: 'notice', text: `شاخهٔ «${ out.branch }» فرستاده شد.` } );
+					broadcast( { type: 'git' } );
+					return { status: 200, body: { ok: true, ...out } };
+				}
+				if ( body.action === 'pr' ) {
+					const out = await vcs.pullRequest( dir, {
+						title: String( body.title || '' ),
+						body: String( body.body || '' ),
+						base: body.base,
+					} );
+					return { status: out.ok ? 200 : 400, body: out.ok ? { ok: true, url: out.url } : { error: out.message } };
+				}
+				if ( body.action === 'clone' ) {
+					const into = path.join( HOME, 'repos' );
+					const out = await vcs.clone( {
+						url: String( body.url || '' ),
+						into,
+						name: body.name,
+						token: body.token,
+						branch: body.branch,
+					} );
+					const cfg = await loadConfig();
+					cfg.workspace = out.path;
+					await saveConfig( cfg );
+					await runtime.reload();
+					await runtime.loadProjectMemory();
+					rebindCheckpoints();
+					broadcast( { type: 'workspace', path: out.path } );
+					return { status: 200, body: { ok: true, ...out } };
+				}
+				return { status: 400, body: { error: 'کنش ناشناخته' } };
+			} catch ( e ) {
+				return { status: 400, body: { error: e?.message || String( e ) } };
+			}
 		},
 
 		// -------------------------------------------------------- چک‌پوینت
@@ -957,6 +1028,25 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 
 			case 'skills':
 				return open( 'settings', 'skills' );
+
+			case 'install': {
+				if ( ! args ) {
+					return say( 'کاربرد: /install <owner/repo یا آدرس گیت یا مسیر محلی>\nیا همان آدرس را در گفتگو بینداز و بگو «نصبش کن».' );
+				}
+				try {
+					const tool = runtime.tools().install;
+					const out = await tool.run( { source: args }, { workspace: runtime.config.workspace } );
+					broadcast( { type: 'notice', text: out } );
+					return { ok: true };
+				} catch ( e ) {
+					return say( `نصب نشد: ${ e?.message || e }` );
+				}
+			}
+
+			case 'git':
+			case 'changes':
+				broadcast( { type: 'open_view', view: 'changes' } );
+				return { ok: true };
 
 			case 'agents':
 				return open( 'settings', 'agents' );

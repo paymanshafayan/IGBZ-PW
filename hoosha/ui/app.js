@@ -23,6 +23,7 @@ import { initRail, paintRail } from './rail.js';
 import { mountSettings, renderSection, SETTINGS_TABS } from './settings.js';
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 import { logoSvg } from './lib/logo.js';
+import { initGitBar, paintGitBar, renderChanges } from './gitbar.js';
 
 // تم: تا وقتی کاربر خودش انتخاب نکرده، از تنظیم سیستم پیروی می‌کنیم — مثل Claude.
 const savedTheme = localStorage.getItem( 'hoosha-theme' );
@@ -55,12 +56,13 @@ if ( localStorage.getItem( 'hoosha-ui-version' ) !== UI_STATE_VERSION ) {
 // ───────────────────────────────────────────────────────── نماها
 
 const PANELS = {
-	tools: { title: 'ابزارها', sub: 'هرچه مدل می‌تواند صدا بزند. آنچه کنترل می‌شود دسترسی است، نه توانایی.', section: 'tools' },
-	connectors: { title: 'کانکتورها', sub: 'سرورهای MCP: ابزارهای سرویس‌های بیرونی را داخل هوشا می‌آورند.', section: 'connectors' },
-	skills: { title: 'اسکیل‌ها', sub: 'دانش رویه‌ای آماده، با فرمت استاندارد SKILL.md.', section: 'skills' },
-	agents: { title: 'زیرعامل‌ها', sub: 'هر زیرعامل یک متخصص است با پرامپت، مدل و ابزارهای خودش.', section: 'agents' },
-	workspace: { title: 'فضای کار', sub: 'پوشهٔ کاری، حافظهٔ پروژه، مجوزها و سندباکس — همه در همین صفحه.', section: 'workspace' },
-	settings: { title: 'تنظیمات', sub: 'هر چیزی که در فایل تنظیمات هست، اینجا فرم دارد.', section: 'settings' },
+	tools: { ico: '⚒', title: 'ابزارها', sub: 'هرچه مدل می‌تواند صدا بزند. آنچه کنترل می‌شود دسترسی است، نه توانایی.', section: 'tools' },
+	connectors: { ico: '⇄', title: 'کانکتورها', sub: 'سرورهای MCP: ابزارهای سرویس‌های بیرونی را داخل هوشا می‌آورند.', section: 'connectors' },
+	skills: { ico: '◆', title: 'اسکیل‌ها', sub: 'دانش رویه‌ای آماده، با فرمت استاندارد SKILL.md. آدرس یک اسکیل را در همان کادر گفتگو بینداز و بگو نصبش کن.', section: 'skills' },
+	agents: { ico: '⌗', title: 'زیرعامل‌ها', sub: 'هر زیرعامل یک متخصص است با پرامپت، مدل و ابزارهای خودش.', section: 'agents' },
+	workspace: { ico: '▤', title: 'فضای کار', sub: 'پوشهٔ کاری، حافظهٔ پروژه، مجوزها و سندباکس — همه در همین صفحه.', section: 'workspace' },
+	changes: { ico: '±', title: 'تغییرات', sub: 'فایل‌های تغییرکرده، دیف هرکدام، و راه بستن کار: ثبت، فرستادن، ادغام.', section: 'changes' },
+	settings: { ico: '⚙', title: 'تنظیمات', sub: 'هر چیزی که در فایل تنظیمات هست، اینجا فرم دارد.', section: 'settings' },
 };
 
 let view = 'chat';
@@ -79,33 +81,48 @@ async function showView( next ) {
 	const chat = $( '#view-chat' );
 	const panel = $( '#view-panel' );
 
+	$( '#btn-back' ).hidden = next === 'chat';
+
 	if ( next === 'chat' ) {
 		chat.hidden = false;
 		panel.hidden = true;
+		$( '#session-title-text' ).textContent = getState()?.sessionTitle || 'گفتگوی تازه';
 		focusComposer();
 		return;
 	}
 
 	chat.hidden = true;
 	panel.hidden = false;
+	$( '#session-title-text' ).textContent = PANELS[ next ].title;
 
 	const meta = PANELS[ next ];
 	const box = $( '#panel-body' );
+
+	// سربرگ «قهرمان»: نشان، عنوان و یک جملهٔ توضیح — تا صفحه باز و خوانا باشد،
+	// نه یک پنجرهٔ کوچک روی گفتگو.
 	box.replaceChildren(
-		h( 'h1', { class: 'panel-title', text: meta.title } ),
-		h( 'p', { class: 'panel-sub', text: meta.sub } )
+		h( 'div', { class: 'panel-hero' }, [
+			h( 'span', { class: 'hero-ico', text: meta.ico } ),
+			h( 'div', {}, [
+				h( 'h1', { class: 'panel-title', text: meta.title } ),
+				h( 'p', { class: 'panel-sub', text: meta.sub } ),
+			] ),
+		] )
 	);
 
 	const host = h( 'div', {} );
 	box.appendChild( host );
 
 	if ( next === 'settings' ) {
-		box.replaceChildren(); // صفحهٔ تنظیمات سربرگ خودش را دارد
-		await mountSettings( box, settingsTab );
+		await mountSettings( host, settingsTab );
 		return;
 	}
 	if ( next === 'workspace' ) {
 		await renderWorkspacePanel( host );
+		return;
+	}
+	if ( next === 'changes' ) {
+		await renderChanges( host );
 		return;
 	}
 	await renderSection( meta.section, host );
@@ -196,6 +213,7 @@ initComposer( {
 } );
 
 initSidebar( { onResume: resumeSession, onView: showView } );
+initGitBar( { onView: showView } );
 initRail( { onRewind: ( id ) => openRewind( doRewind, id ) } );
 
 // ───────────────────────────────────────────────────────── وضعیت
@@ -206,6 +224,7 @@ subscribe( ( s ) => {
 
 	paintSidebarState( s );
 	paintRail( s );
+	paintGitBar( s );
 	setMode( s.config.permissions?.mode || 'default' );
 
 	const ws = String( s.config.workspace || '' );
@@ -216,7 +235,9 @@ subscribe( ( s ) => {
 	$( '#model-name' ).textContent = p.model || 'مدل تنظیم نشده';
 	$( '#pill-model' ).title = `${ p.provider || '' } · ${ p.model || '' }`;
 
-	$( '#session-title-text' ).textContent = s.sessionTitle || 'گفتگوی تازه';
+	if ( view === 'chat' ) {
+		$( '#session-title-text' ).textContent = s.sessionTitle || 'گفتگوی تازه';
+	}
 
 	const used = s.context?.used || 0;
 	const win = s.context?.window || 200_000;
@@ -285,6 +306,7 @@ function connectEvents() {
 				setMode( ev.mode );
 				return;
 
+			case 'git':
 			case 'profile':
 			case 'workspace':
 			case 'checkpoint':
@@ -296,6 +318,10 @@ function connectEvents() {
 
 			case 'open_panel':
 				openSettings( ev.tab );
+				return;
+
+			case 'open_view':
+				showView( ev.view );
 				return;
 
 			case 'open_rewind':
