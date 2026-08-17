@@ -34,22 +34,68 @@ else
 fi
 
 # ------------------------------------------------------- سرهم‌کردن فایل‌های تکه‌شده
+#
+# سه سبک نام‌گذاری پشتیبانی می‌شود، چون بسته به ابزار فرق می‌کند:
+#   split لینوکس/مک   →  x.zip.part-aa , x.zip.part-ab
+#   split.ps1 ویندوز  →  x.zip.part-001 , x.zip.part-002
+#   7-Zip گرافیکی     →  x.zip.001 , x.zip.002
+#
+# اگر فایل <base>.sha256 هم کنارشان باشد، بعد از سرهم‌شدن بررسی می‌شود.
 
 blue "بررسی فایل‌های تکه‌شده در _bin/"
 shopt -s nullglob
-joined=0
-for first in "$BIN"/*.part-aa; do
-	base="${first%.part-aa}"
-	name="$( basename "$base" )"
-	if [ -f "$base" ]; then
-		ok "$name از قبل سرهم شده"
-		continue
-	fi
-	blue "سرهم‌کردن $name"
-	cat "$base".part-* > "$base"
-	ok "$name ساخته شد ($( du -h "$base" | cut -f1 ))"
-	joined=$(( joined + 1 ))
+
+# پیداکردن نام پایهٔ هر مجموعه تکه، بدون تکرار.
+bases=""
+for f in "$BIN"/*.part-* "$BIN"/*.[0-9][0-9][0-9]; do
+	[ -f "$f" ] || continue
+	case "$f" in
+		*.sha256) continue ;;
+		*.part-*) base="${f%.part-*}" ;;
+		*)        base="${f%.*}" ;;
+	esac
+	case "$bases" in
+		*"|$base|"*) ;;
+		*) bases="$bases|$base|" ;;
+	esac
 done
+
+joined=0
+if [ -n "$bases" ]; then
+	# جداکردن نام‌های پایه از رشته‌ای که با | ساخته شد.
+	printf '%s' "$bases" | tr '|' '\n' | grep -v '^$' | while IFS= read -r base; do
+		name="$( basename "$base" )"
+
+		if [ -f "$base" ]; then
+			ok "$name از قبل سرهم شده"
+			continue
+		fi
+
+		parts=$( ls -1 "$base".part-* "$base".[0-9][0-9][0-9] 2>/dev/null | sort )
+		[ -z "$parts" ] && continue
+
+		count=$( printf '%s\n' "$parts" | wc -l )
+		blue "سرهم‌کردن $name از $count تکه"
+		# shellcheck disable=SC2086
+		cat $parts > "$base"
+		ok "$name ساخته شد ($( du -h "$base" | cut -f1 ))"
+
+		if [ -f "$base.sha256" ]; then
+			want=$( tr -d "[:space:]" < "$base.sha256" | tr "[:upper:]" "[:lower:]" )
+			got=$( sha256sum "$base" | cut -d" " -f1 )
+			if [ "$want" = "$got" ]; then
+				ok "امضا درست است"
+			else
+				die "امضای $name نمی‌خواند. فایل ناقص یا خراب است.
+     انتظار: $want
+     واقعی : $got
+     تکه‌ها را دوباره آپلود کن."
+			fi
+		fi
+	done
+	joined=1
+fi
+
 [ "$joined" = 0 ] && warn "چیزی برای سرهم‌کردن نبود"
 
 # ---------------------------------------------------------------- استخراج آرشیوها
@@ -111,7 +157,8 @@ if [ -z "$found_shell" ]; then
 	warn "هیچ پوستهٔ دسکتاپی پیدا نشد"
 	printf '     یکی از این‌ها را در %s بگذار (راهنما: _bin/README.md):\n' "$BIN"
 	printf '       • neutralinojs-v<نسخه>.zip                       (~۵MB، یک فایل)\n'
-	printf '       • electron-v43.4.0-linux-x64.zip.part-aa/ab/ac   (تکه‌شده با split)\n'
+	printf '       • electron-v43.4.0-linux-x64.zip.part-001/002/003 (تکه‌شده با _bin/split.ps1)\n'
+	printf '     راهنمای کامل و دستور پاورشل: _bin/README.md\n'
 fi
 
 # ------------------------------------------------------------------------- Bun
