@@ -13,6 +13,11 @@
 !/_devenv/wordpress-*.zip
 !/_devenv/woocommerce-*.zip
 
+# Same reasoning for _bin/: GitHub release assets are unreachable from the sandbox, so the
+# desktop-shell and runtime binaries have to live in the repository. See _bin/README.md.
+!/_bin/
+!/_bin/**
+
 # Everything the test environment builds from those zips is disposable.
 /_devenv/.work/
 
