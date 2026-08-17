@@ -130,6 +130,7 @@ export class Runtime {
 		return new Agent( {
 			provider,
 			model: profile.model || info?.defaultModel || '',
+			baseUrl: profile.baseUrl || info?.baseUrl || '',
 			workspace: cfg.workspace,
 			rules: cfg.permissions,
 			getTools: () => this.tools( depth ),

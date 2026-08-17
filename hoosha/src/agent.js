@@ -14,6 +14,7 @@
 
 import { decide, describeCall } from './permissions.js';
 import { shouldCompact, compact } from './subagent.js';
+import { explain } from './errors.js';
 
 const DEFAULT_MAX_STEPS = 24;
 
@@ -43,6 +44,7 @@ export class Agent {
 		this.extraPrompt = opts.extraPrompt || '';
 		this.maxSteps = opts.maxSteps || DEFAULT_MAX_STEPS;
 		this.hooks = opts.hooks || null;
+		this.baseUrl = opts.baseUrl || '';
 		this.autoCompact = opts.autoCompact !== false;
 		this.emit = opts.emit;
 
@@ -131,7 +133,9 @@ export class Agent {
 
 			await this.hooks?.run( 'Stop', {} );
 		} catch ( e ) {
-			this.emit( { type: 'error', error: e?.message || String( e ) } );
+			// خطای خام مدل به‌درد کاربر نمی‌خورد؛ ترجمه‌اش می‌کنیم.
+			const info = explain( e, { baseUrl: this.baseUrl, model: this.model } );
+			this.emit( { type: 'error', error: info.message, hint: info.hint, kind: info.kind } );
 		} finally {
 			this.busy = false;
 			this.controller = null;

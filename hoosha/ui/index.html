@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-theme="light">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -8,69 +8,132 @@
 </head>
 <body>
 
-<header class="bar">
-	<div class="brand">
-		<span class="dot"></span>
-		<strong>هوشا</strong>
-		<span class="ver">0.1</span>
-	</div>
+<div class="app">
 
-	<div class="bar-mid">
-		<button id="btn-settings" class="chip" title="تنظیمات پرووایدر">
-			<span id="chip-provider">در حال بارگذاری…</span>
+	<!-- ───────────────────────────────────────────────── نوار کناری -->
+	<aside class="sidebar" id="sidebar">
+		<div class="side-head">
+			<div class="brand">
+				<span class="mark"></span>
+				<span>هوشا</span>
+			</div>
+			<button class="icon-btn" id="btn-theme" title="تغییر تم">◐</button>
+		</div>
+
+		<button class="new-session" id="btn-new">
+			<span class="plus">+</span> گفتگوی تازه
 		</button>
-		<select id="mode" class="chip select" title="حالت کار">
-			<option value="plan">پلن — فقط بررسی</option>
-			<option value="default">عادی — تأیید بگیر</option>
-			<option value="auto">خودکار — بدون تأیید</option>
-		</select>
-		<button id="btn-workspace" class="chip mono" title="پوشهٔ کاری">…</button>
-	</div>
 
-	<div class="bar-end">
-		<span id="usage" class="usage"></span>
-		<button id="btn-panel" class="chip" title="ابزارها، اسکیل‌ها، MCP، پلاگین‌ها">افزونه‌ها</button>
-		<button id="btn-new" class="chip">گفتگوی تازه</button>
-	</div>
-</header>
+		<div class="side-scroll">
+			<div class="side-label">نشست‌ها</div>
+			<div id="session-list" class="session-list"></div>
 
-<main id="chat" class="chat">
-	<div class="welcome" id="welcome">
-		<h1>هوشا</h1>
-		<p>یک دستیار عامل که روی دستگاه خودت اجرا می‌شود، ابزار واقعی دارد و با هر پرووایدری کار می‌کند.</p>
-		<div class="cards">
-			<div class="card">
-				<h3>۱. پرووایدر را انتخاب کن</h3>
-				<p>از فهرست استاندارد، یا «سازگار با OpenAI / Anthropic» با آدرس و کلید خودت.</p>
+			<div class="side-label">فضای کار</div>
+			<button class="side-item mono" id="btn-workspace" title="تغییر پوشهٔ کاری">…</button>
+
+			<div class="side-label">افزونه‌ها</div>
+			<button class="side-item" data-panel="tools"><span class="si-ico">⚒</span> ابزارها <b id="c-tools"></b></button>
+			<button class="side-item" data-panel="skills"><span class="si-ico">◆</span> اسکیل‌ها <b id="c-skills"></b></button>
+			<button class="side-item" data-panel="mcp"><span class="si-ico">⇄</span> MCP <b id="c-mcp"></b></button>
+			<button class="side-item" data-panel="plugins"><span class="si-ico">▣</span> پلاگین‌ها <b id="c-plugins"></b></button>
+			<button class="side-item" data-panel="commands"><span class="si-ico">/</span> دستورها <b id="c-commands"></b></button>
+		</div>
+
+		<button class="side-item settings-btn" id="btn-settings">
+			<span class="si-ico">⚙</span> <span id="chip-provider">تنظیمات</span>
+		</button>
+	</aside>
+
+	<!-- ───────────────────────────────────────────────── ناحیهٔ اصلی -->
+	<main class="main">
+		<header class="topbar">
+			<button class="icon-btn only-narrow" id="btn-menu" title="منو">☰</button>
+			<div class="title" id="session-title">گفتگوی تازه</div>
+			<div class="top-right">
+				<span class="meter" id="context-meter" title="مصرف کانتکست"></span>
+				<span class="badge" id="badge-mode">عادی</span>
 			</div>
-			<div class="card">
-				<h3>۲. پوشهٔ کاری را بده</h3>
-				<p>هوشا فقط داخل همان پوشه کار می‌کند.</p>
-			</div>
-			<div class="card">
-				<h3>۳. کار را بسپار</h3>
-				<p>هر ابزار پرریسک قبل از اجرا از تو تأیید می‌گیرد.</p>
+		</header>
+
+		<div class="thread" id="chat">
+			<div class="welcome" id="welcome">
+				<h1>هوشا</h1>
+				<p>یک دستیار عامل که روی دستگاه خودت اجرا می‌شود، ابزار واقعی دارد و با هر پرووایدری کار می‌کند.</p>
+				<div class="starter" id="starter"></div>
 			</div>
 		</div>
-	</div>
-</main>
 
-<form id="composer" class="composer">
-	<div class="composer-wrap">
-		<div id="cmd-menu" class="cmd-menu" hidden></div>
-		<textarea id="input" rows="1" placeholder="چه کاری انجام بدهم؟  (Enter برای ارسال، Shift+Enter خط جدید، / برای دستورها)"></textarea>
-	</div>
-	<button id="send" type="submit" class="send">ارسال</button>
-	<button id="stop" type="button" class="stop" hidden>توقف</button>
-</form>
+		<div class="composer-shell">
+			<div id="cmd-menu" class="cmd-menu" hidden></div>
 
-<!-- ------------------------------------------------------- پنل افزونه‌ها -->
+			<form id="composer" class="composer">
+				<textarea id="input" rows="1" placeholder="چه کاری انجام بدهم؟"></textarea>
+
+				<div class="composer-bar">
+					<div class="composer-left">
+						<select id="mode" class="pill" title="حالت کار">
+							<option value="plan">◇ پلن — فقط بررسی</option>
+							<option value="default">◈ عادی — تأیید بگیر</option>
+							<option value="auto">◆ خودکار — بدون تأیید</option>
+						</select>
+						<button type="button" class="pill" id="pill-model" title="مدل">—</button>
+					</div>
+					<div class="composer-right">
+						<span class="hint">Enter ارسال · Shift+Enter خط جدید · / دستورها</span>
+						<button id="stop" type="button" class="circle stop" hidden title="توقف">■</button>
+						<button id="send" type="submit" class="circle" title="ارسال">↑</button>
+					</div>
+				</div>
+			</form>
+		</div>
+	</main>
+</div>
+
+<!-- ─────────────────────────────────────────────────────── تنظیمات -->
+<dialog id="settings" class="modal">
+	<div class="modal-body">
+		<h2>پرووایدر</h2>
+		<p class="note" id="home-note"></p>
+
+		<label>سرویس‌دهنده
+			<select id="f-provider"></select>
+		</label>
+		<p id="p-note" class="note"></p>
+
+		<label>آدرس پایه
+			<input id="f-baseurl" type="text" dir="ltr" placeholder="https://…" />
+		</label>
+
+		<label>کلید API <span id="key-state" class="key-state"></span>
+			<input id="f-apikey" type="password" dir="ltr" />
+		</label>
+
+		<label>مدل
+			<span class="row">
+				<input id="f-model" type="text" dir="ltr" placeholder="نام مدل" list="model-list" />
+				<button type="button" id="btn-fetch-models" class="pill">گرفتن فهرست</button>
+			</span>
+			<datalist id="model-list"></datalist>
+		</label>
+		<p id="models-note" class="note"></p>
+
+		<div class="modal-actions">
+			<button type="button" id="btn-test" class="pill">تست اتصال</button>
+			<span class="grow"></span>
+			<button type="button" id="settings-cancel" class="pill">انصراف</button>
+			<button type="button" id="settings-save" class="pill primary">ذخیره</button>
+		</div>
+		<p id="test-note" class="note"></p>
+	</div>
+</dialog>
+
+<!-- ────────────────────────────────────────────────── پنل افزونه‌ها -->
 <dialog id="panel" class="modal wide">
 	<div class="modal-body">
 		<div class="panel-head">
-			<h2>افزونه‌ها</h2>
+			<h2 id="panel-title">ابزارها</h2>
 			<div class="tabs">
-				<button class="tab active" data-tab="tools">ابزارها</button>
+				<button class="tab" data-tab="tools">ابزارها</button>
 				<button class="tab" data-tab="skills">اسکیل‌ها</button>
 				<button class="tab" data-tab="mcp">MCP</button>
 				<button class="tab" data-tab="plugins">پلاگین‌ها</button>
@@ -84,7 +147,7 @@
 		<div id="tab-plugins" class="tab-body" hidden>
 			<div class="row install-row">
 				<input id="plugin-source" type="text" dir="ltr" placeholder="owner/repo یا مسیر محلی" />
-				<button type="button" id="btn-install-plugin" class="chip primary">نصب</button>
+				<button type="button" id="btn-install-plugin" class="pill primary">نصب</button>
 			</div>
 			<p id="plugin-note" class="note"></p>
 			<div id="plugin-list"></div>
@@ -92,44 +155,11 @@
 		<div id="tab-commands" class="tab-body" hidden></div>
 
 		<div class="modal-actions">
-			<button type="button" id="btn-reload" class="chip">بارگذاری دوباره</button>
-			<button type="button" id="panel-close" class="chip">بستن</button>
+			<button type="button" id="btn-reload" class="pill">بارگذاری دوباره</button>
+			<span class="grow"></span>
+			<button type="button" id="panel-close" class="pill">بستن</button>
 		</div>
 	</div>
-</dialog>
-
-<!-- ------------------------------------------------------------ تنظیمات -->
-<dialog id="settings" class="modal">
-	<form method="dialog" class="modal-body" id="settings-form">
-		<h2>تنظیمات پرووایدر</h2>
-
-		<label>پرووایدر
-			<select id="f-provider"></select>
-		</label>
-		<p id="p-note" class="note"></p>
-
-		<label>آدرس پایه (baseURL)
-			<input id="f-baseurl" type="text" dir="ltr" placeholder="https://…" />
-		</label>
-
-		<label>کلید API
-			<input id="f-apikey" type="password" dir="ltr" placeholder="خالی بگذار تا کلید فعلی حفظ شود" />
-		</label>
-
-		<label>مدل
-			<span class="row">
-				<input id="f-model" type="text" dir="ltr" placeholder="نام مدل" list="model-list" />
-				<button type="button" id="btn-fetch-models" class="chip">گرفتن فهرست</button>
-			</span>
-			<datalist id="model-list"></datalist>
-		</label>
-		<p id="models-note" class="note"></p>
-
-		<div class="modal-actions">
-			<button type="button" id="settings-cancel" class="chip">انصراف</button>
-			<button type="button" id="settings-save" class="chip primary">ذخیره</button>
-		</div>
-	</form>
 </dialog>
 
 <script type="module" src="/app.js"></script>

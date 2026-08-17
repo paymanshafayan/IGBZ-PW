@@ -10,7 +10,16 @@ import fssync from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const HOME = path.join( os.homedir(), '.hoosha' );
+/**
+ * محل تنظیمات.
+ *
+ * پیش‌فرض `~/.hoosha` است، ولی با متغیر محیطی `HOOSHA_HOME` قابل تغییر است. این فقط
+ * یک قابلیت تزئینی نیست: در محیط‌هایی که پوشهٔ خانگی بین اجراها پاک می‌شود (مثل همین
+ * سندباکس توسعه)، کلید API کاربر ناپدید می‌شد و به‌نظر می‌رسید «ذخیره نمی‌شود».
+ */
+export const HOME = process.env.HOOSHA_HOME
+	? path.resolve( process.env.HOOSHA_HOME )
+	: path.join( os.homedir(), '.hoosha' );
 export const CONFIG_PATH = path.join( HOME, 'config.json' );
 export const SESSIONS_DIR = path.join( HOME, 'sessions' );
 

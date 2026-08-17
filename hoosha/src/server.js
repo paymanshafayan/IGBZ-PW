@@ -18,6 +18,7 @@ import { saveSession, listSessions, loadSession } from './session.js';
 import { Runtime } from './runtime.js';
 import { parseInput, BUILTIN_COMMANDS } from './commands.js';
 import { listPlugins, installPlugin, removePlugin, setPluginEnabled, fetchMarketplace } from './plugins.js';
+import { explain } from './errors.js';
 
 const __dirname = path.dirname( fileURLToPath( import.meta.url ) );
 const UI_DIR = path.join( __dirname, '..', 'ui' );
@@ -88,11 +89,14 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			// ------------------------------------------------------------ وضعیت
 			if ( url.pathname === '/api/state' && req.method === 'GET' ) {
 				const cfg = runtime.config;
+				const active = activeProfile( cfg ) || {};
 				return send( 200, {
 					config: publicConfig( cfg ),
 					providers: PROVIDERS,
 					modes: MODES,
 					ready: runtime.ready,
+					hasKey: Boolean( active.apiKey ),
+					home: HOME,
 					busy: Boolean( runtime.agent?.busy ),
 					transcript,
 					sessionId,
@@ -165,13 +169,51 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 				return send( 200, { ok: true, path: dir } );
 			}
 
+			// آزمودن واقعی پرووایدر: یک درخواست کوچک، و خطای قابل‌فهم.
+			if ( url.pathname === '/api/test-connection' && req.method === 'POST' ) {
+				const cfg = await loadConfig();
+				const profile = activeProfile( cfg );
+				const check = validateProfile( profile );
+				if ( ! check.ok ) {
+					return send( 200, { ok: false, message: `تنظیمات ناقص است: ${ check.missing.join( '، ' ) }` } );
+				}
+
+				const info = providerInfo( profile.provider );
+				const base = profile.baseUrl || info?.baseUrl;
+				try {
+					const provider = createProvider( profile );
+					let text = '';
+					for await ( const ev of provider.stream( {
+						model: profile.model || info?.defaultModel || '',
+						messages: [ { role: 'user', content: 'بگو: سلام' } ],
+						maxTokens: 16,
+					} ) ) {
+						if ( ev.type === 'text' ) {
+							text += ev.text;
+						}
+						if ( ev.type === 'error' ) {
+							throw new Error( ev.error );
+						}
+					}
+					return send( 200, {
+						ok: true,
+						message: `اتصال برقرار است. پاسخ مدل: «${ text.trim().slice( 0, 60 ) || '(خالی)' }»`,
+					} );
+				} catch ( e ) {
+					const info2 = explain( e, { baseUrl: base, model: profile.model, provider: profile.provider } );
+					return send( 200, { ok: false, message: info2.message, hint: info2.hint, kind: info2.kind } );
+				}
+			}
+
 			if ( url.pathname === '/api/models' && req.method === 'GET' ) {
 				const cfg = await loadConfig();
+				const p = activeProfile( cfg );
 				try {
-					const provider = createProvider( activeProfile( cfg ) );
+					const provider = createProvider( p );
 					return send( 200, { models: await provider.listModels() } );
 				} catch ( e ) {
-					return send( 200, { models: [], error: e?.message || String( e ) } );
+					const info = explain( e, { baseUrl: p?.baseUrl, provider: p?.provider } );
+					return send( 200, { models: [], error: info.message, hint: info.hint } );
 				}
 			}
 
@@ -237,6 +279,19 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 
 			if ( url.pathname === '/api/permission' && req.method === 'POST' ) {
 				const body = await readJson( req );
+
+				// «همیشه اجازه بده» یعنی یک قاعدهٔ ماندگار، نه فقط پاسخ به همین یک بار.
+				if ( body.remember && body.rule ) {
+					const cfg = await loadConfig();
+					cfg.permissions.allow = [ ...new Set( [ ...( cfg.permissions.allow || [] ), String( body.rule ) ] ) ];
+					await saveConfig( cfg );
+					runtime.config = cfg;
+					if ( runtime.agent ) {
+						runtime.agent.rules = cfg.permissions;
+					}
+					broadcast( { type: 'notice', text: `از این پس «${ body.rule }» بدون پرسش اجرا می‌شود.` } );
+				}
+
 				return send( 200, { ok: Boolean( runtime.agent?.resolvePermission( body.id, body.decision ) ) } );
 			}
 
@@ -258,6 +313,20 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 
 			if ( url.pathname === '/api/sessions' && req.method === 'GET' ) {
 				return send( 200, { sessions: await listSessions() } );
+			}
+
+			if ( url.pathname === '/api/resume' && req.method === 'POST' ) {
+				const body = await readJson( req );
+				const saved = await loadSession( String( body.id || '' ) );
+				if ( ! saved ) {
+					return send( 404, { error: 'نشست پیدا نشد.' } );
+				}
+				await runtime.reload( { keepHistory: false } );
+				runtime.agent.messages = saved.messages || [];
+				transcript = saved.transcript || [];
+				sessionId = saved.id;
+				broadcast( { type: 'resumed', sessionId, transcript } );
+				return send( 200, { ok: true, sessionId, transcript } );
 			}
 
 			if ( url.pathname.startsWith( '/api/sessions/' ) && req.method === 'GET' ) {
