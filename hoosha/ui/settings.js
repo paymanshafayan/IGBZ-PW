@@ -26,43 +26,52 @@ const TABS = [
 	{ id: 'appearance', label: 'ظاهر', ico: '◐' },
 ];
 
-let dialog = null;
 let currentTab = 'provider';
 
-export function initSettings() {
-	dialog = $( '#settings' );
+export const SETTINGS_TABS = TABS;
 
-	const nav = $( '#settings-nav' );
-	nav.replaceChildren();
-	for ( const t of TABS ) {
-		const btn = h( 'button', { class: 'snav-item', dataset: { tab: t.id }, onClick: () => openSettings( t.id ) }, [
-			h( 'span', { class: 'snav-ico', text: t.ico } ),
-			h( 'span', { text: t.label } ),
-		] );
-		nav.appendChild( btn );
-	}
-
-	$( '#settings-close' ).onclick = () => dialog.close();
-}
-
-/** @param {string} [tab] */
-export async function openSettings( tab ) {
+/**
+ * تنظیمات، **یک صفحه است نه یک پنجره**.
+ *
+ * شکایت کارفرما دقیقاً همین بود: «برای هر چیزی باید تنظیمات را باز کنی». حالا مثل خود
+ * Claude، تنظیمات یک صفحهٔ عادی در ناحیهٔ اصلی است با ستون کناری خودش، و از نوار کناری
+ * مستقیم باز می‌شود — نه یک دیالوگ که روی همه‌چیز بیفتد.
+ *
+ * @param {HTMLElement} host
+ * @param {string} [tab]
+ */
+export async function mountSettings( host, tab ) {
 	currentTab = tab || currentTab;
-	if ( ! dialog ) {
-		initSettings();
+
+	host.replaceChildren();
+	const nav = h( 'nav', { class: 'sub-nav' } );
+	const body = h( 'div', { class: 'sub-body' } );
+	host.append( h( 'div', { class: 'sub-shell' }, [ nav, body ] ) );
+
+	for ( const t of TABS ) {
+		nav.appendChild(
+			h( 'button', {
+				class: `snav-item ${ t.id === currentTab ? 'active' : '' }`,
+				dataset: { tab: t.id },
+				onClick: () => mountSettings( host, t.id ),
+			}, [ h( 'span', { class: 'snav-ico', text: t.ico } ), h( 'span', { text: t.label } ) ] )
+		);
 	}
-	if ( ! dialog.open ) {
-		dialog.showModal();
-	}
-	for ( const b of document.querySelectorAll( '.snav-item' ) ) {
-		b.classList.toggle( 'active', b.dataset.tab === currentTab );
-	}
-	const body = $( '#settings-content' );
+
 	body.replaceChildren( el( 'div', 'loading', 'در حال بارگذاری…' ) );
 	await refreshState();
 	body.replaceChildren();
 	await RENDER[ currentTab ]( body );
 	body.scrollTop = 0;
+}
+
+/** میان‌بر: از هرجای برنامه، صفحهٔ تنظیمات را روی یک تب باز کن. */
+export function openSettings( tab ) {
+	document.dispatchEvent( new CustomEvent( 'hoosha:settings', { detail: tab } ) );
+}
+
+export function initSettings() {
+	// چیزی برای راه‌اندازی نمانده؛ تنظیمات دیگر دیالوگ نیست.
 }
 
 function section( title, hint ) {

@@ -1608,8 +1608,38 @@ await test( 'پاسخ مدل بدون آواتار و با فونت سریف ن�
 } );
 
 await test( 'ناوبری مستقیم در نوار کناری هست (نه فقط داخل تنظیمات)', () => {
-	for ( const view of [ 'chat', 'tools', 'connectors', 'skills', 'agents', 'workspace' ] ) {
+	for ( const view of [ 'chat', 'tools', 'connectors', 'skills', 'agents', 'workspace', 'settings' ] ) {
 		assert.match( html, new RegExp( `data-view="${ view }"` ), `آیتم ناوبری ${ view } نیست` );
+	}
+} );
+
+await test( 'هیچ چیزی پشت دیالوگ تنظیمات قفل نیست — تنظیمات یک صفحه است', () => {
+	assert.equal( /<dialog id="settings"/.test( html ), false, 'دیالوگ تنظیمات باید حذف شده باشد' );
+
+	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
+	assert.match( settings, /export async function mountSettings/ );
+	assert.equal( /showModal\(\)/.test( settings ), false, 'تنظیمات نباید مودال باز کند' );
+
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /settings: \{ title: 'تنظیمات'/ );
+} );
+
+await test( 'زیربخش‌های فضای کار همان‌جا باز می‌شوند، نه در پنجرهٔ دیگر', () => {
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	for ( const id of [ 'memory', 'permissions', 'sandbox', 'usage', 'status' ] ) {
+		assert.ok( app.includes( `id: '${ id }'` ), `زیربخش ${ id } در فضای کار نیست` );
+	}
+	assert.match( app, /renderSection\( id, body \)/ );
+	assert.match( css, /\.tab-btn\s*\{/ );
+} );
+
+await test( 'همهٔ چهارده بخش تنظیمات، رندرکنندهٔ واقعی دارند', async () => {
+	const mod = await import( `../ui/settings.js?tabs=${ Date.now() }` ).catch( () => null );
+	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
+	const tabs = [ ...settings.matchAll( /\{ id: '([\w]+)', label:/g ) ].map( ( m ) => m[ 1 ] );
+	assert.equal( tabs.length, 14, `انتظار ۱۴ تب، ${ tabs.length } پیدا شد` );
+	for ( const t of tabs ) {
+		assert.ok( new RegExp( `\\n\\t${ t }: render` ).test( settings ), `تب ${ t } رندرکننده ندارد` );
 	}
 } );
 

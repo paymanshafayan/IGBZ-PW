@@ -20,7 +20,7 @@ import {
 import { initComposer, setBusy, setMode, fillComposer, composerIsEmpty, focusComposer } from './composer.js';
 import { initSidebar, refreshSessions, paintSidebarState, markActiveView } from './sidebar.js';
 import { initRail, paintRail } from './rail.js';
-import { initSettings, openSettings, renderSection } from './settings.js';
+import { mountSettings, renderSection, SETTINGS_TABS } from './settings.js';
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 import { logoSvg } from './lib/logo.js';
 
@@ -44,10 +44,18 @@ const PANELS = {
 	connectors: { title: 'کانکتورها', sub: 'سرورهای MCP: ابزارهای سرویس‌های بیرونی را داخل هوشا می‌آورند.', section: 'connectors' },
 	skills: { title: 'اسکیل‌ها', sub: 'دانش رویه‌ای آماده، با فرمت استاندارد SKILL.md.', section: 'skills' },
 	agents: { title: 'زیرعامل‌ها', sub: 'هر زیرعامل یک متخصص است با پرامپت، مدل و ابزارهای خودش.', section: 'agents' },
-	workspace: { title: 'فضای کار', sub: 'پوشهٔ کاری، حافظهٔ پروژه، سندباکس و مجوزها.', section: 'workspace' },
+	workspace: { title: 'فضای کار', sub: 'پوشهٔ کاری، حافظهٔ پروژه، مجوزها و سندباکس — همه در همین صفحه.', section: 'workspace' },
+	settings: { title: 'تنظیمات', sub: 'هر چیزی که در فایل تنظیمات هست، اینجا فرم دارد.', section: 'settings' },
 };
 
 let view = 'chat';
+let settingsTab = 'provider';
+
+/** میان‌بر: باز کردن صفحهٔ تنظیمات روی یک تب مشخص. */
+function openSettings( tab ) {
+	settingsTab = tab || settingsTab;
+	showView( 'settings' );
+}
 
 async function showView( next ) {
 	view = next;
@@ -76,12 +84,26 @@ async function showView( next ) {
 	const host = h( 'div', {} );
 	box.appendChild( host );
 
+	if ( next === 'settings' ) {
+		box.replaceChildren(); // صفحهٔ تنظیمات سربرگ خودش را دارد
+		await mountSettings( box, settingsTab );
+		return;
+	}
 	if ( next === 'workspace' ) {
 		await renderWorkspacePanel( host );
 		return;
 	}
 	await renderSection( meta.section, host );
 }
+
+const WORKSPACE_TABS = [
+	{ id: 'memory', label: 'حافظهٔ پروژه' },
+	{ id: 'permissions', label: 'مجوزها' },
+	{ id: 'sandbox', label: 'سندباکس' },
+	{ id: 'usage', label: 'مصرف و هزینه' },
+	{ id: 'status', label: 'وضعیت' },
+];
+let workspaceTab = 'memory';
 
 async function renderWorkspacePanel( host ) {
 	const s = getState();
@@ -108,18 +130,29 @@ async function renderWorkspacePanel( host ) {
 						showView( 'workspace' );
 					},
 				} ),
-				h( 'button', { class: 'pill', text: 'حافظهٔ پروژه', onClick: () => openSettings( 'memory' ) } ),
-				h( 'button', { class: 'pill', text: 'مجوزها', onClick: () => openSettings( 'permissions' ) } ),
-				h( 'button', { class: 'pill', text: 'سندباکس', onClick: () => openSettings( 'sandbox' ) } ),
-				h( 'button', { class: 'pill', text: 'مصرف و هزینه', onClick: () => openSettings( 'usage' ) } ),
-				h( 'button', { class: 'pill', text: 'وضعیت', onClick: () => openSettings( 'status' ) } ),
 			] ),
 		] )
 	);
 
-	const sub = h( 'div', {} );
-	host.appendChild( sub );
-	await renderSection( 'status', sub );
+	// زیربخش‌ها همین‌جا باز می‌شوند — هیچ‌کدام دیالوگ باز نمی‌کنند.
+	const tabs = h( 'nav', { class: 'tab-row' } );
+	const body = h( 'div', {} );
+	host.append( tabs, body );
+
+	const paint = async ( id ) => {
+		workspaceTab = id;
+		for ( const b of tabs.children ) {
+			b.classList.toggle( 'active', b.dataset.tab === id );
+		}
+		await renderSection( id, body );
+	};
+
+	for ( const t of WORKSPACE_TABS ) {
+		tabs.appendChild(
+			h( 'button', { class: 'tab-btn', dataset: { tab: t.id }, text: t.label, onClick: () => paint( t.id ) } )
+		);
+	}
+	await paint( workspaceTab );
 }
 
 // ───────────────────────────────────────────────────────── راه‌اندازی
@@ -149,7 +182,6 @@ initComposer( {
 
 initSidebar( { onResume: resumeSession, onView: showView } );
 initRail( { onRewind: ( id ) => openRewind( doRewind, id ) } );
-initSettings();
 
 // ───────────────────────────────────────────────────────── وضعیت
 
@@ -367,7 +399,7 @@ $( '#btn-new' ).onclick = async () => {
 	focusComposer();
 };
 
-$( '#btn-settings' ).onclick = () => openSettings();
+$( '#btn-settings' ).onclick = () => showView( 'settings' );
 $( '#btn-account' ).onclick = () => openSettings( 'provider' );
 $( '#btn-export' ).onclick = () => doExport( 'md' );
 $( '#btn-search' ).onclick = () => openPalette( paletteDeps() );
@@ -390,6 +422,7 @@ $( '#session-title' ).onclick = async () => {
 };
 
 document.addEventListener( 'hoosha:settings', ( e ) => openSettings( e.detail ) );
+document.addEventListener( 'hoosha:view', ( e ) => showView( e.detail ) );
 document.addEventListener( 'hoosha:rewind', () => openRewind( doRewind ) );
 
 // ───────────────────────────────────────────────── میان‌برهای صفحه
@@ -416,7 +449,7 @@ document.addEventListener( 'keydown', ( e ) => {
 	}
 	if ( ( e.ctrlKey || e.metaKey ) && e.key === ',' ) {
 		e.preventDefault();
-		openSettings();
+		showView( 'settings' );
 		return;
 	}
 
