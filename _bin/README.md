@@ -94,6 +94,70 @@ sha256sum electron-v43.4.0-linux-x64.zip | cut -d' ' -f1 > electron-v43.4.0-linu
 
 ---
 
+## اگر گیت اجازهٔ push نداد
+
+سه علت کاملاً متفاوت وجود دارد و راه‌حلشان فرق می‌کند. اول تشخیص بدهید کدام است:
+
+### تشخیص ۱ — آیا `.gitignore` فایل را بلاک کرده؟
+
+```powershell
+git check-ignore -v _bin\electron-v43.4.0-linux-x64.zip.part-001
+```
+
+- **چیزی چاپ نشد** → فایل بلاک نیست، مشکل جای دیگری است (برو تشخیص ۲).
+- **یک خط چاپ شد** → یعنی بلاک است. تقریباً همیشه به این دلیل که `.gitignore` جدید را
+  نگرفته‌ای:
+
+```powershell
+git pull
+```
+
+### تشخیص ۲ — آیا حجم فایل از ۱۰۰ مگابایت رد شده؟
+
+این شایع‌ترین علت است و **ربطی به `.gitignore` ندارد**. پیام گیت‌هاب چیزی شبیه این است:
+
+```
+remote: error: File _bin/electron-....zip is 118.00 MB; this exceeds GitHub's file size limit of 100.00 MB
+```
+
+یعنی خودِ فایل کامل را کامیت کرده‌ای، نه تکه‌ها را.
+
+> ⚠️ **نکتهٔ مهم:** پاک‌کردن فایل و کامیت دوباره **کافی نیست**. آن فایل داخل تاریخچهٔ همان
+> کامیت مانده و گیت‌هاب باز هم رد می‌کند. باید کامیت را برگردانی:
+
+```powershell
+# کامیتِ حاوی فایل بزرگ را باز کن (تغییرات سر جایشان می‌مانند)
+git reset --soft HEAD~1
+
+# فایل بزرگ را از حالت آماده‌سازی خارج کن و پاکش کن
+git restore --staged _bin\electron-v43.4.0-linux-x64.zip
+Remove-Item _bin\electron-v43.4.0-linux-x64.zip
+
+# حالا تکه‌اش کن و فقط تکه‌ها را کامیت کن
+cd _bin
+.\split.ps1 -Path .\electron-v43.4.0-linux-x64.zip
+```
+
+اگر چند کامیت درگیر بوده، به‌جای `HEAD~1` بنویس `HEAD~2` و همین‌طور جلو برو.
+
+### تشخیص ۳ — آیا فایل اصلاً کامیت شده؟
+
+```powershell
+git status
+git add _bin
+git commit -m "binaries for hoosha desktop shell"
+git push
+```
+
+اگر `git status` فایل را اصلاً نشان نمی‌دهد و `check-ignore` هم چیزی چاپ نکرد، ممکن است یک
+`.gitignore` سراسری روی سیستمت باشد:
+
+```powershell
+git config --get core.excludesfile
+```
+
+---
+
 ## نکته‌ها
 
 - **معماری مهم است:** نسخهٔ **linux-x64** لازم است، نه ویندوز. سندباکس لینوکس است.
