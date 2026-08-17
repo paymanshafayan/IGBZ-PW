@@ -641,7 +641,6 @@ $( '#btn-new' ).onclick = async () => {
 $( '#btn-back' ).onclick = () => showView( 'chat' );
 $( '#btn-search' ).onclick = () => openPalette( paletteDeps() );
 $( '#btn-export' ).onclick = () => doExport( 'md' );
-$( '#btn-reopen' ).onclick = () => $( '#btn-collapse' ).click();
 $( '#session-title' ).onclick = renameSession;
 $( '#btn-share' ).onclick = () => doExport( 'md' );
 

@@ -1543,10 +1543,11 @@ await test( 'ستون گفتگو می‌تواند اسکرول بخورد (min-
 	assert.match( view, /min-height:\s*0/ );
 } );
 
-await test( 'نوار کناری و ریل هم قابل اسکرول‌اند و بیرون نمی‌زنند', () => {
+await test( 'نوار کناری قابل اسکرول است و بیرون نمی‌زند', () => {
 	assert.match( cssBlock( '.sidebar' ), /min-height:\s*0/ );
-	assert.match( cssBlock( '.side-recents' ), /overflow-y:\s*auto/ );
-	assert.match( cssBlock( '.rail-body' ), /overflow-y:\s*auto/ );
+	assert.match( cssBlock( '.side-scroll' ), /overflow-y:\s*auto/, 'فهرست گفتگوهای اخیر باید خودش اسکرول شود' );
+	// ریل سمت دیگر حذف شده؛ نباید قاعدهٔ مرده‌ای از آن مانده باشد.
+	assert.equal( /\.rail[\s.{,:]/.test( css ), false, 'قاعده‌های ریل باید پاک شده باشند' );
 } );
 
 await test( 'پالت دقیقاً از طرح تأییدشدهٔ کارفرما درآمده', () => {
@@ -1682,19 +1683,32 @@ await test( 'پیام کاربر حباب جمع است و پاسخ مدل مت�
 	assert.equal( /font-family:/.test( bot ), false, 'در تصویر، متن پاسخ همان سنس رابط است' );
 } );
 
-await test( 'نوار جمع‌شده کنار می‌رود و دکمهٔ شناور بازکردنش می‌ماند', () => {
+await test( 'نوار جمع‌شده ریل آیکونی می‌شود، نه هیچ', () => {
 	/*
-	 * اینجا از حدس خودم برگشتم. از روی تصویر فکر کردم نوار به ریل آیکونی تبدیل می‌شود؛
-	 * طرحی که کارفرما امتحان کرده و پذیرفته، عرض را صفر می‌کند و یک دکمهٔ شناور
-	 * بالای محتوا می‌گذارد. طرحِ تأییدشده حرف آخر است.
+	 * اینجا دو بار نظر عوض شد و ثبتش می‌ارزد.
+	 *
+	 * از روی تصویر برداشت کردم که نوار به ریل آیکونی تبدیل می‌شود. طرحِ زیپ عرض را صفر
+	 * می‌کرد و یک دکمهٔ شناور می‌گذاشت، پس به طرح تسلیم شدم. کارفرما بعد از دیدن هر دو
+	 * گفت طرح در همین یک مورد اشتباه است و برداشت اول درست بوده.
+	 *
+	 * پس: آیکون‌ها می‌مانند، و دکمهٔ شناور حذف شد چون همان دکمهٔ جمع‌کردن در ریل باقی
+	 * می‌ماند و کار بازکردن را می‌کند.
 	 */
-	assert.match( cssBlock( 'body.sidebar-collapsed .app' ), /grid-template-columns:\s*0 minmax/ );
-	assert.match( html, /id="btn-reopen"/, 'بدون این دکمه، کاربر راهی برای برگرداندن نوار ندارد' );
-	assert.match( cssBlock( '#btn-reopen' ), /position:\s*absolute/ );
-	assert.match( css, /body:not\(\.sidebar-collapsed\) #btn-reopen/, 'وقتی نوار باز است این دکمه نباید باشد' );
+	assert.match( cssBlock( 'body.sidebar-collapsed .app' ), /grid-template-columns:\s*var\(--rail-w\)/ );
+	assert.match( css, /--rail-w:\s*\d+px/, 'عرض ریل باید تعریف شده باشد، نه فقط استفاده' );
+	// عرض صفر فقط در حالت موبایل مجاز است (آنجا نوار به کشوی روی صفحه تبدیل می‌شود).
+	const desktop = css.replace( /@media[^{]*\{[\s\S]*?\n\}/g, '' );
+	assert.equal( /grid-template-columns:\s*0 minmax/.test( desktop ), false, 'در دسکتاپ نوار نباید ناپدید شود' );
 
+	// در ریل، فقط متن‌ها می‌روند؛ آیکون‌ها و آواتار می‌مانند.
+	assert.match( css, /body\.sidebar-collapsed \.nav-item > span/ );
+	assert.match( css, /body\.sidebar-collapsed \.acc-lines/ );
+
+	// و دکمهٔ شناور دیگر لازم نیست.
+	assert.equal( /id="btn-reopen"/.test( html ), false, 'دکمهٔ شناور باید حذف شده باشد' );
 	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
-	assert.match( app, /#btn-reopen' \)\.onclick/ );
+	assert.equal( /btn-reopen/.test( app ), false );
+	assert.match( html, /id="btn-collapse"/, 'همان دکمهٔ جمع‌کردن باید در ریل بماند' );
 } );
 
 await test( 'پاسخ مدل نشان کنارش دارد، مثل طرح', () => {
@@ -4350,6 +4364,51 @@ await test( 'اعداد چیدمان همان‌هایی است که در طرح
 	assert.match( live, /--primary:\s*#2a9db5/ );
 	assert.match( live, /--brand:\s*#2a9db5/ );
 	assert.equal( /#d97757/.test( live ), false, 'نارنجی نباید بیرون از کامنت بماند' );
+} );
+
+await test( 'جمع‌کردن نوار، ریل را می‌گذارد و آیکون‌ها سر جایشان می‌مانند', async () => {
+	const { dom, q, all } = await bootApp();
+	try {
+		assert.equal( document.body.classList.contains( 'sidebar-collapsed' ), false );
+		const before = all( '.nav-item[data-view]' ).length;
+
+		q( '#btn-collapse' ).click();
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+
+		assert.equal( document.body.classList.contains( 'sidebar-collapsed' ), true, 'کلاس جمع‌شدن نخورد' );
+		assert.equal( all( '.nav-item[data-view]' ).length, before, 'آیکون‌های ناوبری باید در ریل بمانند' );
+		assert.ok( q( '#btn-account' ), 'آواتار حساب هم می‌ماند' );
+		assert.ok( q( '#btn-collapse' ), 'همان دکمه باید برای بازکردن بماند' );
+
+		// و همان دکمه دوباره بازش می‌کند.
+		q( '#btn-collapse' ).click();
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+		assert.equal( document.body.classList.contains( 'sidebar-collapsed' ), false );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'همه‌جا نشان هوشا رسم می‌شود، نه ستاره', async () => {
+	// خواستهٔ کارفرما: هرجا در طرح ستاره بود، آیکون تازه بنشیند.
+	for ( const file of [ 'app.js', 'thread.js', 'sidebar.js', 'composer.js' ] ) {
+		const src = fssync.readFileSync( path.join( uiDir, file ), 'utf8' );
+		const stars = src.match( /[\u2733\u273B\u2726\u2605\u2606\u2731\u2732\u2735\u274B\u2737\u2739\u273A]/g ) || [];
+		assert.deepEqual( stars, [], `${ file } هنوز ستاره دارد: ${ stars.join( ' ' ) }` );
+	}
+	assert.equal( /[\u2733\u273B\u2726\u2605\u2606]/.test( html ), false, 'index.html هم نباید ستاره داشته باشد' );
+
+	// و نشان واقعاً در هر چهار جا رسم می‌شود.
+	const { dom, q } = await bootApp();
+	try {
+		assert.ok( q( '#greet-mark' ).innerHTML.includes( 'svg' ), 'تیتر خوش‌آمد' );
+		assert.ok( q( '#account-initial' ).innerHTML.includes( 'svg' ), 'آواتار حساب' );
+		const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+		assert.match( thread, /class: 'msg-mark', html: logoSvg/, 'کنار پاسخ مدل' );
+		assert.match( thread, /logoLiveSvg/, 'نشانگر در حال کار' );
+	} finally {
+		dom.restore();
+	}
 } );
 
 // ------------------------------------------------------------------ پایان

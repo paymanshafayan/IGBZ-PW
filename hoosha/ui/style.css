@@ -28,6 +28,8 @@
 	--serif: 'Lora', 'Noto Naskh Arabic', 'Times New Roman', Georgia, 'Vazirmatn', serif;
 	--mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, Menlo, monospace;
 	--sidebar-w: 280px;
+	/* عرض ریل وقتی نوار کناری جمع می‌شود — آیکون‌ها می‌مانند. */
+	--rail-w: 56px;
 	--col: 46rem;
 	--ease: cubic-bezier(0.22, 0.9, 0.32, 1);
 }
@@ -1120,15 +1122,6 @@ code .f {
 }
 
 .todos .todo,
-.rail-body .todo {
-	display: flex;
-	gap: 8px;
-	align-items: flex-start;
-	padding: 3px 0;
-	font-family: var(--sans);
-	direction: rtl;
-	text-align: start;
-}
 .todo .box {
 	color: var(--muted-foreground);
 }
@@ -1818,76 +1811,6 @@ code .f {
 
 /* ══════════════════════════════════════════════════════ ریل کناری */
 
-.rail {
-	background: var(--card);
-	border: 1px solid var(--border-soft);
-	border-radius: var(--radius-lg);
-	margin: 8px 0 8px 8px;
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
-	min-height: 0;
-	overflow: hidden;
-	box-shadow: var(--shadow-1);
-}
-.rail-tabs {
-	display: flex;
-	flex: none;
-	border-bottom: 1px solid var(--border-soft);
-}
-.rail-tab {
-	flex: 1;
-	background: transparent;
-	border: 0;
-	border-bottom: 2px solid transparent;
-	color: var(--muted-foreground);
-	padding: 12px 4px;
-	cursor: pointer;
-	font-size: 0.79rem;
-	white-space: nowrap;
-	transition: 0.15s;
-}
-.rail-tab:hover {
-	color: var(--foreground);
-}
-.rail-tab.active {
-	color: var(--primary);
-	border-bottom-color: var(--primary);
-}
-.rail-count:not(:empty) {
-	background: var(--primary-soft);
-	color: var(--primary);
-	border-radius: 20px;
-	padding: 0 5px;
-	font-size: 0.85em;
-	margin-inline-start: 3px;
-}
-.rail-body {
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
-	padding: 12px;
-	font-size: 0.9rem;
-}
-.rail-item {
-	border: 1px solid var(--border);
-	border-radius: var(--radius-sm);
-	padding: 10px 11px;
-	margin-bottom: 8px;
-	transition: 0.15s var(--ease);
-}
-.rail-item:hover {
-	border-color: var(--muted-foreground);
-}
-.rail-item-head {
-	display: flex;
-	align-items: center;
-	gap: 6px;
-}
-.rail-item p {
-	margin: 2px 0 6px;
-	color: var(--muted-foreground);
-}
 .small {
 	font-size: 0.85em;
 }
@@ -2401,8 +2324,50 @@ kbd {
  * این قاعده در یک بازآرایی از فایل افتاد و مدیاکوئری‌های زیرش هنوز چیدمان چهارستونیِ
  * قدیمی را توصیف می‌کردند — یعنی روی نمایشگر کوچک، ستون‌هایی که دیگر وجود ندارند.
  */
+/*
+ * نوار جمع‌شده = ریل آیکونی.
+ *
+ * طرحِ تأییدشده اینجا عرض را صفر می‌کرد و یک دکمهٔ شناور روی محتوا می‌گذاشت. کارفرما
+ * بعد از دیدن هر دو گفت برداشت اول درست بوده: آیکون‌ها بمانند. دلیلش هم روشن است —
+ * با ریل، جابه‌جایی بین صفحه‌ها یک کلیک است؛ با عرض صفر، دو کلیک و یک منوی ناپیدا.
+ */
 body.sidebar-collapsed .app {
-	grid-template-columns: 0 minmax(0, 1fr);
+	grid-template-columns: var(--rail-w) minmax(0, 1fr);
+}
+body.sidebar-collapsed .sidebar {
+	padding: 12px 6px 10px;
+	align-items: center;
+}
+body.sidebar-collapsed .wordmark,
+body.sidebar-collapsed .side-label,
+body.sidebar-collapsed .side-scroll,
+body.sidebar-collapsed .acc-lines,
+body.sidebar-collapsed .nav-item > span,
+body.sidebar-collapsed .new-chat > span:not(.nc-plus),
+body.sidebar-collapsed #btn-search {
+	display: none;
+}
+body.sidebar-collapsed .side-top {
+	justify-content: center;
+	padding: 2px 0 10px;
+}
+body.sidebar-collapsed .nav-item,
+body.sidebar-collapsed .new-chat,
+body.sidebar-collapsed .account-main {
+	justify-content: center;
+	padding-inline: 0;
+	width: 36px;
+	margin-inline: auto;
+}
+body.sidebar-collapsed .nav-badge {
+	position: absolute;
+	top: 1px;
+	inset-inline-end: -2px;
+	margin: 0;
+}
+body.sidebar-collapsed .account-menu {
+	inset-inline-start: 8px;
+	width: 240px;
 }
 
 @media (max-width: 860px) {
@@ -2414,24 +2379,13 @@ body.sidebar-collapsed .app {
 		position: fixed;
 		inset-block: 0;
 		inset-inline-start: 0;
-		width: 272px;
+		width: var(--sidebar-w);
 		z-index: 40;
 		transform: translateX(100%);
 		transition: transform 0.22s var(--ease);
 		box-shadow: var(--shadow-3);
 	}
 	body.sidebar-open .sidebar {
-		transform: none;
-	}
-	.rail {
-		position: fixed;
-		inset-block: 8px;
-		inset-inline-end: 8px;
-		width: 290px;
-		z-index: 40;
-		transform: translateX(-105%);
-	}
-	body.rail-open .rail {
 		transform: none;
 	}
 	.only-narrow {
@@ -3698,12 +3652,6 @@ html[dir='ltr'] .switch input:checked + i::after {
    اندازه‌ها و ساختار از طرح تأییدشده (_bin/claude-ui.zip)
    ══════════════════════════════════════════════════════════════════════ */
 
-#btn-reopen {
-	position: absolute;
-	top: 16px;
-	inset-inline-start: 16px;
-	z-index: 10;
-}
 
 .page-actions .pill {
 	border-radius: 12px;
@@ -3754,8 +3702,4 @@ html[dir='ltr'] .switch input:checked + i::after {
 }
 
 
-
 /* دکمهٔ شناور، فقط وقتی نوار کناری جمع است. */
-body:not(.sidebar-collapsed) #btn-reopen {
-	display: none;
-}
