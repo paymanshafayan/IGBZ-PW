@@ -4312,6 +4312,46 @@ await test( 'هر کنترلِ کلیک‌پذیر واقعاً کاری می‌
 	}
 } );
 
+await test( 'اعداد چیدمان همان‌هایی است که در طرح تأییدشده آمده', () => {
+	/*
+	 * زیپِ طرح یک بیلد Next.js/Tailwind است و اعدادش صریح‌اند. تا وقتی تستی رویشان
+	 * نباشد، یک ویرایش بعدی می‌تواند بی‌سروصدا از طرح دور شود و کسی نفهمد.
+	 */
+	assert.match( css, /--sidebar-w:\s*280px/, 'عرض نوار کناری در طرح ۲۸۰ است' );
+
+	const modal = cssBlock( '.set-modal' );
+	assert.match( modal, /width:\s*960px/, 'مودال تنظیمات در طرح ۹۶۰ است' );
+	assert.match( modal, /height:\s*750px|max-height:\s*750px/, 'ارتفاع مودال در طرح ۷۵۰ است' );
+
+	assert.match( cssBlock( '.set-shell' ), /grid-template-columns:\s*260px/, 'ناوبری مودال در طرح ۲۶۰ است' );
+
+	assert.match( cssBlock( '.page-title' ), /font-size:\s*32px/, 'عنوان صفحه در طرح ۳۲ است' );
+
+	/*
+	 * رنگ‌های طرح، عیناً — ولی روی **کدِ مؤثر**، نه روی کل فایل.
+	 *
+	 * بار اول همین را روی `css` کامل سنجیدم و جهش‌ها زنده ماندند: هر شش رنگ در جدولِ
+	 * کامنتِ بالای فایل هم نوشته شده‌اند، پس تست حتی بعد از عوض‌شدن متغیر واقعی سبز
+	 * می‌ماند. حالا اول کامنت‌ها را برمی‌داریم.
+	 */
+	const live = css.replace( /\/\*[\s\S]*?\*\//g, '' ).toLowerCase();
+	for ( const hex of [ '#faf9f7', '#e5e5e5', '#2c2c2c', '#efece5', '#f3f2ef', '#e5e0d8' ] ) {
+		assert.ok( live.includes( hex ), `رنگ ${ hex } از طرح در پالت مؤثر نیست` );
+	}
+
+	// و هرکدام باید سرِ جای خودش باشد، نه فقط جایی در فایل.
+	assert.match( live, /--muted:\s*#faf9f7/, 'سطح ملایم طرح' );
+	assert.match( live, /--border:\s*#e5e5e5/, 'خط طرح' );
+	assert.match( live, /--foreground:\s*#2c2c2c/, 'متن طرح' );
+	assert.match( live, /--accent:\s*#efece5/, 'هاور طرح' );
+	assert.match( cssBlock( '.msg.user .body' ), /background:\s*(#f3f2ef|var\(--bubble\))/i, 'حباب کاربر رنگ طرح را دارد' );
+
+	// جز یک جا: نارنجی طرح، فیروزهٔ آبی شده — خواستهٔ صریح کارفرما.
+	assert.match( live, /--primary:\s*#2a9db5/ );
+	assert.match( live, /--brand:\s*#2a9db5/ );
+	assert.equal( /#d97757/.test( live ), false, 'نارنجی نباید بیرون از کامنت بماند' );
+} );
+
 // ------------------------------------------------------------------ پایان
 
 await fs.rm( tmpRoot, { recursive: true, force: true } );
