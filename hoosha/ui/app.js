@@ -22,6 +22,7 @@ import { initSidebar, refreshSessions, paintSidebarState, markActiveView } from 
 import { initRail, paintRail } from './rail.js';
 import { initSettings, openSettings, renderSection } from './settings.js';
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
+import { logoSvg } from './lib/logo.js';
 
 // تم: تا وقتی کاربر خودش انتخاب نکرده، از تنظیم سیستم پیروی می‌کنیم — مثل Claude.
 const savedTheme = localStorage.getItem( 'hoosha-theme' );
@@ -32,6 +33,9 @@ systemDark?.addEventListener?.( 'change', ( e ) => {
 		document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
 	}
 } );
+
+// نشان، همان یک جا تعریف می‌شود و همه‌جا از همان می‌آید.
+$( '#brand-mark' ).innerHTML = logoSvg( 20 );
 
 // ───────────────────────────────────────────────────────── نماها
 
@@ -330,7 +334,7 @@ function showWelcome() {
 	chat.appendChild(
 		h( 'div', { class: 'welcome', id: 'welcome' }, [
 			h( 'div', { class: 'greet' }, [
-				h( 'span', { class: 'asterisk', text: '✳' } ),
+				h( 'span', { class: 'greet-mark', html: logoSvg( 34 ) } ),
 				h( 'span', { text: greeting() } ),
 			] ),
 		] )
@@ -454,6 +458,10 @@ async function boot() {
 		const g = $( '#greet-text' );
 		if ( g ) {
 			g.textContent = greeting();
+		}
+		const gm = $( '#greet-mark' );
+		if ( gm && ! gm.innerHTML.trim() ) {
+			gm.innerHTML = logoSvg( 34 );
 		}
 	}
 	for ( const ask of s.pendingAsk || [] ) {

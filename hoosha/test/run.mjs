@@ -1592,6 +1592,7 @@ await test( 'نشانگر «در حال کار» و منوی + در رابط ه�
 	assert.match( thread, /export function showWorking/ );
 	assert.match( thread, /class: 'working'/ );
 	assert.match( css, /\.working\s*\{/ );
+	assert.match( thread, /logoLiveSvg/, 'نشانگر باید از SVG متحرک استفاده کند نه نویسهٔ متنی' );
 
 	assert.match( html, /id="btn-plus"/ );
 	assert.match( html, /id="plus-menu"/ );
@@ -1639,6 +1640,71 @@ await test( 'دکمه‌های زیر پیام آیکون‌اند نه متن',
 	assert.match( thread, /function iconBtn/ );
 	assert.match( thread, /<svg viewBox="0 0 20 20"/ );
 	assert.equal( /'act-btn', 'کپی'/.test( thread ), false, 'دکمه باید آیکون باشد نه کلمه' );
+} );
+
+
+
+// ----------------------------------------------------- نشان و نشانگر
+
+section( 'نشان هوشا' );
+
+const logoMod = await import( '../ui/lib/logo.js' );
+
+await test( 'نشان ساکن، SVG معتبر با اندازهٔ خواسته‌شده می‌دهد', () => {
+	const svg = logoMod.logoSvg( 24 );
+	assert.match( svg, /^<svg class="logo"/ );
+	assert.match( svg, /width="24" height="24"/ );
+	assert.match( svg, /viewBox="0 0 32 32"/ );
+	assert.equal( ( svg.match( /<rect/g ) || [] ).length, 8, 'هشت پرتو' );
+	assert.match( svg, /<circle cx="16" cy="16"/ );
+} );
+
+await test( 'هر بار که صدا زده شود، شناسهٔ گرادیان یکتاست', () => {
+	const a = logoMod.logoSvg();
+	const b = logoMod.logoSvg();
+	const idA = /id="([^"]+)"/.exec( a )[ 1 ];
+	const idB = /id="([^"]+)"/.exec( b )[ 1 ];
+	assert.notEqual( idA, idB, 'شناسهٔ تکراری، گرادیان دو لوگو را به هم می‌ریزد' );
+	assert.ok( a.includes( `url(#${ idA })` ) );
+} );
+
+await test( 'نشان متحرک، واقعاً انیمیشن دارد: چرخش و ضربان', () => {
+	const svg = logoMod.logoLiveSvg( 20 );
+	assert.match( svg, /<animateTransform[^>]+type="rotate"/ );
+	assert.match( svg, /repeatCount="indefinite"/ );
+	assert.equal( ( svg.match( /<animate /g ) || [] ).length, 9, 'هشت پرتو + هسته' );
+	assert.match( svg, /class="logo live"/ );
+} );
+
+await test( 'برای هر ابزار، جملهٔ «در حال …» مخصوص خودش هست', async () => {
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	for ( const [ tool, phrase ] of [
+		[ 'read_file', 'در حال خواندن فایل' ],
+		[ 'bash', 'در حال اجرای فرمان' ],
+		[ 'grep', 'در حال جستجو در کد' ],
+		[ 'web_search', 'در حال جستجو در وب' ],
+		[ 'task', 'زیرعامل در حال کار' ],
+	] ) {
+		assert.ok( thread.includes( `${ tool }: '${ phrase }'` ), `جملهٔ ${ tool } نیست` );
+	}
+	assert.match( thread, /export function workingLabelFor/ );
+} );
+
+await test( 'نشانگر، ثانیه‌شمار و راهنمای Esc دارد و با «کاهش حرکت» آرام می‌شود', () => {
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.match( thread, /class: 'elapsed'/ );
+	assert.match( thread, /Esc برای توقف/ );
+	assert.match( thread, /setInterval\( tickElapsed, 1000 \)/ );
+	assert.match( css, /prefers-reduced-motion: reduce/ );
+} );
+
+await test( 'فایل‌های نشان روی دیسک هستند و فاوآیکون به آن‌ها وصل است', async () => {
+	for ( const f of [ 'logo.svg', 'logo-live.svg' ] ) {
+		const svg = await fs.readFile( path.join( uiDir, 'assets', f ), 'utf8' );
+		assert.match( svg, /<svg/ );
+		assert.match( svg, /viewBox="0 0 32 32"/ );
+	}
+	assert.match( html, /rel="icon" type="image\/svg\+xml" href="\/assets\/logo\.svg"/ );
 } );
 
 

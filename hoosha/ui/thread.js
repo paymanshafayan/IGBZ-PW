@@ -7,6 +7,7 @@
 
 import { $, el, h, esc, copyText, promptDialog } from './lib/dom.js';
 import { markdown, wireCodeCopy } from './lib/markdown.js';
+import { logoLiveSvg } from './lib/logo.js';
 import { post } from './lib/api.js';
 
 let chat = null;
@@ -45,6 +46,8 @@ export function clearThread() {
 	toolEls.clear();
 	streamEl = null;
 	thinkEl = null;
+	clearInterval( workingTimer );
+	workingTimer = null;
 	workingEl = null;
 }
 
@@ -89,7 +92,6 @@ function append( node ) {
 // ─────────────────────────────────────────────────────────────────── پیام‌ها
 
 export function addMessage( role, text, asMarkdown = true, images = [] ) {
-	hideWorking();
 
 	const wrap = el( 'div', `msg ${ role }` );
 	const col = wrap;
@@ -134,27 +136,84 @@ export function addMessage( role, text, asMarkdown = true, images = [] ) {
 // ────────────────────────────────── نشانگر «در حال کار» — ستارهٔ Claude
 
 let workingEl = null;
+let workingTimer = null;
+let workingStart = 0;
 
 /**
- * همان چیزی که در Claude بعد از فرستادن پیام می‌بینی: یک ستارهٔ نارنجیِ چرخان.
- * قبلاً هیچ نشانه‌ای نبود و کاربر نمی‌دانست اصلاً چیزی در حال اتفاق است یا نه.
+ * پیام‌هایی که کنار نشان متحرک می‌آیند.
+ *
+ * چرا برای هر ابزار یک جمله: «در حال کار» به کاربر هیچ نمی‌گوید. وقتی می‌نویسد «در حال
+ * خواندن فایل» یا «در حال اجرای فرمان»، کاربر می‌فهمد کجای کار است و اگر طول کشید، می‌داند
+ * چه چیزی طول کشیده.
+ */
+const WORKING_LABEL = {
+	read_file: 'در حال خواندن فایل',
+	write_file: 'در حال نوشتن فایل',
+	edit_file: 'در حال ویرایش فایل',
+	multi_edit: 'در حال ویرایش فایل',
+	notebook_edit: 'در حال ویرایش نوت‌بوک',
+	list_dir: 'در حال دیدن پوشه',
+	glob: 'در حال گشتن دنبال فایل',
+	grep: 'در حال جستجو در کد',
+	bash: 'در حال اجرای فرمان',
+	bash_output: 'در حال خواندن خروجی',
+	kill_shell: 'در حال متوقف‌کردن شل',
+	web_fetch: 'در حال گرفتن صفحه',
+	web_search: 'در حال جستجو در وب',
+	todo_write: 'در حال به‌روزکردن فهرست کار',
+	skill: 'در حال باز کردن اسکیل',
+	task: 'زیرعامل در حال کار',
+	read_mcp_resource: 'در حال خواندن منبع',
+};
+
+/** @param {string} name */
+export function workingLabelFor( name ) {
+	if ( WORKING_LABEL[ name ] ) {
+		return WORKING_LABEL[ name ];
+	}
+	if ( String( name ).startsWith( 'mcp__' ) ) {
+		return `در حال کار با ${ String( name ).split( '__' )[ 1 ] }`;
+	}
+	return 'در حال کار';
+}
+
+/**
+ * نشانگر «مشغولم» — نشان متحرک هوشا، یک جملهٔ گویا، و شمارندهٔ ثانیه.
+ *
+ * همیشه به **آخر** گفتگو منتقل می‌شود، چون وسط کار مدام کارت ابزار زیرش اضافه می‌شود و
+ * اگر جا نماند، نشانگر بالای صفحه گم می‌شود.
  *
  * @param {string} [label]
  */
-export function showWorking( label = 'در حال کار' ) {
-	if ( workingEl ) {
-		workingEl.querySelector( '.label' ).textContent = label;
-		return workingEl;
+export function showWorking( label = 'در حال فکر کردن' ) {
+	if ( ! workingEl ) {
+		workingEl = h( 'div', { class: 'working' }, [
+			h( 'span', { class: 'work-icon', html: logoLiveSvg( 20 ) } ),
+			h( 'span', { class: 'label', text: label } ),
+			h( 'span', { class: 'elapsed' } ),
+			h( 'span', { class: 'hint-esc', text: 'Esc برای توقف' } ),
+		] );
+		workingStart = Date.now();
+		workingTimer = setInterval( tickElapsed, 1000 );
 	}
-	workingEl = h( 'div', { class: 'working' }, [
-		h( 'span', { class: 'asterisk', text: '✳' } ),
-		h( 'span', { class: 'label', text: label } ),
-	] );
-	append( workingEl );
+
+	workingEl.querySelector( '.label' ).textContent = label;
+	append( workingEl ); // appendChild روی المان موجود، یعنی «ببرش آخر»
+	tickElapsed();
 	return workingEl;
 }
 
+function tickElapsed() {
+	if ( ! workingEl ) {
+		return;
+	}
+	const sec = Math.round( ( Date.now() - workingStart ) / 1000 );
+	workingEl.querySelector( '.elapsed' ).textContent = sec >= 1 ? `${ sec } ثانیه` : '';
+}
+
 export function hideWorking() {
+	clearInterval( workingTimer );
+	workingTimer = null;
 	workingEl?.remove();
 	workingEl = null;
 }
@@ -212,8 +271,6 @@ export function toolMeta( name ) {
 }
 
 function toolCard( id, name, summary, sub ) {
-	hideWorking();
-
 	const meta = toolMeta( name );
 	const card = el( 'div', 'tool' );
 	const head = el( 'div', 'tool-head' );
@@ -407,7 +464,6 @@ function finishTool( id, { output, error, denied, reason } ) {
 // ──────────────────────────────────────────────────────── دروازهٔ تأیید
 
 function askCard( ev ) {
-	hideWorking();
 	const meta = toolMeta( ev.name );
 	const card = el( 'div', 'ask' );
 
@@ -492,7 +548,6 @@ function alwaysLabel( ev ) {
 // ─────────────────────────────────────────── کارت نقشه و کارت پرسش
 
 function planCard( ev ) {
-	hideWorking();
 	const card = el( 'div', 'plan-card' );
 	card.appendChild( h( 'div', { class: 'plan-head' }, [ h( 'span', { text: '◇' } ), h( 'b', { text: 'نقشهٔ کار آماده است' } ) ] ) );
 
@@ -528,7 +583,6 @@ function planCard( ev ) {
 }
 
 function questionCard( ev ) {
-	hideWorking();
 	const card = el( 'div', 'q-card' );
 	card.appendChild( h( 'div', { class: 'q-head' }, [ h( 'span', { text: '?' } ), h( 'b', { text: ev.question || 'یک انتخاب لازم است' } ) ] ) );
 
@@ -574,10 +628,11 @@ export function handleEvent( ev ) {
 		case 'assistant_start':
 			streamEl = addMessage( 'assistant', '' );
 			streamEl._raw = '';
+			showWorking( 'در حال فکر کردن' );
 			break;
 
 		case 'thinking': {
-			hideWorking();
+			showWorking( 'در حال استدلال' );
 			if ( ! thinkEl ) {
 				thinkEl = thinkingBlock();
 			}
@@ -593,6 +648,7 @@ export function handleEvent( ev ) {
 			break;
 
 		case 'text': {
+			hideWorking();
 			if ( ! streamEl ) {
 				streamEl = addMessage( 'assistant', '' );
 				streamEl._raw = '';
@@ -633,10 +689,12 @@ export function handleEvent( ev ) {
 			break;
 
 		case 'permission_request':
+			hideWorking();
 			askCard( ev );
 			break;
 
 		case 'ask_user':
+			hideWorking();
 			if ( ev.kind === 'plan' ) {
 				planCard( ev );
 			} else {
@@ -646,14 +704,17 @@ export function handleEvent( ev ) {
 
 		case 'tool_start':
 			toolCard( ev.id, ev.name, ev.summary, ev.sub );
+			showWorking( workingLabelFor( ev.name ) );
 			break;
 
 		case 'tool_result':
 			finishTool( ev.id, { output: ev.output } );
+			showWorking( 'در حال بررسی نتیجه' );
 			break;
 
 		case 'tool_error':
 			finishTool( ev.id, { error: ev.error } );
+			showWorking( 'در حال بررسی خطا' );
 			break;
 
 		case 'tool_denied':
