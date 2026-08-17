@@ -47,11 +47,15 @@ export class Agent {
 		this.baseUrl = opts.baseUrl || '';
 		this.autoCompact = opts.autoCompact !== false;
 		this.emit = opts.emit;
+		this.checkpoints = opts.checkpoints || null;
+		this.onTurnEnd = opts.onTurnEnd || null;
 
 		/** @type {import('./providers/types.js').Message[]} */
 		this.messages = [];
 		/** @type {Map<string,(d:'allow'|'deny')=>void>} */
 		this.pending = new Map();
+		/** @type {Map<string,(value:any)=>void>} */
+		this.questions = new Map();
 		this.busy = false;
 		/** @type {AbortController|null} */
 		this.controller = null;
@@ -73,11 +77,26 @@ export class Agent {
 		return false;
 	}
 
+	/** پاسخ کاربر به یک پرسش ابزار (سؤال چندگزینه‌ای یا تأیید نقشه). */
+	resolveQuestion( id, value ) {
+		const fn = this.questions.get( id );
+		if ( fn ) {
+			this.questions.delete( id );
+			fn( value );
+			return true;
+		}
+		return false;
+	}
+
 	stop() {
 		this.controller?.abort();
 		for ( const [ id, fn ] of this.pending ) {
 			this.pending.delete( id );
 			fn( 'deny' );
+		}
+		for ( const [ id, fn ] of this.questions ) {
+			this.questions.delete( id );
+			fn( null );
 		}
 	}
 
@@ -132,6 +151,7 @@ export class Agent {
 			}
 
 			await this.hooks?.run( 'Stop', {} );
+			await this.onTurnEnd?.( { usage: this.usage, model: this.model } );
 		} catch ( e ) {
 			// خطای خام مدل به‌درد کاربر نمی‌خورد؛ ترجمه‌اش می‌کنیم.
 			const info = explain( e, { baseUrl: this.baseUrl, model: this.model } );
@@ -235,6 +255,8 @@ export class Agent {
 			const out = await tool.run( call.input || {}, {
 				workspace: this.workspace,
 				log: ( t ) => this.emit( { type: 'tool_log', id: call.id, text: t } ),
+				snapshot: ( p ) => this.checkpoints?.recordFile( p ),
+				ask: ( payload ) => this.#askUser( payload ),
 			} );
 			this.emit( { type: 'tool_result', id: call.id, name: call.name, output: out } );
 			await this.hooks?.run( 'PostToolUse', { tool: call.name, input: call.input, output: out } );
@@ -244,6 +266,16 @@ export class Agent {
 			this.emit( { type: 'tool_error', id: call.id, name: call.name, error: msg } );
 			return `خطا در اجرای ابزار: ${ msg }`;
 		}
+	}
+
+	/**
+	 * پرسیدن از کاربر از داخل یک ابزار، و منتظر ماندن.
+	 * @param {any} payload
+	 */
+	#askUser( payload ) {
+		const id = `q_${ Date.now().toString( 36 ) }_${ this.questions.size }`;
+		this.emit( { type: 'ask_user', id, ...payload } );
+		return new Promise( ( resolve ) => this.questions.set( id, resolve ) );
 	}
 }
 
@@ -260,6 +292,10 @@ export function defaultSystemPrompt( workspace ) {
 		'- کار چندمرحله‌ای را با todo_write ثبت کن تا چیزی گم نشود.',
 		'- برای کاوش‌های طولانی که فقط جوابِ کوتاهش لازم است، از ابزار task استفاده کن.',
 		'- برای تغییر فایل از edit_file استفاده کن، نه بازنویسی کامل، مگر فایل تازه باشد.',
+		'- چند تغییر روی یک فایل را با multi_edit یک‌جا بزن تا فایل نیمه‌کاره نماند.',
+		'- فرمان طولانی (سرور، watcher) را با background=true اجرا کن و بعد با bash_output دنبالش کن.',
+		'- در حالت «پلن» هیچ چیزی را تغییر نده؛ نقشه را بنویس و با exit_plan_mode تأیید بگیر.',
+		'- وقتی تصمیم به سلیقه یا اطلاعات کاربر بستگی دارد، با ask_user_question بپرس؛ حدس نزن.',
 		'- هر فرمان مخرب یا پرریسک را اول توضیح بده؛ کاربر باید بفهمد چه چیزی را تأیید می‌کند.',
 		'- اگر کاربر اجازه نداد، اصرار نکن؛ راه دیگری پیشنهاد بده.',
 		'- کوتاه و دقیق بنویس. چیزی را که ندیده‌ای، ادعا نکن.',

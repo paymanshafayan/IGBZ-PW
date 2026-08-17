@@ -695,6 +695,299 @@ await test( 'سقف گام رعایت می‌شود', async () => {
 	assert.equal( calls, 3 );
 } );
 
+
+// ------------------------------------------------------------------- دیف
+
+section( 'دیف' );
+
+const { unifiedDiff } = await import( '../src/diff.js' );
+
+await test( 'دیف، خط اضافه و حذف را با شماره و علامت درست می‌دهد', () => {
+	const d = unifiedDiff( 'a\nb\nc', 'a\nB\nc' );
+	assert.equal( d.added, 1 );
+	assert.equal( d.removed, 1 );
+	assert.match( d.text, /^-\s+2\s+b$/m );
+	assert.match( d.text, /^\+\s+2\s+B$/m );
+} );
+
+await test( 'دیف بدون تغییر، صریحاً می‌گوید تغییری نیست', () => {
+	const d = unifiedDiff( 'x\ny', 'x\ny' );
+	assert.equal( d.text, '(بدون تغییر)' );
+	assert.equal( d.added + d.removed, 0 );
+} );
+
+await test( 'دیف فقط دور و بر تغییر را نشان می‌دهد، نه کل فایل', () => {
+	const before = Array.from( { length: 60 }, ( _, i ) => `line ${ i }` ).join( '\n' );
+	const after = before.replace( 'line 30', 'line thirty' );
+	const d = unifiedDiff( before, after );
+	assert.ok( d.text.split( '\n' ).length < 20, 'خروجی باید کوتاه باشد' );
+	assert.match( d.text, /@@ …/ );
+} );
+
+// -------------------------------------------------------------- چک‌پوینت
+
+section( 'چک‌پوینت' );
+
+const { CheckpointStore } = await import( '../src/checkpoints.js' );
+
+await test( 'بازگشت، فایل تغییریافته را برمی‌گرداند و فایل تازه را حذف می‌کند', async () => {
+	const home = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-cp-home-' ) );
+	const work = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-cp-work-' ) );
+	await fs.writeFile( path.join( work, 'old.txt' ), 'نسخهٔ یک' );
+
+	const store = new CheckpointStore( { home, workspace: work, sessionId: 's1' } );
+	await store.begin( { label: 'نوبت اول', messageCount: 0 } );
+	await store.recordFile( 'old.txt' );
+	await store.recordFile( 'new.txt' );
+	await fs.writeFile( path.join( work, 'old.txt' ), 'نسخهٔ دو' );
+	await fs.writeFile( path.join( work, 'new.txt' ), 'تازه' );
+
+	const list = await store.list();
+	assert.equal( list.length, 1 );
+	assert.equal( list[ 0 ].fileCount, 2 );
+
+	const out = await store.restore( list[ 0 ].id );
+	assert.deepEqual( out.restored, [ 'old.txt' ] );
+	assert.deepEqual( out.deleted, [ 'new.txt' ] );
+	assert.equal( await fs.readFile( path.join( work, 'old.txt' ), 'utf8' ), 'نسخهٔ یک' );
+	assert.equal( await fs.stat( path.join( work, 'new.txt' ) ).then( () => true ).catch( () => false ), false );
+
+	await fs.rm( home, { recursive: true, force: true } );
+	await fs.rm( work, { recursive: true, force: true } );
+} );
+
+await test( 'بازگشت چند مرحله‌ای، به نسخهٔ همان چک‌پوینت می‌رسد نه نسخهٔ میانی', async () => {
+	const home = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-cp2-home-' ) );
+	const work = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-cp2-work-' ) );
+	const file = path.join( work, 'x.txt' );
+	await fs.writeFile( file, 'v1' );
+
+	const store = new CheckpointStore( { home, workspace: work, sessionId: 's2' } );
+	await store.begin( { label: 'یک', messageCount: 0 } );
+	await store.recordFile( 'x.txt' );
+	await fs.writeFile( file, 'v2' );
+
+	await store.begin( { label: 'دو', messageCount: 2 } );
+	await store.recordFile( 'x.txt' );
+	await fs.writeFile( file, 'v3' );
+
+	const list = await store.list();
+	await store.restore( list[ 0 ].id );
+	assert.equal( await fs.readFile( file, 'utf8' ), 'v1' );
+
+	await fs.rm( home, { recursive: true, force: true } );
+	await fs.rm( work, { recursive: true, force: true } );
+} );
+
+await test( 'پشتیبان فقط یک بار در هر چک‌پوینت گرفته می‌شود', async () => {
+	const home = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-cp3-home-' ) );
+	const work = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-cp3-work-' ) );
+	await fs.writeFile( path.join( work, 'y.txt' ), 'اول' );
+
+	const store = new CheckpointStore( { home, workspace: work, sessionId: 's3' } );
+	await store.begin( { label: 'ی', messageCount: 0 } );
+	await store.recordFile( 'y.txt' );
+	await fs.writeFile( path.join( work, 'y.txt' ), 'دوم' );
+	await store.recordFile( 'y.txt' ); // نباید نسخهٔ «دوم» را ثبت کند
+
+	await store.restore( ( await store.list() )[ 0 ].id );
+	assert.equal( await fs.readFile( path.join( work, 'y.txt' ), 'utf8' ), 'اول' );
+
+	await fs.rm( home, { recursive: true, force: true } );
+	await fs.rm( work, { recursive: true, force: true } );
+} );
+
+// ------------------------------------------------------------- کانکتورها
+
+section( 'کانکتورها' );
+
+const { normalizeConnector } = await import( '../src/connectors.js' );
+
+await test( 'کانکتور stdio با پارامتر رشته‌ای، آرایه می‌شود', () => {
+	const out = normalizeConnector( { name: 'files', kind: 'stdio', command: 'npx', args: '-y pkg /tmp' } );
+	assert.deepEqual( out.config, { command: 'npx', args: [ '-y', 'pkg', '/tmp' ] } );
+} );
+
+await test( 'کانکتور HTTP بدون آدرس درست، رد می‌شود', () => {
+	assert.throws( () => normalizeConnector( { name: 'x', kind: 'http', url: 'ftp://a' } ), /http/ );
+} );
+
+await test( 'نام نامعتبر کانکتور رد می‌شود', () => {
+	assert.throws( () => normalizeConnector( { name: 'نام فارسی', kind: 'stdio', command: 'ls' } ), /نام کانکتور/ );
+} );
+
+// ---------------------------------------------------------------- عامل‌ها
+
+section( 'عامل‌ها' );
+
+const { saveAgent, collectAgents, removeAgent } = await import( '../src/agents.js' );
+
+await test( 'عامل ذخیره، خوانده و حذف می‌شود', async () => {
+	const home = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-ag-home-' ) );
+	const work = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-ag-work-' ) );
+	const roots = { home, workspace: work };
+
+	await saveAgent( roots, { name: 'reviewer', description: 'مرور', prompt: 'تو مرورگری.', tools: [ 'read_file', 'grep' ], model: 'm1' } );
+	let list = await collectAgents( { home, workspace: work } );
+	assert.equal( list.length, 1 );
+	assert.deepEqual( list[ 0 ].tools, [ 'read_file', 'grep' ] );
+	assert.equal( list[ 0 ].model, 'm1' );
+	assert.match( list[ 0 ].prompt, /مرورگری/ );
+
+	await removeAgent( roots, 'reviewer' );
+	list = await collectAgents( { home, workspace: work } );
+	assert.equal( list.length, 0 );
+
+	await fs.rm( home, { recursive: true, force: true } );
+	await fs.rm( work, { recursive: true, force: true } );
+} );
+
+await test( 'عامل پروژه بر عامل سراسری اولویت دارد', async () => {
+	const home = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-ag2-home-' ) );
+	const work = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-ag2-work-' ) );
+	const roots = { home, workspace: work };
+
+	await saveAgent( roots, { name: 'dup', description: 'سراسری', prompt: 'الف', scope: 'user' } );
+	await saveAgent( roots, { name: 'dup', description: 'پروژه', prompt: 'ب', scope: 'project' } );
+
+	const list = await collectAgents( { home, workspace: work } );
+	assert.equal( list.length, 1 );
+	assert.equal( list[ 0 ].source, 'project' );
+
+	await fs.rm( home, { recursive: true, force: true } );
+	await fs.rm( work, { recursive: true, force: true } );
+} );
+
+await test( 'حذف عاملی که نیست، خطا می‌دهد', async () => {
+	const home = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-ag3-' ) );
+	await assert.rejects( () => removeAgent( { home, workspace: home }, 'nope' ), /پیدا نشد/ );
+	await fs.rm( home, { recursive: true, force: true } );
+} );
+
+// -------------------------------------------------------- شل پس‌زمینه
+
+section( 'شل پس‌زمینه' );
+
+const { ShellManager } = await import( '../src/background.js' );
+
+await test( 'شل پس‌زمینه خروجی می‌دهد و خواندنِ دوم، تکراری نیست', async () => {
+	const m = new ShellManager();
+	const sh = m.start( 'echo یک; sleep 0.2; echo دو', tmpRoot );
+	await new Promise( ( r ) => setTimeout( r, 120 ) );
+
+	const first = m.read( sh.id );
+	assert.match( first.text, /یک/ );
+	assert.equal( /دو/.test( first.text ), false );
+
+	await new Promise( ( r ) => setTimeout( r, 300 ) );
+	const second = m.read( sh.id );
+	assert.match( second.text, /دو/ );
+	assert.equal( /یک/.test( second.text ), false, 'خروجی خوانده‌شده نباید دوباره بیاید' );
+	m.killAll();
+} );
+
+await test( 'kill_shell وضعیت را به killed می‌برد', async () => {
+	const m = new ShellManager();
+	const sh = m.start( 'sleep 5', tmpRoot );
+	m.kill( sh.id );
+	assert.equal( m.list()[ 0 ].status, 'killed' );
+} );
+
+await test( 'خواندن شل ناموجود، خطای روشن می‌دهد', () => {
+	const m = new ShellManager();
+	assert.throws( () => m.read( 'sh_404' ), /پیدا نشد/ );
+} );
+
+// ------------------------------------------------------------ فضای کاری
+
+section( 'فضای کاری' );
+
+const { fuzzyFilter } = await import( '../src/workspace.js' );
+
+await test( 'جستجوی فازی، نام دقیق فایل را اول می‌آورد', () => {
+	const files = [ 'src/deep/other-config.js', 'config.js', 'src/config.test.js' ];
+	assert.equal( fuzzyFilter( files, 'config.js' )[ 0 ], 'config.js' );
+} );
+
+await test( 'جستجوی فازی، حروف پراکنده را هم پیدا می‌کند', () => {
+	const hits = fuzzyFilter( [ 'src/providers/anthropic.js', 'README.md' ], 'srpan' );
+	assert.deepEqual( hits, [ 'src/providers/anthropic.js' ] );
+} );
+
+await test( 'جستجوی بی‌ربط چیزی برنمی‌گرداند', () => {
+	assert.deepEqual( fuzzyFilter( [ 'a.js', 'b.js' ], 'zzzz' ), [] );
+} );
+
+// ----------------------------------------------------------------- مصرف
+
+section( 'مصرف و هزینه' );
+
+const { estimateCost, priceOf, estimateContextTokens } = await import( '../src/usage.js' );
+
+await test( 'قیمت مدل با تطبیق پیشوندی پیدا می‌شود', () => {
+	assert.deepEqual( priceOf( 'gpt-4o-mini-2024-07-18' ), { in: 0.15, out: 0.6 } );
+	assert.equal( priceOf( 'مدل-ناشناخته' ), null );
+} );
+
+await test( 'هزینه از روی توکن درست حساب می‌شود', () => {
+	const cost = estimateCost( 'gpt-4o', { inputTokens: 1_000_000, outputTokens: 1_000_000 } );
+	assert.equal( cost, 12.5 );
+} );
+
+await test( 'مدل بی‌قیمت، هزینهٔ ساختگی نمی‌سازد', () => {
+	assert.equal( estimateCost( 'چیزی-که-نیست', { inputTokens: 10, outputTokens: 10 } ), null );
+} );
+
+await test( 'تخمین کانتکست با طولانی‌شدن گفتگو بالا می‌رود', () => {
+	const small = estimateContextTokens( [ { role: 'user', content: 'x'.repeat( 320 ) } ] );
+	const big = estimateContextTokens( [ { role: 'user', content: 'x'.repeat( 3200 ) } ] );
+	assert.ok( big > small * 5, `${ big } باید خیلی بیشتر از ${ small } باشد` );
+} );
+
+// --------------------------------------------------------------- خروجی
+
+section( 'خروجی گفتگو' );
+
+const { toMarkdown } = await import( '../src/export.js' );
+
+await test( 'خروجی مارک‌داون، پیام‌ها و ابزارها را دارد و متن جاری را دوباره نمی‌نویسد', () => {
+	const md = toMarkdown( {
+		sessionId: 's1',
+		transcript: [
+			{ type: 'user', text: 'سلام' },
+			{ type: 'text', text: 'نباید بیاید' },
+			{ type: 'assistant_end', text: 'علیک' },
+			{ type: 'tool_start', name: 'bash', summary: 'ls' },
+			{ type: 'tool_result', output: 'a\nb' },
+		],
+		messages: [],
+	} );
+	assert.match( md, /سلام/ );
+	assert.match( md, /علیک/ );
+	assert.match( md, /### ⚒ bash/ );
+	assert.equal( /نباید بیاید/.test( md ), false );
+} );
+
+// --------------------------------------------------------------- نشست‌ها
+
+section( 'نشست‌ها' );
+
+const { trimTranscript } = await import( '../src/server.js' );
+
+await test( 'بریدن نوار گفتگو، دقیقاً تا پیام کاربرِ N می‌ماند', () => {
+	const list = [
+		{ type: 'user', text: '۱' },
+		{ type: 'assistant_end', text: 'پاسخ ۱' },
+		{ type: 'user', text: '۲' },
+		{ type: 'assistant_end', text: 'پاسخ ۲' },
+	];
+	const out = trimTranscript( list, 1 );
+	assert.equal( out.length, 2 );
+	assert.equal( out[ 1 ].text, 'پاسخ ۱' );
+	assert.deepEqual( trimTranscript( list, 0 ), [] );
+} );
+
+
 // ------------------------------------------------------------------ پایان
 
 await fs.rm( tmpRoot, { recursive: true, force: true } );

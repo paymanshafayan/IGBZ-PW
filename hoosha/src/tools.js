@@ -13,6 +13,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 
+import { unifiedDiff } from './diff.js';
+import { shells } from './background.js';
+
 const MAX_READ_BYTES = 400 * 1024;
 const MAX_OUTPUT_CHARS = 30_000;
 
@@ -20,6 +23,8 @@ const MAX_OUTPUT_CHARS = 30_000;
  * @typedef {Object} ToolContext
  * @property {string} workspace
  * @property {(text:string)=>void} [log]
+ * @property {(relPath:string)=>Promise<any>} [snapshot] پشتیبان‌گیری قبل از تغییر (چک‌پوینت)
+ * @property {(payload:any)=>Promise<any>} [ask] پرسیدن از کاربر و منتظر ماندن برای جواب
  */
 
 /**
@@ -184,13 +189,23 @@ export const TOOLS = {
 		async run( input, ctx ) {
 			const file = resolveInside( ctx, input.path );
 			await fs.mkdir( path.dirname( file ), { recursive: true } );
-			const existed = await fs
-				.access( file )
-				.then( () => true )
-				.catch( () => false );
-			await fs.writeFile( file, String( input.content ?? '' ), 'utf8' );
-			const bytes = Buffer.byteLength( String( input.content ?? '' ) );
-			return `${ existed ? 'بازنویسی شد' : 'ساخته شد' }: ${ path.relative( ctx.workspace, file ) } (${ bytes } بایت)`;
+			const before = await fs.readFile( file, 'utf8' ).catch( () => null );
+			await ctx.snapshot?.( input.path );
+			const content = String( input.content ?? '' );
+			await fs.writeFile( file, content, 'utf8' );
+
+			const rel = path.relative( ctx.workspace, file );
+			const bytes = Buffer.byteLength( content );
+			if ( before === null ) {
+				const preview = content.split( '\n' ).slice( 0, 40 );
+				return clip(
+					`ساخته شد: ${ rel } (${ bytes } بایت)\n` +
+						preview.map( ( l, i ) => `+${ String( i + 1 ).padStart( 5 ) }  ${ l }` ).join( '\n' ) +
+						( content.split( '\n' ).length > 40 ? '\n@@ …' : '' )
+				);
+			}
+			const d = unifiedDiff( before, content, { path: rel } );
+			return clip( `بازنویسی شد: ${ rel } (+${ d.added } −${ d.removed })\n${ d.text }` );
 		},
 	},
 
@@ -221,11 +236,71 @@ export const TOOLS = {
 			if ( count > 1 && ! input.replace_all ) {
 				throw new Error( `رشته ${ count } بار تکرار شده؛ یا متن بیشتری بده یا replace_all را true کن.` );
 			}
+			await ctx.snapshot?.( input.path );
 			const out = input.replace_all
 				? text.split( input.old_string ).join( input.new_string )
 				: text.replace( input.old_string, input.new_string );
 			await fs.writeFile( file, out, 'utf8' );
-			return `ویرایش شد: ${ path.relative( ctx.workspace, file ) } (${ input.replace_all ? count : 1 } جایگزینی)`;
+
+			const rel = path.relative( ctx.workspace, file );
+			const d = unifiedDiff( text, out, { path: rel } );
+			return clip( `ویرایش شد: ${ rel } (${ input.replace_all ? count : 1 } جایگزینی · +${ d.added } −${ d.removed })\n${ d.text }` );
+		},
+	},
+
+	multi_edit: {
+		risk: 'write',
+		spec: {
+			name: 'multi_edit',
+			description:
+				'چند ویرایش پشت‌سرهم روی یک فایل، به‌صورت اتمی: یا همه انجام می‌شوند یا هیچ‌کدام. برای بازنویسی‌های چندنقطه‌ای از این استفاده کن تا فایل نیمه‌کاره نماند.',
+			parameters: {
+				type: 'object',
+				properties: {
+					path: { type: 'string' },
+					edits: {
+						type: 'array',
+						items: {
+							type: 'object',
+							properties: {
+								old_string: { type: 'string' },
+								new_string: { type: 'string' },
+								replace_all: { type: 'boolean' },
+							},
+							required: [ 'old_string', 'new_string' ],
+						},
+					},
+				},
+				required: [ 'path', 'edits' ],
+			},
+		},
+		async run( input, ctx ) {
+			const file = resolveInside( ctx, input.path );
+			const before = await fs.readFile( file, 'utf8' );
+			let text = before;
+
+			const edits = Array.isArray( input.edits ) ? input.edits : [];
+			if ( ! edits.length ) {
+				throw new Error( 'فهرست ویرایش‌ها خالی است.' );
+			}
+
+			edits.forEach( ( e, i ) => {
+				const count = text.split( e.old_string ).length - 1;
+				if ( count === 0 ) {
+					throw new Error( `ویرایش ${ i + 1 }: رشتهٔ موردنظر پیدا نشد.` );
+				}
+				if ( count > 1 && ! e.replace_all ) {
+					throw new Error( `ویرایش ${ i + 1 }: رشته ${ count } بار تکرار شده؛ replace_all بده یا متن بیشتری.` );
+				}
+				text = e.replace_all ? text.split( e.old_string ).join( e.new_string ) : text.replace( e.old_string, e.new_string );
+			} );
+
+			await ctx.snapshot?.( input.path );
+			await fs.writeFile( file, text, 'utf8' );
+
+			const rel = path.relative( ctx.workspace, file );
+			const d = unifiedDiff( before, text, { path: rel } );
+			return clip( `${ edits.length } ویرایش روی ${ rel } (+${ d.added } −${ d.removed })\n${ d.text }` );
 		},
 	},
 
@@ -317,17 +392,27 @@ export const TOOLS = {
 		risk: 'exec',
 		spec: {
 			name: 'bash',
-			description: 'اجرای یک فرمان در پوستهٔ سیستم، داخل پوشهٔ کاری.',
+			description:
+				'اجرای یک فرمان در پوستهٔ سیستم، داخل پوشهٔ کاری. برای فرمان‌های طولانی (سرور توسعه، watcher) پارامتر background را true بده تا گفتگو قفل نشود.',
 			parameters: {
 				type: 'object',
 				properties: {
 					command: { type: 'string' },
+					description: { type: 'string', description: 'یک جمله دربارهٔ اینکه این فرمان چه می‌کند' },
 					timeout_ms: { type: 'integer', description: 'پیش‌فرض ۶۰۰۰۰' },
+					background: { type: 'boolean', description: 'اجرا در پس‌زمینه و برگرداندن شناسهٔ شل' },
 				},
 				required: [ 'command' ],
 			},
 		},
 		run( input, ctx ) {
+			if ( input.background ) {
+				const shell = shells.start( input.command, ctx.workspace );
+				return Promise.resolve(
+					`در پس‌زمینه اجرا شد. شناسهٔ شل: ${ shell.id }\nبا bash_output و همین شناسه خروجی را بخوان، با kill_shell متوقفش کن.`
+				);
+			}
+
 			return new Promise( ( resolve, reject ) => {
 				const timeout = Math.min( input.timeout_ms || 60_000, 600_000 );
 				const child = spawn( input.command, {
@@ -345,9 +430,11 @@ export const TOOLS = {
 
 				child.stdout.on( 'data', ( d ) => {
 					out += d.toString();
+					ctx.log?.( d.toString() );
 				} );
 				child.stderr.on( 'data', ( d ) => {
 					err += d.toString();
+					ctx.log?.( d.toString() );
 				} );
 				child.on( 'error', ( e ) => {
 					clearTimeout( timer );
@@ -359,6 +446,47 @@ export const TOOLS = {
 					resolve( clip( `exit=${ code }\n${ body || '(بدون خروجی)' }` ) );
 				} );
 			} );
+		},
+	},
+
+	bash_output: {
+		risk: 'read',
+		spec: {
+			name: 'bash_output',
+			description: 'خواندن خروجی تازهٔ یک شل پس‌زمینه (از آخرین باری که خواندی به بعد).',
+			parameters: {
+				type: 'object',
+				properties: {
+					shell_id: { type: 'string' },
+					filter: { type: 'string', description: 'فقط خط‌هایی که با این regex می‌خوانند' },
+				},
+				required: [ 'shell_id' ],
+			},
+		},
+		async run( input ) {
+			const r = shells.read( input.shell_id, { filter: input.filter } );
+			return clip(
+				`وضعیت: ${ r.status }${ r.exitCode !== null && r.exitCode !== undefined ? ` (exit=${ r.exitCode })` : '' }\n${
+					r.text || '(خروجی تازه‌ای نیست)'
+				}`
+			);
+		},
+	},
+
+	kill_shell: {
+		risk: 'exec',
+		spec: {
+			name: 'kill_shell',
+			description: 'متوقف‌کردن یک شل پس‌زمینه.',
+			parameters: {
+				type: 'object',
+				properties: { shell_id: { type: 'string' } },
+				required: [ 'shell_id' ],
+			},
+		},
+		async run( input ) {
+			const s = shells.kill( input.shell_id );
+			return `شل ${ s.id } متوقف شد.`;
 		},
 	},
 
@@ -383,6 +511,110 @@ export const TOOLS = {
 				.replace( /\s+/g, ' ' )
 				.trim();
 			return clip( `HTTP ${ res.status }\n\n${ stripped }` );
+		},
+	},
+
+	web_search: {
+		risk: 'network',
+		spec: {
+			name: 'web_search',
+			description: 'جستجوی وب و برگرداندن چند نتیجهٔ اول با عنوان، آدرس و خلاصه.',
+			parameters: {
+				type: 'object',
+				properties: {
+					query: { type: 'string' },
+					max_results: { type: 'integer', description: 'پیش‌فرض ۵' },
+				},
+				required: [ 'query' ],
+			},
+		},
+		async run( input ) {
+			const max = Math.min( input.max_results || 5, 10 );
+			const url = `https://duckduckgo.com/html/?q=${ encodeURIComponent( input.query ) }`;
+			const res = await fetch( url, { headers: { 'User-Agent': 'Mozilla/5.0 Hoosha/0.3' } } );
+			if ( ! res.ok ) {
+				throw new Error( `موتور جستجو پاسخ ${ res.status } داد.` );
+			}
+			const html = await res.text();
+
+			/** @type {string[]} */
+			const out = [];
+			const re = /<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
+			let m;
+			while ( ( m = re.exec( html ) ) && out.length < max ) {
+				const href = decodeDuck( m[ 1 ] );
+				const title = stripTags( m[ 2 ] );
+				if ( title ) {
+					out.push( `${ out.length + 1 }. ${ title }\n   ${ href }` );
+				}
+			}
+			return out.length ? out.join( '\n' ) : '(نتیجه‌ای پیدا نشد یا ساختار صفحه عوض شده است)';
+		},
+	},
+
+	exit_plan_mode: {
+		risk: 'read',
+		spec: {
+			name: 'exit_plan_mode',
+			description:
+				'وقتی در حالت «پلن» هستی و نقشهٔ کار آماده شد، با این ابزار نقشه را به کاربر نشان بده و اجازهٔ اجرا بگیر. تا تأیید نگیری هیچ تغییری نده.',
+			parameters: {
+				type: 'object',
+				properties: { plan: { type: 'string', description: 'نقشهٔ کار به مارک‌داون' } },
+				required: [ 'plan' ],
+			},
+		},
+		async run( input, ctx ) {
+			if ( ! ctx.ask ) {
+				return 'این محیط تأیید تعاملی ندارد؛ نقشه را در پیام بنویس.';
+			}
+			const answer = await ctx.ask( { kind: 'plan', plan: String( input.plan || '' ) } );
+			if ( answer === true || answer?.approved ) {
+				return `کاربر نقشه را تأیید کرد و حالت به «${ answer.mode || 'default' }» تغییر کرد. حالا اجرا کن.`;
+			}
+			return `کاربر نقشه را تأیید نکرد.${ answer?.feedback ? ` بازخوردش: ${ answer.feedback }` : '' } نقشه را اصلاح کن.`;
+		},
+	},
+
+	ask_user_question: {
+		risk: 'read',
+		spec: {
+			name: 'ask_user_question',
+			description:
+				'پرسیدن یک سؤال چندگزینه‌ای از کاربر وقتی تصمیم به او مربوط است (نه به تو). به‌جای حدس‌زدن، بپرس.',
+			parameters: {
+				type: 'object',
+				properties: {
+					question: { type: 'string' },
+					options: {
+						type: 'array',
+						items: {
+							type: 'object',
+							properties: {
+								label: { type: 'string' },
+								description: { type: 'string' },
+							},
+							required: [ 'label' ],
+						},
+					},
+					allow_other: { type: 'boolean', description: 'اجازهٔ جواب آزاد' },
+				},
+				required: [ 'question', 'options' ],
+			},
+		},
+		async run( input, ctx ) {
+			if ( ! ctx.ask ) {
+				return 'این محیط تعاملی نیست؛ خودت بهترین گزینه را انتخاب کن و دلیلش را بنویس.';
+			}
+			const answer = await ctx.ask( {
+				kind: 'question',
+				question: String( input.question || '' ),
+				options: Array.isArray( input.options ) ? input.options.slice( 0, 6 ) : [],
+				allowOther: input.allow_other !== false,
+			} );
+			// جواب می‌تواند رشته باشد (کلیک روی گزینه) یا شیء (فرم آزاد) — هر دو را بپذیر.
+			const value = typeof answer === 'string' ? answer : answer?.value;
+			return value ? `پاسخ کاربر: ${ value }` : 'کاربر جوابی نداد.';
 		},
 	},
 
@@ -422,3 +654,28 @@ export const TOOLS = {
 export function toolSpecs() {
 	return Object.values( TOOLS ).map( ( t ) => t.spec );
 }
+
+/** @param {string} s */
+function stripTags( s ) {
+	return String( s )
+		.replace( /<[^>]+>/g, '' )
+		.replace( /&amp;/g, '&' )
+		.replace( /&quot;/g, '"' )
+		.replace( /&#x27;|&#39;/g, "'" )
+		.replace( /&lt;/g, '<' )
+		.replace( /&gt;/g, '>' )
+		.replace( /\s+/g, ' ' )
+		.trim();
+}
+
+/** داک‌داک‌گو لینک‌ها را دور یک ریدایرکت می‌پیچد؛ بازش می‌کنیم. */
+function decodeDuck( href ) {
+	try {
+		const u = new URL( href.startsWith( '//' ) ? `https:${ href }` : href, 'https://duckduckgo.com' );
+		const real = u.searchParams.get( 'uddg' );
+		return real ? decodeURIComponent( real ) : u.toString();
+	} catch {
+		return href;
+	}
+}
+

@@ -17,6 +17,7 @@ import { McpManager } from './mcp.js';
 import { HookRunner } from './hooks.js';
 import { collectSkills, makeSkillTool, skillsPromptSection } from './skills.js';
 import { collectCommands } from './commands.js';
+import { collectAgents } from './agents.js';
 import { activePlugins } from './plugins.js';
 import { makeTaskTool } from './subagent.js';
 
@@ -29,6 +30,10 @@ export class Runtime {
 		this.skills = [];
 		/** @type {import('./commands.js').UserCommand[]} */
 		this.commands = [];
+		/** @type {import('./agents.js').AgentDef[]} */
+		this.agents = [];
+		/** @type {any} */
+		this.checkpoints = null;
 		/** @type {{name:string,dir:string}[]} */
 		this.plugins = [];
 		/** @type {Agent|null} */
@@ -56,6 +61,12 @@ export class Runtime {
 		} );
 
 		this.commands = await collectCommands( {
+			home: HOME,
+			workspace: cfg.workspace,
+			pluginDirs: this.plugins,
+		} );
+
+		this.agents = await collectAgents( {
 			home: HOME,
 			workspace: cfg.workspace,
 			pluginDirs: this.plugins,
@@ -95,20 +106,36 @@ export class Runtime {
 	 *
 	 * @param {number} [depth]
 	 */
-	tools( depth = 0 ) {
-		return {
+	tools( depth = 0, allowedTools = null ) {
+		const all = {
 			...TOOLS,
 			skill: makeSkillTool( () => this.skills ),
 			...( depth === 0
 				? {
 						task: makeTaskTool( {
 							emit: this.emit,
+							getAgents: () => this.agents,
 							makeAgent: ( o ) => this.#makeAgent( { ...o, depth: depth + 1 } ),
 						} ),
 				  }
 				: {} ),
 			...this.mcp.toolEntries(),
 		};
+
+		if ( ! allowedTools?.length ) {
+			return all;
+		}
+
+		// عاملِ تعریف‌شده می‌تواند فهرست ابزار محدود داشته باشد؛ نام ناشناخته را ساکت رد می‌کنیم
+		// تا یک اشتباه تایپی در فایل عامل، کل زیرعامل را بی‌ابزار نکند.
+		/** @type {Record<string, any>} */
+		const picked = {};
+		for ( const name of allowedTools ) {
+			if ( all[ name ] ) {
+				picked[ name ] = all[ name ];
+			}
+		}
+		return Object.keys( picked ).length ? picked : all;
 	}
 
 	/**
@@ -116,6 +143,7 @@ export class Runtime {
 	 */
 	#makeAgent( opts ) {
 		const depth = opts.depth || 0;
+		const allowedTools = opts.allowedTools || null;
 		const cfg = this.config;
 		const profile = cfg.profiles?.[ cfg.activeProfile ] || {};
 		const info = providerInfo( profile.provider );
@@ -129,15 +157,17 @@ export class Runtime {
 
 		return new Agent( {
 			provider,
-			model: profile.model || info?.defaultModel || '',
+			model: opts.model || profile.model || info?.defaultModel || '',
 			baseUrl: profile.baseUrl || info?.baseUrl || '',
 			workspace: cfg.workspace,
 			rules: cfg.permissions,
-			getTools: () => this.tools( depth ),
+			getTools: () => this.tools( depth, allowedTools ),
 			systemPrompt: opts.systemPrompt || defaultSystemPrompt( cfg.workspace ),
 			extraPrompt: this.#extraPrompt(),
 			maxSteps: opts.maxSteps,
 			hooks: this.hooks,
+			checkpoints: depth === 0 ? this.checkpoints : null,
+			onTurnEnd: depth === 0 ? this.onTurnEnd : null,
 			emit: opts.emit || this.emit,
 		} );
 	}

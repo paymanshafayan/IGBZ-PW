@@ -111,6 +111,16 @@ export async function loadSkillsFrom( root, source ) {
 		}
 		const dir = path.join( root, e.name );
 		const file = path.join( dir, 'SKILL.md' );
+
+		// اسکیل خاموش‌شده اصلاً بارگذاری نمی‌شود (فایل نشانهٔ .disabled، مثل پلاگین‌ها).
+		const disabled = await fs
+			.access( path.join( dir, '.disabled' ) )
+			.then( () => true )
+			.catch( () => false );
+		if ( disabled ) {
+			continue;
+		}
+
 		let text;
 		try {
 			text = await fs.readFile( file, 'utf8' );

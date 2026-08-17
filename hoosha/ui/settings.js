@@ -1,0 +1,1156 @@
+/**
+ * پنجرهٔ تنظیمات — همان جایی که در Claude Code به آن Customize می‌گویند.
+ *
+ * قاعده: هر چیزی که تا دیروز فقط با ویرایش دستی JSON ممکن بود، اینجا یک فرم دارد —
+ * پرووایدرها، کانکتورهای MCP، اسکیل‌ها، پلاگین‌ها، زیرعامل‌ها، دستورها، هوک‌ها، مجوزها،
+ * حافظهٔ پروژه، مصرف و هزینه، و تشخیص خرابی.
+ */
+
+import { $, el, h, toast, confirmDialog } from './lib/dom.js';
+import { api, post, refreshState, getState } from './lib/api.js';
+
+const TABS = [
+	{ id: 'provider', label: 'پرووایدر و مدل', ico: '◈' },
+	{ id: 'connectors', label: 'کانکتورها (MCP)', ico: '⇄' },
+	{ id: 'skills', label: 'اسکیل‌ها', ico: '◆' },
+	{ id: 'plugins', label: 'پلاگین‌ها', ico: '▣' },
+	{ id: 'agents', label: 'زیرعامل‌ها', ico: '⌗' },
+	{ id: 'commands', label: 'دستورها', ico: '/' },
+	{ id: 'hooks', label: 'هوک‌ها', ico: '⚑' },
+	{ id: 'permissions', label: 'مجوزها', ico: '⛨' },
+	{ id: 'memory', label: 'حافظهٔ پروژه', ico: '❒' },
+	{ id: 'tools', label: 'ابزارها', ico: '⚒' },
+	{ id: 'usage', label: 'مصرف و هزینه', ico: '⌁' },
+	{ id: 'status', label: 'وضعیت و تشخیص', ico: '✚' },
+	{ id: 'appearance', label: 'ظاهر', ico: '◐' },
+];
+
+let dialog = null;
+let currentTab = 'provider';
+
+export function initSettings() {
+	dialog = $( '#settings' );
+
+	const nav = $( '#settings-nav' );
+	nav.replaceChildren();
+	for ( const t of TABS ) {
+		const btn = h( 'button', { class: 'snav-item', dataset: { tab: t.id }, onClick: () => openSettings( t.id ) }, [
+			h( 'span', { class: 'snav-ico', text: t.ico } ),
+			h( 'span', { text: t.label } ),
+		] );
+		nav.appendChild( btn );
+	}
+
+	$( '#settings-close' ).onclick = () => dialog.close();
+}
+
+/** @param {string} [tab] */
+export async function openSettings( tab ) {
+	currentTab = tab || currentTab;
+	if ( ! dialog.open ) {
+		dialog.showModal();
+	}
+	for ( const b of document.querySelectorAll( '.snav-item' ) ) {
+		b.classList.toggle( 'active', b.dataset.tab === currentTab );
+	}
+	const body = $( '#settings-content' );
+	body.replaceChildren( el( 'div', 'loading', 'در حال بارگذاری…' ) );
+	await refreshState();
+	body.replaceChildren();
+	await RENDER[ currentTab ]( body );
+	body.scrollTop = 0;
+}
+
+function section( title, hint ) {
+	return h( 'div', { class: 'sec-head' }, [ h( 'h3', { text: title } ), hint ? h( 'p', { class: 'note', text: hint } ) : null ] );
+}
+
+function field( label, control, hint ) {
+	return h( 'label', { class: 'field-label' }, [ h( 'span', { text: label } ), control, hint ? h( 'small', { class: 'note', text: hint } ) : null ] );
+}
+
+function row( ...children ) {
+	return h( 'div', { class: 'row' }, children );
+}
+
+function emptyBox( text ) {
+	return h( 'div', { class: 'empty', text } );
+}
+
+// ═══════════════════════════════════════════════════════════ پرووایدر
+
+async function renderProvider( box ) {
+	const s = getState();
+	const cfg = s.config;
+	const profiles = Object.entries( cfg.profiles || {} );
+
+	box.appendChild( section( 'پرووایدر و مدل', 'می‌توانی چند پروفایل داشته باشی و بینشان جابه‌جا شوی — مثل Cline.' ) );
+
+	// فهرست پروفایل‌ها
+	const list = el( 'div', 'card-list' );
+	for ( const [ id, p ] of profiles ) {
+		const active = id === cfg.activeProfile;
+		const card = h( 'div', { class: `item ${ active ? 'active' : '' }` }, [
+			h( 'div', { class: 'item-main' }, [
+				h( 'b', { text: p.label || id } ),
+				h( 'p', { class: 'mono', text: `${ p.provider } · ${ p.model || 'بدون مدل' }${ p.apiKey ? ' · کلید ✓' : ' · بدون کلید' }` } ),
+			] ),
+			active ? h( 'span', { class: 'tag ok', text: 'فعال' } ) : null,
+			! active
+				? h( 'button', {
+						class: 'pill',
+						text: 'فعال کن',
+						onClick: async () => {
+							await post( '/api/profiles', { action: 'activate', id } );
+							await openSettings( 'provider' );
+							toast( 'پروفایل عوض شد.' );
+						},
+				  } )
+				: null,
+			h( 'button', { class: 'pill', text: 'ویرایش', onClick: () => editProfile( id, p ) } ),
+			profiles.length > 1
+				? h( 'button', {
+						class: 'pill ghost danger',
+						text: 'حذف',
+						onClick: async () => {
+							if ( ! ( await confirmDialog( `پروفایل «${ p.label || id }» حذف شود؟`, { danger: true } ) ) ) {
+								return;
+							}
+							await post( '/api/profiles', { action: 'remove', id } );
+							await openSettings( 'provider' );
+						},
+				  } )
+				: null,
+		] );
+		list.appendChild( card );
+	}
+	box.appendChild( list );
+
+	box.appendChild(
+		row(
+			h( 'button', { class: 'pill primary', text: '+ پروفایل تازه', onClick: () => editProfile( `p${ Date.now().toString( 36 ) }`, null ) } )
+		)
+	);
+
+	// فرم ویرایش
+	const formHost = el( 'div', 'form-host' );
+	box.appendChild( formHost );
+
+	function editProfile( id, p ) {
+		formHost.replaceChildren();
+		const providers = s.providers || [];
+		const current = p || { provider: 'openai', model: '', baseUrl: '', apiKey: '', label: 'پروفایل تازه' };
+
+		const label = h( 'input', { class: 'field', value: current.label || '' } );
+		const select = h( 'select', { class: 'field' } );
+		for ( const pr of providers ) {
+			select.appendChild( h( 'option', { value: pr.id, text: `${ pr.label } ${ pr.needsKey ? '' : '(بدون کلید)' }` } ) );
+		}
+		select.value = current.provider;
+
+		const baseUrl = h( 'input', { class: 'field', dir: 'ltr', value: current.baseUrl || '', placeholder: 'https://…' } );
+		const apiKey = h( 'input', { class: 'field', dir: 'ltr', type: 'password', placeholder: current.apiKey ? '••••••• (تغییر نده تا بماند)' : '' } );
+		const model = h( 'input', { class: 'field', dir: 'ltr', value: current.model || '', list: 'model-list' } );
+		const datalist = h( 'datalist', { id: 'model-list' } );
+		const note = h( 'p', { class: 'note' } );
+		const testNote = h( 'p', { class: 'note' } );
+
+		const info = () => providers.find( ( x ) => x.id === select.value );
+		const sync = () => {
+			const i = info();
+			note.textContent = i?.note || '';
+			baseUrl.placeholder = i?.baseUrl || 'https://…';
+			baseUrl.disabled = ! i?.editableBaseUrl;
+			apiKey.disabled = ! i?.needsKey;
+			if ( ! model.value && i?.defaultModel ) {
+				model.value = i.defaultModel;
+			}
+		};
+		select.onchange = sync;
+		sync();
+
+		const save = async ( activate = true ) => {
+			const out = await post( '/api/profiles', {
+				action: 'save',
+				id,
+				label: label.value.trim() || id,
+				provider: select.value,
+				baseUrl: baseUrl.value.trim(),
+				apiKey: apiKey.value.trim(),
+				model: model.value.trim(),
+				activate,
+			} );
+			if ( out.error ) {
+				toast( out.error, 'error' );
+				return false;
+			}
+			return true;
+		};
+
+		formHost.appendChild(
+			h( 'div', { class: 'form-card' }, [
+				h( 'h4', { text: p ? `ویرایش «${ current.label || id }»` : 'پروفایل تازه' } ),
+				field( 'نام پروفایل', label ),
+				field( 'سرویس‌دهنده', select ),
+				note,
+				field( 'آدرس پایه', baseUrl, 'برای سرویس‌های سازگار با OpenAI/Anthropic (مثل OpenRouter، Ollama، LM Studio) اینجا را پر کن.' ),
+				field( 'کلید API', apiKey, 'کلید در فایل تنظیمات محلی ذخیره می‌شود؛ به جایی فرستاده نمی‌شود.' ),
+				field( 'مدل', row( model, h( 'button', {
+					class: 'pill',
+					text: 'گرفتن فهرست مدل‌ها',
+					onClick: async () => {
+						if ( ! ( await save() ) ) {
+							return;
+						}
+						const out = await api( '/api/models' );
+						if ( out.error ) {
+							toast( `${ out.error }${ out.hint ? ' — ' + out.hint : '' }`, 'error' );
+							return;
+						}
+						datalist.replaceChildren();
+						for ( const m of out.models || [] ) {
+							datalist.appendChild( h( 'option', { value: m } ) );
+						}
+						toast( `${ ( out.models || [] ).length } مدل پیدا شد — روی کادر مدل کلیک کن.` );
+					},
+				} ) ) ),
+				datalist,
+				h( 'div', { class: 'modal-actions' }, [
+					h( 'button', {
+						class: 'pill',
+						text: 'تست اتصال',
+						onClick: async () => {
+							testNote.className = 'note';
+							testNote.textContent = 'در حال آزمودن…';
+							if ( ! ( await save() ) ) {
+								return;
+							}
+							const out = await post( '/api/test-connection', { id } );
+							testNote.className = `note ${ out.ok ? 'ok' : 'error' }`;
+							testNote.textContent = out.ok ? out.message : `${ out.message }${ out.hint ? '\n' + out.hint : '' }`;
+						},
+					} ),
+					h( 'span', { class: 'grow' } ),
+					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
+					h( 'button', {
+						class: 'pill primary',
+						text: 'ذخیره',
+						onClick: async () => {
+							if ( await save() ) {
+								toast( 'ذخیره شد.' );
+								await openSettings( 'provider' );
+							}
+						},
+					} ),
+				] ),
+				testNote,
+			] )
+		);
+		formHost.scrollIntoView( { block: 'nearest', behavior: 'smooth' } );
+	}
+}
+
+// ═══════════════════════════════════════════════════════ کانکتورها (MCP)
+
+async function renderConnectors( box ) {
+	const s = getState();
+
+	box.appendChild(
+		section(
+			'کانکتورها (سرورهای MCP)',
+			'هر کانکتور، ابزارهای یک سرویس بیرونی را داخل هوشا می‌آورد. دو نوع: اجرای فرمان محلی (stdio) یا آدرس اینترنتی (HTTP).'
+		)
+	);
+
+	const statusOf = ( name ) => ( s.mcp || [] ).find( ( m ) => m.name === name );
+
+	const list = el( 'div', 'card-list' );
+	if ( ! ( s.connectors || [] ).length ) {
+		list.appendChild( emptyBox( 'هنوز کانکتوری اضافه نکرده‌ای. با دکمهٔ زیر یکی بساز.' ) );
+	}
+	for ( const c of s.connectors || [] ) {
+		const st = statusOf( c.name );
+		const badge = c.disabled
+			? h( 'span', { class: 'tag', text: 'خاموش' } )
+			: st?.status === 'connected'
+			? h( 'span', { class: 'tag ok', text: `وصل · ${ st.tools.length } ابزار` } )
+			: h( 'span', { class: 'tag err', text: st?.error ? 'خطا' : 'وصل نشد' } );
+
+		list.appendChild(
+			h( 'div', { class: 'item' }, [
+				h( 'div', { class: 'item-main' }, [
+					h( 'b', { text: c.name } ),
+					h( 'p', { class: 'mono', text: c.kind === 'http' ? c.config.url : `${ c.config.command } ${ ( c.config.args || [] ).join( ' ' ) }` } ),
+					st?.error ? h( 'p', { class: 'note error', text: st.error } ) : null,
+					st?.tools?.length ? h( 'p', { class: 'note', text: `ابزارها: ${ st.tools.join( '، ' ) }` } ) : null,
+				] ),
+				h( 'span', { class: 'tag', text: c.scope === 'project' ? 'پروژه' : 'سراسری' } ),
+				badge,
+				h( 'button', {
+					class: 'pill',
+					text: c.disabled ? 'روشن' : 'خاموش',
+					onClick: async () => {
+						await post( '/api/connectors', { action: 'toggle', name: c.name, scope: c.scope, enabled: c.disabled } );
+						await openSettings( 'connectors' );
+					},
+				} ),
+				h( 'button', { class: 'pill', text: 'ویرایش', onClick: () => form( c ) } ),
+				h( 'button', {
+					class: 'pill ghost danger',
+					text: 'حذف',
+					onClick: async () => {
+						if ( ! ( await confirmDialog( `کانکتور «${ c.name }» حذف شود؟`, { danger: true } ) ) ) {
+							return;
+						}
+						const out = await post( '/api/connectors', { action: 'remove', name: c.name, scope: c.scope } );
+						if ( out.error ) {
+							toast( out.error, 'error' );
+						}
+						await openSettings( 'connectors' );
+					},
+				} ),
+			] )
+		);
+	}
+	box.appendChild( list );
+
+	box.appendChild(
+		row(
+			h( 'button', { class: 'pill primary', text: '+ کانکتور تازه', onClick: () => form( null ) } ),
+			h( 'button', { class: 'pill', text: 'نمونه: فایل‌سیستم', onClick: () => form( sample( 'files' ) ) } ),
+			h( 'button', { class: 'pill', text: 'نمونه: گیت‌هاب', onClick: () => form( sample( 'github' ) ) } ),
+			h( 'button', {
+				class: 'pill',
+				text: 'اتصال دوباره به همه',
+				onClick: async () => {
+					await post( '/api/reload', {} );
+					await openSettings( 'connectors' );
+					toast( 'دوباره وصل شد.' );
+				},
+			} )
+		)
+	);
+
+	const formHost = el( 'div', 'form-host' );
+	box.appendChild( formHost );
+
+	function sample( kind ) {
+		if ( kind === 'files' ) {
+			return {
+				name: 'files',
+				scope: 'user',
+				kind: 'stdio',
+				config: { command: 'npx', args: [ '-y', '@modelcontextprotocol/server-filesystem', s.config.workspace ] },
+			};
+		}
+		return {
+			name: 'github',
+			scope: 'user',
+			kind: 'http',
+			config: { url: 'https://api.githubcopilot.com/mcp/', headers: { Authorization: 'Bearer ' } },
+		};
+	}
+
+	function form( c ) {
+		formHost.replaceChildren();
+		const editing = Boolean( c?.config );
+		const cfg = c?.config || {};
+		const kind = c?.kind || ( cfg.url ? 'http' : 'stdio' );
+
+		const name = h( 'input', { class: 'field', dir: 'ltr', value: c?.name || '', placeholder: 'مثلاً files' } );
+		const scope = h( 'select', { class: 'field' }, [
+			h( 'option', { value: 'user', text: 'سراسری (همهٔ پروژه‌ها)' } ),
+			h( 'option', { value: 'project', text: 'فقط این پروژه' } ),
+		] );
+		scope.value = c?.scope || 'user';
+
+		const kindSel = h( 'select', { class: 'field' }, [
+			h( 'option', { value: 'stdio', text: 'اجرای فرمان محلی (stdio)' } ),
+			h( 'option', { value: 'http', text: 'آدرس اینترنتی (HTTP)' } ),
+		] );
+		kindSel.value = kind;
+
+		const command = h( 'input', { class: 'field', dir: 'ltr', value: cfg.command || '', placeholder: 'npx' } );
+		const args = h( 'input', { class: 'field', dir: 'ltr', value: ( cfg.args || [] ).join( ' ' ), placeholder: '-y @modelcontextprotocol/server-filesystem /path' } );
+		const url = h( 'input', { class: 'field', dir: 'ltr', value: cfg.url || '', placeholder: 'https://example.com/mcp' } );
+		const envBox = kvEditor( cfg.env || {}, 'متغیر محیطی' );
+		const headBox = kvEditor( cfg.headers || {}, 'هدر' );
+		const note = h( 'p', { class: 'note' } );
+
+		const stdioRow = h( 'div', {}, [ field( 'فرمان', command ), field( 'پارامترها', args, 'با فاصله جدا کن.' ), field( 'متغیرهای محیطی', envBox.node ) ] );
+		const httpRow = h( 'div', {}, [ field( 'آدرس', url ), field( 'هدرها', headBox.node, 'مثلاً Authorization: Bearer …' ) ] );
+
+		const sync = () => {
+			stdioRow.hidden = kindSel.value !== 'stdio';
+			httpRow.hidden = kindSel.value !== 'http';
+		};
+		kindSel.onchange = sync;
+		sync();
+
+		const payload = () => ( {
+			name: name.value.trim(),
+			scope: scope.value,
+			previousScope: c?.scope,
+			kind: kindSel.value,
+			command: command.value.trim(),
+			args: args.value.trim(),
+			url: url.value.trim(),
+			env: envBox.value(),
+			headers: headBox.value(),
+		} );
+
+		formHost.appendChild(
+			h( 'div', { class: 'form-card' }, [
+				h( 'h4', { text: editing ? `ویرایش «${ c.name }»` : 'کانکتور تازه' } ),
+				field( 'نام', name, 'ابزارهای این سرور با پیشوند mcp__<نام>__ ظاهر می‌شوند.' ),
+				field( 'محدوده', scope ),
+				field( 'نوع اتصال', kindSel ),
+				stdioRow,
+				httpRow,
+				h( 'div', { class: 'modal-actions' }, [
+					h( 'button', {
+						class: 'pill',
+						text: 'تست اتصال',
+						onClick: async () => {
+							note.className = 'note';
+							note.textContent = 'در حال آزمودن…';
+							const out = await post( '/api/connectors', { action: 'test', ...payload() } );
+							note.className = `note ${ out.ok ? 'ok' : 'error' }`;
+							note.textContent = out.message || out.error || '';
+						},
+					} ),
+					h( 'span', { class: 'grow' } ),
+					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
+					h( 'button', {
+						class: 'pill primary',
+						text: 'ذخیره',
+						onClick: async () => {
+							const out = await post( '/api/connectors', { action: 'save', ...payload() } );
+							if ( out.error ) {
+								note.className = 'note error';
+								note.textContent = out.error;
+								return;
+							}
+							toast( 'کانکتور ذخیره شد.' );
+							await openSettings( 'connectors' );
+						},
+					} ),
+				] ),
+				note,
+			] )
+		);
+		formHost.scrollIntoView( { block: 'nearest', behavior: 'smooth' } );
+	}
+}
+
+/** ویرایشگر کلید/مقدار — برای env و headers. */
+function kvEditor( initial, label ) {
+	const host = el( 'div', 'kv' );
+
+	const addRow = ( k = '', v = '' ) => {
+		const key = h( 'input', { class: 'field small', dir: 'ltr', value: k, placeholder: 'کلید' } );
+		const val = h( 'input', { class: 'field small', dir: 'ltr', value: v, placeholder: 'مقدار' } );
+		const del = h( 'button', { class: 'pill ghost', text: '×', onClick: () => line.remove() } );
+		const line = h( 'div', { class: 'kv-row' }, [ key, val, del ] );
+		host.insertBefore( line, adder );
+		return line;
+	};
+
+	const adder = h( 'button', { class: 'pill', text: `+ ${ label }`, onClick: () => addRow() } );
+	host.appendChild( adder );
+	for ( const [ k, v ] of Object.entries( initial || {} ) ) {
+		addRow( k, String( v ) );
+	}
+
+	return {
+		node: host,
+		value() {
+			/** @type {Record<string,string>} */
+			const out = {};
+			for ( const line of host.querySelectorAll( '.kv-row' ) ) {
+				const [ k, v ] = line.querySelectorAll( 'input' );
+				if ( k.value.trim() ) {
+					out[ k.value.trim() ] = v.value;
+				}
+			}
+			return out;
+		},
+	};
+}
+
+// ═══════════════════════════════════════════════════════════ اسکیل‌ها
+
+async function renderSkills( box ) {
+	const s = getState();
+	box.appendChild(
+		section( 'اسکیل‌ها', 'اسکیل آماده را از یک مخزن گیت‌هاب یا پوشهٔ محلی نصب کن. فرمت استاندارد SKILL.md پشتیبانی می‌شود.' )
+	);
+
+	const source = h( 'input', { class: 'field', dir: 'ltr', placeholder: 'owner/repo یا /path/to/skill' } );
+	const note = h( 'p', { class: 'note' } );
+	box.appendChild(
+		h( 'div', { class: 'form-card' }, [
+			field( 'نصب اسکیل', row( source, h( 'button', {
+				class: 'pill primary',
+				text: 'نصب',
+				onClick: async () => {
+					if ( ! source.value.trim() ) {
+						return;
+					}
+					note.className = 'note';
+					note.textContent = 'در حال نصب…';
+					const out = await post( '/api/skills', { action: 'install', source: source.value.trim() } );
+					if ( out.error ) {
+						note.className = 'note error';
+						note.textContent = out.error;
+						return;
+					}
+					toast( `نصب شد: ${ ( out.installed || [] ).join( '، ' ) }` );
+					await openSettings( 'skills' );
+				},
+			} ) ) ),
+			note,
+		] )
+	);
+
+	const list = el( 'div', 'card-list' );
+	if ( ! ( s.skills || [] ).length ) {
+		list.appendChild( emptyBox( 'هیچ اسکیلی نصب نیست.' ) );
+	}
+	for ( const sk of s.skills || [] ) {
+		list.appendChild(
+			h( 'div', { class: 'item' }, [
+				h( 'div', { class: 'item-main' }, [ h( 'b', { text: sk.name } ), h( 'p', { text: sk.description || '' } ) ] ),
+				h( 'span', { class: 'tag', text: sk.source } ),
+				sk.source === 'user'
+					? h( 'button', {
+							class: 'pill ghost danger',
+							text: 'حذف',
+							onClick: async () => {
+								if ( ! ( await confirmDialog( `اسکیل «${ sk.name }» حذف شود؟`, { danger: true } ) ) ) {
+									return;
+								}
+								const out = await post( '/api/skills', { action: 'remove', name: sk.name } );
+								if ( out.error ) {
+									toast( out.error, 'error' );
+								}
+								await openSettings( 'skills' );
+							},
+					  } )
+					: null,
+			] )
+		);
+	}
+	box.appendChild( list );
+}
+
+// ═══════════════════════════════════════════════════════════ پلاگین‌ها
+
+async function renderPlugins( box ) {
+	const s = getState();
+	box.appendChild( section( 'پلاگین‌ها', 'یک پلاگین می‌تواند اسکیل، دستور، کانکتور MCP و هوک با خودش بیاورد.' ) );
+
+	const source = h( 'input', { class: 'field', dir: 'ltr', placeholder: 'owner/repo یا مسیر محلی' } );
+	const market = h( 'input', { class: 'field', dir: 'ltr', placeholder: 'مارکت‌پلیس: owner/repo' } );
+	const note = h( 'p', { class: 'note' } );
+	const marketList = el( 'div', 'card-list' );
+
+	box.appendChild(
+		h( 'div', { class: 'form-card' }, [
+			field( 'نصب پلاگین', row( source, h( 'button', {
+				class: 'pill primary',
+				text: 'نصب',
+				onClick: async () => {
+					note.className = 'note';
+					note.textContent = 'در حال نصب…';
+					const out = await post( '/api/plugins', { action: 'install', source: source.value.trim() } );
+					if ( out.error ) {
+						note.className = 'note error';
+						note.textContent = out.error;
+						return;
+					}
+					toast( `«${ out.plugin.name }» نصب شد.` );
+					await openSettings( 'plugins' );
+				},
+			} ) ) ),
+			field( 'مرور مارکت‌پلیس', row( market, h( 'button', {
+				class: 'pill',
+				text: 'باز کن',
+				onClick: async () => {
+					marketList.replaceChildren( el( 'div', 'loading', 'در حال گرفتن فهرست…' ) );
+					const out = await post( '/api/plugins', { action: 'marketplace', source: market.value.trim() } );
+					marketList.replaceChildren();
+					if ( out.error ) {
+						marketList.appendChild( h( 'p', { class: 'note error', text: out.error } ) );
+						return;
+					}
+					for ( const p of out.marketplace?.plugins || [] ) {
+						marketList.appendChild(
+							h( 'div', { class: 'item' }, [
+								h( 'div', { class: 'item-main' }, [ h( 'b', { text: p.name } ), h( 'p', { text: p.description || '' } ) ] ),
+								h( 'button', {
+									class: 'pill primary',
+									text: 'نصب',
+									onClick: async () => {
+										const r = await post( '/api/plugins', { action: 'install', source: p.source, name: p.name } );
+										toast( r.error || `«${ p.name }» نصب شد.`, r.error ? 'error' : '' );
+										await openSettings( 'plugins' );
+									},
+								} ),
+							] )
+						);
+					}
+				},
+			} ) ) ),
+			note,
+			marketList,
+		] )
+	);
+
+	const list = el( 'div', 'card-list' );
+	if ( ! ( s.plugins || [] ).length ) {
+		list.appendChild( emptyBox( 'پلاگینی نصب نیست.' ) );
+	}
+	for ( const p of s.plugins || [] ) {
+		list.appendChild(
+			h( 'div', { class: 'item' }, [
+				h( 'div', { class: 'item-main' }, [
+					h( 'b', { text: p.name } ),
+					h( 'p', { text: `اسکیل: ${ p.has.skills } · دستور: ${ p.has.commands }${ p.has.mcp ? ' · MCP' : '' }${ p.has.hooks ? ' · هوک' : '' }` } ),
+				] ),
+				h( 'span', { class: `tag ${ p.enabled ? 'ok' : '' }`, text: p.enabled ? 'فعال' : 'خاموش' } ),
+				h( 'button', {
+					class: 'pill',
+					text: p.enabled ? 'خاموش' : 'روشن',
+					onClick: async () => {
+						await post( '/api/plugins', { action: 'toggle', name: p.name, enabled: ! p.enabled } );
+						await openSettings( 'plugins' );
+					},
+				} ),
+				h( 'button', {
+					class: 'pill ghost danger',
+					text: 'حذف',
+					onClick: async () => {
+						if ( ! ( await confirmDialog( `پلاگین «${ p.name }» حذف شود؟`, { danger: true } ) ) ) {
+							return;
+						}
+						await post( '/api/plugins', { action: 'remove', name: p.name } );
+						await openSettings( 'plugins' );
+					},
+				} ),
+			] )
+		);
+	}
+	box.appendChild( list );
+}
+
+// ═══════════════════════════════════════════════════════════ زیرعامل‌ها
+
+async function renderAgents( box ) {
+	const s = getState();
+	box.appendChild(
+		section( 'زیرعامل‌ها', 'هر زیرعامل یک متخصص است با پرامپت، مدل و ابزارهای خودش. عامل اصلی با ابزار task صدایشان می‌زند.' )
+	);
+
+	const list = el( 'div', 'card-list' );
+	if ( ! ( s.agents || [] ).length ) {
+		list.appendChild( emptyBox( 'هنوز زیرعاملی تعریف نکرده‌ای.' ) );
+	}
+	for ( const a of s.agents || [] ) {
+		list.appendChild(
+			h( 'div', { class: 'item' }, [
+				h( 'div', { class: 'item-main' }, [
+					h( 'b', { text: a.name } ),
+					h( 'p', { text: a.description || '' } ),
+					h( 'p', { class: 'note mono', text: `${ a.model || 'مدل پیش‌فرض' } · ${ a.tools?.length ? a.tools.join( '، ' ) : 'همهٔ ابزارها' }` } ),
+				] ),
+				h( 'span', { class: 'tag', text: a.source } ),
+				h( 'button', { class: 'pill', text: 'ویرایش', onClick: () => form( a ) } ),
+				h( 'button', {
+					class: 'pill ghost danger',
+					text: 'حذف',
+					onClick: async () => {
+						if ( ! ( await confirmDialog( `زیرعامل «${ a.name }» حذف شود؟`, { danger: true } ) ) ) {
+							return;
+						}
+						const out = await post( '/api/agents', { action: 'remove', name: a.name } );
+						if ( out.error ) {
+							toast( out.error, 'error' );
+						}
+						await openSettings( 'agents' );
+					},
+				} ),
+			] )
+		);
+	}
+	box.appendChild( list );
+	box.appendChild( row( h( 'button', { class: 'pill primary', text: '+ زیرعامل تازه', onClick: () => form( null ) } ) ) );
+
+	const formHost = el( 'div', 'form-host' );
+	box.appendChild( formHost );
+
+	function form( a ) {
+		formHost.replaceChildren();
+		const name = h( 'input', { class: 'field', dir: 'ltr', value: a?.name || '', placeholder: 'reviewer' } );
+		const desc = h( 'input', { class: 'field', value: a?.description || '', placeholder: 'کد را مرور می‌کند و ایراد می‌گیرد' } );
+		const model = h( 'input', { class: 'field', dir: 'ltr', value: a?.model || '', placeholder: 'خالی = مدل پیش‌فرض' } );
+		const prompt = h( 'textarea', { class: 'field tall', text: a?.prompt || '' } );
+		const scope = h( 'select', { class: 'field' }, [
+			h( 'option', { value: 'user', text: 'سراسری' } ),
+			h( 'option', { value: 'project', text: 'فقط این پروژه' } ),
+		] );
+		scope.value = a?.source === 'project' ? 'project' : 'user';
+
+		const toolsBox = el( 'div', 'chips' );
+		const chosen = new Set( a?.tools || [] );
+		for ( const t of s.tools || [] ) {
+			const chip = h( 'button', {
+				class: `chip ${ chosen.has( t.name ) ? 'on' : '' }`,
+				text: t.name,
+				onClick: () => {
+					if ( chosen.has( t.name ) ) {
+						chosen.delete( t.name );
+						chip.classList.remove( 'on' );
+					} else {
+						chosen.add( t.name );
+						chip.classList.add( 'on' );
+					}
+				},
+			} );
+			toolsBox.appendChild( chip );
+		}
+
+		formHost.appendChild(
+			h( 'div', { class: 'form-card' }, [
+				h( 'h4', { text: a ? `ویرایش «${ a.name }»` : 'زیرعامل تازه' } ),
+				field( 'نام (انگلیسی)', name ),
+				field( 'توضیح', desc, 'همین متن به مدل نشان داده می‌شود تا بداند کِی صدایش بزند.' ),
+				field( 'مدل', model ),
+				field( 'محدوده', scope ),
+				field( 'ابزارهای مجاز', toolsBox, 'هیچ‌کدام انتخاب نشود یعنی همهٔ ابزارها.' ),
+				field( 'پرامپت سیستمی', prompt ),
+				h( 'div', { class: 'modal-actions' }, [
+					h( 'span', { class: 'grow' } ),
+					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
+					h( 'button', {
+						class: 'pill primary',
+						text: 'ذخیره',
+						onClick: async () => {
+							const out = await post( '/api/agents', {
+								action: 'save',
+								name: name.value.trim(),
+								description: desc.value.trim(),
+								model: model.value.trim(),
+								prompt: prompt.value,
+								tools: [ ...chosen ],
+								scope: scope.value,
+							} );
+							if ( out.error ) {
+								toast( out.error, 'error' );
+								return;
+							}
+							toast( 'ذخیره شد.' );
+							await openSettings( 'agents' );
+						},
+					} ),
+				] ),
+			] )
+		);
+		formHost.scrollIntoView( { block: 'nearest', behavior: 'smooth' } );
+	}
+}
+
+// ═══════════════════════════════════════════════════════════ دستورها
+
+async function renderCommands( box ) {
+	const s = getState();
+	box.appendChild(
+		section( 'دستورهای اسلش', 'دستور خودت را بساز: متن دستور همان پرامپتی است که فرستاده می‌شود. $ARGUMENTS و $1 و $2 جایگزین می‌شوند.' )
+	);
+
+	const list = el( 'div', 'card-list' );
+	for ( const c of s.commands || [] ) {
+		list.appendChild(
+			h( 'div', { class: 'item' }, [
+				h( 'div', { class: 'item-main' }, [ h( 'b', { class: 'mono', text: `/${ c.name }` } ), h( 'p', { text: c.description || '' } ) ] ),
+				h( 'span', { class: 'tag', text: c.source } ),
+				c.source !== 'builtin' ? h( 'button', { class: 'pill', text: 'ویرایش', onClick: () => form( c ) } ) : null,
+				c.source !== 'builtin'
+					? h( 'button', {
+							class: 'pill ghost danger',
+							text: 'حذف',
+							onClick: async () => {
+								if ( ! ( await confirmDialog( `دستور /${ c.name } حذف شود؟`, { danger: true } ) ) ) {
+									return;
+								}
+								const out = await post( '/api/commands', { action: 'remove', name: c.name } );
+								if ( out.error ) {
+									toast( out.error, 'error' );
+								}
+								await openSettings( 'commands' );
+							},
+					  } )
+					: null,
+			] )
+		);
+	}
+	box.appendChild( list );
+	box.appendChild( row( h( 'button', { class: 'pill primary', text: '+ دستور تازه', onClick: () => form( null ) } ) ) );
+
+	const formHost = el( 'div', 'form-host' );
+	box.appendChild( formHost );
+
+	function form( c ) {
+		formHost.replaceChildren();
+		const name = h( 'input', { class: 'field', dir: 'ltr', value: c?.name || '', placeholder: 'review' } );
+		const desc = h( 'input', { class: 'field', value: c?.description || '' } );
+		const body = h( 'textarea', { class: 'field tall', text: c?.body || '' } );
+		const scope = h( 'select', { class: 'field' }, [
+			h( 'option', { value: 'user', text: 'سراسری' } ),
+			h( 'option', { value: 'project', text: 'فقط این پروژه' } ),
+		] );
+		scope.value = c?.source === 'project' ? 'project' : 'user';
+
+		formHost.appendChild(
+			h( 'div', { class: 'form-card' }, [
+				h( 'h4', { text: c ? `ویرایش /${ c.name }` : 'دستور تازه' } ),
+				field( 'نام', name ),
+				field( 'توضیح', desc ),
+				field( 'محدوده', scope ),
+				field( 'متن دستور (پرامپت)', body ),
+				h( 'div', { class: 'modal-actions' }, [
+					h( 'span', { class: 'grow' } ),
+					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
+					h( 'button', {
+						class: 'pill primary',
+						text: 'ذخیره',
+						onClick: async () => {
+							const out = await post( '/api/commands', {
+								action: 'save',
+								name: name.value.trim(),
+								description: desc.value.trim(),
+								body: body.value,
+								scope: scope.value,
+							} );
+							if ( out.error ) {
+								toast( out.error, 'error' );
+								return;
+							}
+							toast( 'ذخیره شد.' );
+							await openSettings( 'commands' );
+						},
+					} ),
+				] ),
+			] )
+		);
+	}
+}
+
+// ═══════════════════════════════════════════════════════════════ هوک‌ها
+
+async function renderHooks( box ) {
+	box.appendChild(
+		section(
+			'هوک‌ها',
+			'فرمان‌هایی که در لحظه‌های مشخص اجرا می‌شوند: PreToolUse، PostToolUse، UserPromptSubmit، SessionStart، SessionEnd، Stop. اگر PreToolUse با کد ۲ خارج شود، جلوی ابزار گرفته می‌شود.'
+		)
+	);
+
+	const out = await api( '/api/hooks' );
+	const editor = h( 'textarea', { class: 'field code tall', text: JSON.stringify( out.hooks || {}, null, 2 ) } );
+	const note = h( 'p', { class: 'note' } );
+
+	box.appendChild(
+		h( 'div', { class: 'form-card' }, [
+			field( 'تعریف هوک‌ها (JSON)', editor ),
+			h( 'pre', { class: 'sample mono', text: `{\n  "PreToolUse": [\n    { "matcher": "bash", "command": "echo $HOOSHA_TOOL >> ~/hoosha-audit.log" }\n  ]\n}` } ),
+			h( 'div', { class: 'modal-actions' }, [
+				h( 'span', { class: 'grow' } ),
+				h( 'button', {
+					class: 'pill primary',
+					text: 'ذخیره',
+					onClick: async () => {
+						let parsed;
+						try {
+							parsed = JSON.parse( editor.value || '{}' );
+						} catch ( e ) {
+							note.className = 'note error';
+							note.textContent = `JSON نامعتبر: ${ e.message }`;
+							return;
+						}
+						const res = await post( '/api/hooks', { hooks: parsed } );
+						note.className = `note ${ res.error ? 'error' : 'ok' }`;
+						note.textContent = res.error || 'ذخیره شد.';
+					},
+				} ),
+			] ),
+			note,
+		] )
+	);
+}
+
+// ═══════════════════════════════════════════════════════════════ مجوزها
+
+async function renderPermissions( box ) {
+	const s = getState();
+	const p = s.config.permissions || { mode: 'default', allow: [], ask: [], deny: [] };
+
+	box.appendChild(
+		section( 'مجوزها', 'قاعده می‌تواند نام ابزار باشد (مثل bash) یا پیشوندی (مثل bash:git) یا * برای همه.' )
+	);
+
+	const mode = h( 'select', { class: 'field' }, [
+		h( 'option', { value: 'plan', text: 'پلن — فقط بررسی و خواندن' } ),
+		h( 'option', { value: 'default', text: 'عادی — نوشتن و اجرا با تأیید' } ),
+		h( 'option', { value: 'auto', text: 'خودکار — بدون تأیید (جز فهرست ممنوع)' } ),
+	] );
+	mode.value = p.mode;
+
+	const allow = listEditor( p.allow || [], 'قاعدهٔ مجاز' );
+	const ask = listEditor( p.ask || [], 'قاعدهٔ پرسشی' );
+	const deny = listEditor( p.deny || [], 'قاعدهٔ ممنوع' );
+
+	box.appendChild(
+		h( 'div', { class: 'form-card' }, [
+			field( 'حالت کار', mode ),
+			field( 'همیشه مجاز', allow.node ),
+			field( 'همیشه بپرس', ask.node ),
+			field( 'همیشه ممنوع', deny.node ),
+			h( 'div', { class: 'modal-actions' }, [
+				h( 'span', { class: 'grow' } ),
+				h( 'button', {
+					class: 'pill primary',
+					text: 'ذخیره',
+					onClick: async () => {
+						const res = await post( '/api/permissions', {
+							mode: mode.value,
+							allow: allow.value(),
+							ask: ask.value(),
+							deny: deny.value(),
+						} );
+						toast( res.error || 'قواعد ذخیره شد.', res.error ? 'error' : '' );
+						await refreshState();
+					},
+				} ),
+			] ),
+		] )
+	);
+}
+
+function listEditor( initial, label ) {
+	const host = el( 'div', 'kv' );
+	const addRow = ( v = '' ) => {
+		const input = h( 'input', { class: 'field small', dir: 'ltr', value: v, placeholder: 'bash:git' } );
+		const del = h( 'button', { class: 'pill ghost', text: '×', onClick: () => line.remove() } );
+		const line = h( 'div', { class: 'kv-row' }, [ input, del ] );
+		host.insertBefore( line, adder );
+	};
+	const adder = h( 'button', { class: 'pill', text: `+ ${ label }`, onClick: () => addRow() } );
+	host.appendChild( adder );
+	for ( const v of initial ) {
+		addRow( v );
+	}
+	return {
+		node: host,
+		value: () => [ ...host.querySelectorAll( 'input' ) ].map( ( i ) => i.value.trim() ).filter( Boolean ),
+	};
+}
+
+// ═══════════════════════════════════════════════════════ حافظهٔ پروژه
+
+async function renderMemory( box ) {
+	const out = await api( '/api/memory' );
+	box.appendChild(
+		section( 'حافظهٔ پروژه (HOOSHA.md)', 'هرچه اینجا بنویسی، در هر گفتگو به مدل داده می‌شود. جای قواعد پروژه، سبک کد، و کارهای ممنوع.' )
+	);
+
+	const editor = h( 'textarea', { class: 'field code tall', text: out.text || '' } );
+	const note = h( 'p', { class: 'note mono', text: out.path } );
+
+	box.appendChild(
+		h( 'div', { class: 'form-card' }, [
+			editor,
+			note,
+			h( 'div', { class: 'modal-actions' }, [
+				h( 'button', {
+					class: 'pill',
+					text: 'نمونهٔ آماده',
+					onClick: () => {
+						editor.value = [
+							'# دستورالعمل این پروژه',
+							'',
+							'## سبک کد',
+							'- ',
+							'',
+							'## فرمان‌های مهم',
+							'- تست: ',
+							'- اجرا: ',
+							'',
+							'## کارهای ممنوع',
+							'- ',
+						].join( '\n' );
+					},
+				} ),
+				h( 'span', { class: 'grow' } ),
+				h( 'button', {
+					class: 'pill primary',
+					text: 'ذخیره',
+					onClick: async () => {
+						const res = await post( '/api/memory', { text: editor.value } );
+						toast( res.error || 'ذخیره شد.', res.error ? 'error' : '' );
+					},
+				} ),
+			] ),
+		] )
+	);
+}
+
+// ═══════════════════════════════════════════════════════════════ ابزارها
+
+async function renderTools( box ) {
+	const s = getState();
+	box.appendChild( section( `ابزارها (${ ( s.tools || [] ).length })`, 'ابزارها حذف نمی‌شوند؛ آنچه کنترل می‌شود دسترسی است — در تب مجوزها.' ) );
+
+	const RISK = { read: 'خواندن', write: 'نوشتن', exec: 'اجرا', network: 'شبکه' };
+	const list = el( 'div', 'card-list' );
+	for ( const t of s.tools || [] ) {
+		list.appendChild(
+			h( 'div', { class: 'item' }, [
+				h( 'div', { class: 'item-main' }, [ h( 'b', { class: 'mono', text: t.name } ), h( 'p', { text: t.description } ) ] ),
+				h( 'span', { class: `tag risk-${ t.risk }`, text: RISK[ t.risk ] || t.risk } ),
+				t.name.startsWith( 'mcp__' ) ? h( 'span', { class: 'tag mcp', text: 'MCP' } ) : null,
+			] )
+		);
+	}
+	box.appendChild( list );
+}
+
+// ═══════════════════════════════════════════════════════════ مصرف
+
+async function renderUsage( box ) {
+	const out = await api( '/api/usage' );
+	box.appendChild( section( 'مصرف و هزینه', 'هزینه تخمینی است و از جدول قیمت داخلی می‌آید؛ در config.json با کلید pricing قابل تغییر است.' ) );
+
+	const s = out.session || {};
+	box.appendChild(
+		h( 'div', { class: 'stat-row' }, [
+			stat( 'توکن ورودی این نشست', String( s.inputTokens || 0 ) ),
+			stat( 'توکن خروجی این نشست', String( s.outputTokens || 0 ) ),
+			stat( 'هزینهٔ این نشست', s.cost ? `$${ Number( s.cost ).toFixed( 4 ) }` : '—' ),
+			stat( 'مدل', out.model || '—' ),
+		] )
+	);
+
+	const days = out.history?.days || [];
+	if ( ! days.length ) {
+		box.appendChild( emptyBox( 'هنوز مصرفی ثبت نشده.' ) );
+		return;
+	}
+
+	const table = h( 'table', { class: 'table' }, [
+		h( 'thead', {}, [ h( 'tr', {}, [ h( 'th', { text: 'روز' } ), h( 'th', { text: 'ورودی' } ), h( 'th', { text: 'خروجی' } ), h( 'th', { text: 'هزینه' } ) ] ) ] ),
+		h(
+			'tbody',
+			{},
+			days.map( ( d ) =>
+				h( 'tr', {}, [
+					h( 'td', { class: 'mono', text: d.date } ),
+					h( 'td', { text: String( d.inputTokens ) } ),
+					h( 'td', { text: String( d.outputTokens ) } ),
+					h( 'td', { text: `$${ Number( d.cost || 0 ).toFixed( 4 ) }` } ),
+				] )
+			)
+		),
+	] );
+	box.appendChild( table );
+	box.appendChild(
+		h( 'p', { class: 'note', text: `جمع ۳۰ روز: $${ Number( out.history?.total?.cost || 0 ).toFixed( 4 ) }` } )
+	);
+}
+
+function stat( label, value ) {
+	return h( 'div', { class: 'stat' }, [ h( 'span', { class: 'stat-label', text: label } ), h( 'b', { class: 'stat-value', text: value } ) ] );
+}
+
+// ═══════════════════════════════════════════════════════ وضعیت/تشخیص
+
+async function renderStatus( box ) {
+	const s = getState();
+	const out = await api( '/api/doctor' );
+
+	box.appendChild( section( 'وضعیت و تشخیص', 'اگر چیزی کار نمی‌کند، اول اینجا را ببین.' ) );
+
+	const list = el( 'div', 'card-list' );
+	for ( const c of out.checks || [] ) {
+		list.appendChild(
+			h( 'div', { class: 'item' }, [
+				h( 'span', { class: `dot ${ c.ok ? 'ok' : 'err' }`, text: c.ok ? '✓' : '✗' } ),
+				h( 'div', { class: 'item-main' }, [
+					h( 'b', { text: c.name } ),
+					h( 'p', { class: 'mono', text: c.detail } ),
+					c.hint && ! c.ok ? h( 'p', { class: 'note error', text: c.hint } ) : null,
+				] ),
+			] )
+		);
+	}
+	box.appendChild( list );
+
+	box.appendChild(
+		h( 'div', { class: 'form-card' }, [
+			h( 'h4', { text: 'مسیرها' } ),
+			h( 'p', { class: 'mono', text: `تنظیمات: ${ s.home }` } ),
+			h( 'p', { class: 'mono', text: `پوشهٔ کاری: ${ s.config.workspace }` } ),
+			h( 'p', { class: 'mono', text: `نسخه: هوشا ${ s.version }` } ),
+		] )
+	);
+}
+
+// ═══════════════════════════════════════════════════════════════ ظاهر
+
+async function renderAppearance( box ) {
+	box.appendChild( section( 'ظاهر', 'تنظیمات ظاهری در همین مرورگر ذخیره می‌شود.' ) );
+
+	const theme = h( 'select', { class: 'field' }, [
+		h( 'option', { value: 'dark', text: 'تاریک' } ),
+		h( 'option', { value: 'light', text: 'روشن' } ),
+	] );
+	theme.value = document.documentElement.dataset.theme || 'dark';
+	theme.onchange = () => {
+		document.documentElement.dataset.theme = theme.value;
+		localStorage.setItem( 'hoosha-theme', theme.value );
+	};
+
+	const density = h( 'select', { class: 'field' }, [
+		h( 'option', { value: 'comfy', text: 'راحت' } ),
+		h( 'option', { value: 'compact', text: 'فشرده' } ),
+	] );
+	density.value = localStorage.getItem( 'hoosha-density' ) || 'comfy';
+	density.onchange = () => {
+		document.documentElement.dataset.density = density.value;
+		localStorage.setItem( 'hoosha-density', density.value );
+	};
+
+	const size = h( 'input', { class: 'field', type: 'range', min: '13', max: '19', value: localStorage.getItem( 'hoosha-fontsize' ) || '15' } );
+	size.oninput = () => {
+		document.documentElement.style.setProperty( '--fs', `${ size.value }px` );
+		localStorage.setItem( 'hoosha-fontsize', size.value );
+	};
+
+	box.appendChild( h( 'div', { class: 'form-card' }, [ field( 'تم', theme ), field( 'تراکم', density ), field( 'اندازهٔ متن', size ) ] ) );
+}
+
+const RENDER = {
+	provider: renderProvider,
+	connectors: renderConnectors,
+	skills: renderSkills,
+	plugins: renderPlugins,
+	agents: renderAgents,
+	commands: renderCommands,
+	hooks: renderHooks,
+	permissions: renderPermissions,
+	memory: renderMemory,
+	tools: renderTools,
+	usage: renderUsage,
+	status: renderStatus,
+	appearance: renderAppearance,
+};

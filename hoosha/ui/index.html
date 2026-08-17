@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl" data-theme="light">
+<html lang="fa" dir="rtl" data-theme="dark" data-density="comfy">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -10,53 +10,62 @@
 
 <div class="app">
 
-	<!-- ───────────────────────────────────────────────── نوار کناری -->
+	<!-- ─────────────────────────────────────────────── نوار کناری -->
 	<aside class="sidebar" id="sidebar">
 		<div class="side-head">
 			<div class="brand">
 				<span class="mark"></span>
-				<span>هوشا</span>
+				<span class="brand-name">هوشا</span>
 			</div>
-			<button class="icon-btn" id="btn-theme" title="تغییر تم">◐</button>
+			<button class="icon-btn" id="btn-collapse" title="جمع‌کردن نوار کناری">⟨⟩</button>
 		</div>
 
 		<button class="new-session" id="btn-new">
-			<span class="plus">+</span> گفتگوی تازه
+			<span class="plus">+</span> <span>گفتگوی تازه</span>
 		</button>
 
-		<div class="side-scroll">
-			<div class="side-label">نشست‌ها</div>
-			<div id="session-list" class="session-list"></div>
-
-			<div class="side-label">فضای کار</div>
-			<button class="side-item mono" id="btn-workspace" title="تغییر پوشهٔ کاری">…</button>
-
-			<div class="side-label">افزونه‌ها</div>
-			<button class="side-item" data-panel="tools"><span class="si-ico">⚒</span> ابزارها <b id="c-tools"></b></button>
-			<button class="side-item" data-panel="skills"><span class="si-ico">◆</span> اسکیل‌ها <b id="c-skills"></b></button>
-			<button class="side-item" data-panel="mcp"><span class="si-ico">⇄</span> MCP <b id="c-mcp"></b></button>
-			<button class="side-item" data-panel="plugins"><span class="si-ico">▣</span> پلاگین‌ها <b id="c-plugins"></b></button>
-			<button class="side-item" data-panel="commands"><span class="si-ico">/</span> دستورها <b id="c-commands"></b></button>
+		<div class="side-search">
+			<input id="session-search" type="search" placeholder="جستجوی گفتگو…  (Ctrl+K)" />
 		</div>
 
-		<button class="side-item settings-btn" id="btn-settings">
-			<span class="si-ico">⚙</span> <span id="chip-provider">تنظیمات</span>
-		</button>
+		<div class="side-scroll">
+			<div id="session-list" class="session-list"></div>
+		</div>
+
+		<div class="side-foot">
+			<button class="side-item" id="btn-workspace" title="تغییر پوشهٔ کاری">
+				<span class="si-ico">▤</span>
+				<span class="grow-txt" id="chip-workspace">…</span>
+			</button>
+			<button class="side-item" id="btn-settings" title="تنظیمات (Ctrl+,)">
+				<span class="si-ico">⚙</span>
+				<span class="grow-txt" id="chip-provider">تنظیمات</span>
+			</button>
+		</div>
 	</aside>
 
-	<!-- ───────────────────────────────────────────────── ناحیهٔ اصلی -->
+	<!-- ─────────────────────────────────────────────── ناحیهٔ اصلی -->
 	<main class="main">
 		<header class="topbar">
 			<button class="icon-btn only-narrow" id="btn-menu" title="منو">☰</button>
 			<div class="title" id="session-title">گفتگوی تازه</div>
+
 			<div class="top-right">
-				<span class="meter" id="context-meter" title="مصرف کانتکست"></span>
-				<span class="badge" id="badge-mode">عادی</span>
+				<span class="badge" id="badge-mode" data-mode="default">◈ عادی</span>
+				<span class="meter" id="context-meter" title="مصرف کانتکست">
+					<span class="meter-fill" id="meter-fill"></span>
+					<span class="meter-text" id="meter-text">۰٪</span>
+				</span>
+				<span class="cost" id="cost-chip" title="هزینهٔ تخمینی این نشست"></span>
+				<button class="icon-btn" id="btn-export" title="خروجی گفتگو">⤓</button>
+				<button class="icon-btn" id="btn-help" title="میان‌برها">?</button>
+				<button class="icon-btn" id="btn-rail" title="پنل کناری (Ctrl+B)">▥</button>
 			</div>
 		</header>
 
 		<div class="thread" id="chat">
 			<div class="welcome" id="welcome">
+				<div class="welcome-mark"></div>
 				<h1>هوشا</h1>
 				<p>یک دستیار عامل که روی دستگاه خودت اجرا می‌شود، ابزار واقعی دارد و با هر پرووایدری کار می‌کند.</p>
 				<div class="starter" id="starter"></div>
@@ -64,100 +73,49 @@
 		</div>
 
 		<div class="composer-shell">
+			<div id="queue" class="queue" hidden></div>
 			<div id="cmd-menu" class="cmd-menu" hidden></div>
 
 			<form id="composer" class="composer">
-				<textarea id="input" rows="1" placeholder="چه کاری انجام بدهم؟"></textarea>
+				<textarea id="input" rows="1" placeholder="چه کاری انجام بدهم؟  «@» برای فایل، «/» برای دستور"></textarea>
 
 				<div class="composer-bar">
 					<div class="composer-left">
-						<select id="mode" class="pill" title="حالت کار">
-							<option value="plan">◇ پلن — فقط بررسی</option>
-							<option value="default">◈ عادی — تأیید بگیر</option>
-							<option value="auto">◆ خودکار — بدون تأیید</option>
-						</select>
+						<button type="button" class="pill mode-pill" id="pill-mode" data-mode="default" title="حالت کار (Shift+Tab)">◈ عادی</button>
 						<button type="button" class="pill" id="pill-model" title="مدل">—</button>
 					</div>
 					<div class="composer-right">
-						<span class="hint">Enter ارسال · Shift+Enter خط جدید · / دستورها</span>
-						<button id="stop" type="button" class="circle stop" hidden title="توقف">■</button>
+						<span class="hint">Enter ارسال · Shift+Enter خط تازه · Shift+Tab حالت</span>
+						<button id="stop" type="button" class="circle stop" hidden title="توقف (Esc)">■</button>
 						<button id="send" type="submit" class="circle" title="ارسال">↑</button>
 					</div>
 				</div>
 			</form>
 		</div>
 	</main>
+
+	<!-- ─────────────────────────────────────────────── ریل کناری -->
+	<aside class="rail" id="rail">
+		<div class="rail-tabs">
+			<button class="rail-tab active" data-tab="todos">کارها <b class="rail-count"></b></button>
+			<button class="rail-tab" data-tab="shells">شل‌ها <b class="rail-count"></b></button>
+			<button class="rail-tab" data-tab="checkpoints">چک‌پوینت <b class="rail-count"></b></button>
+			<button class="rail-tab" data-tab="git">گیت <b class="rail-count"></b></button>
+		</div>
+		<div class="rail-body" id="rail-body"></div>
+	</aside>
 </div>
 
-<!-- ─────────────────────────────────────────────────────── تنظیمات -->
-<dialog id="settings" class="modal">
-	<div class="modal-body">
-		<h2>پرووایدر</h2>
-		<p class="note" id="home-note"></p>
-
-		<label>سرویس‌دهنده
-			<select id="f-provider"></select>
-		</label>
-		<p id="p-note" class="note"></p>
-
-		<label>آدرس پایه
-			<input id="f-baseurl" type="text" dir="ltr" placeholder="https://…" />
-		</label>
-
-		<label>کلید API <span id="key-state" class="key-state"></span>
-			<input id="f-apikey" type="password" dir="ltr" />
-		</label>
-
-		<label>مدل
-			<span class="row">
-				<input id="f-model" type="text" dir="ltr" placeholder="نام مدل" list="model-list" />
-				<button type="button" id="btn-fetch-models" class="pill">گرفتن فهرست</button>
-			</span>
-			<datalist id="model-list"></datalist>
-		</label>
-		<p id="models-note" class="note"></p>
-
-		<div class="modal-actions">
-			<button type="button" id="btn-test" class="pill">تست اتصال</button>
-			<span class="grow"></span>
-			<button type="button" id="settings-cancel" class="pill">انصراف</button>
-			<button type="button" id="settings-save" class="pill primary">ذخیره</button>
-		</div>
-		<p id="test-note" class="note"></p>
-	</div>
-</dialog>
-
-<!-- ────────────────────────────────────────────────── پنل افزونه‌ها -->
-<dialog id="panel" class="modal wide">
-	<div class="modal-body">
-		<div class="panel-head">
-			<h2 id="panel-title">ابزارها</h2>
-			<div class="tabs">
-				<button class="tab" data-tab="tools">ابزارها</button>
-				<button class="tab" data-tab="skills">اسکیل‌ها</button>
-				<button class="tab" data-tab="mcp">MCP</button>
-				<button class="tab" data-tab="plugins">پلاگین‌ها</button>
-				<button class="tab" data-tab="commands">دستورها</button>
+<!-- ───────────────────────────────────────────────────── تنظیمات -->
+<dialog id="settings" class="modal settings-modal">
+	<div class="settings-shell">
+		<nav class="settings-nav" id="settings-nav"></nav>
+		<div class="settings-main">
+			<div class="settings-top">
+				<h2>تنظیمات</h2>
+				<button class="icon-btn" id="settings-close" title="بستن">×</button>
 			</div>
-		</div>
-
-		<div id="tab-tools" class="tab-body"></div>
-		<div id="tab-skills" class="tab-body" hidden></div>
-		<div id="tab-mcp" class="tab-body" hidden></div>
-		<div id="tab-plugins" class="tab-body" hidden>
-			<div class="row install-row">
-				<input id="plugin-source" type="text" dir="ltr" placeholder="owner/repo یا مسیر محلی" />
-				<button type="button" id="btn-install-plugin" class="pill primary">نصب</button>
-			</div>
-			<p id="plugin-note" class="note"></p>
-			<div id="plugin-list"></div>
-		</div>
-		<div id="tab-commands" class="tab-body" hidden></div>
-
-		<div class="modal-actions">
-			<button type="button" id="btn-reload" class="pill">بارگذاری دوباره</button>
-			<span class="grow"></span>
-			<button type="button" id="panel-close" class="pill">بستن</button>
+			<div class="settings-content" id="settings-content"></div>
 		</div>
 	</div>
 </dialog>

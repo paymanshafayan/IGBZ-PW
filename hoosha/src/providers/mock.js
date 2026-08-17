@@ -62,6 +62,59 @@ export function createMockProvider( _cfg ) {
 				const rest = text.replace( /^(write|بنویس)\s*/i, '' ).trim();
 				const [ path, ...body ] = rest.split( / +/ );
 				call = { name: 'write_file', input: { path: path || 'hoosha-test.txt', content: body.join( ' ' ) || 'سلام از هوشا' } };
+			} else if ( /^(plan|نقشه)(?:\s|$)/i.test( text ) ) {
+				const subject = text.replace( /^(plan|نقشه)\s*/i, '' ).trim() || 'کار خواسته‌شده';
+				call = {
+					name: 'exit_plan_mode',
+					input: {
+						plan: [
+							`## نقشهٔ کار برای ${ subject }`,
+							'',
+							'1. فایل‌های مرتبط را می‌خوانم.',
+							'2. تغییر را در یک فایل می‌زنم.',
+							'3. تست را اجرا می‌کنم و نتیجه را گزارش می‌دهم.',
+						].join( '\n' ),
+					},
+				};
+			} else if ( /^(ask|بپرس)(?:\s|$)/i.test( text ) ) {
+				call = {
+					name: 'ask_user_question',
+					input: {
+						question: text.replace( /^(ask|بپرس)\s*/i, '' ).trim() || 'کدام راه را برویم؟',
+						options: [
+							{ label: 'راه سریع', description: 'کمتر تمیز، سریع‌تر' },
+							{ label: 'راه تمیز', description: 'بیشتر طول می‌کشد ولی بدهی فنی نمی‌سازد' },
+						],
+						allow_other: true,
+					},
+				};
+			} else if ( /^(bg|پس‌زمینه|پس زمینه)(?:\s|$)/i.test( text ) ) {
+				call = {
+					name: 'bash',
+					input: { command: text.replace( /^(bg|پس‌زمینه|پس زمینه)\s*/i, '' ).trim() || 'sleep 30', background: true },
+				};
+			} else if ( /^(todo|کارها)(?:\s|$)/i.test( text ) ) {
+				const items = text
+					.replace( /^(todo|کارها)\s*/i, '' )
+					.split( /[،,]/ )
+					.map( ( s ) => s.trim() )
+					.filter( Boolean );
+				const list = items.length ? items : [ 'خواندن کد', 'زدن تغییر', 'اجرای تست' ];
+				call = {
+					name: 'todo_write',
+					input: {
+						todos: list.map( ( content, i ) => ( {
+							content,
+							status: i === 0 ? 'in_progress' : 'pending',
+						} ) ),
+					},
+				};
+			} else if ( /^(replace|جایگزین)(?:\s|$)/i.test( text ) ) {
+				const [ , file, from, to ] = text.split( / +/ );
+				call = {
+					name: 'multi_edit',
+					input: { path: file, edits: [ { old_string: from, new_string: to, replace_all: true } ] },
+				};
 			}
 
 			if ( ! call ) {
@@ -72,7 +125,12 @@ export function createMockProvider( _cfg ) {
 					'• `بخوان package.json` — خواندن فایل\n' +
 					'• `جستجو hoosha` — جستجوی متن\n' +
 					'• `!echo سلام` — اجرای فرمان (دروازهٔ تأیید را نشان می‌دهد)\n' +
-					'• `بنویس note.txt متن` — نوشتن فایل (این هم تأیید می‌خواهد)\n\n' +
+					'• `بنویس note.txt متن` — نوشتن فایل (این هم تأیید می‌خواهد)\n' +
+					'• `نقشه بازطراحی صفحهٔ سبد` — کارت تأیید نقشه\n' +
+					'• `بپرس کدام راه؟` — کارت پرسش چندگزینه‌ای\n' +
+					'• `کارها خواندن، نوشتن، تست` — فهرست کار زنده\n' +
+					'• `پس‌زمینه sleep 60` — شل پس‌زمینه\n' +
+					'• `جایگزین note.txt قدیم جدید` — ویرایش چندگانه با دیف\n\n' +
 					'برای کار واقعی، از تنظیمات یک پرووایدر واقعی انتخاب کن.';
 				for ( const piece of chunk( reply ) ) {
 					yield { type: 'text', text: piece };

@@ -91,6 +91,18 @@ export function describeCall( toolName, input ) {
 			return `نوشتن در ${ input?.path } (${ String( input?.content ?? '' ).length } نویسه)`;
 		case 'edit_file':
 			return `ویرایش ${ input?.path }`;
+		case 'multi_edit':
+			return `${ ( input?.edits || [] ).length } ویرایش روی ${ input?.path }`;
+		case 'bash_output':
+			return `خواندن خروجی شل ${ input?.shell_id }`;
+		case 'kill_shell':
+			return `توقف شل ${ input?.shell_id }`;
+		case 'web_search':
+			return `جستجوی وب: ${ input?.query || '' }`;
+		case 'exit_plan_mode':
+			return 'ارائهٔ نقشهٔ کار برای تأیید';
+		case 'ask_user_question':
+			return input?.question || 'پرسش از کاربر';
 		case 'read_file':
 			return `خواندن ${ input?.path }`;
 		case 'list_dir':

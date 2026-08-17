@@ -77,20 +77,88 @@ export async function collectCommands( { home, workspace, pluginDirs = [] } ) {
 
 /** فهرست دستورهای داخلی — برای راهنما و تکمیل خودکار در رابط کاربری. */
 export const BUILTIN_COMMANDS = [
-	{ name: 'help', description: 'فهرست دستورها' },
+	{ name: 'help', description: 'فهرست دستورها و میان‌برها' },
 	{ name: 'clear', description: 'پاک‌کردن گفتگو و شروع تازه' },
 	{ name: 'compact', description: 'فشرده‌کردن گفتگوی طولانی در یک خلاصه' },
 	{ name: 'mode', description: 'تغییر حالت: plan | default | auto' },
 	{ name: 'model', description: 'نمایش یا تغییر مدل' },
+	{ name: 'config', description: 'باز کردن تنظیمات' },
+	{ name: 'provider', description: 'تنظیم پرووایدر، کلید و مدل' },
+	{ name: 'connectors', description: 'کانکتورها (سرورهای MCP): افزودن، آزمودن، حذف' },
+	{ name: 'mcp', description: 'وضعیت کانکتورهای MCP' },
 	{ name: 'tools', description: 'فهرست ابزارهای در دسترس' },
-	{ name: 'skills', description: 'فهرست اسکیل‌های نصب‌شده' },
-	{ name: 'mcp', description: 'وضعیت سرورهای MCP' },
+	{ name: 'skills', description: 'نصب و مدیریت اسکیل‌ها' },
+	{ name: 'agents', description: 'ساخت و مدیریت زیرعامل‌ها' },
 	{ name: 'plugin', description: 'مدیریت پلاگین‌ها: list | install <src> | remove <name>' },
-	{ name: 'permissions', description: 'نمایش قواعد مجوز' },
-	{ name: 'cost', description: 'مصرف توکن این نشست' },
+	{ name: 'hooks', description: 'ویرایش هوک‌ها' },
+	{ name: 'memory', description: 'ویرایش HOOSHA.md (حافظهٔ پروژه)' },
+	{ name: 'init', description: 'ساخت HOOSHA.md برای این پروژه' },
+	{ name: 'permissions', description: 'ویرایش قواعد مجوز' },
+	{ name: 'usage', description: 'مصرف توکن و هزینه' },
+	{ name: 'cost', description: 'هزینهٔ این نشست' },
+	{ name: 'rewind', description: 'بازگشت به یک چک‌پوینت' },
+	{ name: 'bashes', description: 'شل‌های پس‌زمینه' },
+	{ name: 'todos', description: 'فهرست کارهای جاری' },
+	{ name: 'export', description: 'خروجی گفتگو: md | json' },
+	{ name: 'doctor', description: 'بررسی سلامت نصب' },
+	{ name: 'status', description: 'وضعیت کلی' },
 	{ name: 'workspace', description: 'نمایش یا تغییر پوشهٔ کاری' },
-	{ name: 'sessions', description: 'فهرست نشست‌های ذخیره‌شده' },
+	{ name: 'sessions', description: 'نشست‌های ذخیره‌شده' },
+	{ name: 'resume', description: 'ادامهٔ یک نشست قبلی' },
 ];
+
+/**
+ * نوشتن یک دستور کاربر از داخل رابط کاربری.
+ *
+ * @param {{home:string, workspace:string}} roots
+ * @param {{name:string, description?:string, body:string, scope?:'user'|'project'}} def
+ */
+export async function saveCommand( roots, def ) {
+	const name = String( def.name || '' ).trim().replace( /^\//, '' );
+	if ( ! /^[\w-]{1,60}$/.test( name ) ) {
+		throw new Error( 'نام دستور فقط حرف انگلیسی، رقم، خط تیره و زیرخط باشد.' );
+	}
+	const base =
+		def.scope === 'project' ? path.join( roots.workspace, '.hoosha', 'commands' ) : path.join( roots.home, 'commands' );
+	await fs.mkdir( base, { recursive: true } );
+
+	const front = [
+		'---',
+		`name: ${ name }`,
+		`description: ${ String( def.description || '' ).replace( /\n/g, ' ' ) }`,
+		'---',
+		'',
+	].join( '\n' );
+
+	const file = path.join( base, `${ name }.md` );
+	await fs.writeFile( file, front + String( def.body || '' ).trim() + '\n', 'utf8' );
+	return { name, file };
+}
+
+/**
+ * @param {{home:string, workspace:string}} roots
+ * @param {string} name
+ */
+export async function removeCommand( roots, name ) {
+	const safe = String( name ).replace( /[^\w-]/g, '' );
+	let removed = false;
+	for ( const base of [ path.join( roots.home, 'commands' ), path.join( roots.workspace, '.hoosha', 'commands' ) ] ) {
+		const file = path.join( base, `${ safe }.md` );
+		const exists = await fs
+			.stat( file )
+			.then( () => true )
+			.catch( () => false );
+		if ( ! exists ) {
+			continue;
+		}
+		await fs.rm( file, { force: true } );
+		removed = true;
+	}
+	if ( ! removed ) {
+		throw new Error( 'دستور پیدا نشد.' );
+	}
+	return { ok: true };
+}
 
 /**
  * تبدیل ورودی کاربر به یک «قصد».

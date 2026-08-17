@@ -15,38 +15,58 @@ const LIFECYCLE = new Set( [ 'idle', 'user', 'assistant_start', 'assistant_end' 
 /**
  * ابزار `task` — اجرای یک زیرعامل.
  *
+ * زیرعامل می‌تواند «نوع» داشته باشد: یکی از عامل‌هایی که کاربر در `~/.hoosha/agents/*.md`
+ * تعریف کرده. آن وقت پرامپت سیستمی و مدل و ابزارهای مجاز از همان تعریف می‌آید.
+ *
  * @param {{
- *   makeAgent: (opts:{systemPrompt:string, maxSteps:number, emit:(ev:any)=>void}) => any,
+ *   makeAgent: (opts:{systemPrompt:string, maxSteps:number, emit:(ev:any)=>void, model?:string, allowedTools?:string[]}) => any,
  *   emit: (ev:any) => void,
+ *   getAgents?: () => import('./agents.js').AgentDef[],
  * }} deps
  */
 export function makeTaskTool( deps ) {
+	const defs = () => ( deps.getAgents ? deps.getAgents() : [] );
+	const known = defs()
+		.map( ( a ) => `${ a.name }: ${ a.description }` )
+		.join( ' · ' );
+
 	return {
 		risk: /** @type {const} */ ( 'read' ),
 		spec: {
 			name: 'task',
 			description:
-				'اجرای یک کار جداگانه توسط یک زیرعامل با کانتکست تازه. برای کاوش‌های طولانی که فقط جوابِ کوتاهش لازم است. زیرعامل همان ابزارها را دارد و همان قواعد مجوز رویش اعمال می‌شود.',
+				'اجرای یک کار جداگانه توسط یک زیرعامل با کانتکست تازه. برای کاوش‌های طولانی که فقط جوابِ کوتاهش لازم است. زیرعامل همان ابزارها را دارد و همان قواعد مجوز رویش اعمال می‌شود.' +
+				( known ? ` عامل‌های تعریف‌شده: ${ known }` : '' ),
 			parameters: {
 				type: 'object',
 				properties: {
 					description: { type: 'string', description: 'یک خط توضیح کار، برای نمایش به کاربر' },
 					prompt: { type: 'string', description: 'شرح کامل کار برای زیرعامل' },
+					subagent_type: { type: 'string', description: 'نام یکی از عامل‌های تعریف‌شده؛ اختیاری' },
 					max_steps: { type: 'integer', description: 'سقف گام؛ پیش‌فرض ۱۲' },
 				},
 				required: [ 'prompt' ],
 			},
 		},
 
-		/** @param {{description?:string, prompt:string, max_steps?:number}} input */
+		/** @param {{description?:string, prompt:string, subagent_type?:string, max_steps?:number}} input */
 		async run( input ) {
-			const label = input.description || input.prompt.slice( 0, 60 );
-			deps.emit( { type: 'subagent_start', label } );
+			const def = input.subagent_type ? defs().find( ( a ) => a.name === input.subagent_type ) : null;
+			if ( input.subagent_type && ! def ) {
+				const names = defs().map( ( a ) => a.name ).join( '، ' ) || '(هیچ عاملی تعریف نشده)';
+				throw new Error( `عاملی به نام «${ input.subagent_type }» تعریف نشده. عامل‌های موجود: ${ names }` );
+			}
+
+			const label = input.description || def?.name || input.prompt.slice( 0, 60 );
+			deps.emit( { type: 'subagent_start', label, agent: def?.name } );
 
 			const sub = deps.makeAgent( {
 				systemPrompt:
+					def?.prompt ||
 					'تو یک زیرعامل هستی. کار خواسته‌شده را انجام بده و در پایان **فقط نتیجه** را کوتاه و دقیق گزارش کن. ' +
-					'از پرسیدن سؤال بپرهیز؛ اگر چیزی مبهم بود، فرض معقول بگیر و فرضت را بنویس.',
+						'از پرسیدن سؤال بپرهیز؛ اگر چیزی مبهم بود، فرض معقول بگیر و فرضت را بنویس.',
+				model: def?.model,
+				allowedTools: def?.tools,
 				maxSteps: Math.min( input.max_steps || 12, 20 ),
 				emit: ( ev ) => {
 					// رویدادهای چرخهٔ عمرِ زیرعامل بیرون نمی‌روند. اگر `idle` زیرعامل پخش شود،
@@ -62,7 +82,7 @@ export function makeTaskTool( deps ) {
 			await sub.run( input.prompt );
 
 			const last = [ ...sub.messages ].reverse().find( ( m ) => m.role === 'assistant' && m.content?.trim() );
-			deps.emit( { type: 'subagent_end', label } );
+			deps.emit( { type: 'subagent_end', label, agent: def?.name } );
 
 			return last?.content?.trim() || '(زیرعامل خروجی متنی نداد)';
 		},
