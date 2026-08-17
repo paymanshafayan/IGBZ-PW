@@ -1554,18 +1554,22 @@ await test( 'پالت، رنگ‌های رسمی آنتروپیک است — ن�
 		assert.ok( css.includes( `${ token }:` ), `توکن ${ token } نیست` );
 	}
 
-	// شش رنگ رسمی. هر کدام نباشد یعنی از روی حدس رنگ گذاشته‌ام.
-	for ( const hex of [ '#faf9f5', '#141413', '#d97757', '#e8e6dc', '#b0aea5', '#6a9bcc' ] ) {
+	// خنثی‌های Claude عیناً سر جایشان‌اند.
+	for ( const hex of [ '#faf9f5', '#141413', '#e8e6dc', '#b0aea5' ] ) {
 		assert.ok( css.toLowerCase().includes( hex ), `رنگ رسمی ${ hex } در پالت نیست` );
 	}
 
 	const light = css.slice( css.indexOf( "html[data-theme='light']" ), css.indexOf( "html[data-theme='dark']" ) );
 	assert.match( light, /--background:\s*#faf9f5/, 'پس‌زمینهٔ روشن باید همان کرم رسمی باشد' );
+	assert.match( light, /--foreground:\s*#141413/ );
 
-	// درس نسخهٔ قبل: دکمهٔ اصلی در Claude مشکی است، نه نارنجی.
-	assert.match( light, /--primary:\s*#141413/, 'رنگ اصلی باید مشکی باشد نه نارنجی' );
-	assert.match( light, /--brand:\s*#d97757/, 'نارنجی باید متغیر جدا باشد و فقط برای نشان' );
-	assert.equal( /--primary:\s*#d97757/.test( css ), false, 'نارنجی نباید رنگ دکمه‌ها باشد' );
+	// ولی رنگ برند مالِ خودمان است: فیروزهٔ ایرانی، نه نارنجیِ آنتروپیک.
+	assert.match( light, /--primary:\s*#2f9e9b/, 'رنگ اصلی باید فیروزهٔ ایرانی باشد' );
+	assert.match( light, /--brand:\s*#2f9e9b/ );
+	assert.equal( /--primary:\s*#d97757/.test( css ), false, 'نارنجی نباید رنگ اصلی باشد' );
+
+	// و میکروفنِ در حال ضبط، همان فیروزه — نه قرمزِ Claude.
+	assert.match( cssBlock( '.round-btn.recording' ), /background:\s*var\(--primary\)/ );
 } );
 
 await test( 'رابط زنده است: ترنزیشن، سایه و حرکت دارد', () => {
@@ -1659,11 +1663,29 @@ await test( 'نشانگر «در حال کار» و منوی + در رابط ه�
 	assert.match( html, /class="disclaimer"/ );
 } );
 
-await test( 'پاسخ مدل بدون آواتار و با فونت سریف نمایش داده می‌شود', () => {
+await test( 'پیام کاربر حباب جمع است و پاسخ مدل متن ساده — از تصویر گفتگوی واقعی', () => {
 	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
 	assert.equal( /class="avatar"|'avatar'/.test( thread ), false, 'آواتار باید حذف شده باشد' );
-	assert.match( cssBlock( '.msg.assistant .body' ), /font-family:\s*var\(--serif\)/ );
-	assert.match( cssBlock( '.msg.user .body' ), /background:\s*linear-gradient/ );
+
+	// حباب کاربر به اندازهٔ محتوا و چسبیده به ابتدای سطر.
+	const user = cssBlock( '.msg.user .body' );
+	assert.match( user, /width:\s*fit-content/ );
+	assert.match( user, /max-width:\s*min\(75%/ );
+	assert.match( cssBlock( '.msg.user' ), /justify-content:\s*flex-end/ );
+
+	// و پاسخ، متن ساده است: نه حباب، نه قاب، نه سریف.
+	const bot = cssBlock( '.msg.assistant .body' );
+	assert.equal( /background:/.test( bot ), false, 'پاسخ مدل نباید پس‌زمینه داشته باشد' );
+	assert.equal( /font-family:/.test( bot ), false, 'در تصویر، متن پاسخ همان سنس رابط است' );
+} );
+
+await test( 'نوار کناریِ جمع‌شده ریل آیکونی می‌شود، نه هیچ', () => {
+	// در تصویر، بعد از جمع‌کردن همهٔ آیکون‌ها عمودی می‌مانند و آواتار هم ته آن است.
+	const rule = cssBlock( 'body.sidebar-collapsed .app' );
+	assert.match( rule, /grid-template-columns:\s*var\(--rail-w\)/ );
+	assert.match( css, /--rail-w:\s*\d+px/ );
+	assert.equal( /grid-template-columns:\s*0 minmax/.test( css ), false, 'نوار نباید کاملاً ناپدید شود' );
+	assert.match( css, /body\.sidebar-collapsed \.nav-item > span/, 'در حالت ریل فقط متن‌ها پنهان می‌شوند' );
 } );
 
 await test( 'ناوبری نوار کناری همان ترتیب Claude را دارد', () => {
@@ -3937,6 +3959,11 @@ await test( 'جستجوی ناوبری تنظیمات، فهرست را کم م�
 		const labels = all( '.set-item' ).map( ( x ) => x.textContent );
 		assert.ok( labels.length < 19 && labels.length > 0, `فیلتر کار نکرد: ${ labels.length }` );
 		assert.ok( labels.some( ( l ) => l.includes( 'مدل' ) ) );
+
+		// و بستن و بازکردن دوباره، فیلتر را پاک می‌کند — وگرنه دفعهٔ بعد نیمی از فهرست غیب است.
+		document.querySelector( '.nav-item[data-view="customize"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 150 ) );
+		assert.equal( all( '.set-item' ).length, 19, 'جستجوی دفعهٔ قبل نباید بماند' );
 	} finally {
 		dom.restore();
 	}
@@ -4026,7 +4053,7 @@ await test( 'اجزای فرم به سبک Claude درآمده‌اند: تخت�
 	assert.match( item, /border-radius:\s*0/ );
 } );
 
-await test( 'نشان هوشا سر جایش است: تیتر، آواتار، و آیکون‌ها', () => {
+await test( 'نشان هوشا سر جایش است و فیروزه‌ای است', () => {
 	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
 	assert.match( app, /class: 'greet-mark', html: logoSvg\( 34 \)/, 'نشان باید کنار تیتر خوش‌آمد باشد — همان‌جا که Claude ستاره‌اش را می‌گذارد' );
 
@@ -4038,10 +4065,73 @@ await test( 'نشان هوشا سر جایش است: تیتر، آواتار، �
 
 	// و رنگش روی نارنجی رسمی نشسته باشد.
 	const mark = fssync.readFileSync( path.join( uiDir, 'lib', 'mark.js' ), 'utf8' );
-	assert.match( mark, /from: '#e08a6b'/ );
-	assert.match( mark, /to: '#d0674a'/ );
+	assert.match( mark, /from: '#3ab3af'/, 'نشان باید فیروزه باشد' );
+	assert.match( mark, /to: '#26837f'/ );
+	assert.equal( /from: '#e0|from: '#d9/.test( mark ), false, 'رنگ نارنجی نباید در نشان بماند' );
 	for ( const f of [ 'icon-16.png', 'icon-32.png', 'icon-192.png', 'icon-512.png' ] ) {
 		assert.ok( fssync.existsSync( path.join( uiDir, 'assets', 'icons', f ) ), `آیکون ${ f } ساخته نشده` );
+	}
+} );
+
+await test( 'نوار بالای گفتگو دو حالت دارد: نام پروژه یا نام گفتگو', async () => {
+	const { dom, q } = await bootApp();
+	try {
+		// گفتگوی خالی → نام پروژه وسط، بدون «اشتراک»
+		assert.equal( q( '#plan-chip' ).hidden, false );
+		assert.equal( q( '#session-title' ).hidden, true );
+		assert.equal( q( '#btn-share' ).hidden, true );
+		assert.equal( q( '#plan-text' ).textContent, 'IGBZ-WP' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'با وجود گفتگو، نام گفتگو و دکمهٔ اشتراک می‌آیند', async () => {
+	const { dom, q } = await bootApp( {
+		transcript: [ { type: 'user', text: 'سلام' }, { type: 'assistant_end', text: 'سلام!' } ],
+		sessionTitle: 'سلام و احوالپرسی',
+	} );
+	try {
+		assert.equal( q( '#session-title' ).hidden, false, 'نام گفتگو باید بالای صفحه بیاید' );
+		assert.equal( q( '#session-title-text' ).textContent, 'سلام و احوالپرسی' );
+		assert.equal( q( '#btn-share' ).hidden, false );
+		assert.equal( q( '#plan-chip' ).hidden, true, 'نام پروژه باید جایش را بدهد' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'منوی «+» با ترتیب تصویر باز می‌شود', async () => {
+	const { dom, q, all } = await bootApp();
+	try {
+		q( '#btn-plus' ).click();
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+		assert.equal( q( '#plus-menu' ).hidden, false );
+		const labels = all( '.menu-item' ).map( ( x ) => x.textContent );
+		assert.match( labels[ 0 ], /افزودن فایل یا تصویر/, 'قلم اول باید افزودن فایل باشد' );
+		assert.match( labels[ 0 ], /Ctrl\+U/, 'میان‌بر باید نوشته شود' );
+		assert.ok( labels.some( ( l ) => l.includes( 'اسکیل‌ها' ) ) );
+		assert.ok( labels.some( ( l ) => l.includes( 'کانکتورها' ) ) );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'سربرگ تنظیمات برای هر تب دکمهٔ عمل خودش را دارد', async () => {
+	const { dom, q, all } = await bootApp();
+	try {
+		document.querySelector( '.nav-item[data-view="customize"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 150 ) );
+		// تب پیش‌فرضِ «سفارشی‌سازی» اسکیل‌هاست: باید «مرور» و «افزودن» داشته باشد.
+		const actions = all( '#set-head-actions button' ).map( ( x ) => x.textContent );
+		assert.deepEqual( actions, [ 'مرور', 'افزودن' ] );
+
+		// و تبی که عمل ندارد، سربرگش خالی می‌ماند.
+		all( '.set-item' ).find( ( x ) => x.textContent.includes( 'ظاهر' ) ).click();
+		await new Promise( ( r ) => setTimeout( r, 120 ) );
+		assert.equal( q( '#set-head-actions' ).children.length, 0 );
+	} finally {
+		dom.restore();
 	}
 } );
 

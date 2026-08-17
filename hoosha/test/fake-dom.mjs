@@ -162,7 +162,26 @@ class FakeNode {
 	}
 
 	querySelectorAll( sel ) {
-		return this.all().filter( ( n ) => matches( n, sel ) );
+		// پشتیبانی از سلکتور نسبی: «‎#a button» یعنی هر button که جایی زیر ‎#a باشد.
+		const parts = String( sel ).trim().split( /\s+/ );
+		const last = parts[ parts.length - 1 ];
+		const ancestors = parts.slice( 0, -1 );
+		return this.all().filter( ( n ) => {
+			if ( ! matches( n, last ) ) {
+				return false;
+			}
+			let node = n.parentNode;
+			for ( let i = ancestors.length - 1; i >= 0; i-- ) {
+				while ( node && ! matches( node, ancestors[ i ] ) ) {
+					node = node.parentNode;
+				}
+				if ( ! node ) {
+					return false;
+				}
+				node = node.parentNode;
+			}
+			return true;
+		} );
 	}
 
 	/**

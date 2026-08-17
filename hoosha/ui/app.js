@@ -384,9 +384,19 @@ subscribe( ( s ) => {
 	paintGitBar( s );
 	setMode( s.config.permissions?.mode || 'default' );
 
+	/*
+	 * نوار بالا دو حالت دارد، مثل تصویرها:
+	 *   گفتگوی خالی → نام پروژه، وسط‌چین (جای «Free plan · Upgrade»)
+	 *   گفتگوی واقعی → نام گفتگو با فلش در ابتدا، و «اشتراک» در انتها
+	 */
 	const ws = String( s.config.workspace || '' );
+	const inChat = ( s.transcript || [] ).length > 0 || ! $( '#welcome' );
 	$( '#plan-text' ).textContent = ws.split( /[\\/]/ ).filter( Boolean ).pop() || 'بدون پروژه';
 	$( '#plan-chip' ).title = ws;
+	$( '#plan-chip' ).hidden = inChat && view === 'chat';
+	$( '#session-title' ).hidden = ! ( inChat && view === 'chat' );
+	$( '#btn-share' ).hidden = ! ( inChat && view === 'chat' );
+	$( '#session-title-text' ).textContent = s.sessionTitle || 'گفتگوی تازه';
 
 	const p = s.config.profiles?.[ s.config.activeProfile ] || {};
 	$( '#model-name' ).textContent = s.hub?.active ? 'خودکار' : p.model || 'مدل تنظیم نشده';
@@ -618,6 +628,8 @@ $( '#btn-new' ).onclick = async () => {
 
 $( '#btn-back' ).onclick = () => showView( 'chat' );
 $( '#btn-search' ).onclick = () => openPalette( paletteDeps() );
+$( '#session-title' ).onclick = renameSession;
+$( '#btn-share' ).onclick = () => doExport( 'md' );
 
 $( '#btn-more' ).onclick = ( e ) => {
 	e.stopPropagation();

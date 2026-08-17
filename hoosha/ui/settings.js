@@ -66,6 +66,9 @@ export const SETTINGS_GROUPS = GROUPS;
  */
 export async function openSettingsModal( tab ) {
 	currentTab = tab && TABS.some( ( t ) => t.id === tab ) ? tab : currentTab;
+	// جستجوی دفعهٔ قبل نباید بماند؛ وگرنه کاربر تنظیمات را باز می‌کند و نیمی از فهرست
+	// غیب است بی‌آنکه بداند چرا.
+	navFilter = '';
 
 	const dlg = $( '#settings' );
 	if ( ! dlg.open ) {
@@ -113,9 +116,37 @@ function paintSettingsNav() {
 	}
 }
 
+/**
+ * دکمه‌های سربرگ هر تب.
+ *
+ * در تصاویر، کنار عنوانِ «Skills» دکمه‌های «Browse» و «Add ⌄» هستند و کنار «Connectors»
+ * فقط «Add ⌄». پس سربرگ ثابت نیست؛ به تب بستگی دارد.
+ */
+const HEAD_ACTIONS = {
+	skills: [ [ 'مرور', 'skills-browse' ], [ 'افزودن', 'skills-add' ] ],
+	connectors: [ [ 'افزودن', 'connectors-add' ] ],
+	plugins: [ [ 'مرور', 'plugins-browse' ], [ 'افزودن', 'plugins-add' ] ],
+	agents: [ [ 'افزودن', 'agents-add' ] ],
+	commands: [ [ 'افزودن', 'commands-add' ] ],
+};
+
+function paintHeadActions() {
+	const box = $( '#set-head-actions' );
+	box.replaceChildren(
+		...( HEAD_ACTIONS[ currentTab ] || [] ).map( ( [ label, action ] ) =>
+			h( 'button', {
+				class: 'pill',
+				text: label,
+				onClick: () => document.dispatchEvent( new CustomEvent( 'hoosha:set-action', { detail: action } ) ),
+			} )
+		)
+	);
+}
+
 async function paintSettingsBody() {
 	const body = $( '#set-body' );
 	$( '#set-title' ).textContent = TABS.find( ( t ) => t.id === currentTab )?.label || 'تنظیمات';
+	paintHeadActions();
 	body.replaceChildren( el( 'div', 'loading', 'در حال بارگذاری…' ) );
 	await refreshState();
 	body.replaceChildren();

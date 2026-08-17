@@ -108,11 +108,18 @@
 				<svg viewBox="0 0 20 20" width="16" height="16"><path d="M12 5l-5 5 5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
 			</button>
 
+			<!-- در گفتگو: نام گفتگو با فلش. در صفحهٔ خالی: نام پروژه، وسط‌چین. -->
+			<button class="chat-title" id="session-title" hidden>
+				<span id="session-title-text">گفتگوی تازه</span>
+				<svg viewBox="0 0 20 20" width="13" height="13"><path d="M6 8l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+			</button>
+
 			<button class="plan-chip" id="plan-chip" tabindex="-1">
 				<span id="plan-text">—</span>
 			</button>
 
 			<div class="top-right">
+				<button class="pill" id="btn-share" hidden title="خروجی گفتگو">اشتراک</button>
 				<span class="ctx-chip" id="context-meter" title="مصرف کانتکست"><span id="meter-text">۰٪</span></span>
 				<button class="round-ghost" id="btn-more" title="بیشتر">
 					<svg viewBox="0 0 20 20" width="16" height="16"><circle cx="5" cy="10" r="1.4" fill="currentColor"/><circle cx="10" cy="10" r="1.4" fill="currentColor"/><circle cx="15" cy="10" r="1.4" fill="currentColor"/></svg>

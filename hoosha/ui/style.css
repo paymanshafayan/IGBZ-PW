@@ -3,17 +3,20 @@
  *
  * پالت، رنگ‌های **رسمی** آنتروپیک است، نه حدس و نه سلیقهٔ من:
  *
- *   Crail Orange  #d97757   تنها جایی که رنگ دارد: خودِ نشان
+ *   فیروزهٔ ایرانی #2f9e9b   رنگ برند هوشا: نشان، دکمهٔ اصلی، و حالت‌های فعال
+ *   Crail Orange  #d97757   رنگ برند Claude — فقط به‌عنوان مرجع نگه داشته شده
  *   Dark          #141413   متن، و پس‌زمینهٔ دکمه‌های اصلی
  *   Light         #faf9f5   پس‌زمینهٔ صفحه
  *   Mid Gray      #b0aea5   عناصر ثانویه
  *   Light Gray    #e8e6dc   خط‌ها و سطح‌های ملایم
  *   Slate Blue    #6a9bcc   لهجهٔ دوم
  *
- * درس گران‌قیمت این دور: در نسخهٔ قبل نارنجی را رنگ **اصلی** کردم و دکمه‌ها نارنجی شدند.
- * در خود Claude دکمه‌های اصلی **مشکی**اند و تنها نارنجیِ صفحه، ستارهٔ لوگوست. حالا
- * `--primary` مشکی است و نارنجی یک متغیر جداست به نام `--brand` که فقط نشان از آن
- * استفاده می‌کند.
+ * خاکستری‌ها، پس‌زمینه‌ها، خط‌ها و متن **عیناً** پالت Claude است. تنها چیزی که عوض شده،
+ * رنگ برند است: نارنجیِ Crail مالِ آنتروپیک است، نه ما. جایش فیروزهٔ ایرانی نشسته — همان
+ * رنگی که در `mark.js` از روز اول برای نشان تعریف شده بود.
+ *
+ * جایی که در Claude قرمز است (میکروفن در حال ضبط) و جایی که آبی است (سوییچ‌ها)، در هوشا
+ * همین فیروزه است. یعنی رنگِ «الان این فعال است» در کل برنامه یکی است.
  */
 
 :root {
@@ -35,6 +38,8 @@
 	--mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, Menlo, monospace;
 
 	--sidebar-w: 272px;
+	/* عرض ریل وقتی نوار کناری جمع می‌شود — در Claude آیکون‌ها می‌مانند. */
+	--rail-w: 52px;
 	--col: 46rem;
 
 	--ease: cubic-bezier(0.22, 0.9, 0.32, 1);
@@ -64,18 +69,21 @@ html[data-theme='light'] {
 	--border: #e8e6dc;
 	--border-soft: #f0eee7;
 	--input: #e8e6dc;
-	--ring: #d97757;
+	--ring: #2f9e9b;
 
-	/* دکمهٔ اصلی: مشکی. همان چیزی که در «New chat» و «New project» می‌بینی. */
-	--primary: #141413;
-	--primary-hover: #2b2a27;
-	--primary-foreground: #faf9f5;
-	--primary-soft: rgba(20, 20, 19, 0.06);
-	--primary-line: rgba(20, 20, 19, 0.16);
+	/* رنگ اصلی: فیروزهٔ ایرانی. */
+	--primary: #2f9e9b;
+	--primary-hover: #268582;
+	--primary-foreground: #ffffff;
+	--primary-soft: rgba(47, 158, 155, 0.1);
+	--primary-line: rgba(47, 158, 155, 0.28);
 
-	/* نشان — تنها رنگ گرم صفحه. */
-	--brand: #d97757;
-	--brand-soft: rgba(217, 119, 87, 0.12);
+	/* نشان — همان فیروزه. */
+	--brand: #2f9e9b;
+	--brand-soft: rgba(47, 158, 155, 0.12);
+
+	/* نارنجی Crail فقط برای ارجاع می‌ماند؛ در رابط استفاده نمی‌شود. */
+	--claude-orange: #d97757;
 
 	--second: #6a9bcc;
 	--second-soft: rgba(106, 155, 204, 0.14);
@@ -96,7 +104,7 @@ html[data-theme='light'] {
 	--shadow-1: 0 1px 2px rgba(20, 20, 19, 0.05);
 	--shadow-2: 0 2px 10px rgba(20, 20, 19, 0.07);
 	--shadow-3: 0 16px 44px rgba(20, 20, 19, 0.12);
-	--glow: 0 0 0 3px rgba(217, 119, 87, 0.22);
+	--glow: 0 0 0 3px rgba(47, 158, 155, 0.25);
 }
 
 /* ─────────────────────────────────────────────────── تم تیرهٔ همان پالت */
@@ -123,16 +131,17 @@ html[data-theme='dark'] {
 	--border: #3e3e39;
 	--border-soft: #333330;
 	--input: #3e3e39;
-	--ring: #d97757;
+	--ring: #3fb5b1;
 
-	--primary: #faf9f5;
-	--primary-hover: #ffffff;
-	--primary-foreground: #141413;
-	--primary-soft: rgba(250, 249, 245, 0.08);
-	--primary-line: rgba(250, 249, 245, 0.2);
+	--primary: #3fb5b1;
+	--primary-hover: #4cc4c0;
+	--primary-foreground: #10201f;
+	--primary-soft: rgba(63, 181, 177, 0.14);
+	--primary-line: rgba(63, 181, 177, 0.32);
 
-	--brand: #d97757;
-	--brand-soft: rgba(217, 119, 87, 0.16);
+	--brand: #3fb5b1;
+	--brand-soft: rgba(63, 181, 177, 0.16);
+	--claude-orange: #d97757;
 
 	--second: #6a9bcc;
 	--second-soft: rgba(106, 155, 204, 0.16);
@@ -153,7 +162,7 @@ html[data-theme='dark'] {
 	--shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
 	--shadow-2: 0 4px 14px rgba(0, 0, 0, 0.35);
 	--shadow-3: 0 16px 44px rgba(0, 0, 0, 0.5);
-	--glow: 0 0 0 3px rgba(217, 119, 87, 0.3);
+	--glow: 0 0 0 3px rgba(63, 181, 177, 0.3);
 }
 
 /*
@@ -242,8 +251,49 @@ textarea {
 	overflow: hidden;
 	transition: grid-template-columns 0.22s var(--ease);
 }
+/*
+ * نوار جمع‌شده **ناپدید نمی‌شود**؛ به یک ریل آیکونی باریک تبدیل می‌شود.
+ *
+ * در تصویر، Claude بعد از جمع‌کردن هنوز همهٔ آیکون‌های ناوبری را عمودی نگه می‌دارد و
+ * ته آن هم آواتار را. نسخهٔ قبلی ما عرض را صفر می‌کرد و کاربر یک‌باره هیچ منویی نداشت.
+ */
 body.sidebar-collapsed .app {
-	grid-template-columns: 0 minmax(0, 1fr);
+	grid-template-columns: var(--rail-w) minmax(0, 1fr);
+}
+body.sidebar-collapsed .sidebar {
+	padding: 12px 6px 10px;
+	align-items: center;
+}
+body.sidebar-collapsed .wordmark,
+body.sidebar-collapsed .side-label,
+body.sidebar-collapsed .side-scroll,
+body.sidebar-collapsed .acc-lines,
+body.sidebar-collapsed .nav-item > span,
+body.sidebar-collapsed .new-chat > span:not(.nc-plus),
+body.sidebar-collapsed #btn-search {
+	display: none;
+}
+body.sidebar-collapsed .side-top {
+	justify-content: center;
+	padding: 2px 0 10px;
+}
+body.sidebar-collapsed .nav-item,
+body.sidebar-collapsed .new-chat,
+body.sidebar-collapsed .account-main {
+	justify-content: center;
+	padding-inline: 0;
+	width: 36px;
+	margin-inline: auto;
+}
+body.sidebar-collapsed .nav-badge {
+	position: absolute;
+	top: 1px;
+	inset-inline-end: -2px;
+	margin: 0;
+}
+body.sidebar-collapsed .account-menu {
+	inset-inline-start: 8px;
+	width: 240px;
 }
 
 /* ══════════════════════════════════════════════════════ نوار کناری */
@@ -698,18 +748,28 @@ body.sidebar-collapsed .app {
 .msg .body {
 	overflow-wrap: anywhere;
 }
+/*
+ * پیام کاربر یک حباب است که **به اندازهٔ محتوایش** است و به ابتدای سطر می‌چسبد؛
+ * پاسخ دستیار متن ساده و تمام‌عرض است، بدون حباب و بدون قاب. این را از تصویر یک
+ * گفتگوی واقعی برداشتم — تا قبل از آن نداشتمش و حدس نزدم.
+ */
+.msg.user {
+	display: flex;
+	justify-content: flex-end;
+}
 .msg.user .body {
-	background: linear-gradient(135deg, var(--muted), var(--accent));
-	border: 1px solid var(--border-soft);
+	background: var(--muted);
+	border: 0;
 	border-radius: var(--radius-lg);
-	padding: 12px 16px;
+	padding: 11px 17px;
 	white-space: pre-wrap;
 	font-size: 0.97rem;
+	max-width: min(75%, 34rem);
+	width: fit-content;
 }
 .msg.assistant .body {
-	font-family: var(--serif);
-	font-size: 1.06rem;
-	line-height: 1.85;
+	font-size: 1rem;
+	line-height: 1.9;
 }
 .msg.system .body {
 	color: var(--muted-foreground);
@@ -1329,9 +1389,16 @@ code .f {
 }
 
 
+/*
+ * میکروفن در حال ضبط.
+ *
+ * در Claude این دکمه قرمزِ توپر می‌شود. رنگِ «الان فعال است» در هوشا فیروزه است، پس
+ * همان شکل با همان وزن، ولی فیروزه — خواستهٔ صریح کارفرما.
+ */
 .round-btn.recording {
-	color: var(--destructive);
-	background: var(--destructive-soft);
+	color: var(--primary-foreground);
+	background: var(--primary);
+	border-color: var(--primary);
 	animation: pulse-mic 1.2s ease-in-out infinite;
 }
 @keyframes pulse-mic {
@@ -3575,4 +3642,60 @@ html[dir='ltr'] .switch input:checked + i::after {
 	font-size: 1.05rem;
 	font-weight: 600;
 	margin: 0 0 4px;
+}
+
+/* نوار بالای گفتگو: نام گفتگو با فلش در ابتدا، «اشتراک» در انتها — از تصویر گفتگو. */
+.topbar .chat-title {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: transparent;
+	border: 0;
+	color: var(--foreground);
+	font-size: 0.92rem;
+	font-weight: 500;
+	padding: 6px 10px;
+	border-radius: var(--radius-sm);
+	cursor: pointer;
+	max-width: 40%;
+	min-width: 0;
+	transition: background 0.15s var(--ease);
+}
+.topbar .chat-title:hover {
+	background: var(--accent);
+}
+.topbar .chat-title span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.topbar .top-right {
+	margin-inline-start: auto;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.set-head-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: none;
+}
+
+/*
+ * کارت تودرتو داخل تنظیمات.
+ *
+ * در تصویر «Capabilities»، تنظیم «Allow network egress» داخل یک کادر با پس‌زمینهٔ کمی
+ * متفاوت نشسته — چون زیرمجموعهٔ تنظیم بالای خودش است و ریسک دارد.
+ */
+.set-box {
+	background: var(--sidebar);
+	border: 1px solid var(--border);
+	border-radius: var(--radius);
+	padding: 4px 16px;
+	margin: 14px 0 4px;
+}
+.set-box .set-row {
+	border-bottom: 0;
 }

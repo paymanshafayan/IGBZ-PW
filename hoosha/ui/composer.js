@@ -329,16 +329,22 @@ function togglePlusMenu() {
 		openView( view );
 	};
 
+	// ترتیب و گروه‌بندی از روی تصویر منوی «+» در Claude است؛ چهار قلم اول همان‌هاست.
 	box.replaceChildren(
-		menuItem( '🖼', 'افزودن تصویر', 'یا فقط بچسبان', () => {
+		menuItem( '⎙', 'افزودن فایل یا تصویر', 'Ctrl+U — یا فقط بچسبان', () => {
 			close();
 			$( '#file-input' ).click();
 		} ),
-		menuItem( '@', 'اشاره به فایل', 'جستجوی فازی در پروژه', () => {
+		menuItem( '@', 'اشاره به فایل پروژه', 'جستجوی فازی', () => {
 			close();
 			insertAtCursor( '@' );
 			refreshMenu();
 		} ),
+		menuItem( '▤', 'پروژه', shortPath( s?.config?.workspace ), go( 'workspace' ) ),
+		menuItem( '◆', 'اسکیل‌ها', `${ ( s?.skills || [] ).length } نصب‌شده`, go( 'skills' ) ),
+		menuItem( '⇄', 'کانکتورها', `${ ( s?.connectors || [] ).length } تعریف‌شده`, go( 'connectors' ) ),
+		menuItem( '⚒', 'ابزارها', `${ ( s?.tools || [] ).length } در دسترس`, go( 'tools' ) ),
+		menuItem( '⌗', 'زیرعامل‌ها', `${ ( s?.agents || [] ).length } تعریف‌شده`, go( 'agents' ) ),
 		h( 'div', { class: 'menu-sep' } ),
 		h( 'div', { class: 'menu-label', text: 'حالت کار' } ),
 		...MODES.map( ( m ) =>
@@ -355,12 +361,6 @@ function togglePlusMenu() {
 			)
 		),
 		h( 'div', { class: 'menu-sep' } ),
-		menuItem( '⇄', 'کانکتورها', `${ ( s?.connectors || [] ).length } تعریف‌شده`, go( 'connectors' ) ),
-		menuItem( '◆', 'اسکیل‌ها', `${ ( s?.skills || [] ).length } نصب‌شده`, go( 'skills' ) ),
-		menuItem( '⚒', 'ابزارها', `${ ( s?.tools || [] ).length } در دسترس`, go( 'tools' ) ),
-		menuItem( '⌗', 'زیرعامل‌ها', `${ ( s?.agents || [] ).length } تعریف‌شده`, go( 'agents' ) ),
-		h( 'div', { class: 'menu-sep' } ),
-		menuItem( '▤', 'پوشهٔ کاری', shortPath( s?.config?.workspace ), go( 'workspace' ) ),
 		menuItem( '↶', 'بازگشت به چک‌پوینت', `${ ( s?.checkpoints || [] ).length } نقطه`, () => {
 			close();
 			document.dispatchEvent( new CustomEvent( 'hoosha:rewind' ) );
