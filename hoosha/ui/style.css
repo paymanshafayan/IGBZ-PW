@@ -1979,3 +1979,13 @@ body.offline .topbar::after {
 .banner.danger b {
 	color: var(--err);
 }
+
+.brand-version {
+	font-family: var(--mono);
+	font-size: 0.66em;
+	color: var(--fg-mute);
+	border: 1px solid var(--line);
+	border-radius: 20px;
+	padding: 0 6px;
+	line-height: 1.7;
+}

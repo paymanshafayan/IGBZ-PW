@@ -48,6 +48,11 @@ initSettings();
 // ───────────────────────────────────────────────────────────────── وضعیت
 
 subscribe( ( s ) => {
+	// نسخه همیشه روی صفحه باشد. وقتی کسی می‌گوید «همان نسخهٔ قبلی است»، این تنها راهی است
+	// که در یک نگاه معلوم شود واقعاً کدام کد در حال اجراست.
+	$( '#brand-version' ).textContent = `v${ s.version }`;
+	document.title = `هوشا ${ s.version }`;
+
 	paintSidebarState( s );
 	paintRail( s );
 	setMode( s.config.permissions?.mode || 'default' );
