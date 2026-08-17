@@ -48,6 +48,9 @@ export function initSettings() {
 /** @param {string} [tab] */
 export async function openSettings( tab ) {
 	currentTab = tab || currentTab;
+	if ( ! dialog ) {
+		initSettings();
+	}
 	if ( ! dialog.open ) {
 		dialog.showModal();
 	}
@@ -1243,6 +1246,27 @@ async function renderAppearance( box ) {
 	};
 
 	box.appendChild( h( 'div', { class: 'form-card' }, [ field( 'تم', theme ), field( 'تراکم', density ), field( 'اندازهٔ متن', size ) ] ) );
+}
+
+/**
+ * رندر یک بخش از تنظیمات، داخل هر ظرفی که بدهی.
+ *
+ * دلیل وجودش: کارفرما درست می‌گفت که «برای هر چیزی باید تنظیمات را باز کنی» ایراد است.
+ * حالا همین بخش‌ها از نوار کناری، مستقیم در ناحیهٔ اصلی باز می‌شوند — بدون دیالوگ.
+ *
+ * @param {string} tab
+ * @param {HTMLElement} box
+ */
+export async function renderSection( tab, box ) {
+	const fn = RENDER[ tab ];
+	if ( ! fn ) {
+		box.replaceChildren( el( 'div', 'empty', `بخش ناشناخته: ${ tab }` ) );
+		return;
+	}
+	box.replaceChildren( el( 'div', 'loading', 'در حال بارگذاری…' ) );
+	await refreshState();
+	box.replaceChildren();
+	await fn( box );
 }
 
 const RENDER = {

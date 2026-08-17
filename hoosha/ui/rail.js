@@ -23,13 +23,6 @@ export function initRail( opts ) {
 		};
 	}
 
-	$( '#btn-rail' ).onclick = () => {
-		document.body.classList.toggle( 'rail-open' );
-		localStorage.setItem( 'hoosha-rail', document.body.classList.contains( 'rail-open' ) ? '1' : '' );
-	};
-	if ( localStorage.getItem( 'hoosha-rail' ) ) {
-		document.body.classList.add( 'rail-open' );
-	}
 }
 
 /** @param {any} s */

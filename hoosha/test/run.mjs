@@ -9,6 +9,7 @@
 
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
+import fssync from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
@@ -1505,6 +1506,109 @@ await test( 'موتور جعلی: فرمان واقعاً از راه docker م�
 	} finally {
 		process.env.PATH = realPath;
 		await fs.rm( bin, { recursive: true, force: true } );
+	}
+} );
+
+
+
+// --------------------------------------------------------- رابط کاربری
+
+section( 'رابط کاربری' );
+
+const uiDir = path.resolve( 'ui' );
+const css = await fs.readFile( path.join( uiDir, 'style.css' ), 'utf8' );
+const html = await fs.readFile( path.join( uiDir, 'index.html' ), 'utf8' );
+
+/** یک بلوک CSS را از روی سلکتور بیرون می‌کشد. */
+function cssBlock( selector ) {
+	const i = css.indexOf( `\n${ selector } {` );
+	if ( i === -1 ) {
+		throw new Error( `سلکتور «${ selector }» در style.css نیست` );
+	}
+	return css.slice( i, css.indexOf( '}', i ) );
+}
+
+await test( 'ستون گفتگو می‌تواند اسکرول بخورد (min-height صفر روی ظرف و ناحیهٔ پیام‌ها)', () => {
+	// این باگ واقعی بود: بدون min-height:0 روی آیتمِ فلکس، ناحیهٔ گفتگو به‌جای اسکرول
+	// بزرگ می‌شود، کامپوزر از صفحه بیرون می‌رود و پیام‌های قبلی ناپدید می‌شوند.
+	const main = cssBlock( '.main' );
+	assert.match( main, /min-height:\s*0/, '.main باید min-height صفر داشته باشد' );
+	assert.match( main, /overflow:\s*hidden/ );
+
+	const thread = cssBlock( '.thread' );
+	assert.match( thread, /min-height:\s*0/, '.thread باید min-height صفر داشته باشد' );
+	assert.match( thread, /overflow-y:\s*auto/ );
+
+	const view = cssBlock( '.view' );
+	assert.match( view, /min-height:\s*0/ );
+} );
+
+await test( 'نوار کناری و ریل هم قابل اسکرول‌اند و بیرون نمی‌زنند', () => {
+	assert.match( cssBlock( '.sidebar' ), /min-height:\s*0/ );
+	assert.match( cssBlock( '.side-recents' ), /overflow-y:\s*auto/ );
+	assert.match( cssBlock( '.rail-body' ), /overflow-y:\s*auto/ );
+} );
+
+await test( 'رنگ‌های Claude دقیقاً همان‌اند', () => {
+	const root = cssBlock( ':root' );
+	assert.match( root, /--bg:\s*#262624/ );
+	assert.match( root, /--bg-side:\s*#1f1e1d/ );
+	assert.match( root, /--bg-raise:\s*#30302e/ );
+	assert.match( root, /--accent:\s*#d97757/ );
+
+	assert.ok( css.includes( '--bg: #faf9f5' ), 'تم روشن باید کرمِ #faf9f5 باشد' );
+	assert.ok( css.includes( '--bg-side: #f0efe6' ) );
+} );
+
+await test( 'همهٔ ماژول‌های رابط، فایل‌های واقعی را import می‌کنند', async () => {
+	const files = ( await fs.readdir( uiDir ) ).filter( ( f ) => f.endsWith( '.js' ) );
+	files.push( ...( await fs.readdir( path.join( uiDir, 'lib' ) ) ).map( ( f ) => `lib/${ f }` ) );
+
+	for ( const file of files ) {
+		const src = await fs.readFile( path.join( uiDir, file ), 'utf8' );
+		for ( const m of src.matchAll( /from\s+'(\.[^']+)'/g ) ) {
+			const target = path.resolve( path.dirname( path.join( uiDir, file ) ), m[ 1 ] );
+			const ok = await fs.access( target ).then( () => true ).catch( () => false );
+			assert.ok( ok, `${ file } به ${ m[ 1 ] } import دارد که وجود ندارد` );
+		}
+	}
+} );
+
+await test( 'هر شناسه‌ای که JS صدا می‌زند، در HTML هست', async () => {
+	const ids = new Set( [ ...html.matchAll( /id="([^"]+)"/g ) ].map( ( m ) => m[ 1 ] ) );
+	const dynamic = new Set( [ 'toasts', 'welcome', 'setup-banner', 'model-list' ] );
+
+	const files = ( await fs.readdir( uiDir ) ).filter( ( f ) => f.endsWith( '.js' ) );
+	for ( const file of files ) {
+		const src = await fs.readFile( path.join( uiDir, file ), 'utf8' );
+		for ( const m of src.matchAll( /\$\(\s*'#([\w-]+)'/g ) ) {
+			assert.ok( ids.has( m[ 1 ] ) || dynamic.has( m[ 1 ] ), `${ file } سراغ #${ m[ 1 ] } می‌رود که در HTML نیست` );
+		}
+	}
+} );
+
+await test( 'نشانگر «در حال کار» و منوی + در رابط هستند', () => {
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.match( thread, /export function showWorking/ );
+	assert.match( thread, /class: 'working'/ );
+	assert.match( css, /\.working\s*\{/ );
+
+	assert.match( html, /id="btn-plus"/ );
+	assert.match( html, /id="plus-menu"/ );
+	assert.match( html, /id="model-menu"/ );
+	assert.match( html, /class="disclaimer"/ );
+} );
+
+await test( 'پاسخ مدل بدون آواتار و با فونت سریف نمایش داده می‌شود', () => {
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.equal( /class="avatar"|'avatar'/.test( thread ), false, 'آواتار باید حذف شده باشد' );
+	assert.match( cssBlock( '.msg.assistant .body' ), /font-family:\s*var\(--serif\)/ );
+	assert.match( cssBlock( '.msg.user .body' ), /background:\s*var\(--user-bubble\)/ );
+} );
+
+await test( 'ناوبری مستقیم در نوار کناری هست (نه فقط داخل تنظیمات)', () => {
+	for ( const view of [ 'chat', 'tools', 'connectors', 'skills', 'agents', 'workspace' ] ) {
+		assert.match( html, new RegExp( `data-view="${ view }"` ), `آیتم ناوبری ${ view } نیست` );
 	}
 } );
 

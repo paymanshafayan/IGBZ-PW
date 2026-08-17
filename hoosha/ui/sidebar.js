@@ -1,20 +1,20 @@
-/** نوار کناری: نشست‌ها، جستجو، تغییر نام، حذف، و اطلاعات پوشهٔ کاری. */
+/** نوار کناری: ناوبری مستقیم + فهرست گفتگوهای اخیر. */
 
 import { $, h, timeAgo, toast, confirmDialog, promptDialog } from './lib/dom.js';
 import { api, post, getState } from './lib/api.js';
 
 let onResume = () => {};
+let onView = () => {};
 let sessions = [];
-let filter = '';
 
-/** @param {{onResume:(id:string)=>void}} opts */
+/** @param {{onResume:(id:string)=>void, onView:(view:string)=>void}} opts */
 export function initSidebar( opts ) {
 	onResume = opts.onResume;
+	onView = opts.onView;
 
-	$( '#session-search' ).addEventListener( 'input', ( e ) => {
-		filter = e.target.value.trim().toLowerCase();
-		paint();
-	} );
+	for ( const b of document.querySelectorAll( '.nav-item[data-view]' ) ) {
+		b.onclick = () => onView( b.dataset.view );
+	}
 
 	$( '#btn-collapse' ).onclick = () => {
 		document.body.classList.toggle( 'sidebar-collapsed' );
@@ -25,6 +25,13 @@ export function initSidebar( opts ) {
 	}
 }
 
+/** @param {string} view */
+export function markActiveView( view ) {
+	for ( const b of document.querySelectorAll( '.nav-item[data-view]' ) ) {
+		b.classList.toggle( 'active', b.dataset.view === view );
+	}
+}
+
 export async function refreshSessions() {
 	const out = await api( '/api/sessions' );
 	sessions = out.sessions || [];
@@ -32,104 +39,70 @@ export async function refreshSessions() {
 	return sessions;
 }
 
-export function getSessions() {
-	return sessions;
-}
-
-function group( ts ) {
-	const day = 86_400_000;
-	const diff = Date.now() - Number( ts || 0 );
-	if ( diff < day ) {
-		return 'امروز';
-	}
-	if ( diff < 2 * day ) {
-		return 'دیروز';
-	}
-	if ( diff < 7 * day ) {
-		return 'این هفته';
-	}
-	if ( diff < 30 * day ) {
-		return 'این ماه';
-	}
-	return 'قدیمی‌تر';
-}
-
 function paint() {
 	const box = $( '#session-list' );
+	if ( ! box ) {
+		return;
+	}
 	box.replaceChildren();
 
 	const s = getState();
-	const list = sessions.filter( ( x ) => ! filter || String( x.title || '' ).toLowerCase().includes( filter ) );
-
-	if ( ! list.length ) {
-		box.appendChild( h( 'div', { class: 'empty small', text: filter ? 'چیزی پیدا نشد.' : 'هنوز گفتگویی نداری.' } ) );
+	if ( ! sessions.length ) {
+		box.appendChild( h( 'div', { class: 'empty small', text: 'هنوز گفتگویی نداری.' } ) );
 		return;
 	}
 
-	let last = '';
-	for ( const item of list ) {
-		const g = group( item.updatedAt );
-		if ( g !== last ) {
-			box.appendChild( h( 'div', { class: 'side-group', text: g } ) );
-			last = g;
-		}
-
+	for ( const item of sessions.slice( 0, 40 ) ) {
 		const active = s?.sessionId === item.id;
-		const row = h( 'div', { class: `session ${ active ? 'active' : '' }` }, [
-			h( 'button', {
-				class: 'session-main',
-				title: item.title,
-				onClick: () => onResume( item.id ),
-			}, [
-				h( 'span', { class: 'session-title', text: item.title || 'بدون عنوان' } ),
-				h( 'span', { class: 'session-meta', text: `${ timeAgo( item.updatedAt ) } · ${ item.messages } پیام` } ),
-			] ),
-			h( 'div', { class: 'session-actions' }, [
+		box.appendChild(
+			h( 'div', { class: `session ${ active ? 'active' : '' }` }, [
 				h( 'button', {
-					class: 'icon-btn tiny',
-					title: 'تغییر نام',
-					text: '✎',
-					onClick: async ( e ) => {
-						e.stopPropagation();
-						const title = await promptDialog( 'نام تازهٔ گفتگو:', item.title || '' );
-						if ( title === null ) {
-							return;
-						}
-						await post( '/api/sessions', { action: 'rename', id: item.id, title } );
-						await refreshSessions();
-					},
+					class: 'session-main',
+					title: `${ item.title }\n${ timeAgo( item.updatedAt ) } · ${ item.messages } پیام`,
+					text: item.title || 'بدون عنوان',
+					onClick: () => onResume( item.id ),
 				} ),
-				h( 'button', {
-					class: 'icon-btn tiny danger',
-					title: 'حذف',
-					text: '×',
-					onClick: async ( e ) => {
-						e.stopPropagation();
-						if ( ! ( await confirmDialog( 'این گفتگو حذف شود؟', { danger: true } ) ) ) {
-							return;
-						}
-						const out = await post( '/api/sessions', { action: 'delete', id: item.id } );
-						if ( out.error ) {
-							toast( out.error, 'error' );
-						}
-						await refreshSessions();
-					},
-				} ),
-			] ),
-		] );
-		box.appendChild( row );
+				h( 'div', { class: 'session-actions' }, [
+					h( 'button', {
+						class: 'ghost-icon',
+						title: 'تغییر نام',
+						text: '✎',
+						onClick: async ( e ) => {
+							e.stopPropagation();
+							const title = await promptDialog( 'نام تازهٔ گفتگو:', item.title || '' );
+							if ( title === null ) {
+								return;
+							}
+							await post( '/api/sessions', { action: 'rename', id: item.id, title } );
+							await refreshSessions();
+						},
+					} ),
+					h( 'button', {
+						class: 'ghost-icon',
+						title: 'حذف',
+						text: '×',
+						onClick: async ( e ) => {
+							e.stopPropagation();
+							if ( ! ( await confirmDialog( 'این گفتگو حذف شود؟', { danger: true } ) ) ) {
+								return;
+							}
+							const out = await post( '/api/sessions', { action: 'delete', id: item.id } );
+							if ( out.error ) {
+								toast( out.error, 'error' );
+							}
+							await refreshSessions();
+						},
+					} ),
+				] ),
+			] )
+		);
 	}
 }
 
-/** تکه‌های پایین نوار کناری که به وضعیت وابسته‌اند. */
+/** @param {any} s */
 export function paintSidebarState( s ) {
-	const ws = String( s.config.workspace || '' );
-	const name = ws.split( /[\\/]/ ).filter( Boolean ).pop() || ws;
-	$( '#chip-workspace' ).textContent = name;
-	$( '#chip-workspace' ).title = ws;
-
 	const p = s.config.profiles?.[ s.config.activeProfile ] || {};
-	$( '#chip-provider' ).textContent = `${ p.provider || '—' } · ${ p.model || 'بدون مدل' }`;
-
+	$( '#chip-provider' ).textContent = p.provider || '—';
+	$( '#account-initial' ).textContent = ( p.provider || 'ه' ).slice( 0, 1 ).toUpperCase();
 	paint();
 }

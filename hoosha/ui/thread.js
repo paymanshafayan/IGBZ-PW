@@ -32,6 +32,7 @@ export function clearThread() {
 	toolEls.clear();
 	streamEl = null;
 	thinkEl = null;
+	workingEl = null;
 }
 
 function atBottom() {
@@ -55,13 +56,10 @@ function append( node ) {
 // ─────────────────────────────────────────────────────────────────── پیام‌ها
 
 export function addMessage( role, text, asMarkdown = true, images = [] ) {
+	hideWorking();
+
 	const wrap = el( 'div', `msg ${ role }` );
-
-	const gutter = el( 'div', 'gutter' );
-	gutter.appendChild( el( 'span', 'avatar', role === 'user' ? '⌂' : role === 'system' ? 'i' : '✦' ) );
-	wrap.appendChild( gutter );
-
-	const col = el( 'div', 'col' );
+	const col = wrap;
 	const body = el( 'div', 'body' );
 	if ( asMarkdown ) {
 		body.innerHTML = markdown( text );
@@ -84,20 +82,47 @@ export function addMessage( role, text, asMarkdown = true, images = [] ) {
 	}
 
 	const actions = el( 'div', 'msg-actions' );
-	const copy = el( 'button', 'ghost-btn', 'کپی' );
+	const copy = el( 'button', 'act-btn', 'کپی' );
 	copy.onclick = () => copyText( body.dataset.raw || body.textContent || '' );
 	actions.appendChild( copy );
 
 	if ( role === 'user' ) {
-		const again = el( 'button', 'ghost-btn', 'دوباره بفرست' );
+		const again = el( 'button', 'act-btn', 'دوباره' );
 		again.onclick = () => onResend( body.textContent || '' );
 		actions.appendChild( again );
 	}
 
 	col.appendChild( actions );
-	wrap.appendChild( col );
 	append( wrap );
 	return body;
+}
+
+// ────────────────────────────────── نشانگر «در حال کار» — ستارهٔ Claude
+
+let workingEl = null;
+
+/**
+ * همان چیزی که در Claude بعد از فرستادن پیام می‌بینی: یک ستارهٔ نارنجیِ چرخان.
+ * قبلاً هیچ نشانه‌ای نبود و کاربر نمی‌دانست اصلاً چیزی در حال اتفاق است یا نه.
+ *
+ * @param {string} [label]
+ */
+export function showWorking( label = 'در حال کار' ) {
+	if ( workingEl ) {
+		workingEl.querySelector( '.label' ).textContent = label;
+		return workingEl;
+	}
+	workingEl = h( 'div', { class: 'working' }, [
+		h( 'span', { class: 'asterisk', text: '✳' } ),
+		h( 'span', { class: 'label', text: label } ),
+	] );
+	append( workingEl );
+	return workingEl;
+}
+
+export function hideWorking() {
+	workingEl?.remove();
+	workingEl = null;
 }
 
 export function addNotice( text ) {
@@ -115,50 +140,57 @@ export function addError( message, hint ) {
 
 // ────────────────────────────────────────────────────────── کارت‌های ابزار
 
-const TOOL_META = {
-	read_file: { ico: '◎', label: 'خواندن' },
-	write_file: { ico: '✎', label: 'نوشتن' },
-	edit_file: { ico: '✎', label: 'ویرایش' },
-	multi_edit: { ico: '✎', label: 'ویرایش چندگانه' },
-	list_dir: { ico: '▤', label: 'فهرست پوشه' },
-	glob: { ico: '⌕', label: 'یافتن فایل' },
-	grep: { ico: '⌕', label: 'جستجوی متن' },
-	bash: { ico: '❯', label: 'فرمان' },
-	bash_output: { ico: '❯', label: 'خروجی شل' },
-	kill_shell: { ico: '■', label: 'توقف شل' },
-	web_fetch: { ico: '⇩', label: 'دریافت از وب' },
-	web_search: { ico: '⌕', label: 'جستجوی وب' },
-	todo_write: { ico: '☑', label: 'فهرست کار' },
-	skill: { ico: '◆', label: 'اسکیل' },
-	task: { ico: '⌗', label: 'زیرعامل' },
-	exit_plan_mode: { ico: '◇', label: 'نقشهٔ کار' },
-	ask_user_question: { ico: '?', label: 'پرسش' },
+/**
+ * نام نمایشی ابزارها — دقیقاً همان چیزی که در Claude Code روی کارت می‌بینی:
+ * نام ابزار با فونت مونو و پررنگ، بعدش آرگومانش.
+ */
+const TOOL_LABEL = {
+	read_file: 'Read',
+	write_file: 'Write',
+	edit_file: 'Edit',
+	multi_edit: 'MultiEdit',
+	notebook_edit: 'NotebookEdit',
+	list_dir: 'LS',
+	glob: 'Glob',
+	grep: 'Grep',
+	bash: 'Bash',
+	bash_output: 'BashOutput',
+	kill_shell: 'KillShell',
+	web_fetch: 'WebFetch',
+	web_search: 'WebSearch',
+	todo_write: 'TodoWrite',
+	skill: 'Skill',
+	task: 'Task',
+	read_mcp_resource: 'Resource',
+	exit_plan_mode: 'ExitPlanMode',
+	ask_user_question: 'AskUserQuestion',
 };
 
 export function toolMeta( name ) {
-	if ( TOOL_META[ name ] ) {
-		return TOOL_META[ name ];
+	if ( TOOL_LABEL[ name ] ) {
+		return { label: TOOL_LABEL[ name ], ico: '' };
 	}
 	if ( String( name ).startsWith( 'mcp__' ) ) {
 		const [ , server, tool ] = String( name ).split( '__' );
-		return { ico: '⇄', label: `${ server } · ${ tool }` };
+		return { label: `${ server }:${ tool }`, ico: '' };
 	}
-	return { ico: '⚒', label: name };
+	return { label: name, ico: '' };
 }
 
 function toolCard( id, name, summary, sub ) {
+	hideWorking();
+
 	const meta = toolMeta( name );
 	const card = el( 'div', 'tool' );
 	const head = el( 'div', 'tool-head' );
 
-	head.appendChild( el( 'span', 'tool-ico', meta.ico ) );
+	head.appendChild( el( 'span', 'tool-name', meta.label ) );
 	if ( sub ) {
 		head.appendChild( el( 'span', 'sub-tag', sub ) );
 	}
-	head.appendChild( el( 'span', 'tool-name', meta.label ) );
-	head.appendChild( el( 'span', 'tool-sum mono', summary || '' ) );
+	head.appendChild( el( 'span', 'tool-sum', summary || '' ) );
 
-	const badge = el( 'span', 'tool-state run', 'در حال اجرا' );
+	const badge = el( 'span', 'tool-state run', '…' );
 	head.appendChild( badge );
 	head.appendChild( el( 'span', 'tool-chevron', '⌄' ) );
 
@@ -303,7 +335,7 @@ function finishTool( id, { output, error, denied, reason } ) {
 		badge.textContent = 'خطا';
 	} else {
 		badge.className = 'tool-state ok';
-		badge.textContent = 'انجام شد';
+		badge.textContent = '✓';
 	}
 
 	const body = output ?? error ?? reason ?? '';
@@ -334,6 +366,7 @@ function finishTool( id, { output, error, denied, reason } ) {
 // ──────────────────────────────────────────────────────── دروازهٔ تأیید
 
 function askCard( ev ) {
+	hideWorking();
 	const meta = toolMeta( ev.name );
 	const card = el( 'div', 'ask' );
 
@@ -418,6 +451,7 @@ function alwaysLabel( ev ) {
 // ─────────────────────────────────────────── کارت نقشه و کارت پرسش
 
 function planCard( ev ) {
+	hideWorking();
 	const card = el( 'div', 'plan-card' );
 	card.appendChild( h( 'div', { class: 'plan-head' }, [ h( 'span', { text: '◇' } ), h( 'b', { text: 'نقشهٔ کار آماده است' } ) ] ) );
 
@@ -453,6 +487,7 @@ function planCard( ev ) {
 }
 
 function questionCard( ev ) {
+	hideWorking();
 	const card = el( 'div', 'q-card' );
 	card.appendChild( h( 'div', { class: 'q-head' }, [ h( 'span', { text: '?' } ), h( 'b', { text: ev.question || 'یک انتخاب لازم است' } ) ] ) );
 
@@ -501,6 +536,7 @@ export function handleEvent( ev ) {
 			break;
 
 		case 'thinking': {
+			hideWorking();
 			if ( ! thinkEl ) {
 				thinkEl = thinkingBlock();
 			}
@@ -592,6 +628,9 @@ export function handleEvent( ev ) {
 
 		case 'subagent_end':
 			append( h( 'div', { class: 'subagent done' }, [ h( 'span', { text: '⌗' } ), h( 'b', { text: ev.label } ), h( 'span', { class: 'note', text: 'زیرعامل تمام شد' } ) ] ) );
+			break;
+
+		case 'tool_log':
 			break;
 
 		case 'compacted':

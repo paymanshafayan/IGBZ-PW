@@ -1,15 +1,19 @@
 /**
- * کامپوزر: کادر نوشتن، منوی «/» دستورها، منوی «@» فایل‌ها، چرخش حالت و تاریخچهٔ پیام.
+ * کامپوزر — کپی از Claude.
  *
- * نکتهٔ ریز ولی مهم: وقتی عامل مشغول است، پیام تازه دور ریخته نمی‌شود؛ در صف می‌ماند و
- * به‌محض بیکارشدن فرستاده می‌شود. در نسخهٔ قبل، پیام در همین حالت گم می‌شد.
+ * چیدمان: کادر گرد، `+` سمت راست‌ترین (در RTL: ابتدای ردیف)، بعد فضای خالی، بعد نشان حالت،
+ * نشان مدل با فلش، و دکمهٔ گرد ارسال. زیرش، همان جملهٔ کوچک «هوشا هم اشتباه می‌کند».
+ *
+ * منوی `+` همان کاری را می‌کند که در Claude: فایل و تصویر، کانکتورها، اسکیل‌ها، حالت کار.
+ * یعنی چیزهای پرکاربرد **از داخل خود کامپوزر** در دسترس‌اند، نه ته یک پنجرهٔ تنظیمات.
  */
 
-import { $, el, h, toast } from './lib/dom.js';
+import { $, h, toast } from './lib/dom.js';
 import { api, post, getState, refreshState } from './lib/api.js';
+import { showWorking, hideWorking } from './thread.js';
 
 const MODES = [ 'plan', 'default', 'auto' ];
-const MODE_LABEL = { plan: '◇ پلن', default: '◈ عادی', auto: '◆ خودکار' };
+const MODE_LABEL = { plan: 'پلن', default: 'عادی', auto: 'خودکار' };
 const MODE_HINT = {
 	plan: 'فقط بررسی و خواندن — چیزی تغییر نمی‌کند',
 	default: 'نوشتن و اجرا با تأیید تو',
@@ -28,17 +32,22 @@ let historyIndex = -1;
 const queue = [];
 let busy = false;
 
-/** @type {(text:string, images:any[])=>Promise<any>} */
-let send = async () => {};
-
 /** @type {{name:string, mediaType:string, data:string, url:string}[]} */
 let attachments = [];
 
-/** @param {{onSend:(text:string)=>Promise<any>}} deps */
+/** @type {(text:string, images:any[])=>Promise<any>} */
+let send = async () => {};
+/** @type {(view:string)=>void} */
+let openView = () => {};
+
+/**
+ * @param {{onSend:(text:string, images:any[])=>Promise<any>, onView:(v:string)=>void}} deps
+ */
 export function initComposer( deps ) {
 	input = $( '#input' );
 	menu = $( '#cmd-menu' );
 	send = deps.onSend;
+	openView = deps.onView;
 
 	$( '#composer' ).onsubmit = async ( e ) => {
 		e.preventDefault();
@@ -46,13 +55,17 @@ export function initComposer( deps ) {
 	};
 
 	$( '#stop' ).onclick = () => post( '/api/stop', {} );
-
 	$( '#pill-mode' ).onclick = () => cycleMode();
-	$( '#pill-model' ).onclick = () => openModelMenu();
-	$( '#btn-attach' ).onclick = () => $( '#file-input' ).click();
+	$( '#pill-model' ).onclick = () => toggleModelMenu();
+	$( '#btn-plus' ).onclick = () => togglePlusMenu();
 	$( '#file-input' ).onchange = ( e ) => addFiles( e.target.files );
 
-	// چسباندن و کشیدن تصویر — همان کاری که در Claude Code با اسکرین‌شات می‌کنی.
+	input.addEventListener( 'input', () => {
+		autoGrow();
+		refreshMenu();
+	} );
+	input.addEventListener( 'keydown', onKeyDown );
+
 	input.addEventListener( 'paste', ( e ) => {
 		const files = [ ...( e.clipboardData?.files || [] ) ].filter( ( f ) => f.type.startsWith( 'image/' ) );
 		if ( files.length ) {
@@ -61,18 +74,19 @@ export function initComposer( deps ) {
 		}
 	} );
 
-	for ( const evName of [ 'dragover', 'dragenter' ] ) {
-		$( '#composer' ).addEventListener( evName, ( e ) => {
+	const form = $( '#composer' );
+	for ( const name of [ 'dragover', 'dragenter' ] ) {
+		form.addEventListener( name, ( e ) => {
 			if ( [ ...( e.dataTransfer?.types || [] ) ].includes( 'Files' ) ) {
 				e.preventDefault();
-				$( '#composer' ).classList.add( 'dropping' );
+				form.classList.add( 'dropping' );
 			}
 		} );
 	}
-	for ( const evName of [ 'dragleave', 'drop' ] ) {
-		$( '#composer' ).addEventListener( evName, () => $( '#composer' ).classList.remove( 'dropping' ) );
+	for ( const name of [ 'dragleave', 'drop' ] ) {
+		form.addEventListener( name, () => form.classList.remove( 'dropping' ) );
 	}
-	$( '#composer' ).addEventListener( 'drop', ( e ) => {
+	form.addEventListener( 'drop', ( e ) => {
 		const files = [ ...( e.dataTransfer?.files || [] ) ].filter( ( f ) => f.type.startsWith( 'image/' ) );
 		if ( files.length ) {
 			e.preventDefault();
@@ -80,30 +94,21 @@ export function initComposer( deps ) {
 		}
 	} );
 
-	input.addEventListener( 'input', () => {
-		autoGrow();
-		refreshMenu();
+	document.addEventListener( 'click', ( e ) => {
+		closeIfOutside( '#plus-menu', '#btn-plus', e );
+		closeIfOutside( '#model-menu', '#pill-model', e );
 	} );
-
-	input.addEventListener( 'keydown', onKeyDown );
-
-	// چسباندن مسیر فایل با drag & drop
-	input.addEventListener( 'drop', ( e ) => {
-		const text = e.dataTransfer?.getData( 'text/plain' );
-		if ( text ) {
-			e.preventDefault();
-			insertAtCursor( `@${ text } ` );
-		}
-	} );
-
-	document.addEventListener( 'keydown', ( e ) => {
-		if ( e.key === 'Escape' && ! menu.hidden ) {
-			menu.hidden = true;
-			e.stopPropagation();
-		}
-	} );
-
 }
+
+function closeIfOutside( menuSel, triggerSel, e ) {
+	const box = $( menuSel );
+	const trigger = $( triggerSel );
+	if ( box && ! box.hidden && ! box.contains( e.target ) && ! trigger.contains( e.target ) ) {
+		box.hidden = true;
+	}
+}
+
+// ─────────────────────────────────────────────────────────── حالت و مدل
 
 export function setMode( next ) {
 	mode = MODES.includes( next ) ? next : 'default';
@@ -111,8 +116,6 @@ export function setMode( next ) {
 	pill.textContent = MODE_LABEL[ mode ];
 	pill.title = MODE_HINT[ mode ];
 	pill.dataset.mode = mode;
-	$( '#badge-mode' ).textContent = MODE_LABEL[ mode ];
-	$( '#badge-mode' ).dataset.mode = mode;
 	document.body.dataset.mode = mode;
 }
 
@@ -133,6 +136,12 @@ export function setBusy( value ) {
 	$( '#stop' ).hidden = ! value;
 	document.body.classList.toggle( 'busy', value );
 
+	if ( value ) {
+		showWorking();
+	} else {
+		hideWorking();
+	}
+
 	if ( ! value && queue.length ) {
 		const next = queue.shift();
 		paintQueue();
@@ -144,18 +153,11 @@ export function focusComposer() {
 	input?.focus();
 }
 
+// ──────────────────────────────────────────────────────────── ارسال
+
 function autoGrow() {
 	input.style.height = 'auto';
-	input.style.height = Math.min( input.scrollHeight, 260 ) + 'px';
-}
-
-function insertAtCursor( text ) {
-	const start = input.selectionStart ?? input.value.length;
-	const end = input.selectionEnd ?? input.value.length;
-	input.value = input.value.slice( 0, start ) + text + input.value.slice( end );
-	input.selectionStart = input.selectionEnd = start + text.length;
-	input.focus();
-	autoGrow();
+	input.style.height = Math.min( input.scrollHeight, window.innerHeight * 0.4 ) + 'px';
 }
 
 async function submit() {
@@ -191,7 +193,29 @@ async function submitText( text, images = [] ) {
 	}
 }
 
-// ───────────────────────────────────────────────────────────── پیوست‌ها
+function paintQueue() {
+	const box = $( '#queue' );
+	box.replaceChildren();
+	box.hidden = ! queue.length;
+	queue.forEach( ( q, i ) => {
+		box.appendChild(
+			h( 'div', { class: 'queued' }, [
+				h( 'span', { text: '⏱' } ),
+				h( 'span', { class: 'q-text', text: q.text || `${ q.images.length } تصویر` } ),
+				h( 'button', {
+					class: 'ghost-icon',
+					text: '×',
+					onClick: () => {
+						queue.splice( i, 1 );
+						paintQueue();
+					},
+				} ),
+			] )
+		);
+	} );
+}
+
+// ───────────────────────────────────────────────────────── پیوست‌ها
 
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
@@ -235,7 +259,7 @@ function paintAttachments() {
 			h( 'div', { class: 'attachment', title: a.name }, [
 				h( 'img', { src: a.url, alt: a.name } ),
 				h( 'button', {
-					class: 'icon-btn tiny',
+					class: 'ghost-icon',
 					type: 'button',
 					text: '×',
 					onClick: () => {
@@ -248,83 +272,140 @@ function paintAttachments() {
 	} );
 }
 
-// ────────────────────────────────────────────────────── انتخاب سریع مدل
+// ─────────────────────────────────────────────────────── منوی «+»
 
-async function openModelMenu() {
+function menuItem( ico, label, desc, onClick, checked ) {
+	return h( 'div', { class: 'menu-item', onClick }, [
+		h( 'span', { class: 'm-ico', text: ico } ),
+		h( 'b', { text: label } ),
+		desc ? h( 'span', { class: 'm-desc', text: desc } ) : null,
+		checked ? h( 'span', { class: 'm-check', text: '✓' } ) : null,
+	] );
+}
+
+function togglePlusMenu() {
+	const box = $( '#plus-menu' );
+	if ( ! box.hidden ) {
+		box.hidden = true;
+		return;
+	}
+	$( '#model-menu' ).hidden = true;
+
+	const s = getState();
+	const close = () => ( box.hidden = true );
+	const go = ( view ) => () => {
+		close();
+		openView( view );
+	};
+
+	box.replaceChildren(
+		menuItem( '🖼', 'افزودن تصویر', 'یا فقط بچسبان', () => {
+			close();
+			$( '#file-input' ).click();
+		} ),
+		menuItem( '@', 'اشاره به فایل', 'جستجوی فازی در پروژه', () => {
+			close();
+			insertAtCursor( '@' );
+			refreshMenu();
+		} ),
+		h( 'div', { class: 'menu-sep' } ),
+		h( 'div', { class: 'menu-label', text: 'حالت کار' } ),
+		...MODES.map( ( m ) =>
+			menuItem(
+				m === 'plan' ? '◇' : m === 'default' ? '◈' : '◆',
+				MODE_LABEL[ m ],
+				MODE_HINT[ m ],
+				async () => {
+					close();
+					setMode( m );
+					await post( '/api/mode', { mode: m } );
+				},
+				m === mode
+			)
+		),
+		h( 'div', { class: 'menu-sep' } ),
+		menuItem( '⇄', 'کانکتورها', `${ ( s?.connectors || [] ).length } تعریف‌شده`, go( 'connectors' ) ),
+		menuItem( '◆', 'اسکیل‌ها', `${ ( s?.skills || [] ).length } نصب‌شده`, go( 'skills' ) ),
+		menuItem( '⚒', 'ابزارها', `${ ( s?.tools || [] ).length } در دسترس`, go( 'tools' ) ),
+		menuItem( '⌗', 'زیرعامل‌ها', `${ ( s?.agents || [] ).length } تعریف‌شده`, go( 'agents' ) ),
+		h( 'div', { class: 'menu-sep' } ),
+		menuItem( '▤', 'پوشهٔ کاری', shortPath( s?.config?.workspace ), go( 'workspace' ) ),
+		menuItem( '↶', 'بازگشت به چک‌پوینت', `${ ( s?.checkpoints || [] ).length } نقطه`, () => {
+			close();
+			document.dispatchEvent( new CustomEvent( 'hoosha:rewind' ) );
+		} )
+	);
+	box.hidden = false;
+}
+
+function shortPath( p ) {
+	const parts = String( p || '' ).split( /[\\/]/ ).filter( Boolean );
+	return parts.slice( -2 ).join( '/' ) || '—';
+}
+
+// ─────────────────────────────────────────────────────── منوی مدل
+
+async function toggleModelMenu() {
 	const box = $( '#model-menu' );
 	if ( ! box.hidden ) {
 		box.hidden = true;
 		return;
 	}
-	box.replaceChildren( h( 'div', { class: 'cmd-item', text: 'در حال گرفتن فهرست مدل‌ها…' } ) );
+	$( '#plus-menu' ).hidden = true;
+
+	box.replaceChildren( h( 'div', { class: 'menu-item', text: 'در حال گرفتن فهرست مدل‌ها…' } ) );
 	box.hidden = false;
 
 	const out = await api( '/api/models' );
+	const s = getState();
+	const current = s?.config?.profiles?.[ s?.config?.activeProfile ]?.model;
 	box.replaceChildren();
 
 	if ( out.error || ! ( out.models || [] ).length ) {
 		box.appendChild(
-			h( 'div', { class: 'cmd-item' }, [
+			h( 'div', { class: 'menu-item' }, [
 				h( 'b', { text: 'فهرست نیامد' } ),
-				h( 'span', { text: out.error || 'این پرووایدر فهرست مدل نمی‌دهد.' } ),
+				h( 'span', { class: 'm-desc', text: out.error || 'این پرووایدر فهرست مدل نمی‌دهد.' } ),
 			] )
 		);
-		box.appendChild(
-			h( 'div', { class: 'cmd-item', onClick: () => {
-				box.hidden = true;
-				document.dispatchEvent( new CustomEvent( 'hoosha:settings', { detail: 'provider' } ) );
-			} }, [ h( 'b', { text: 'باز کردن تنظیمات' } ) ] )
-		);
-		return;
-	}
-
-	const current = getState()?.config?.profiles?.[ getState()?.config?.activeProfile ]?.model;
-	for ( const m of out.models.slice( 0, 60 ) ) {
-		box.appendChild(
-			h( 'div', { class: `cmd-item ${ m === current ? 'active' : '' }`, onClick: async () => {
-				box.hidden = true;
-				const res = await post( '/api/message', { text: `/model ${ m }` } );
-				if ( res.error ) {
-					toast( res.error, 'error' );
-					return;
-				}
-				await refreshState();
-				toast( `مدل شد: ${ m }` );
-			} }, [ h( 'b', { text: m } ), m === current ? h( 'em', { text: 'فعلی' } ) : null ] )
-		);
-	}
-}
-
-document.addEventListener( 'click', ( e ) => {
-	const box = $( '#model-menu' );
-	if ( box && ! box.hidden && ! box.contains( e.target ) && e.target !== $( '#pill-model' ) ) {
-		box.hidden = true;
-	}
-} );
-
-function paintQueue() {
-	const box = $( '#queue' );
-	box.replaceChildren();
-	box.hidden = ! queue.length;
-	queue.forEach( ( q, i ) => {
-		box.appendChild(
-			h( 'div', { class: 'queued' }, [
-				h( 'span', { text: '⏱' } ),
-				h( 'span', { class: 'q-text', text: q.text || `${ q.images.length } تصویر` } ),
-				h( 'button', {
-					class: 'icon-btn tiny',
-					text: '×',
-					onClick: () => {
-						queue.splice( i, 1 );
-						paintQueue();
+	} else {
+		for ( const m of out.models.slice( 0, 80 ) ) {
+			box.appendChild(
+				menuItem(
+					'',
+					m,
+					'',
+					async () => {
+						box.hidden = true;
+						await post( '/api/message', { text: `/model ${ m }` } );
+						await refreshState();
+						toast( `مدل شد: ${ m }` );
 					},
-				} ),
-			] )
-		);
-	} );
+					m === current
+				)
+			);
+		}
+	}
+
+	box.appendChild( h( 'div', { class: 'menu-sep' } ) );
+	box.appendChild(
+		menuItem( '⚙', 'تنظیمات پرووایدر', 'کلید، آدرس، پروفایل‌ها', () => {
+			box.hidden = true;
+			document.dispatchEvent( new CustomEvent( 'hoosha:settings', { detail: 'provider' } ) );
+		} )
+	);
 }
 
-// ──────────────────────────────────────────────── منوهای «/» و «@»
+// ─────────────────────────────────────────── منوهای «/» و «@»
+
+function insertAtCursor( text ) {
+	const start = input.selectionStart ?? input.value.length;
+	const end = input.selectionEnd ?? input.value.length;
+	input.value = input.value.slice( 0, start ) + text + input.value.slice( end );
+	input.selectionStart = input.selectionEnd = start + text.length;
+	input.focus();
+	autoGrow();
+}
 
 function context() {
 	const value = input.value;
@@ -354,11 +435,11 @@ async function refreshMenu() {
 		const s = getState();
 		items = ( s?.commands || [] )
 			.filter( ( c ) => c.name.toLowerCase().startsWith( ctx.query ) )
-			.slice( 0, 10 )
+			.slice( 0, 12 )
 			.map( ( c ) => ( { label: `/${ c.name }`, hint: c.description || '', source: c.source, insert: `/${ c.name } `, start: 0 } ) );
 	} else {
 		const out = await api( `/api/files?q=${ encodeURIComponent( ctx.query ) }` );
-		items = ( out.files || [] ).slice( 0, 10 ).map( ( f ) => ( { label: f, hint: '', source: 'فایل', insert: `@${ f } `, start: ctx.start } ) );
+		items = ( out.files || [] ).slice( 0, 12 ).map( ( f ) => ( { label: f, hint: '', source: 'فایل', insert: `@${ f } `, start: ctx.start } ) );
 	}
 
 	index = 0;
@@ -398,7 +479,6 @@ function pick( i ) {
 }
 
 function onKeyDown( e ) {
-	// منوی باز، اول کلیدها را می‌گیرد.
 	if ( ! menu.hidden && items.length ) {
 		if ( e.key === 'ArrowDown' ) {
 			e.preventDefault();
@@ -432,7 +512,6 @@ function onKeyDown( e ) {
 		return;
 	}
 
-	// تاریخچه: وقتی کادر خالی است، بالا یعنی پیام قبلی.
 	if ( e.key === 'ArrowUp' && ! input.value.trim() && history.length ) {
 		e.preventDefault();
 		historyIndex = Math.min( historyIndex + 1, history.length - 1 );
@@ -448,7 +527,6 @@ function onKeyDown( e ) {
 	}
 }
 
-/** برای دکمه‌های بیرونی (مثل «دوباره بفرست»). */
 export function fillComposer( text, submitNow = false ) {
 	input.value = text;
 	autoGrow();
