@@ -23,7 +23,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-/** @typedef {{name:string, status:'connected'|'failed'|'disabled', error?:string, tools:string[]}} McpStatus */
+/** @typedef {{name:string, status:'connected'|'failed'|'disabled', error?:string, tools:string[], prompts?:{name:string,description:string}[], resources?:{uri:string,name:string}[]}} McpStatus */
 
 export class McpManager {
 	constructor() {
@@ -122,8 +122,87 @@ export class McpManager {
 			names.push( t.name );
 		}
 
+		// پرامپت‌ها و منابع، بخش‌های کم‌استفاده‌ترِ MCP اند و خیلی سرورها اصلاً ندارند؛
+		// پس نبودنشان خطا نیست و ساکت رد می‌شود.
+		const prompts = await withTimeout( client.listPrompts(), 8000, 'پرامپت‌ها' )
+			.then( ( r ) => ( r.prompts || [] ).map( ( p ) => ( { name: p.name, description: p.description || '' } ) ) )
+			.catch( () => [] );
+
+		const resources = await withTimeout( client.listResources(), 8000, 'منابع' )
+			.then( ( r ) => ( r.resources || [] ).map( ( x ) => ( { uri: x.uri, name: x.name || x.uri } ) ) )
+			.catch( () => [] );
+
 		this.clients.set( name, client );
-		this.status.push( { name, status: 'connected', tools: names } );
+		this.status.push( { name, status: 'connected', tools: names, prompts, resources } );
+	}
+
+	/** همهٔ پرامپت‌های همهٔ سرورها، با نام یکتا. */
+	promptEntries() {
+		/** @type {{name:string, server:string, prompt:string, description:string}[]} */
+		const out = [];
+		for ( const s of this.status ) {
+			for ( const p of s.prompts || [] ) {
+				out.push( { name: `mcp__${ s.name }__${ p.name }`, server: s.name, prompt: p.name, description: p.description } );
+			}
+		}
+		return out;
+	}
+
+	/** همهٔ منابع همهٔ سرورها. */
+	resourceEntries() {
+		/** @type {{server:string, uri:string, name:string}[]} */
+		const out = [];
+		for ( const s of this.status ) {
+			for ( const r of s.resources || [] ) {
+				out.push( { server: s.name, uri: r.uri, name: r.name } );
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * گرفتن متن یک پرامپت MCP تا به‌عنوان پیام کاربر فرستاده شود.
+	 * @param {string} server
+	 * @param {string} prompt
+	 * @param {Record<string,any>} [args]
+	 */
+	async getPrompt( server, prompt, args ) {
+		const client = this.clients.get( server );
+		if ( ! client ) {
+			throw new Error( `سرور MCP «${ server }» وصل نیست.` );
+		}
+		const res = await withTimeout(
+			client.getPrompt( { name: prompt, arguments: args || {} } ),
+			30_000,
+			`پرامپت «${ prompt }» نیامد`
+		);
+		return ( res.messages || [] )
+			.map( ( m ) => {
+				const c = m.content;
+				if ( Array.isArray( c ) ) {
+					return c.map( ( x ) => x.text || '' ).join( '\n' );
+				}
+				return c?.text || '';
+			} )
+			.filter( Boolean )
+			.join( '\n\n' );
+	}
+
+	/**
+	 * خواندن یک منبع MCP.
+	 * @param {string} server
+	 * @param {string} uri
+	 */
+	async readResource( server, uri ) {
+		const client = this.clients.get( server );
+		if ( ! client ) {
+			throw new Error( `سرور MCP «${ server }» وصل نیست.` );
+		}
+		const res = await withTimeout( client.readResource( { uri } ), 30_000, `منبع «${ uri }» نیامد` );
+		return ( res.contents || [] )
+			.map( ( c ) => c.text || `[${ c.mimeType || 'باینری' }: ${ c.uri }]` )
+			.join( '\n' )
+			.trim();
 	}
 
 	/** ابزارهای MCP به شکل رجیستری داخلی هوشا. */

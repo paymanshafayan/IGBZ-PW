@@ -9,6 +9,8 @@
  * هر نشست طولانی یا می‌ترکد یا گران تمام می‌شود.
  */
 
+import { textOf } from './content.js';
+
 /** رویدادهایی که فقط به عاملِ اصلی تعلق دارند و نباید از زیرعامل بیرون بروند. */
 const LIFECYCLE = new Set( [ 'idle', 'user', 'assistant_start', 'assistant_end' ] );
 
@@ -81,10 +83,10 @@ export function makeTaskTool( deps ) {
 
 			await sub.run( input.prompt );
 
-			const last = [ ...sub.messages ].reverse().find( ( m ) => m.role === 'assistant' && m.content?.trim() );
+			const last = [ ...sub.messages ].reverse().find( ( m ) => m.role === 'assistant' && textOf( m.content ).trim() );
 			deps.emit( { type: 'subagent_end', label, agent: def?.name } );
 
-			return last?.content?.trim() || '(زیرعامل خروجی متنی نداد)';
+			return textOf( last?.content || '' ).trim() || '(زیرعامل خروجی متنی نداد)';
 		},
 	};
 }
@@ -98,7 +100,7 @@ export function makeTaskTool( deps ) {
 export function shouldCompact( messages, threshold = 120_000 ) {
 	let size = 0;
 	for ( const m of messages ) {
-		size += ( m.content || '' ).length;
+		size += textOf( m.content || '' ).length;
 		for ( const c of m.toolCalls || [] ) {
 			size += JSON.stringify( c.input || {} ).length;
 		}
@@ -123,10 +125,10 @@ export async function compact( { provider, model, messages, keep = 6 } ) {
 	const transcript = older
 		.map( ( m ) => {
 			if ( m.role === 'tool' ) {
-				return `[نتیجهٔ ابزار] ${ ( m.content || '' ).slice( 0, 600 ) }`;
+				return `[نتیجهٔ ابزار] ${ textOf( m.content || '' ).slice( 0, 600 ) }`;
 			}
 			const calls = ( m.toolCalls || [] ).map( ( c ) => `${ c.name }(${ JSON.stringify( c.input ).slice( 0, 200 ) })` );
-			return `[${ m.role }] ${ ( m.content || '' ).slice( 0, 1200 ) }${ calls.length ? `\n  ابزارها: ${ calls.join( ', ' ) }` : '' }`;
+			return `[${ m.role }] ${ textOf( m.content || '' ).slice( 0, 1200 ) }${ calls.length ? `\n  ابزارها: ${ calls.join( ', ' ) }` : '' }`;
 		} )
 		.join( '\n' );
 

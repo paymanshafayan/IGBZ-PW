@@ -31,7 +31,7 @@
 /**
  * @typedef {Object} Message
  * @property {'user'|'assistant'|'tool'} role
- * @property {string} content
+ * @property {string|import('../content.js').ContentPart[]} content
  * @property {ToolCall[]} [toolCalls]
  * @property {string} [toolCallId]
  */
@@ -49,6 +49,7 @@
 
 /**
  * @typedef {{type:'text',text:string}
+ *   | {type:'thinking',text:string}
  *   | {type:'tool_call',id:string,name:string,input:any}
  *   | {type:'usage',inputTokens:number,outputTokens:number}
  *   | {type:'error',error:string}} StreamEvent

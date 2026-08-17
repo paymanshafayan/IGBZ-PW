@@ -76,7 +76,7 @@ export function createAnthropicProvider( cfg ) {
 					continue;
 				}
 
-				messages.push( { role: m.role, content: m.content } );
+				messages.push( { role: m.role, content: toAnthropicContent( m.content ) } );
 			}
 
 			const payload = {
@@ -127,6 +127,8 @@ export function createAnthropicProvider( cfg ) {
 				} else if ( ev.type === 'content_block_delta' ) {
 					if ( ev.delta?.type === 'text_delta' && ev.delta.text ) {
 						yield { type: 'text', text: ev.delta.text };
+					} else if ( ev.delta?.type === 'thinking_delta' && ev.delta.thinking ) {
+						yield { type: 'thinking', text: ev.delta.thinking };
 					} else if ( ev.delta?.type === 'input_json_delta' ) {
 						const cur = pending.get( ev.index );
 						if ( cur ) {
@@ -162,4 +164,19 @@ export function createAnthropicProvider( cfg ) {
 			}
 		},
 	};
+}
+
+/**
+ * محتوای پیام کاربر به شکل Anthropic.
+ * @param {any} content
+ */
+function toAnthropicContent( content ) {
+	if ( ! Array.isArray( content ) ) {
+		return content;
+	}
+	return content.map( ( part ) =>
+		part.type === 'image'
+			? { type: 'image', source: { type: 'base64', media_type: part.mediaType, data: part.data } }
+			: { type: 'text', text: part.text || '' }
+	);
 }

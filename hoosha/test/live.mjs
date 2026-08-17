@@ -353,6 +353,84 @@ await step( 'مسیر ناشناخته، ۴۰۴ می‌دهد نه صفحهٔ HT
 	assert.match( body.error, /ناشناخته/ );
 } );
 
+
+await step( 'پیام با تصویر: پیوست به مدل می‌رسد و در رویداد کاربر دیده می‌شود', async () => {
+	// یک PNG یک‌پیکسلی واقعی.
+	const png =
+		'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+	events.length = 0;
+	const out = await post( '/api/message', {
+		text: 'این را ببین',
+		images: [ { name: 'dot.png', mediaType: 'image/png', data: png } ],
+	} );
+	assert.ok( ! out.error, out.error );
+
+	const user = await waitFor( ( e ) => e.type === 'user', 8000, 'پیام کاربر' );
+	assert.equal( user.images.length, 1 );
+	assert.equal( user.images[ 0 ].name, 'dot.png' );
+	await waitIdle();
+
+	// در حافظهٔ مدل، محتوا باید تکه‌تکه شده باشد نه یک رشته.
+	const session = await get( `/api/sessions/${ ( await get( '/api/state' ) ).sessionId }` );
+	const stored = ( session.messages || [] ).find( ( m ) => Array.isArray( m.content ) );
+	assert.ok( stored, 'پیام چندتکه باید در نشست ذخیره شده باشد' );
+	assert.equal( stored.content[ 1 ].type, 'image' );
+} );
+
+await step( 'فایل غیرتصویری به‌عنوان پیوست پذیرفته نمی‌شود', async () => {
+	events.length = 0;
+	await post( '/api/message', {
+		text: 'این فایل',
+		images: [ { name: 'x.pdf', mediaType: 'application/pdf', data: 'AAAA' } ],
+	} );
+	const user = await waitFor( ( e ) => e.type === 'user', 8000, 'پیام کاربر' );
+	assert.equal( user.images.length, 0 );
+	await waitIdle();
+} );
+
+await step( 'پرامپت MCP مثل دستور اسلش کار می‌کند و منبعش خوانده می‌شود', async () => {
+	const fixture = path.resolve( 'test/fixtures/mcp-server.mjs' );
+	await post( '/api/connectors', { action: 'save', name: 'demo', kind: 'stdio', command: process.execPath, args: fixture } );
+
+	const s = await get( '/api/state' );
+	assert.ok( s.commands.some( ( c ) => c.name === 'mcp__demo__greet' && c.source === 'MCP' ), 'پرامپت باید در فهرست دستورها بیاید' );
+	assert.ok( s.tools.some( ( t ) => t.name === 'read_mcp_resource' ), 'ابزار خواندن منبع باید ساخته شود' );
+	assert.deepEqual( s.resources.map( ( r ) => r.uri ), [ 'demo://note' ] );
+
+	await say( '/mcp__demo__greet پیمان' );
+	const user = await waitFor( ( e ) => e.type === 'user', 8000, 'پیام کاربر' );
+	assert.match( user.text, /به پیمان سلام رسمی بگو/ );
+	await waitIdle();
+
+	await post( '/api/connectors', { action: 'remove', name: 'demo' } );
+} );
+
+await step( 'حالت بدون‌رابط: اجرا می‌شود، JSON می‌دهد، و بدون اجازه چیزی را اجرا نمی‌کند', async () => {
+	const { execFile } = await import( 'node:child_process' );
+	const run = ( args ) =>
+		new Promise( ( resolve ) => {
+			execFile(
+				process.execPath,
+				[ path.resolve( 'src/cli.js' ), ...args ],
+				{ env: { ...process.env, HOOSHA_HOME: HOME }, timeout: 30_000 },
+				( err, stdout ) => resolve( { code: err?.code ?? 0, stdout } )
+			);
+		} );
+
+	const denied = await run( [ '-p', '!echo سلام', '--dir', WORK, '--output-format', 'json' ] );
+	const a = JSON.parse( denied.stdout );
+	assert.equal( a.tools.length, 0, 'در حالت پیش‌فرض نباید ابزاری اجرا شود' );
+	assert.equal( a.denied.length, 1 );
+
+	const allowed = await run( [ '-p', '!echo سلام‌بی‌رابط', '--dir', WORK, '--mode', 'auto', '--output-format', 'json' ] );
+	const b = JSON.parse( allowed.stdout );
+	assert.deepEqual( b.tools, [ 'bash' ] );
+	assert.match( b.text, /سلام‌بی‌رابط/ );
+	assert.equal( b.ok, true );
+} );
+
+
 // ------------------------------------------------------------------- پایان
 
 reader.cancel().catch( () => {} );

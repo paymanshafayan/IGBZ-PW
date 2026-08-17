@@ -11,6 +11,7 @@
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { textOf } from './content.js';
 
 /** @type {Record<string, {in:number, out:number}>} دلار به‌ازای یک میلیون توکن */
 export const DEFAULT_PRICING = {
@@ -148,7 +149,7 @@ export async function readUsage( home ) {
 export function estimateContextTokens( messages ) {
 	let chars = 0;
 	for ( const m of messages || [] ) {
-		chars += String( m?.content ?? '' ).length;
+		chars += textOf( m?.content ?? '' ).length;
 		for ( const c of m?.toolCalls || [] ) {
 			chars += JSON.stringify( c?.input ?? {} ).length + 40;
 		}

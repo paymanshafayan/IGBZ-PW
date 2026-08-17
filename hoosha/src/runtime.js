@@ -120,6 +120,7 @@ export class Runtime {
 				  }
 				: {} ),
 			...this.mcp.toolEntries(),
+			...( this.mcp.resourceEntries().length ? { read_mcp_resource: this.#resourceTool() } : {} ),
 		};
 
 		if ( ! allowedTools?.length ) {
@@ -136,6 +137,30 @@ export class Runtime {
 			}
 		}
 		return Object.keys( picked ).length ? picked : all;
+	}
+
+	/** ابزار خواندن منابع MCP — فقط وقتی ساخته می‌شود که سروری منبع داشته باشد. */
+	#resourceTool() {
+		const list = () => this.mcp.resourceEntries();
+		return {
+			risk: /** @type {const} */ ( 'read' ),
+			spec: {
+				name: 'read_mcp_resource',
+				description: `خواندن یک منبع از سرورهای MCP. منابع موجود: ${ list()
+					.slice( 0, 20 )
+					.map( ( r ) => `${ r.server }:${ r.uri }` )
+					.join( '، ' ) }`,
+				parameters: {
+					type: 'object',
+					properties: {
+						server: { type: 'string' },
+						uri: { type: 'string' },
+					},
+					required: [ 'server', 'uri' ],
+				},
+			},
+			run: async ( input ) => this.mcp.readResource( String( input.server ), String( input.uri ) ),
+		};
 	}
 
 	/**

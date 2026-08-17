@@ -70,6 +70,7 @@ const STORED_EVENTS = new Set( [
 	'subagent_start',
 	'subagent_end',
 	'compacted',
+	'parallel',
 ] );
 
 export async function startServer( { port = 7788, host = '127.0.0.1', workspace } = {} ) {
@@ -197,7 +198,9 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			commands: [
 				...BUILTIN_COMMANDS.map( ( c ) => ( { ...c, source: 'builtin' } ) ),
 				...runtime.commands.map( ( c ) => ( { name: c.name, description: c.description, source: c.source, body: c.body } ) ),
+				...runtime.mcp.promptEntries().map( ( p ) => ( { name: p.name, description: p.description, source: 'MCP' } ) ),
 			],
+			resources: runtime.mcp.resourceEntries(),
 			mcp: runtime.mcp.status,
 			connectors: await listConnectors( { workspace: cfg.workspace } ),
 			plugins: await listPlugins( HOME ),
@@ -205,7 +208,7 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			checkpoints: await runtime.checkpoints.list(),
 			memory: Boolean( runtime.projectMemory ),
 			providerInfo: info || null,
-			version: '0.3.0',
+			version: '0.4.0',
 		};
 	}
 
@@ -579,11 +582,28 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 		// ------------------------------------------------------------- چت
 		'POST /api/message': async ( { body } ) => {
 			const text = String( body.text || '' ).trim();
-			if ( ! text ) {
+			const images = normalizeImages( body.images );
+			if ( ! text && ! images.length ) {
 				return { status: 400, body: { error: 'متن خالی است.' } };
 			}
 
 			const intent = parseInput( text, runtime.commands );
+
+			// پرامپت‌های MCP هم مثل دستور اسلش صدا زده می‌شوند، ولی متنشان از خود سرور
+			// گرفته می‌شود: /mcp__<سرور>__<پرامپت> [آرگومان‌ها]
+			if ( intent.kind === 'builtin' && intent.name.startsWith( 'mcp__' ) ) {
+				const entry = runtime.mcp.promptEntries().find( ( p ) => p.name.toLowerCase() === intent.name );
+				if ( entry ) {
+					try {
+						const filled = await runtime.mcp.getPrompt( entry.server, entry.prompt, parseArgs( intent.args ) );
+						intent.kind = 'prompt';
+						intent.text = filled || intent.args || entry.prompt;
+					} catch ( e ) {
+						return { status: 400, body: { error: e?.message || String( e ) } };
+					}
+				}
+			}
+
 			if ( intent.kind === 'builtin' ) {
 				const out = await handleBuiltin( intent.name, intent.args );
 				return { status: 200, body: { ok: true, handled: true, ...out } };
@@ -604,7 +624,7 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			broadcast( { type: 'checkpoint', checkpoints: await runtime.checkpoints.list() } );
 
 			agent
-				.run( intent.text )
+				.run( intent.text, { images } )
 				.then( () => saveSession( sessionId, { messages: agent.messages, transcript, title: sessionTitle } ) );
 			return { status: 202, body: { ok: true } };
 		},
@@ -1036,6 +1056,44 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 	} );
 
 	return { server, port, host, config: runtime.config, runtime };
+}
+
+/**
+ * پیوست‌های تصویری: فقط تصویر، فقط تا سقف معقول، و همیشه base64 خام.
+ * @param {any} value
+ */
+function normalizeImages( value ) {
+	if ( ! Array.isArray( value ) ) {
+		return [];
+	}
+	return value
+		.slice( 0, 8 )
+		.filter( ( x ) => x && typeof x.data === 'string' && /^image\//.test( String( x.mediaType || '' ) ) )
+		.map( ( x ) => ( {
+			name: String( x.name || 'image' ).slice( 0, 120 ),
+			mediaType: String( x.mediaType ),
+			data: String( x.data ).replace( /^data:[^;]+;base64,/, '' ),
+		} ) );
+}
+
+/**
+ * آرگومان‌های یک پرامپت MCP: یا `key=value` است یا یک رشتهٔ آزاد که به `input` می‌رود.
+ * @param {string} args
+ */
+function parseArgs( args ) {
+	const raw = String( args || '' ).trim();
+	if ( ! raw ) {
+		return {};
+	}
+	if ( ! /(^|\s)[\w-]+=/.test( raw ) ) {
+		return { input: raw };
+	}
+	/** @type {Record<string,string>} */
+	const out = {};
+	for ( const m of raw.matchAll( /([\w-]+)=("[^"]*"|\S+)/g ) ) {
+		out[ m[ 1 ] ] = m[ 2 ].replace( /^"|"$/g, '' );
+	}
+	return out;
 }
 
 /** @param {any} value */

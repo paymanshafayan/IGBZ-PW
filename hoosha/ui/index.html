@@ -75,14 +75,18 @@
 		<div class="composer-shell">
 			<div id="queue" class="queue" hidden></div>
 			<div id="cmd-menu" class="cmd-menu" hidden></div>
+			<div id="model-menu" class="cmd-menu model-menu" hidden></div>
 
 			<form id="composer" class="composer">
-				<textarea id="input" rows="1" placeholder="چه کاری انجام بدهم؟  «@» برای فایل، «/» برای دستور"></textarea>
+				<div id="attachments" class="attachments" hidden></div>
+				<textarea id="input" rows="1" placeholder="چه کاری انجام بدهم؟  «@» برای فایل، «/» برای دستور، تصویر را بچسبان"></textarea>
 
 				<div class="composer-bar">
 					<div class="composer-left">
 						<button type="button" class="pill mode-pill" id="pill-mode" data-mode="default" title="حالت کار (Shift+Tab)">◈ عادی</button>
-						<button type="button" class="pill" id="pill-model" title="مدل">—</button>
+						<button type="button" class="pill" id="pill-model" title="مدل — کلیک کن تا عوض شود">—</button>
+						<button type="button" class="pill" id="btn-attach" title="افزودن تصویر">🖼</button>
+						<input type="file" id="file-input" accept="image/*" multiple hidden />
 					</div>
 					<div class="composer-right">
 						<span class="hint">Enter ارسال · Shift+Enter خط تازه · Shift+Tab حالت</span>

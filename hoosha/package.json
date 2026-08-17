@@ -1,6 +1,6 @@
 {
   "name": "hoosha",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "هوشا — دستیار عامل (agent) بومی با پشتیبانی از هر پرووایدری",
   "type": "module",
   "bin": {
@@ -27,5 +27,9 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "node-unrar-js": "^2.0.2"
+  },
+  "exports": {
+    ".": "./src/index.js",
+    "./server": "./src/server.js"
   }
 }

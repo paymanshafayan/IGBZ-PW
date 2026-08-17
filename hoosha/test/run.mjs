@@ -988,6 +988,301 @@ await test( 'بریدن نوار گفتگو، دقیقاً تا پیام کار�
 } );
 
 
+
+// ------------------------------------------------------- محتوای چندرسانه‌ای
+
+section( 'محتوای چندرسانه‌ای' );
+
+const { textOf, buildContent, stripDataUrl, normalizeMediaType } = await import( '../src/content.js' );
+
+await test( 'متن ساده دست‌نخورده می‌ماند و تصویر برچسب می‌گیرد', () => {
+	assert.equal( textOf( 'سلام' ), 'سلام' );
+	assert.equal(
+		textOf( [ { type: 'text', text: 'این را ببین' }, { type: 'image', mediaType: 'image/png', data: 'x', name: 'shot.png' } ] ),
+		'این را ببین\n[تصویر: shot.png]'
+	);
+} );
+
+await test( 'buildContent بدون تصویر، رشته می‌ماند (تا پرووایدرهای قدیمی نشکنند)', () => {
+	assert.equal( buildContent( 'سلام' ), 'سلام' );
+	assert.equal( typeof buildContent( 'سلام', [] ), 'string' );
+} );
+
+await test( 'buildContent با تصویر، آرایهٔ تکه‌ها می‌سازد و data-URL را می‌کند', () => {
+	const out = buildContent( 'ببین', [ { mediaType: 'image/jpg', data: 'data:image/jpeg;base64,AAAA', name: 'a.jpg' } ] );
+	assert.equal( Array.isArray( out ), true );
+	assert.deepEqual( out[ 0 ], { type: 'text', text: 'ببین' } );
+	assert.equal( out[ 1 ].data, 'AAAA' );
+	assert.equal( out[ 1 ].mediaType, 'image/jpeg', 'image/jpg باید به image/jpeg تبدیل شود' );
+} );
+
+await test( 'نوع رسانهٔ ناشناخته به png امن برمی‌گردد', () => {
+	assert.equal( normalizeMediaType( 'application/pdf' ), 'image/png' );
+	assert.equal( stripDataUrl( 'خام' ), 'خام' );
+} );
+
+// ------------------------------------------ پرووایدر: تصویر و استدلال
+
+section( 'پرووایدر: تصویر و استدلال' );
+
+await test( 'آداپتور OpenAI تصویر را به image_url تبدیل می‌کند و استدلال را جدا می‌دهد', async () => {
+	let body = null;
+	const srv = http.createServer( ( req, res ) => {
+		let raw = '';
+		req.on( 'data', ( c ) => ( raw += c ) );
+		req.on( 'end', () => {
+			body = JSON.parse( raw );
+			res.writeHead( 200, { 'Content-Type': 'text/event-stream' } );
+			res.write( `data: ${ JSON.stringify( { choices: [ { delta: { reasoning_content: 'دارم فکر می‌کنم' } } ] } ) }\n\n` );
+			res.write( `data: ${ JSON.stringify( { choices: [ { delta: { content: 'یک گربه' } } ] } ) }\n\n` );
+			res.write( 'data: [DONE]\n\n' );
+			res.end();
+		} );
+	} );
+	await new Promise( ( r ) => srv.listen( 0, r ) );
+	const port = srv.address().port;
+
+	const { createOpenAiProvider } = await import( '../src/providers/openai.js' );
+	const provider = createOpenAiProvider( { providerId: 'x', kind: 'openai', baseUrl: `http://127.0.0.1:${ port }`, model: 'm' } );
+
+	const events = [];
+	for await ( const ev of provider.stream( {
+		model: 'm',
+		messages: [ { role: 'user', content: [ { type: 'text', text: 'چیست؟' }, { type: 'image', mediaType: 'image/png', data: 'QUJD' } ] } ],
+	} ) ) {
+		events.push( ev );
+	}
+	srv.close();
+
+	const parts = body.messages[ 0 ].content;
+	assert.equal( parts[ 1 ].type, 'image_url' );
+	assert.match( parts[ 1 ].image_url.url, /^data:image\/png;base64,QUJD$/ );
+	assert.deepEqual(
+		events.map( ( e ) => e.type ),
+		[ 'thinking', 'text' ]
+	);
+} );
+
+await test( 'آداپتور Anthropic تصویر را به بلوک base64 می‌دهد و thinking را جدا می‌کند', async () => {
+	let body = null;
+	const srv = http.createServer( ( req, res ) => {
+		let raw = '';
+		req.on( 'data', ( c ) => ( raw += c ) );
+		req.on( 'end', () => {
+			body = JSON.parse( raw );
+			res.writeHead( 200, { 'Content-Type': 'text/event-stream' } );
+			res.write(
+				`data: ${ JSON.stringify( { type: 'content_block_delta', index: 0, delta: { type: 'thinking_delta', thinking: 'هوم' } } ) }\n\n`
+			);
+			res.write(
+				`data: ${ JSON.stringify( { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'گربه' } } ) }\n\n`
+			);
+			res.end();
+		} );
+	} );
+	await new Promise( ( r ) => srv.listen( 0, r ) );
+	const port = srv.address().port;
+
+	const { createAnthropicProvider } = await import( '../src/providers/anthropic.js' );
+	const provider = createAnthropicProvider( { providerId: 'x', kind: 'anthropic', baseUrl: `http://127.0.0.1:${ port }`, model: 'm' } );
+
+	const events = [];
+	for await ( const ev of provider.stream( {
+		model: 'm',
+		messages: [ { role: 'user', content: [ { type: 'image', mediaType: 'image/jpeg', data: 'QUJD' } ] } ],
+	} ) ) {
+		events.push( ev );
+	}
+	srv.close();
+
+	const block = body.messages[ 0 ].content[ 0 ];
+	assert.equal( block.type, 'image' );
+	assert.deepEqual( block.source, { type: 'base64', media_type: 'image/jpeg', data: 'QUJD' } );
+	assert.deepEqual(
+		events.map( ( e ) => e.type ),
+		[ 'thinking', 'text' ]
+	);
+} );
+
+// ------------------------------------------------------- اجرای موازی
+
+section( 'اجرای موازی ابزارها' );
+
+await test( 'ابزارهای خواندنی با هم اجرا می‌شوند و ترتیب نتیجه‌ها حفظ می‌شود', async () => {
+	const { Agent } = await import( '../src/agent.js' );
+
+	let inFlight = 0;
+	let peak = 0;
+	const slowRead = ( label ) => ( {
+		risk: 'read',
+		spec: { name: label, description: label, parameters: { type: 'object', properties: {} } },
+		async run() {
+			inFlight++;
+			peak = Math.max( peak, inFlight );
+			await new Promise( ( r ) => setTimeout( r, 40 ) );
+			inFlight--;
+			return label;
+		},
+	} );
+
+	const tools = { r1: slowRead( 'r1' ), r2: slowRead( 'r2' ), r3: slowRead( 'r3' ) };
+
+	let turn = 0;
+	const provider = {
+		async *stream() {
+			if ( turn++ === 0 ) {
+				yield { type: 'tool_call', id: 'a', name: 'r1', input: {} };
+				yield { type: 'tool_call', id: 'b', name: 'r2', input: {} };
+				yield { type: 'tool_call', id: 'c', name: 'r3', input: {} };
+			} else {
+				yield { type: 'text', text: 'تمام' };
+			}
+		},
+	};
+
+	const agent = new Agent( {
+		provider,
+		model: 'm',
+		workspace: tmpRoot,
+		rules: { mode: 'auto' },
+		getTools: () => tools,
+		emit: () => {},
+	} );
+
+	const started = Date.now();
+	await agent.run( 'برو' );
+	const took = Date.now() - started;
+
+	assert.equal( peak, 3, `باید هر سه با هم می‌رفتند، بیشینهٔ هم‌زمانی ${ peak } بود` );
+	assert.ok( took < 110, `سه ابزار ۴۰ میلی‌ثانیه‌ای موازی نباید ${ took }ms طول بکشد` );
+
+	const results = agent.messages.filter( ( m ) => m.role === 'tool' ).map( ( m ) => m.content );
+	assert.deepEqual( results, [ 'r1', 'r2', 'r3' ], 'ترتیب نتیجه‌ها باید همان ترتیب درخواست مدل باشد' );
+} );
+
+await test( 'ابزار نویسنده هرگز موازی نمی‌شود', async () => {
+	const { Agent } = await import( '../src/agent.js' );
+
+	let inFlight = 0;
+	let peak = 0;
+	const writer = ( label ) => ( {
+		risk: 'write',
+		spec: { name: label, description: label, parameters: { type: 'object', properties: {} } },
+		async run() {
+			inFlight++;
+			peak = Math.max( peak, inFlight );
+			await new Promise( ( r ) => setTimeout( r, 20 ) );
+			inFlight--;
+			return label;
+		},
+	} );
+
+	const tools = { w1: writer( 'w1' ), w2: writer( 'w2' ) };
+	let turn = 0;
+	const provider = {
+		async *stream() {
+			if ( turn++ === 0 ) {
+				yield { type: 'tool_call', id: 'a', name: 'w1', input: {} };
+				yield { type: 'tool_call', id: 'b', name: 'w2', input: {} };
+			} else {
+				yield { type: 'text', text: 'تمام' };
+			}
+		},
+	};
+
+	const agent = new Agent( {
+		provider,
+		model: 'm',
+		workspace: tmpRoot,
+		rules: { mode: 'auto' },
+		getTools: () => tools,
+		emit: () => {},
+	} );
+
+	await agent.run( 'برو' );
+	assert.equal( peak, 1, 'ابزارهای نویسنده باید ترتیبی اجرا شوند' );
+} );
+
+// ----------------------------------------------------------------- SDK
+
+section( 'SDK' );
+
+await test( 'query در حالت پیش‌فرض، ابزار پرریسک را رد می‌کند', async () => {
+	const home = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-sdk1-' ) );
+	const prev = process.env.HOOSHA_HOME;
+	process.env.HOOSHA_HOME = home;
+
+	// config.js مسیر خانه را در زمان import می‌خواند، پس ماژول را تازه بارگذاری می‌کنیم.
+	const { query } = await import( `../src/index.js?sdk1=${ Date.now() }` );
+	const out = await query( { prompt: '!echo سلام', workspace: tmpRoot } );
+
+	assert.match( out.text, /اجازه/ );
+	assert.ok( out.events.some( ( e ) => e.type === 'tool_denied' ) );
+
+	process.env.HOOSHA_HOME = prev;
+	await fs.rm( home, { recursive: true, force: true } );
+} );
+
+await test( 'query در حالت auto، ابزار را واقعاً اجرا می‌کند', async () => {
+	const home = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-sdk2-' ) );
+	const prev = process.env.HOOSHA_HOME;
+	process.env.HOOSHA_HOME = home;
+
+	const { query } = await import( `../src/index.js?sdk2=${ Date.now() }` );
+	const out = await query( { prompt: '!echo سلام‌از‌sdk', workspace: tmpRoot, mode: 'auto' } );
+
+	assert.match( out.text, /سلام‌از‌sdk/ );
+	assert.ok( out.events.some( ( e ) => e.type === 'tool_result' ) );
+
+	process.env.HOOSHA_HOME = prev;
+	await fs.rm( home, { recursive: true, force: true } );
+} );
+
+await test( 'allowedTools فهرست ابزار مدل را واقعاً می‌بندد', async () => {
+	const home = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-sdk3-' ) );
+	const prev = process.env.HOOSHA_HOME;
+	process.env.HOOSHA_HOME = home;
+
+	const { createHoosha } = await import( `../src/index.js?sdk3=${ Date.now() }` );
+	const h = await createHoosha( { workspace: tmpRoot, allowedTools: [ 'read_file' ] } );
+	const names = Object.keys( h.runtime.tools() );
+	assert.deepEqual( names, [ 'read_file' ] );
+	await h.close();
+
+	process.env.HOOSHA_HOME = prev;
+	await fs.rm( home, { recursive: true, force: true } );
+} );
+
+// ------------------------------------------------- پرامپت و منبع MCP
+
+section( 'پرامپت و منبع MCP' );
+
+await test( 'پرامپت و منبع سرور MCP خوانده می‌شوند', async () => {
+	const { McpManager } = await import( '../src/mcp.js' );
+	const manager = new McpManager();
+	const fixture = path.resolve( 'test/fixtures/mcp-server.mjs' );
+
+	const status = await manager.connectAll( {
+		home: tmpRoot,
+		workspace: tmpRoot,
+		servers: { demo: { command: process.execPath, args: [ fixture ] } },
+	} );
+	assert.equal( status[ 0 ].status, 'connected', status[ 0 ].error );
+
+	const prompts = manager.promptEntries();
+	assert.deepEqual( prompts.map( ( p ) => p.name ), [ 'mcp__demo__greet' ] );
+
+	const filled = await manager.getPrompt( 'demo', 'greet', { input: 'پیمان' } );
+	assert.match( filled, /به پیمان سلام رسمی بگو/ );
+
+	const resources = manager.resourceEntries();
+	assert.deepEqual( resources.map( ( r ) => r.uri ), [ 'demo://note' ] );
+	assert.equal( await manager.readResource( 'demo', 'demo://note' ), 'محتوای منبع نمونه' );
+
+	await manager.close();
+} );
+
+
 // ------------------------------------------------------------------ پایان
 
 await fs.rm( tmpRoot, { recursive: true, force: true } );

@@ -2,11 +2,15 @@
 /**
  * ورودی خط فرمان هوشا.
  *
- *   hoosha                     اجرای نسخهٔ دسکتاپ (سرور محلی + باز کردن پنجره)
- *   hoosha --port 7788         پورت دلخواه
- *   hoosha --dir /path/to/dir  پوشهٔ کاری
- *   hoosha --no-open           پنجره باز نشود (برای سرور)
- *   hoosha --host 0.0.0.0      شنیدن روی همهٔ رابط‌ها
+ * دو حالت:
+ *
+ *   hoosha                       رابط کاربری (سرور محلی + باز کردن پنجره)
+ *   hoosha -p "کاری که می‌خواهی"   بدون رابط: اجرا کن، جواب را چاپ کن، برو
+ *
+ * حالت دوم برای اسکریپت و CI است و همان چیزی است که در Claude Code به آن headless
+ * می‌گویند. عمداً محتاط است: هر ابزاری که تأیید بخواهد **رد می‌شود**، مگر حالت auto
+ * بدهی یا با --allow قاعده بگذاری. یک اسکریپت خودکار نباید بی‌سروصدا اجازهٔ کار خطرناک
+ * بگیرد.
  */
 
 import { spawn } from 'node:child_process';
@@ -23,24 +27,136 @@ function flag( name, fallback = undefined ) {
 	return next && ! next.startsWith( '--' ) ? next : true;
 }
 
-if ( args.includes( '--help' ) || args.includes( '-h' ) ) {
-	console.log( `
+/** پارامتری که می‌تواند چند بار بیاید یا با کاما جدا شود. */
+function list( name ) {
+	/** @type {string[]} */
+	const out = [];
+	args.forEach( ( a, i ) => {
+		if ( a === `--${ name }` && args[ i + 1 ] && ! args[ i + 1 ].startsWith( '--' ) ) {
+			out.push( ...String( args[ i + 1 ] ).split( ',' ).map( ( s ) => s.trim() ).filter( Boolean ) );
+		}
+	} );
+	return out;
+}
+
+const HELP = `
 هوشا — دستیار عامل بومی
 
-  hoosha                  اجرا با تنظیمات ذخیره‌شده
-  hoosha --dir <path>     تعیین پوشهٔ کاری
-  hoosha --port <n>       پورت (پیش‌فرض 7788)
-  hoosha --host <h>       میزبان (پیش‌فرض 127.0.0.1)
-  hoosha --no-open        پنجره/مرورگر باز نشود
-  hoosha --version        نسخه
-` );
+  رابط کاربری:
+    hoosha                       اجرا با تنظیمات ذخیره‌شده
+    hoosha --dir <path>          تعیین پوشهٔ کاری
+    hoosha --port <n>            پورت (پیش‌فرض 7788)
+    hoosha --host <h>            میزبان (پیش‌فرض 127.0.0.1)
+    hoosha --no-open             پنجره/مرورگر باز نشود
+
+  بدون رابط (headless):
+    hoosha -p "<پرامپت>"          اجرا کن و جواب را چاپ کن
+    hoosha -p - < file.txt       پرامپت را از ورودی استاندارد بخوان
+    --output-format text|json|stream-json
+    --mode plan|default|auto     حالت مجوز (پیش‌فرض default)
+    --allowed-tools a,b          فقط این ابزارها در دسترس مدل باشند
+    --allow "bash:git status"    قاعدهٔ مجوز اضافه (چند بار قابل تکرار)
+    --deny "bash:rm"             قاعدهٔ ممنوع
+    --max-turns <n>              سقف گام (پیش‌فرض ۲۴)
+    --model <name>               مدل، فقط برای همین اجرا
+
+  عمومی:
+    hoosha --version
+    hoosha --help
+`;
+
+if ( args.includes( '--help' ) || args.includes( '-h' ) ) {
+	console.log( HELP );
 	process.exit( 0 );
 }
 
 if ( args.includes( '--version' ) || args.includes( '-v' ) ) {
-	console.log( '0.1.0' );
+	console.log( '0.4.0' );
 	process.exit( 0 );
 }
+
+// ─────────────────────────────────────────────────────────── حالت headless
+
+const printIndex = args.findIndex( ( a ) => a === '-p' || a === '--print' );
+if ( printIndex > -1 ) {
+	const raw = args[ printIndex + 1 ];
+	const prompt = raw === '-' || raw === undefined || raw.startsWith( '--' ) ? await readStdin() : raw;
+
+	if ( ! String( prompt ).trim() ) {
+		console.error( 'پرامپت خالی است.' );
+		process.exit( 2 );
+	}
+
+	const format = String( flag( 'output-format', 'text' ) );
+	const { createHoosha, lastAssistantText } = await import( './index.js' );
+
+	const started = Date.now();
+	/** @type {any[]} */
+	const events = [];
+
+	const h = await createHoosha( {
+		workspace: typeof flag( 'dir' ) === 'string' ? String( flag( 'dir' ) ) : undefined,
+		mode: /** @type {any} */ ( flag( 'mode', 'default' ) ),
+		allowedTools: list( 'allowed-tools' ),
+		allow: list( 'allow' ),
+		deny: list( 'deny' ),
+		maxTurns: Number( flag( 'max-turns', 0 ) ) || undefined,
+		model: typeof flag( 'model' ) === 'string' ? String( flag( 'model' ) ) : undefined,
+		onEvent: ( ev ) => {
+			events.push( ev );
+			if ( format === 'stream-json' ) {
+				process.stdout.write( `${ JSON.stringify( ev ) }\n` );
+			} else if ( format === 'text' && ev.type === 'text' ) {
+				process.stdout.write( ev.text );
+			}
+		},
+	} );
+
+	h.onPermission( () => false );
+	h.onQuestion( () => null );
+
+	if ( ! h.ready.ok ) {
+		console.error( `تنظیمات ناقص است: ${ h.ready.missing.join( '، ' ) }` );
+		console.error( 'یک بار `hoosha` را باز کن و پرووایدر را تنظیم کن.' );
+		process.exit( 3 );
+	}
+
+	let failed = false;
+	try {
+		await h.send( String( prompt ) );
+	} catch ( e ) {
+		console.error( e?.message || String( e ) );
+		failed = true;
+	}
+
+	const text = lastAssistantText( h.messages );
+	const errored = failed || events.some( ( e ) => e.type === 'error' );
+
+	if ( format === 'json' ) {
+		process.stdout.write(
+			`${ JSON.stringify(
+				{
+					ok: ! errored,
+					text,
+					usage: h.usage,
+					durationMs: Date.now() - started,
+					tools: events.filter( ( e ) => e.type === 'tool_start' ).map( ( e ) => e.name ),
+					denied: events.filter( ( e ) => e.type === 'tool_denied' ).map( ( e ) => e.summary ),
+					errors: events.filter( ( e ) => e.type === 'error' ).map( ( e ) => e.error ),
+				},
+				null,
+				2
+			) }\n`
+		);
+	} else if ( format === 'text' ) {
+		process.stdout.write( '\n' );
+	}
+
+	await h.close();
+	process.exit( errored ? 1 : 0 );
+}
+
+// ───────────────────────────────────────────────────────────── حالت رابط
 
 const port = Number( flag( 'port', 7788 ) );
 const host = String( flag( 'host', '127.0.0.1' ) );
@@ -81,4 +197,17 @@ function openBrowser( target ) {
 	} catch {
 		// روی سرور بدون محیط گرافیکی طبیعی است؛ آدرس بالا چاپ شده.
 	}
+}
+
+function readStdin() {
+	return new Promise( ( resolve ) => {
+		if ( process.stdin.isTTY ) {
+			resolve( '' );
+			return;
+		}
+		let data = '';
+		process.stdin.setEncoding( 'utf8' );
+		process.stdin.on( 'data', ( c ) => ( data += c ) );
+		process.stdin.on( 'end', () => resolve( data.trim() ) );
+	} );
 }

@@ -13,6 +13,7 @@
  */
 
 import { decide, describeCall } from './permissions.js';
+import { buildContent, textOf } from './content.js';
 import { shouldCompact, compact } from './subagent.js';
 import { explain } from './errors.js';
 
@@ -112,8 +113,11 @@ export class Agent {
 		return { before, after: this.messages.length };
 	}
 
-	/** @param {string} text */
-	async run( text ) {
+	/**
+	 * @param {string} text
+	 * @param {{images?:{name?:string,mediaType:string,data:string}[]}} [opts]
+	 */
+	async run( text, opts = {} ) {
 		if ( this.busy ) {
 			throw new Error( 'یک درخواست در حال اجراست.' );
 		}
@@ -132,8 +136,9 @@ export class Agent {
 				}
 			}
 
-			this.messages.push( { role: 'user', content: text } );
-			this.emit( { type: 'user', text } );
+			const content = buildContent( text, opts.images );
+			this.messages.push( { role: 'user', content } );
+			this.emit( { type: 'user', text, images: ( opts.images || [] ).map( ( i ) => ( { name: i.name, mediaType: i.mediaType } ) ) } );
 
 			if ( this.autoCompact && shouldCompact( this.messages ) ) {
 				this.emit( { type: 'notice', text: 'گفتگو طولانی شد؛ خلاصه‌اش می‌کنم.' } );
@@ -185,6 +190,8 @@ export class Agent {
 			if ( ev.type === 'text' ) {
 				text += ev.text;
 				this.emit( { type: 'text', text: ev.text } );
+			} else if ( ev.type === 'thinking' ) {
+				this.emit( { type: 'thinking', text: ev.text } );
 			} else if ( ev.type === 'tool_call' ) {
 				toolCalls.push( { id: ev.id, name: ev.name, input: ev.input } );
 			} else if ( ev.type === 'usage' ) {
@@ -202,10 +209,46 @@ export class Agent {
 		} );
 		this.emit( { type: 'assistant_end', text, toolCalls } );
 
-		for ( const call of toolCalls ) {
-			const result = await this.#runTool( call, tools );
-			this.messages.push( { role: 'tool', toolCallId: call.id, content: result } );
+		/**
+		 * اجرای ابزارها.
+		 *
+		 * ابزارهای «فقط خواندنی» در یک نوبت با هم اجرا می‌شوند — وقتی مدل پنج فایل را
+		 * هم‌زمان می‌خواهد، صف‌کردنشان فقط وقت تلف‌کردن است. هر چیزی که می‌نویسد یا اجرا
+		 * می‌کند، ترتیبی می‌ماند: هم چون ممکن است روی هم اثر بگذارند، هم چون دروازهٔ تأیید
+		 * نباید چند پنجره را با هم جلوی کاربر بگذارد.
+		 *
+		 * نتیجه‌ها به همان ترتیبِ درخواستِ مدل برمی‌گردند، وگرنه مدل گیج می‌شود.
+		 */
+		const results = new Array( toolCalls.length );
+		let i = 0;
+		while ( i < toolCalls.length ) {
+			const call = toolCalls[ i ];
+			const safe = tools[ call.name ]?.risk === 'read';
+
+			if ( ! safe ) {
+				results[ i ] = await this.#runTool( call, tools );
+				i++;
+				continue;
+			}
+
+			let j = i;
+			while ( j < toolCalls.length && tools[ toolCalls[ j ].name ]?.risk === 'read' ) {
+				j++;
+			}
+			const batch = toolCalls.slice( i, j );
+			if ( batch.length > 1 ) {
+				this.emit( { type: 'parallel', count: batch.length, names: batch.map( ( c ) => c.name ) } );
+			}
+			const out = await Promise.all( batch.map( ( c ) => this.#runTool( c, tools ) ) );
+			out.forEach( ( value, k ) => {
+				results[ i + k ] = value;
+			} );
+			i = j;
 		}
+
+		toolCalls.forEach( ( call, index ) => {
+			this.messages.push( { role: 'tool', toolCallId: call.id, content: results[ index ] } );
+		} );
 
 		return { text, toolCalls };
 	}

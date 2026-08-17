@@ -9,6 +9,8 @@
  * به‌صورت tool_call بیرون می‌دهد.
  */
 
+import { textOf } from '../content.js';
+
 /** @param {import('./types.js').ProviderConfig} _cfg */
 export function createMockProvider( _cfg ) {
 	return {
@@ -25,7 +27,7 @@ export function createMockProvider( _cfg ) {
 		 */
 		async *stream( req ) {
 			const lastUser = [ ...req.messages ].reverse().find( ( m ) => m.role === 'user' );
-			const text = String( lastUser?.content || '' ).trim();
+			const text = textOf( lastUser?.content || '' ).trim();
 
 			// فقط ابزارهای «همین نوبت» مهم‌اند، نه کل تاریخچه — وگرنه بعد از اولین ابزار،
 			// مدل آزمایشی تا آخر عمر نشست فکر می‌کند کارش تمام شده.
@@ -35,7 +37,7 @@ export function createMockProvider( _cfg ) {
 			// دور دوم: نتیجهٔ ابزار آمده، پس فقط جمع‌بندی می‌کنیم.
 			if ( alreadyRan ) {
 				const lastTool = [ ...req.messages ].reverse().find( ( m ) => m.role === 'tool' );
-				const out = String( lastTool?.content || '' );
+				const out = textOf( lastTool?.content || '' );
 				for ( const piece of chunk( `نتیجه را گرفتم. خلاصه‌اش این است:\n\n${ out.slice( 0, 800 ) }` ) ) {
 					yield { type: 'text', text: piece };
 					await sleep( 12 );

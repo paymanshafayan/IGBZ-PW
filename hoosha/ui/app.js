@@ -29,8 +29,8 @@ mountThread( {
 } );
 
 initComposer( {
-	onSend: async ( text ) => {
-		const out = await post( '/api/message', { text } );
+	onSend: async ( text, images ) => {
+		const out = await post( '/api/message', { text, images } );
 		if ( out.error ) {
 			addError( out.error );
 		}
@@ -287,7 +287,7 @@ $( '#btn-workspace' ).onclick = async () => {
 	toast( 'پوشهٔ کاری عوض شد.' );
 };
 
-$( '#pill-model' ).onclick = () => openSettings( 'provider' );
+document.addEventListener( 'hoosha:settings', ( e ) => openSettings( e.detail ) );
 $( '#session-title' ).onclick = async () => {
 	const s = getState();
 	const title = await promptDialog( 'نام گفتگو:', s?.sessionTitle || '' );

@@ -3,6 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { SESSIONS_DIR, ensureHome } from './config.js';
+import { textOf } from './content.js';
 
 /** @param {string} id */
 function fileFor( id ) {
@@ -19,7 +20,7 @@ export async function saveSession( id, data ) {
 	const title =
 		data.title ||
 		previous?.title ||
-		data.messages?.find( ( m ) => m.role === 'user' )?.content?.slice( 0, 60 ) ||
+		textOf( data.messages?.find( ( m ) => m.role === 'user' )?.content || '' ).slice( 0, 60 ) ||
 		'بدون عنوان';
 	await fs.writeFile(
 		fileFor( id ),

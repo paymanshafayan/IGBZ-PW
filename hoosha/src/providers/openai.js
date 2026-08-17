@@ -67,7 +67,7 @@ export function createOpenAiProvider( cfg ) {
 					} );
 					continue;
 				}
-				messages.push( { role: m.role, content: m.content } );
+				messages.push( { role: m.role, content: toOpenAiContent( m.content ) } );
 			}
 
 			const payload = {
@@ -128,6 +128,11 @@ export function createOpenAiProvider( cfg ) {
 				if ( delta.content ) {
 					yield { type: 'text', text: delta.content };
 				}
+				// مدل‌های استدلالی (o-series، DeepSeek-R1، …) فکرشان را جدا می‌فرستند.
+				const thought = delta.reasoning_content ?? delta.reasoning;
+				if ( typeof thought === 'string' && thought ) {
+					yield { type: 'thinking', text: thought };
+				}
 				for ( const call of delta.tool_calls || [] ) {
 					const idx = call.index ?? 0;
 					const cur = pending.get( idx ) || { id: '', name: '', args: '' };
@@ -171,4 +176,19 @@ export function createOpenAiProvider( cfg ) {
 			}
 		},
 	};
+}
+
+/**
+ * محتوای پیام کاربر به شکل OpenAI. تصویر به data-URL تبدیل می‌شود.
+ * @param {any} content
+ */
+function toOpenAiContent( content ) {
+	if ( ! Array.isArray( content ) ) {
+		return content;
+	}
+	return content.map( ( part ) =>
+		part.type === 'image'
+			? { type: 'image_url', image_url: { url: `data:${ part.mediaType };base64,${ part.data }` } }
+			: { type: 'text', text: part.text || '' }
+	);
 }

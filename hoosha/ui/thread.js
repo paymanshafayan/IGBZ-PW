@@ -11,6 +11,7 @@ import { post } from './lib/api.js';
 
 let chat = null;
 let streamEl = null;
+let thinkEl = null;
 const toolEls = new Map();
 /** @type {(text:string)=>void} */
 let onResend = () => {};
@@ -30,6 +31,7 @@ export function clearThread() {
 	chat.replaceChildren();
 	toolEls.clear();
 	streamEl = null;
+	thinkEl = null;
 }
 
 function atBottom() {
@@ -52,7 +54,7 @@ function append( node ) {
 
 // ─────────────────────────────────────────────────────────────────── پیام‌ها
 
-export function addMessage( role, text, asMarkdown = true ) {
+export function addMessage( role, text, asMarkdown = true, images = [] ) {
 	const wrap = el( 'div', `msg ${ role }` );
 
 	const gutter = el( 'div', 'gutter' );
@@ -68,6 +70,18 @@ export function addMessage( role, text, asMarkdown = true ) {
 		body.textContent = text;
 	}
 	col.appendChild( body );
+
+	if ( images?.length ) {
+		const strip = el( 'div', 'msg-images' );
+		for ( const img of images ) {
+			strip.appendChild(
+				img.data
+					? h( 'img', { src: `data:${ img.mediaType };base64,${ img.data }`, alt: img.name || 'تصویر' } )
+					: h( 'span', { class: 'img-chip', text: `🖼 ${ img.name || 'تصویر' }` } )
+			);
+		}
+		col.appendChild( strip );
+	}
 
 	const actions = el( 'div', 'msg-actions' );
 	const copy = el( 'button', 'ghost-btn', 'کپی' );
@@ -478,12 +492,27 @@ function questionCard( ev ) {
 export function handleEvent( ev ) {
 	switch ( ev.type ) {
 		case 'user':
-			addMessage( 'user', ev.text, false );
+			addMessage( 'user', ev.text, false, ev.images );
 			break;
 
 		case 'assistant_start':
 			streamEl = addMessage( 'assistant', '' );
 			streamEl._raw = '';
+			break;
+
+		case 'thinking': {
+			if ( ! thinkEl ) {
+				thinkEl = thinkingBlock();
+			}
+			thinkEl._body.textContent += ev.text;
+			if ( atBottom() ) {
+				scrollToEnd();
+			}
+			break;
+		}
+
+		case 'parallel':
+			addNotice( `${ ev.count } ابزار خواندنی را با هم اجرا می‌کنم: ${ ( ev.names || [] ).join( '، ' ) }` );
 			break;
 
 		case 'text': {
@@ -506,6 +535,12 @@ export function handleEvent( ev ) {
 				streamEl.closest( '.msg' )?.remove();
 			}
 			streamEl = null;
+			if ( thinkEl ) {
+				thinkEl.classList.add( 'done' );
+				thinkEl.querySelector( 'b' ).textContent = 'فکر کرد';
+				thinkEl.querySelector( '.spin' )?.remove();
+				thinkEl = null;
+			}
 			break;
 
 		case 'system':
