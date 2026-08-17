@@ -2029,3 +2029,50 @@ kbd {
 		font-size: 1.5rem;
 	}
 }
+
+/* ════════════════════════════ جزئیاتی که از اسکرین‌شات Claude آمد */
+
+/* ردیف آیکون‌های زیر پیام */
+.act-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+}
+
+/* خروجی بلند ابزار: یک تکه پیداست و بقیه محو می‌شود */
+.tool-body.peek {
+	max-height: 132px;
+	overflow: hidden;
+	-webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+	mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+}
+
+/* دکمهٔ «برو به آخر» */
+.jump-down {
+	position: absolute;
+	inset-inline-start: 50%;
+	transform: translateX(50%);
+	bottom: 126px;
+	width: 34px;
+	height: 34px;
+	border-radius: 50%;
+	border: 1px solid var(--line);
+	background: var(--bg-raise);
+	color: var(--fg-dim);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 6px 18px #0004;
+	z-index: 15;
+}
+.jump-down:hover {
+	color: var(--fg);
+	border-color: var(--fg-mute);
+}
+.view-chat {
+	position: relative;
+}

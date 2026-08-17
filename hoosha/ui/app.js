@@ -23,7 +23,15 @@ import { initRail, paintRail } from './rail.js';
 import { initSettings, openSettings, renderSection } from './settings.js';
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 
-document.documentElement.dataset.theme = localStorage.getItem( 'hoosha-theme' ) || 'dark';
+// تم: تا وقتی کاربر خودش انتخاب نکرده، از تنظیم سیستم پیروی می‌کنیم — مثل Claude.
+const savedTheme = localStorage.getItem( 'hoosha-theme' );
+const systemDark = window.matchMedia?.( '(prefers-color-scheme: dark)' );
+document.documentElement.dataset.theme = savedTheme || ( systemDark?.matches ? 'dark' : 'light' );
+systemDark?.addEventListener?.( 'change', ( e ) => {
+	if ( ! localStorage.getItem( 'hoosha-theme' ) ) {
+		document.documentElement.dataset.theme = e.matches ? 'dark' : 'light';
+	}
+} );
 
 // ───────────────────────────────────────────────────────── نماها
 
@@ -443,6 +451,10 @@ async function boot() {
 		renderTranscript( s.transcript );
 	} else {
 		showWelcome();
+		const g = $( '#greet-text' );
+		if ( g ) {
+			g.textContent = greeting();
+		}
 	}
 	for ( const ask of s.pendingAsk || [] ) {
 		handleEvent( ask );

@@ -1613,6 +1613,35 @@ await test( 'ناوبری مستقیم در نوار کناری هست (نه ف�
 } );
 
 
+
+await test( 'خروجی بلند ابزار، محو شونده جمع می‌شود نه اینکه ناپدید شود', () => {
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.match( thread, /classList\.add\( 'peek' \)/ );
+	assert.match( cssBlock( '.tool-body.peek' ), /mask-image/ );
+	assert.match( cssBlock( '.tool-body.peek' ), /max-height/ );
+} );
+
+await test( 'دکمهٔ «برو به آخر» وجود دارد و به اسکرول وصل است', () => {
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.match( thread, /jump-down/ );
+	assert.match( thread, /addEventListener\( 'scroll'/ );
+	assert.match( cssBlock( '.jump-down' ), /position:\s*absolute/ );
+} );
+
+await test( 'تم، تا وقتی کاربر انتخاب نکرده از سیستم پیروی می‌کند', () => {
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /prefers-color-scheme: dark/ );
+	assert.match( app, /localStorage\.getItem\( 'hoosha-theme' \)/ );
+} );
+
+await test( 'دکمه‌های زیر پیام آیکون‌اند نه متن', () => {
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.match( thread, /function iconBtn/ );
+	assert.match( thread, /<svg viewBox="0 0 20 20"/ );
+	assert.equal( /'act-btn', 'کپی'/.test( thread ), false, 'دکمه باید آیکون باشد نه کلمه' );
+} );
+
+
 // ------------------------------------------------------------------ پایان
 
 await fs.rm( tmpRoot, { recursive: true, force: true } );

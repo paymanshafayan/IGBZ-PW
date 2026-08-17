@@ -25,6 +25,19 @@ export function mountThread( opts ) {
 	chat = opts.root;
 	onResend = opts.onResend;
 	onOpenFile = opts.onOpenFile;
+
+	const jump = h( 'button', {
+		class: 'jump-down',
+		id: 'jump-down',
+		title: 'برو به آخر',
+		hidden: true,
+		onClick: () => scrollToEnd(),
+	}, [ h( 'span', { text: '↓' } ) ] );
+	chat.parentElement.appendChild( jump );
+
+	chat.addEventListener( 'scroll', () => {
+		jump.hidden = atBottom();
+	} );
 }
 
 export function clearThread() {
@@ -33,6 +46,26 @@ export function clearThread() {
 	streamEl = null;
 	thinkEl = null;
 	workingEl = null;
+}
+
+/**
+ * دکمهٔ کوچک آیکونی — همان ردیفی که در Claude زیر هر پاسخ می‌آید.
+ * @param {string} title
+ * @param {string} d مسیر SVG
+ * @param {()=>void} onClick
+ */
+function iconBtn( title, d, onClick ) {
+	const b = el( 'button', 'act-btn' );
+	b.title = title;
+	b.innerHTML = `<svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${ d }"/></svg>`;
+	b.onclick = onClick;
+	return b;
+}
+
+/** آخرین چیزی که کاربر گفته — برای دکمهٔ «دوباره» زیر پاسخ. */
+function lastUserText() {
+	const all = [ ...chat.querySelectorAll( '.msg.user .body' ) ];
+	return all.length ? all[ all.length - 1 ].textContent || '' : '';
 }
 
 function atBottom() {
@@ -82,15 +115,16 @@ export function addMessage( role, text, asMarkdown = true, images = [] ) {
 	}
 
 	const actions = el( 'div', 'msg-actions' );
-	const copy = el( 'button', 'act-btn', 'کپی' );
-	copy.onclick = () => copyText( body.dataset.raw || body.textContent || '' );
-	actions.appendChild( copy );
-
-	if ( role === 'user' ) {
-		const again = el( 'button', 'act-btn', 'دوباره' );
-		again.onclick = () => onResend( body.textContent || '' );
-		actions.appendChild( again );
-	}
+	actions.appendChild(
+		iconBtn( 'کپی', 'M7 7V4.5A1.5 1.5 0 018.5 3h7A1.5 1.5 0 0117 4.5v7a1.5 1.5 0 01-1.5 1.5H13M3 8.5A1.5 1.5 0 014.5 7h7A1.5 1.5 0 0113 8.5v7a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 013 15.5z', () =>
+			copyText( body.dataset.raw || body.textContent || '' )
+		)
+	);
+	actions.appendChild(
+		iconBtn( 'دوباره', 'M16 6v4h-4M4 14v-4h4M15.5 9a5.5 5.5 0 00-9.6-2.6M4.5 11a5.5 5.5 0 009.6 2.6', () =>
+			onResend( role === 'user' ? body.textContent || '' : lastUserText() )
+		)
+	);
 
 	col.appendChild( actions );
 	append( wrap );
@@ -345,10 +379,17 @@ function finishTool( id, { output, error, denied, reason } ) {
 
 	const node = error || denied ? h( 'pre', { class: 'tool-body mono', text: String( body ) } ) : renderOutput( card._name, body );
 
-	const short = String( body ).split( '\n' ).length <= 14;
+	const lines = String( body ).split( '\n' ).length;
+	const short = lines <= 14;
 	node.hidden = ! short;
 	if ( short ) {
 		card.classList.add( 'open' );
+	} else {
+		// خروجی بلند، جمع می‌ماند ولی یک تکه‌اش با محوشدگی پیداست — همان کاری که
+		// Claude می‌کند تا بدانی چیزی هست بدون اینکه صفحه را ببلعد.
+		node.hidden = false;
+		node.classList.add( 'peek' );
+		card.addEventListener( 'click', () => node.classList.toggle( 'peek', ! card.classList.contains( 'open' ) ) );
 	}
 
 	// خط اول خروجی، خلاصهٔ خوبی برای هدر است (مثلاً «+12 −3»).
