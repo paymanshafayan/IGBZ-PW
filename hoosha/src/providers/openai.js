@@ -6,28 +6,26 @@
  */
 
 import { sseLines } from './sse.js';
+import { buildHeaders, authedUrl, finalizePayload, backoff, reshapeMessages } from './wire.js';
 
 /** @param {import('./types.js').ProviderConfig} cfg */
 export function createOpenAiProvider( cfg ) {
 	const base = ( cfg.baseUrl || '' ).replace( /\/+$/, '' );
+	const overrides = cfg.overrides || {};
 
-	/** @type {Record<string,string>} */
-	const headers = {
-		'Content-Type': 'application/json',
-	};
-	if ( cfg.apiKey ) {
-		headers.Authorization = `Bearer ${ cfg.apiKey }`;
-	}
 	// OpenRouter این دو را برای شناسایی برنامه می‌خواهد (اختیاری ولی مؤدبانه).
-	headers['HTTP-Referer'] = 'https://github.com/paymanshafayan/IGBZ-WP';
-	headers['X-Title'] = 'Hoosha';
+	const headers = buildHeaders( cfg, {
+		'HTTP-Referer': 'https://github.com/paymanshafayan/IGBZ-WP',
+		'X-Title': 'Hoosha',
+	} );
 
 	return {
 		id: cfg.providerId,
 		kind: /** @type {const} */ ( 'openai' ),
 
 		async listModels() {
-			const res = await fetch( `${ base }/models`, { headers } );
+			const path = cfg.modelsPath || '/models';
+			const res = await fetch( authedUrl( `${ base }${ path.startsWith( '/' ) ? path : `/${ path }` }`, cfg ), { headers } );
 			if ( ! res.ok ) {
 				throw new Error( `فهرست مدل‌ها گرفته نشد (${ res.status })` );
 			}
@@ -41,12 +39,17 @@ export function createOpenAiProvider( cfg ) {
 		 * @returns {AsyncGenerator<import('./types.js').StreamEvent>}
 		 */
 		async *stream( req ) {
+			// وصلهٔ «عقب‌نشینی و تکرار» اینجا اثر می‌کند، قبل از اینکه دست به شبکه ببریم.
+			await backoff( overrides, req.signal );
+
+			const shaped = reshapeMessages( req.messages, req.system || '', overrides.reshape );
+
 			/** @type {any[]} */
 			const messages = [];
-			if ( req.system ) {
-				messages.push( { role: 'system', content: req.system } );
+			if ( shaped.system ) {
+				messages.push( { role: 'system', content: shaped.system } );
 			}
-			for ( const m of req.messages ) {
+			for ( const m of shaped.messages ) {
 				if ( m.role === 'tool' ) {
 					messages.push( {
 						role: 'tool',
@@ -70,10 +73,10 @@ export function createOpenAiProvider( cfg ) {
 				messages.push( { role: m.role, content: toOpenAiContent( m.content ) } );
 			}
 
-			const payload = {
+			const payload = finalizePayload( {
 				model: req.model,
 				messages,
-				stream: true,
+				stream: ! overrides.noStream,
 				...( req.temperature !== undefined ? { temperature: req.temperature } : {} ),
 				...( req.maxTokens ? { max_tokens: req.maxTokens } : {} ),
 				...( req.tools?.length
@@ -89,9 +92,9 @@ export function createOpenAiProvider( cfg ) {
 							tool_choice: 'auto',
 					  }
 					: {} ),
-			};
+			}, overrides );
 
-			const res = await fetch( `${ base }/chat/completions`, {
+			const res = await fetch( authedUrl( `${ base }/chat/completions`, cfg ), {
 				method: 'POST',
 				headers,
 				body: JSON.stringify( payload ),
@@ -101,6 +104,29 @@ export function createOpenAiProvider( cfg ) {
 			if ( ! res.ok || ! res.body ) {
 				const text = await res.text().catch( () => '' );
 				yield { type: 'error', error: `پاسخ ${ res.status } از پرووایدر: ${ text.slice( 0, 500 ) }` };
+				return;
+			}
+
+			// سرویسی که استریم ندارد، کل پاسخ را یک‌جا می‌دهد. وصلهٔ `disable_stream`
+			// همین مسیر را روشن می‌کند تا لازم نباشد پرووایدر را کنار بگذاریم.
+			if ( overrides.noStream ) {
+				const body = await res.json().catch( () => null );
+				const choice = body?.choices?.[ 0 ]?.message;
+				if ( choice?.content ) {
+					yield { type: 'text', text: String( choice.content ) };
+				}
+				for ( const call of choice?.tool_calls || [] ) {
+					let input = {};
+					try {
+						input = call.function?.arguments ? JSON.parse( call.function.arguments ) : {};
+					} catch {
+						input = { __raw: call.function?.arguments };
+					}
+					yield { type: 'tool_call', id: call.id || `call_${ Math.random().toString( 36 ).slice( 2, 10 ) }`, name: call.function?.name || '', input };
+				}
+				if ( body?.usage ) {
+					yield { type: 'usage', inputTokens: body.usage.prompt_tokens ?? 0, outputTokens: body.usage.completion_tokens ?? 0 };
+				}
 				return;
 			}
 

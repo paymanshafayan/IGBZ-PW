@@ -8,28 +8,27 @@
  */
 
 import { sseLines } from './sse.js';
+import { buildHeaders, authedUrl, finalizePayload, backoff, reshapeMessages } from './wire.js';
 
 const ANTHROPIC_VERSION = '2023-06-01';
 
 /** @param {import('./types.js').ProviderConfig} cfg */
 export function createAnthropicProvider( cfg ) {
 	const base = ( cfg.baseUrl || 'https://api.anthropic.com' ).replace( /\/+$/, '' );
+	const overrides = cfg.overrides || {};
 
-	/** @type {Record<string,string>} */
-	const headers = {
-		'Content-Type': 'application/json',
-		'anthropic-version': ANTHROPIC_VERSION,
-	};
-	if ( cfg.apiKey ) {
-		headers['x-api-key'] = cfg.apiKey;
-	}
+	const headers = buildHeaders(
+		{ ...cfg, authStyle: cfg.authStyle || 'x-api-key' },
+		{ 'anthropic-version': ANTHROPIC_VERSION }
+	);
 
 	return {
 		id: cfg.providerId,
 		kind: /** @type {const} */ ( 'anthropic' ),
 
 		async listModels() {
-			const res = await fetch( `${ base }/v1/models`, { headers } );
+			const path = cfg.modelsPath || '/v1/models';
+			const res = await fetch( authedUrl( `${ base }${ path.startsWith( '/' ) ? path : `/${ path }` }`, cfg ), { headers } );
 			if ( ! res.ok ) {
 				throw new Error( `فهرست مدل‌ها گرفته نشد (${ res.status })` );
 			}
@@ -43,10 +42,14 @@ export function createAnthropicProvider( cfg ) {
 		 * @returns {AsyncGenerator<import('./types.js').StreamEvent>}
 		 */
 		async *stream( req ) {
+			await backoff( overrides, req.signal );
+
+			const shaped = reshapeMessages( req.messages, req.system || '', overrides.reshape );
+
 			/** @type {any[]} */
 			const messages = [];
 
-			for ( const m of req.messages ) {
+			for ( const m of shaped.messages ) {
 				if ( m.role === 'tool' ) {
 					const last = messages[ messages.length - 1 ];
 					const block = {
@@ -79,11 +82,11 @@ export function createAnthropicProvider( cfg ) {
 				messages.push( { role: m.role, content: toAnthropicContent( m.content ) } );
 			}
 
-			const payload = {
+			const payload = finalizePayload( {
 				model: req.model,
 				max_tokens: req.maxTokens || 8192,
-				stream: true,
-				...( req.system ? { system: req.system } : {} ),
+				stream: ! overrides.noStream,
+				...( shaped.system ? { system: shaped.system } : {} ),
 				...( req.temperature !== undefined ? { temperature: req.temperature } : {} ),
 				messages,
 				...( req.tools?.length
@@ -95,9 +98,9 @@ export function createAnthropicProvider( cfg ) {
 							} ) ),
 					  }
 					: {} ),
-			};
+			}, overrides );
 
-			const res = await fetch( `${ base }/v1/messages`, {
+			const res = await fetch( authedUrl( `${ base }/v1/messages`, cfg ), {
 				method: 'POST',
 				headers,
 				body: JSON.stringify( payload ),
@@ -107,6 +110,21 @@ export function createAnthropicProvider( cfg ) {
 			if ( ! res.ok || ! res.body ) {
 				const text = await res.text().catch( () => '' );
 				yield { type: 'error', error: `پاسخ ${ res.status } از پرووایدر: ${ text.slice( 0, 500 ) }` };
+				return;
+			}
+
+			if ( overrides.noStream ) {
+				const body = await res.json().catch( () => null );
+				for ( const block of body?.content || [] ) {
+					if ( block.type === 'text' && block.text ) {
+						yield { type: 'text', text: block.text };
+					} else if ( block.type === 'tool_use' ) {
+						yield { type: 'tool_call', id: block.id, name: block.name, input: block.input ?? {} };
+					}
+				}
+				if ( body?.usage ) {
+					yield { type: 'usage', inputTokens: body.usage.input_tokens ?? 0, outputTokens: body.usage.output_tokens ?? 0 };
+				}
 				return;
 			}
 

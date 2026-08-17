@@ -1685,13 +1685,17 @@ await test( 'زیربخش‌های فضای کار همان‌جا باز می�
 	assert.match( css, /\.tab-btn\s*\{/ );
 } );
 
-await test( 'همهٔ چهارده بخش تنظیمات، رندرکنندهٔ واقعی دارند', async () => {
-	const mod = await import( `../ui/settings.js?tabs=${ Date.now() }` ).catch( () => null );
+await test( 'همهٔ بخش‌های تنظیمات رندرکنندهٔ واقعی دارند', async () => {
 	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
-	const tabs = [ ...settings.matchAll( /\{ id: '([\w]+)', label:/g ) ].map( ( m ) => m[ 1 ] );
-	assert.equal( tabs.length, 14, `انتظار ۱۴ تب، ${ tabs.length } پیدا شد` );
+	const tabs = [ ...settings.matchAll( /\{ id: '([\w-]+)', label:/g ) ].map( ( m ) => m[ 1 ] );
+	// نوزده تب: چهارده تای قبلی + پنج صفحهٔ هاب.
+	assert.equal( tabs.length, 19, `انتظار ۱۹ تب، ${ tabs.length } پیدا شد` );
 	for ( const t of tabs ) {
-		assert.ok( new RegExp( `\\n\\t${ t }: render` ).test( settings ), `تب ${ t } رندرکننده ندارد` );
+		const key = /-/.test( t ) ? `'${ t }'` : t;
+		assert.ok(
+			new RegExp( `\\n\\t${ key.replace( /[-']/g, ( c ) => '\\' + c ) }: ` ).test( settings ),
+			`تب ${ t } رندرکننده ندارد`
+		);
 	}
 } );
 
@@ -2170,6 +2174,1480 @@ await test( 'ابزار install هست تا «آدرس را بینداز و بگ
 	assert.match( rt, /install: this\.#installTool\(\)/ );
 } );
 
+
+// ---------------------------------------------------------------- هاب: تشخیص جنس درخواست
+
+section( 'هاب — تشخیص جنس درخواست' );
+
+const { classify, hasWord, persianRatio } = await import( '../src/hub/classify.js' );
+
+await test( 'مرز کلمه برای فارسی کار می‌کند (جایی که \\b شکست می‌خورد)', () => {
+	assert.equal( hasWord( 'یک خطا رخ داد', 'خطا' ), true );
+	assert.equal( hasWord( 'مخطای', 'خطا' ), false, 'نباید داخل کلمهٔ دیگر بگیرد' );
+	assert.equal( hasWord( 'خطا.', 'خطا' ), true, 'نقطه مرز کلمه است' );
+	assert.equal( hasWord( 'debugging', 'debug' ), false );
+} );
+
+await test( 'نسبت فارسی متن را درست می‌سنجد', () => {
+	assert.equal( persianRatio( 'hello world' ), 0 );
+	assert.ok( persianRatio( 'سلام دنیا' ) > 0.9 );
+	assert.equal( persianRatio( '12345' ), 0, 'رقم حرف نیست' );
+} );
+
+await test( 'درخواست عیب‌یابی، دستهٔ debug می‌گیرد نه coding', () => {
+	const out = classify( { text: 'این تابع باگ دارد و ارور می‌دهد، عیب‌یابی کن' } );
+	assert.equal( out.category, 'debug' );
+	assert.ok( out.confidence > 0.2 );
+} );
+
+await test( 'رد پشتهٔ خطا از هر کلیدواژه‌ای گویاتر است', () => {
+	const out = classify( { text: 'Traceback (most recent call last)\n  File "a.py", line 3' } );
+	assert.equal( out.category, 'debug' );
+} );
+
+await test( 'تصویر در ورودی یعنی بینایی، هرچه متن بگوید', () => {
+	const out = classify( { text: 'این را ترجمه کن', hasImages: true } );
+	assert.equal( out.category, 'vision' );
+} );
+
+await test( 'متن بی‌نشانه، دستهٔ عمومی با اطمینان صفر می‌گیرد', () => {
+	const out = classify( { text: 'سلام' } );
+	assert.equal( out.category, 'general' );
+	assert.equal( out.confidence, 0 );
+} );
+
+await test( 'دو دستهٔ هم‌امتیاز یعنی اطمینان پایین، نه اطمینان بالا', () => {
+	const tie = classify( { text: 'این کد خراب است' } );
+	assert.ok( tie.confidence < 0.45, `اطمینان ${ tie.confidence } برای یک تساوی خیلی بالاست` );
+	const clear = classify( { text: 'این تابع باگ دارد، traceback بده و عیب‌یابی کن' } );
+	assert.ok( clear.confidence > tie.confidence );
+} );
+
+await test( 'پسوند فایل و ابزار درگیر روی تشخیص اثر می‌گذارند', () => {
+	const out = classify( { text: 'این را درست کن', files: [ 'src/App.php' ], tools: [ 'edit_file' ] } );
+	assert.equal( out.category, 'coding' );
+	assert.ok( out.reasons.some( ( r ) => r.includes( 'php' ) ) );
+} );
+
+// ---------------------------------------------------------------- هاب: سلامت
+
+section( 'هاب — سلامت و مدارشکن' );
+
+const { Health } = await import( '../src/hub/health.js' );
+
+await test( 'مدار بعد از سه شکست پیاپی باز می‌شود', () => {
+	let now = 1000;
+	const h = new Health( { failuresToOpen: 3, cooldownMs: 5000, now: () => now } );
+	h.record( 'a', { ok: false } );
+	h.record( 'a', { ok: false } );
+	assert.equal( h.circuit( 'a' ), 'closed' );
+	h.record( 'a', { ok: false } );
+	assert.equal( h.circuit( 'a' ), 'open' );
+	assert.equal( h.available( 'a' ), false );
+} );
+
+await test( 'بعد از خنک‌شدن، مدار نیمه‌باز می‌شود و یک تلاش مجاز است', () => {
+	let now = 1000;
+	const h = new Health( { failuresToOpen: 1, cooldownMs: 5000, now: () => now } );
+	h.record( 'a', { ok: false } );
+	now += 5001;
+	assert.equal( h.circuit( 'a' ), 'half-open' );
+	assert.equal( h.available( 'a' ), true );
+} );
+
+await test( 'یک موفقیت، مدار را می‌بندد و شمارش را صفر می‌کند', () => {
+	const h = new Health( { failuresToOpen: 2 } );
+	h.record( 'a', { ok: false } );
+	h.record( 'a', { ok: false } );
+	h.record( 'a', { ok: true, ms: 100 } );
+	assert.equal( h.circuit( 'a' ), 'closed' );
+	assert.equal( h.entry( 'a' ).consecutiveFail, 0 );
+} );
+
+await test( 'پایان اعتبار، اتصال را «خالی» علامت می‌زند نه «خراب»', () => {
+	const h = new Health( { failuresToOpen: 5 } );
+	h.record( 'a', { ok: false, kind: 'credit' } );
+	assert.equal( h.entry( 'a' ).exhausted, true );
+	assert.equal( h.available( 'a' ), false );
+	assert.equal( h.entry( 'a' ).consecutiveFail, 1, 'یک شکست است، نه سه‌تا' );
+} );
+
+await test( 'صدک تأخیر از نمونه‌های واقعی درمی‌آید', () => {
+	const h = new Health();
+	for ( const ms of [ 100, 200, 300, 400, 1000 ] ) {
+		h.record( 'a', { ok: true, ms } );
+	}
+	assert.equal( h.latency( 'a', 0.5 ), 300 );
+	assert.equal( h.latency( 'a', 0.95 ), 1000 );
+	assert.equal( h.latency( 'b', 0.5 ), null, 'بدون نمونه، عدد ساختگی نمی‌دهیم' );
+} );
+
+await test( 'مدل بدون سابقه خوش‌بینانه دیده می‌شود، نه بدبینانه', () => {
+	const h = new Health();
+	assert.equal( h.successRate( 'تازه' ), 0.8 );
+} );
+
+await test( 'ریست دستی مدار و علامت خالی را برمی‌دارد', () => {
+	const h = new Health( { failuresToOpen: 1 } );
+	h.record( 'a', { ok: false, kind: 'credit' } );
+	h.reset( 'a' );
+	assert.equal( h.available( 'a' ), true );
+} );
+
+await test( 'حالت سلامت به JSON می‌رود و برمی‌گردد', () => {
+	const h = new Health( { failuresToOpen: 1 } );
+	h.record( 'a', { ok: true, ms: 50 } );
+	const clone = new Health( { state: h.toJSON() } );
+	assert.equal( clone.latency( 'a', 0.5 ), 50 );
+} );
+
+// ---------------------------------------------------------------- هاب: یادگیری
+
+section( 'هاب — یادگیری از نتیجه' );
+
+const { Learning } = await import( '../src/hub/learning.js' );
+
+await test( 'شکست امتیاز صفر می‌گیرد و موفقیت سریع و ارزان، بالاترین', () => {
+	assert.equal( Learning.outcomeScore( { ok: false } ), 0 );
+	const fast = Learning.outcomeScore( { ok: true, ms: 1000, cost: 0.001, satisfaction: 1 } );
+	const slow = Learning.outcomeScore( { ok: true, ms: 50_000, cost: 0.2, satisfaction: 0 } );
+	assert.ok( fast > slow );
+	assert.ok( fast <= 1 );
+} );
+
+await test( 'امتیاز با نمونهٔ کم به خنثی کشیده می‌شود', () => {
+	const l = new Learning();
+	l.record( { modelKey: 'm', category: 'coding', ok: true, ms: 500, cost: 0 } );
+	const one = l.score( 'm', 'coding' );
+	for ( let i = 0; i < 20; i++ ) {
+		l.record( { modelKey: 'm', category: 'coding', ok: true, ms: 500, cost: 0 } );
+	}
+	assert.ok( l.score( 'm', 'coding' ) > one, 'با نمونهٔ بیشتر باید به مقدار واقعی نزدیک‌تر شود' );
+} );
+
+await test( 'مدلی که تازه خراب شده، سریع سقوط می‌کند', () => {
+	const l = new Learning();
+	for ( let i = 0; i < 20; i++ ) {
+		l.record( { modelKey: 'm', category: 'coding', ok: true, ms: 500 } );
+	}
+	const before = l.score( 'm', 'coding' );
+	for ( let i = 0; i < 5; i++ ) {
+		l.record( { modelKey: 'm', category: 'coding', ok: false } );
+	}
+	assert.ok( l.score( 'm', 'coding' ) < before - 0.15, 'پنج شکست باید محسوس باشد' );
+} );
+
+await test( 'امتیاز هر دسته جداست', () => {
+	const l = new Learning();
+	l.record( { modelKey: 'm', category: 'coding', ok: false } );
+	assert.equal( l.score( 'm', 'persian' ), 0.5, 'دستهٔ دیگر نباید اثر بگیرد' );
+} );
+
+await test( 'فراموشی یک مدل، همهٔ دسته‌هایش را پاک می‌کند', () => {
+	const l = new Learning();
+	l.record( { modelKey: 'm', category: 'coding', ok: true } );
+	l.record( { modelKey: 'm', category: 'debug', ok: true } );
+	l.forget( 'm' );
+	assert.equal( Object.keys( l.toJSON() ).length, 0 );
+} );
+
+// ---------------------------------------------------------------- هاب: بودجه
+
+section( 'هاب — سقف هزینه' );
+
+const { Budget } = await import( '../src/hub/budget.js' );
+
+await test( 'سقف خالی یعنی بی‌سقف، نه سقف صفر', () => {
+	const b = new Budget( { limits: { daily: null } } );
+	b.record( 999 );
+	assert.equal( b.check( { estimate: 1000 } ).allowed, true );
+} );
+
+await test( 'عبور از سقف روزانه، درخواست را رد می‌کند نه اینکه فقط هشدار بدهد', () => {
+	const b = new Budget( { limits: { daily: 1 } } );
+	b.record( 0.9 );
+	const out = b.check( { estimate: 0.2 } );
+	assert.equal( out.allowed, false );
+	assert.match( out.reason, /سقف روزانه/ );
+} );
+
+await test( 'در هشتاد درصد سقف، هشدار می‌دهد ولی جلو را نمی‌گیرد', () => {
+	const b = new Budget( { limits: { daily: 1, warnAt: 0.8 } } );
+	b.record( 0.75 );
+	const out = b.check( { estimate: 0.05 } );
+	assert.equal( out.allowed, true );
+	assert.equal( out.warn, true );
+} );
+
+await test( 'سقف هر کار و هر مدیر جدا حساب می‌شوند', () => {
+	const b = new Budget( { limits: { perTask: 1, perAdmin: 10 } } );
+	b.record( 1, { task: 'coding', admin: 'ali' } );
+	assert.equal( b.check( { task: 'coding', estimate: 0.1 } ).allowed, false );
+	assert.equal( b.check( { task: 'persian', estimate: 0.1 } ).allowed, true );
+	assert.equal( b.check( { admin: 'ali', estimate: 0.1 } ).allowed, true );
+} );
+
+await test( 'با عوض‌شدن روز، شمارش صفر می‌شود', () => {
+	let now = Date.parse( '2026-08-17T10:00:00Z' );
+	const b = new Budget( { limits: { daily: 1 }, now: () => now } );
+	b.record( 1 );
+	assert.equal( b.check( { estimate: 0.5 } ).allowed, false );
+	now = Date.parse( '2026-08-18T10:00:00Z' );
+	assert.equal( b.check( { estimate: 0.5 } ).allowed, true );
+} );
+
+// ---------------------------------------------------------------- هاب: کش
+
+section( 'هاب — کش پاسخ' );
+
+const { ResponseCache } = await import( '../src/hub/cache.js' );
+
+await test( 'کلید کش با عوض‌شدن هر پیام عوض می‌شود', () => {
+	const a = ResponseCache.keyOf( { model: 'm', messages: [ { role: 'user', content: 'سلام' } ] }, 'k' );
+	const b = ResponseCache.keyOf( { model: 'm', messages: [ { role: 'user', content: 'سلامم' } ] }, 'k' );
+	const c = ResponseCache.keyOf( { model: 'm', messages: [ { role: 'user', content: 'سلام' } ] }, 'k2' );
+	assert.notEqual( a, b );
+	assert.notEqual( a, c, 'مدل متفاوت یعنی کلید متفاوت' );
+} );
+
+await test( 'پاسخی که فراخوانی ابزار دارد کش نمی‌شود', () => {
+	const c = new ResponseCache();
+	assert.equal( c.set( 'k', [ { type: 'text', text: 'x' }, { type: 'tool_call', name: 'bash' } ] ), false );
+	assert.equal( c.get( 'k' ), null );
+} );
+
+await test( 'پاسخ متنی کش می‌شود و برمی‌گردد', () => {
+	const c = new ResponseCache();
+	c.set( 'k', [ { type: 'text', text: 'سلام' } ] );
+	assert.deepEqual( c.get( 'k' ), [ { type: 'text', text: 'سلام' } ] );
+	assert.equal( c.stats().hits, 1 );
+} );
+
+await test( 'بعد از انقضا، کش دیگر جواب نمی‌دهد', () => {
+	let now = 0;
+	const c = new ResponseCache( { ttlMs: 100, now: () => now } );
+	c.set( 'k', [ { type: 'text', text: 'x' } ] );
+	now = 101;
+	assert.equal( c.get( 'k' ), null );
+} );
+
+await test( 'کش از سقف اندازه فراتر نمی‌رود', () => {
+	const c = new ResponseCache( { max: 2 } );
+	c.set( 'a', [ { type: 'text', text: '1' } ] );
+	c.set( 'b', [ { type: 'text', text: '2' } ] );
+	c.set( 'c', [ { type: 'text', text: '3' } ] );
+	assert.equal( c.entries.size, 2 );
+	assert.equal( c.get( 'a' ), null, 'قدیمی‌ترین باید رفته باشد' );
+} );
+
+// ---------------------------------------------------------------- هاب: امضا و پاک‌سازی
+
+section( 'هاب — امضای خطا و پاک‌سازی' );
+
+const { signatureOf, sanitize, statusOf } = await import( '../src/hub/signature.js' );
+
+await test( 'دو خطای یکسان با شناسهٔ متفاوت، یک امضا می‌گیرند', () => {
+	const a = signatureOf( { status: 400, message: 'request 8f3a2b1c-1111-2222-3333-444455556666 failed at 12:00' } );
+	const b = signatureOf( { status: 400, message: 'request 99999999-aaaa-bbbb-cccc-dddddddddddd failed at 13:45' } );
+	assert.equal( a, b );
+} );
+
+await test( 'خطای متفاوت، امضای متفاوت می‌گیرد', () => {
+	const a = signatureOf( { status: 400, message: 'unknown parameter' } );
+	const b = signatureOf( { status: 404, message: 'unknown parameter' } );
+	assert.notEqual( a, b );
+} );
+
+await test( 'پاک‌سازی، کلید و توکن و مسیر را بیرون نمی‌گذارد', () => {
+	const dirty = 'failed with sk-abcdef1234567890 and ghp_ABCDEFGHIJKLMNOP at /home/payman/secret/app.php';
+	const clean = sanitize( dirty );
+	assert.equal( /sk-abcdef/.test( clean ), false );
+	assert.equal( /ghp_/.test( clean ), false );
+	assert.equal( /payman/.test( clean ), false );
+} );
+
+await test( 'کد وضعیت از متن فارسی آداپتور درمی‌آید', () => {
+	assert.equal( statusOf( 'پاسخ 429 از پرووایدر: slow down' ), 429 );
+	assert.equal( statusOf( 'fetch failed' ), 0 );
+} );
+
+// ---------------------------------------------------------------- هاب: وصله
+
+section( 'هاب — وصلهٔ ساختاریافته' );
+
+const { validatePatch, applyPatch, applyPatches, rulePatch, PATCH_OPS } = await import( '../src/hub/repair.js' );
+
+await test( 'عملیات خارج از فهرست بسته رد می‌شود', () => {
+	assert.equal( validatePatch( { op: 'run_shell', cmd: 'rm -rf /' } ).ok, false );
+	assert.equal( validatePatch( { op: 'eval', code: 'x' } ).ok, false );
+	assert.ok( PATCH_OPS.length >= 8 );
+} );
+
+await test( 'وصله اجازه ندارد میزبان آدرس پایه را عوض کند', () => {
+	const same = validatePatch( { op: 'set_base_url', value: 'https://api.x.ai/v1' }, { baseUrl: 'https://api.x.ai' } );
+	const other = validatePatch( { op: 'set_base_url', value: 'https://evil.example/v1' }, { baseUrl: 'https://api.x.ai' } );
+	assert.equal( same.ok, true );
+	assert.equal( other.ok, false );
+	assert.match( other.reason, /میزبان/ );
+} );
+
+await test( 'پارامترهای حیاتی نه حذف می‌شوند نه تنظیم', () => {
+	assert.equal( validatePatch( { op: 'drop_param', name: 'messages' } ).ok, false );
+	assert.equal( validatePatch( { op: 'set_param', name: 'model', value: 'x' } ).ok, false );
+	assert.equal( validatePatch( { op: 'drop_param', name: 'top_p' } ).ok, true );
+} );
+
+await test( 'هدر احراز از راه وصله عوض نمی‌شود', () => {
+	assert.equal( validatePatch( { op: 'add_header', name: 'Authorization', value: 'Bearer x' } ).ok, false );
+	assert.equal( validatePatch( { op: 'add_header', name: 'X-Org', value: 'acme' } ).ok, true );
+} );
+
+await test( 'مقدار پارامتر باید ساده و کوتاه باشد', () => {
+	assert.equal( validatePatch( { op: 'set_param', name: 'extra', value: { a: 1 } } ).ok, false );
+	assert.equal( validatePatch( { op: 'set_param', name: 'extra', value: 'x'.repeat( 500 ) } ).ok, false );
+	assert.equal( validatePatch( { op: 'set_param', name: 'max_tokens', value: 4096 } ).ok, true );
+} );
+
+await test( 'اعمال وصله ورودی را دست‌نخورده می‌گذارد', () => {
+	const cfg = { baseUrl: 'https://a.test', headers: {}, overrides: {} };
+	const out = applyPatch( cfg, { op: 'add_header', name: 'X-A', value: '1' } );
+	assert.equal( Object.keys( cfg.headers ).length, 0, 'اصل نباید عوض شود' );
+	assert.equal( out.headers[ 'X-A' ], '1' );
+} );
+
+await test( 'ترتیب حذف و تنظیم پارامتر درست است', () => {
+	const out = applyPatches( { overrides: {} }, [
+		{ op: 'drop_param', name: 'max_tokens' },
+		{ op: 'set_param', name: 'max_tokens', value: 100 },
+	] );
+	assert.equal( out.overrides.setParams.max_tokens, 100 );
+	assert.equal( out.overrides.dropParams.includes( 'max_tokens' ), false );
+} );
+
+await test( 'قاعده: آدرس پایهٔ بدون نسخه، /v1 می‌گیرد', () => {
+	const out = rulePatch( { status: 404, message: 'پاسخ 404 از پرووایدر: not found' }, { baseUrl: 'https://api.test', kind: 'openai' } );
+	assert.equal( out.patch.op, 'set_base_url' );
+	assert.equal( out.patch.value, 'https://api.test/v1' );
+} );
+
+await test( 'قاعده: همان وصله دو بار پیشنهاد نمی‌شود', () => {
+	const applied = [ { op: 'set_base_url', value: 'https://api.test/v1' } ];
+	const out = rulePatch( { status: 404, message: 'not found' }, { baseUrl: 'https://api.test', kind: 'openai', applied } );
+	assert.equal( out, null );
+} );
+
+await test( 'قاعده: پارامتر ناشناخته حذف می‌شود', () => {
+	const out = rulePatch( { status: 400, message: 'Unrecognized request argument: reasoning_effort' }, { kind: 'openai' } );
+	assert.equal( out.patch.op, 'drop_param' );
+	assert.equal( out.patch.name, 'reasoning_effort' );
+} );
+
+await test( 'قاعده: max_tokens اجباری، تنظیم می‌شود', () => {
+	const out = rulePatch( { status: 400, message: 'field required: max_tokens' }, {} );
+	assert.equal( out.patch.op, 'set_param' );
+	assert.equal( out.patch.name, 'max_tokens' );
+} );
+
+await test( 'قاعده: نقش system که قبول نشود، به user تبدیل می‌شود', () => {
+	const out = rulePatch( { status: 400, message: 'system role is not supported by this model' }, {} );
+	assert.equal( out.patch.op, 'reshape_messages' );
+	assert.equal( out.patch.mode, 'system_as_user' );
+} );
+
+await test( 'قاعده: نبود استریم، استریم را خاموش می‌کند', () => {
+	const out = rulePatch( { status: 400, message: 'streaming is not supported' }, {} );
+	assert.equal( out.patch.op, 'disable_stream' );
+} );
+
+await test( 'قاعده: ۴۲۹ عقب‌نشینی دوبرابرشونده می‌سازد و بی‌نهایت تکرار نمی‌کند', () => {
+	const first = rulePatch( { status: 429, message: 'rate limit' }, {} );
+	assert.equal( first.patch.ms, 1000 );
+	const second = rulePatch( { status: 429, message: 'rate limit' }, { applied: [ { op: 'backoff_retry', ms: 1000 } ] } );
+	assert.equal( second.patch.ms, 2000 );
+	const tooMany = rulePatch( { status: 429, message: 'rate limit' }, {
+		applied: [ { op: 'backoff_retry', ms: 1000 }, { op: 'backoff_retry', ms: 2000 }, { op: 'backoff_retry', ms: 4000 } ],
+	} );
+	assert.equal( tooMany, null );
+} );
+
+await test( 'قاعده: پایان اعتبار وصله نمی‌گیرد', () => {
+	assert.equal( rulePatch( { status: 402, message: 'insufficient balance', kind: 'credit' }, {} ), null );
+} );
+
+// ---------------------------------------------------------------- هاب: دفتر راه‌حل‌ها
+
+section( 'هاب — دفتر راه‌حل‌ها' );
+
+const { Ledger } = await import( '../src/hub/ledger.js' );
+
+await test( 'وصلهٔ آزمون‌نداده ثبت نمی‌شود', () => {
+	const l = new Ledger();
+	const out = l.remember( { signature: 's', patches: [ { op: 'disable_stream' } ] } );
+	assert.equal( out.stored, false );
+	assert.equal( l.lookup( 's' ), null );
+} );
+
+await test( 'وصلهٔ آزموده ثبت می‌شود ولی موقت است', () => {
+	const l = new Ledger();
+	const out = l.remember( { signature: 's', patches: [ { op: 'disable_stream' } ], verified: true } );
+	assert.equal( out.stored, true );
+	assert.equal( l.lookup( 's' ).state, 'temporary' );
+} );
+
+await test( 'ماندگارکردن، تأیید مدیر است و بعدش موقت نمی‌شود', () => {
+	const l = new Ledger();
+	l.remember( { signature: 's', patches: [ { op: 'disable_stream' } ], verified: true } );
+	l.promote( 's' );
+	l.remember( { signature: 's', patches: [ { op: 'disable_stream' } ], verified: true } );
+	assert.equal( l.lookup( 's' ).state, 'permanent' );
+} );
+
+await test( 'وصله‌ای که سه بار پشت سر هم شکست بخورد، فراموش می‌شود', () => {
+	const l = new Ledger();
+	l.remember( { signature: 's', patches: [ { op: 'disable_stream' } ], verified: true } );
+	l.hit( 's', false );
+	l.hit( 's', false );
+	assert.ok( l.lookup( 's' ) );
+	l.hit( 's', false );
+	assert.equal( l.lookup( 's' ), null );
+} );
+
+await test( 'وصلهٔ دائمی با شکست پاک نمی‌شود', () => {
+	const l = new Ledger();
+	l.remember( { signature: 's', patches: [ { op: 'disable_stream' } ], verified: true } );
+	l.promote( 's' );
+	l.hit( 's', false );
+	l.hit( 's', false );
+	l.hit( 's', false );
+	assert.ok( l.lookup( 's' ), 'تصمیم مدیر را خودکار پس نمی‌گیریم' );
+} );
+
+await test( 'دفتر به حوزه حساس است — وصلهٔ هاب برای درگاه پرداخت برنمی‌گردد', () => {
+	const l = new Ledger();
+	l.remember( { signature: 's', patches: [ { op: 'disable_stream' } ], verified: true, domain: 'hub' } );
+	assert.equal( l.lookup( 's', 'payment' ), null );
+	assert.ok( l.lookup( 's', 'hub' ) );
+} );
+
+// ---------------------------------------------------------------- هاب: عیب‌یاب
+
+section( 'هاب — نردبان عیب‌یابی' );
+
+const { Diagnoser, parsePatches } = await import( '../src/hub/diagnoser.js' );
+
+await test( 'خطای شناخته‌شده در پلهٔ دو حل می‌شود، بدون تماس با مدل', async () => {
+	let calls = 0;
+	const d = new Diagnoser( { ledger: new Ledger(), callModel: async () => { calls++; return '{}'; } } );
+	const out = await d.suggest( {
+		signature: 'sig',
+		error: { status: 404, message: 'پاسخ 404 از پرووایدر: not found' },
+		cfg: { baseUrl: 'https://api.test', kind: 'openai' },
+	} );
+	assert.equal( out.source, 'rule' );
+	assert.equal( calls, 0, 'مدل نباید صدا زده شود' );
+} );
+
+await test( 'راه‌حل ثبت‌شده، پلهٔ اول است و از قاعده جلو می‌زند', async () => {
+	const ledger = new Ledger();
+	ledger.remember( { signature: 'sig', patches: [ { op: 'disable_stream' } ], verified: true, why: 'قبلاً' } );
+	const d = new Diagnoser( { ledger } );
+	const out = await d.suggest( { signature: 'sig', error: { status: 404, message: 'not found' }, cfg: { baseUrl: 'https://api.test' } } );
+	assert.equal( out.source, 'ledger' );
+	assert.equal( out.patches[ 0 ].op, 'disable_stream' );
+} );
+
+await test( 'پایان اعتبار اصلاً وارد نردبان نمی‌شود', async () => {
+	let calls = 0;
+	const d = new Diagnoser( { ledger: new Ledger(), callModel: async () => { calls++; return '{}'; } } );
+	const out = await d.suggest( { signature: 'sig', error: { kind: 'credit', message: 'insufficient balance' }, cfg: {} } );
+	assert.equal( out, null );
+	assert.equal( calls, 0 );
+} );
+
+await test( 'صد خطای هم‌امضا صد تماس نمی‌سازد', async () => {
+	let calls = 0;
+	const d = new Diagnoser( {
+		ledger: new Ledger(),
+		config: { minFailures: 2, perSignaturePerHour: 1 },
+		callModel: async () => { calls++; return JSON.stringify( { patches: [ { op: 'disable_stream' } ] } ); },
+	} );
+	for ( let i = 0; i < 100; i++ ) {
+		await d.suggest( { signature: 'sig', error: { status: 500, message: 'internal boom' }, cfg: {} } );
+	}
+	assert.equal( calls, 1, `انتظار یک تماس بود، ${ calls } تماس شد` );
+} );
+
+await test( 'قبل از رسیدن به آستانهٔ شکست، مدل صدا زده نمی‌شود', async () => {
+	let calls = 0;
+	const d = new Diagnoser( {
+		ledger: new Ledger(),
+		config: { minFailures: 3, perSignaturePerHour: 5 },
+		callModel: async () => { calls++; return '{"patches":[]}'; },
+	} );
+	await d.suggest( { signature: 'sig', error: { status: 500, message: 'boom' }, cfg: {} } );
+	assert.equal( calls, 0 );
+	await d.suggest( { signature: 'sig', error: { status: 500, message: 'boom' }, cfg: {} } );
+	await d.suggest( { signature: 'sig', error: { status: 500, message: 'boom' }, cfg: {} } );
+	assert.equal( calls, 1 );
+} );
+
+await test( 'بودجهٔ روزانهٔ عیب‌یاب، جلوی تماس را می‌گیرد', async () => {
+	let calls = 0;
+	const d = new Diagnoser( {
+		ledger: new Ledger(),
+		config: { minFailures: 1, perSignaturePerHour: 99, dailyBudget: 2 },
+		callModel: async () => { calls++; return '{"patches":[]}'; },
+	} );
+	for ( let i = 0; i < 6; i++ ) {
+		await d.suggest( { signature: `sig${ i }`, error: { status: 500, message: 'boom' }, cfg: {} } );
+	}
+	assert.equal( calls, 2 );
+} );
+
+await test( 'وصلهٔ نامعتبر مدل، دور انداخته می‌شود', async () => {
+	const d = new Diagnoser( {
+		ledger: new Ledger(),
+		config: { minFailures: 1 },
+		callModel: async () => JSON.stringify( { patches: [ { op: 'run_shell', cmd: 'rm -rf /' }, { op: 'set_base_url', value: 'https://evil.test/v1' } ] } ),
+	} );
+	const out = await d.suggest( { signature: 'sig', error: { status: 500, message: 'boom' }, cfg: { baseUrl: 'https://api.test' } } );
+	assert.equal( out, null, 'هیچ وصلهٔ معتبری نمانده' );
+} );
+
+await test( 'وصلهٔ معتبر مدل قبول می‌شود', async () => {
+	const d = new Diagnoser( {
+		ledger: new Ledger(),
+		config: { minFailures: 1 },
+		callModel: async () => '```json\n{"patches":[{"op":"disable_stream"}],"why":"بدون استریم"}\n```',
+	} );
+	const out = await d.suggest( { signature: 'sig', error: { status: 500, message: 'boom' }, cfg: {} } );
+	assert.equal( out.source, 'model' );
+	assert.equal( out.patches[ 0 ].op, 'disable_stream' );
+} );
+
+await test( 'گزارش موفق ثبت می‌شود، گزارش ناموفق نه', () => {
+	const ledger = new Ledger();
+	const d = new Diagnoser( { ledger } );
+	d.report( { signature: 'a', source: 'rule', patches: [ { op: 'disable_stream' } ], ok: false } );
+	assert.equal( ledger.lookup( 'a' ), null );
+	d.report( { signature: 'a', source: 'rule', patches: [ { op: 'disable_stream' } ], ok: true } );
+	assert.ok( ledger.lookup( 'a' ) );
+} );
+
+await test( 'متن پرامپت عیب‌یاب کلید را بیرون نمی‌برد', async () => {
+	let seen = '';
+	const d = new Diagnoser( {
+		ledger: new Ledger(),
+		config: { minFailures: 1 },
+		callModel: async ( p ) => { seen = p; return '{"patches":[]}'; },
+	} );
+	await d.suggest( { signature: 'sig', error: { status: 401, message: 'bad key sk-supersecret123456' }, cfg: {} } );
+	assert.equal( /sk-supersecret/.test( seen ), false );
+} );
+
+await test( 'خروجی مدل در هر شکلی خوانده می‌شود', () => {
+	assert.equal( parsePatches( '{"op":"disable_stream"}' ).length, 1 );
+	assert.equal( parsePatches( '[{"op":"disable_stream"}]' ).length, 1 );
+	assert.equal( parsePatches( '```json\n{"patches":[{"op":"disable_stream"}]}\n```' ).length, 1 );
+	assert.equal( parsePatches( 'حرف بی‌ربط' ).length, 0 );
+} );
+
+// ---------------------------------------------------------------- هاب: مسیریاب
+
+section( 'هاب — مسیریاب' );
+
+const { route, scoreOf } = await import( '../src/hub/router.js' );
+const { defaultHub, normalizeConnection, normalizeModel, modelKey } = await import( '../src/hub/schema.js' );
+
+function fakeHub( models ) {
+	const hub = defaultHub();
+	hub.enabled = true;
+	hub.connections.c1 = normalizeConnection( { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'k' } );
+	hub.connections.c2 = normalizeConnection( { id: 'c2', label: 'دو', baseUrl: 'https://b.test', apiKey: 'k' } );
+	for ( const m of models ) {
+		const key = modelKey( m.connectionId || 'c1', m.modelId );
+		hub.models[ key ] = normalizeModel( { ...m, key, connectionId: m.connectionId || 'c1' } );
+	}
+	return hub;
+}
+
+const routeCtx = ( hub, extra = {} ) => ( {
+	hub,
+	health: new Health(),
+	learning: new Learning(),
+	...extra,
+} );
+
+await test( 'راهبرد اولویت، به ترتیب عدد اولویت می‌رود', () => {
+	const hub = fakeHub( [
+		{ modelId: 'a', priority: 50 },
+		{ modelId: 'b', priority: 10 },
+	] );
+	hub.routing.strategy = 'priority';
+	const out = route( routeCtx( hub ) );
+	assert.equal( out.candidates[ 0 ].modelId, 'b' );
+} );
+
+await test( 'راهبرد ارزان‌ترین، قیمت را مبنا می‌گیرد نه اولویت', () => {
+	const hub = fakeHub( [
+		{ modelId: 'gran', priority: 1, priceIn: 10, priceOut: 30 },
+		{ modelId: 'arzan', priority: 90, priceIn: 0.1, priceOut: 0.3 },
+	] );
+	hub.routing.strategy = 'cost-optimized';
+	const out = route( routeCtx( hub ) );
+	assert.equal( out.candidates[ 0 ].modelId, 'arzan' );
+} );
+
+await test( 'راهبرد سریع‌ترین، صدک ۹۵ را مبنا می‌گیرد', () => {
+	const hub = fakeHub( [ { modelId: 'kond' }, { modelId: 'tond' } ] );
+	hub.routing.strategy = 'fastest';
+	const health = new Health();
+	health.record( modelKey( 'c1', 'kond' ), { ok: true, ms: 9000 } );
+	health.record( modelKey( 'c1', 'tond' ), { ok: true, ms: 200 } );
+	const out = route( routeCtx( hub, { health } ) );
+	assert.equal( out.candidates[ 0 ].modelId, 'tond' );
+} );
+
+await test( 'راهبرد کم‌کارترین، سراغ آنکه امروز کمتر استفاده شده می‌رود', () => {
+	const hub = fakeHub( [ { modelId: 'porkar' }, { modelId: 'bikar' } ] );
+	hub.routing.strategy = 'least-used';
+	const health = new Health();
+	for ( let i = 0; i < 5; i++ ) {
+		health.record( modelKey( 'c1', 'porkar' ), { ok: true, ms: 10 } );
+	}
+	const out = route( routeCtx( hub, { health } ) );
+	assert.equal( out.candidates[ 0 ].modelId, 'bikar' );
+} );
+
+await test( 'راهبرد وزنی با قرعهٔ کنترل‌شده، همان وزن را رعایت می‌کند', () => {
+	const hub = fakeHub( [ { modelId: 'kam', weight: 1 }, { modelId: 'ziad', weight: 99 } ] );
+	hub.routing.strategy = 'weighted';
+	// قرعهٔ نزدیک به یک یعنی «انتهای کیسه» — که با وزن ۹۹ به «ziad» می‌رسد.
+	const out = route( routeCtx( hub, { rng: () => 0.5 } ) );
+	assert.equal( out.candidates[ 0 ].modelId, 'ziad' );
+} );
+
+await test( 'مدل خاموش و اتصال خاموش نامزد نمی‌شوند و دلیلشان گفته می‌شود', () => {
+	const hub = fakeHub( [ { modelId: 'a', enabled: false }, { modelId: 'b' } ] );
+	hub.connections.c2.enabled = false;
+	const out = route( routeCtx( hub ) );
+	assert.equal( out.candidates.length, 1 );
+	assert.match( out.blocked.map( ( b ) => b.reason ).join( ' ' ), /خاموش/ );
+} );
+
+await test( 'درخواست تصویری، مدل نابینا را کنار می‌گذارد', () => {
+	const hub = fakeHub( [ { modelId: 'kur', caps: { vision: false } }, { modelId: 'bina', caps: { vision: true } } ] );
+	const out = route( routeCtx( hub, { needsVision: true } ) );
+	assert.equal( out.candidates.length, 1 );
+	assert.equal( out.candidates[ 0 ].modelId, 'bina' );
+} );
+
+await test( 'درخواست ابزاردار، مدل بدون ابزار را کنار می‌گذارد', () => {
+	const hub = fakeHub( [ { modelId: 'saade', caps: { tools: false } }, { modelId: 'kamel' } ] );
+	const out = route( routeCtx( hub, { needsTools: true } ) );
+	assert.equal( out.candidates.length, 1 );
+	assert.equal( out.candidates[ 0 ].modelId, 'kamel' );
+} );
+
+await test( 'مدار باز، مدل را از فهرست نامزدها بیرون می‌اندازد', () => {
+	const hub = fakeHub( [ { modelId: 'kharab' }, { modelId: 'salem' } ] );
+	const health = new Health( { failuresToOpen: 1 } );
+	health.record( modelKey( 'c1', 'kharab' ), { ok: false } );
+	const out = route( routeCtx( hub, { health } ) );
+	assert.equal( out.candidates.length, 1 );
+	assert.match( out.blocked[ 0 ].reason, /مدارشکن/ );
+} );
+
+await test( 'اتصال با اعتبار تمام، با دلیل روشن کنار گذاشته می‌شود', () => {
+	const hub = fakeHub( [ { modelId: 'khali' }, { modelId: 'salem' } ] );
+	const health = new Health();
+	health.record( modelKey( 'c1', 'khali' ), { ok: false, kind: 'credit' } );
+	const out = route( routeCtx( hub, { health } ) );
+	assert.match( out.blocked[ 0 ].reason, /اعتبار/ );
+} );
+
+await test( 'سقف روزانهٔ اتصال، بعد از پرشدن مسیر را می‌بندد', () => {
+	const hub = fakeHub( [ { modelId: 'a' } ] );
+	hub.connections.c1.dailyCap = 2;
+	const health = new Health();
+	health.record( modelKey( 'c1', 'a' ), { ok: true, ms: 5 } );
+	health.record( modelKey( 'c1', 'a' ), { ok: true, ms: 5 } );
+	const out = route( routeCtx( hub, { health } ) );
+	assert.equal( out.candidates.length, 0 );
+	assert.match( out.blocked[ 0 ].reason, /سقف روزانه/ );
+} );
+
+await test( 'مدل سنجاق‌شده اول صف می‌ایستد ولی بقیه هم برای شکست می‌مانند', () => {
+	const hub = fakeHub( [ { modelId: 'a', priority: 1 }, { modelId: 'b', priority: 90 } ] );
+	const out = route( routeCtx( hub, { pinModel: modelKey( 'c1', 'b' ) } ) );
+	assert.equal( out.candidates[ 0 ].modelId, 'b' );
+	assert.equal( out.candidates.length, 2 );
+	assert.equal( out.strategy, 'pinned' );
+} );
+
+await test( 'ترکیب دستهٔ کار بر راهبرد کلی می‌چربد', () => {
+	const hub = fakeHub( [ { modelId: 'a', priority: 1 }, { modelId: 'b', priority: 90 } ] );
+	hub.routing.strategy = 'priority';
+	hub.combos.x = { id: 'x', label: 'کد', strategy: 'priority', members: [ modelKey( 'c1', 'b' ) ] };
+	hub.categoryCombo.coding = 'x';
+	const out = route( routeCtx( hub, { category: 'coding' } ) );
+	assert.equal( out.candidates.length, 1 );
+	assert.equal( out.candidates[ 0 ].modelId, 'b' );
+	assert.equal( out.comboId, 'x' );
+} );
+
+await test( 'حالت خودکار، برچسب زمینه را می‌بیند', () => {
+	const hub = fakeHub( [
+		{ modelId: 'general', tags: [] },
+		{ modelId: 'coder', tags: [ 'coding' ] },
+	] );
+	const out = route( routeCtx( hub, { category: 'coding' } ) );
+	assert.equal( out.candidates[ 0 ].modelId, 'coder' );
+} );
+
+await test( 'یادگیری بر برچسب اولیه می‌چربد', () => {
+	const hub = fakeHub( [
+		{ modelId: 'barchasb', tags: [ 'coding' ] },
+		{ modelId: 'amalgara', tags: [] },
+	] );
+	const learning = new Learning();
+	for ( let i = 0; i < 30; i++ ) {
+		learning.record( { modelKey: modelKey( 'c1', 'amalgara' ), category: 'coding', ok: true, ms: 300, cost: 0, satisfaction: 1 } );
+		learning.record( { modelKey: modelKey( 'c1', 'barchasb' ), category: 'coding', ok: false } );
+	}
+	const out = route( routeCtx( hub, { category: 'coding', learning } ) );
+	assert.equal( out.candidates[ 0 ].modelId, 'amalgara', 'دادهٔ واقعی باید برندهٔ جدول اولیه را کنار بزند' );
+} );
+
+await test( 'امتیاز خودکار همیشه بین صفر و یک می‌ماند', () => {
+	const hub = fakeHub( [ { modelId: 'a', tags: [ 'coding' ], priceIn: 0, priceOut: 0 } ] );
+	const ctxr = routeCtx( hub, { category: 'coding' } );
+	const c = { key: modelKey( 'c1', 'a' ), model: hub.models[ modelKey( 'c1', 'a' ) ], conn: hub.connections.c1 };
+	const s = scoreOf( c, ctxr, 'coding' );
+	assert.ok( s >= 0 && s <= 1, `امتیاز ${ s } از بازه بیرون است` );
+} );
+
+// ---------------------------------------------------------------- هاب: رجیستری و شکل داده
+
+section( 'هاب — رجیستری و شکل داده' );
+
+const { inferCaps, inferTags, inferContext, mergeDiscovered, hubReady } = await import( '../src/hub/registry.js' );
+const { validateConnection, publicHub, normalizeCombo } = await import( '../src/hub/schema.js' );
+
+await test( 'توانایی مدل از نامش حدس زده می‌شود', () => {
+	assert.equal( inferCaps( 'gpt-4o' ).vision, true );
+	assert.equal( inferCaps( 'text-embedding-3-large' ).tools, false );
+	assert.equal( inferCaps( 'o3-mini' ).reasoning, true );
+	assert.equal( inferCaps( 'deepseek-chat' ).reasoning, false );
+} );
+
+await test( 'برچسب و کانتکست اولیه از نام مدل می‌آید', () => {
+	assert.ok( inferTags( 'claude-sonnet-4-5' ).includes( 'coding' ) );
+	assert.ok( inferTags( 'gpt-4o-mini' ).includes( 'cheap' ) );
+	assert.equal( inferContext( 'claude-sonnet-4-5' ), 200_000 );
+} );
+
+await test( 'کشف دوباره، ویرایش مدیر را پاک نمی‌کند', () => {
+	const hub = defaultHub();
+	hub.models[ 'c1::a' ] = normalizeModel( { key: 'c1::a', connectionId: 'c1', modelId: 'a', label: 'اسم دستی', editedByAdmin: true, tags: [ 'persian' ] } );
+	const out = mergeDiscovered( hub, 'c1', [ 'a', 'b' ] );
+	assert.equal( out.models[ 'c1::a' ].label, 'اسم دستی' );
+	assert.deepEqual( out.models[ 'c1::a' ].tags, [ 'persian' ] );
+	assert.equal( out.added, 1 );
+} );
+
+await test( 'مدل ناپیدا حذف نمی‌شود، فقط علامت می‌خورد', () => {
+	const hub = defaultHub();
+	hub.models[ 'c1::old' ] = normalizeModel( { key: 'c1::old', connectionId: 'c1', modelId: 'old' } );
+	const out = mergeDiscovered( hub, 'c1', [ 'new' ] );
+	assert.ok( out.models[ 'c1::old' ], 'آمار و امتیاز یادگیری‌اش نباید برود' );
+	assert.equal( out.models[ 'c1::old' ].missing, true );
+	assert.equal( out.missing, 1 );
+} );
+
+await test( 'کشف، روشن/خاموش بودن مدل را حفظ می‌کند', () => {
+	const hub = defaultHub();
+	hub.models[ 'c1::a' ] = normalizeModel( { key: 'c1::a', connectionId: 'c1', modelId: 'a', enabled: false } );
+	const out = mergeDiscovered( hub, 'c1', [ 'a' ] );
+	assert.equal( out.models[ 'c1::a' ].enabled, false );
+} );
+
+await test( 'آمادگی هاب سه شرط دارد و دلیل نبودنش را می‌گوید', () => {
+	const hub = defaultHub();
+	assert.match( hubReady( hub ).reason, /خاموش/ );
+	hub.enabled = true;
+	assert.match( hubReady( hub ).reason, /اتصال/ );
+	hub.connections.c1 = normalizeConnection( { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'k' } );
+	assert.match( hubReady( hub ).reason, /مدل/ );
+	hub.models[ 'c1::a' ] = normalizeModel( { key: 'c1::a', connectionId: 'c1', modelId: 'a' } );
+	assert.equal( hubReady( hub ).ok, true );
+} );
+
+await test( 'کلید ماسک‌شده که برگردد، کلید واقعی را پاک نمی‌کند', () => {
+	const before = normalizeConnection( { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'sk-real-key-1234' } );
+	const masked = publicHub( { connections: { c1: before } } ).connections.c1;
+	const after = normalizeConnection( { ...masked, label: 'نام تازه' }, before );
+	assert.equal( after.apiKey, 'sk-real-key-1234' );
+	assert.equal( after.label, 'نام تازه' );
+} );
+
+await test( 'کلید هیچ‌وقت خام به رابط نمی‌رود', () => {
+	const hub = defaultHub();
+	hub.connections.c1 = normalizeConnection( { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'sk-real-key-1234' } );
+	const out = JSON.stringify( publicHub( hub ) );
+	assert.equal( out.includes( 'sk-real-key-1234' ), false );
+	assert.ok( out.includes( '1234' ), 'چهار رقم آخر برای شناسایی می‌ماند' );
+} );
+
+await test( 'اتصال بی‌آدرس یا بی‌کلید، معتبر نیست — مگر محلی', () => {
+	assert.equal( validateConnection( normalizeConnection( { label: 'x' } ) ).ok, false );
+	assert.equal( validateConnection( normalizeConnection( { label: 'x', baseUrl: 'https://a.test' } ) ).ok, false );
+	assert.equal( validateConnection( normalizeConnection( { label: 'x', baseUrl: 'http://127.0.0.1:11434/v1' } ) ).ok, true );
+} );
+
+await test( 'هدر با نام نامعتبر بی‌سروصدا دور انداخته می‌شود', () => {
+	const conn = normalizeConnection( { label: 'x', baseUrl: 'https://a.test', apiKey: 'k', headers: { 'X-Ok': '1', 'bad header!': '2', '': '3' } } );
+	assert.deepEqual( Object.keys( conn.headers ), [ 'X-Ok' ] );
+} );
+
+await test( 'برچسب ناشناخته روی مدل ننشیند', () => {
+	const m = normalizeModel( { key: 'k', connectionId: 'c', modelId: 'm', tags: [ 'coding', 'چرت' ] } );
+	assert.deepEqual( m.tags, [ 'coding' ] );
+} );
+
+await test( 'راهبرد ناشناختهٔ ترکیب به خودکار برمی‌گردد', () => {
+	assert.equal( normalizeCombo( { label: 'x', strategy: 'هرچی' } ).strategy, 'auto' );
+} );
+
+// ---------------------------------------------------------------- هاب: سیم‌کشی آداپتور
+
+section( 'هاب — سیم‌کشی آداپتور' );
+
+const { buildHeaders, authedUrl, finalizePayload, reshapeMessages } = await import( '../src/providers/wire.js' );
+
+await test( 'سبک احراز، جای کلید را عوض می‌کند', () => {
+	assert.equal( buildHeaders( { apiKey: 'k', authStyle: 'bearer' } ).Authorization, 'Bearer k' );
+	assert.equal( buildHeaders( { apiKey: 'k', authStyle: 'x-api-key' } )[ 'x-api-key' ], 'k' );
+	assert.equal( buildHeaders( { apiKey: 'k', authStyle: 'header', authHeader: 'X-Token' } )[ 'X-Token' ], 'k' );
+	assert.equal( buildHeaders( { apiKey: 'k', authStyle: 'none' } ).Authorization, undefined );
+} );
+
+await test( 'سبک پارامتر آدرس، کلید را در هدر نمی‌گذارد', () => {
+	const cfg = { apiKey: 'k', authStyle: 'query', authHeader: 'key' };
+	assert.equal( buildHeaders( cfg ).Authorization, undefined );
+	assert.match( authedUrl( 'https://a.test/x', cfg ), /[?&]key=k$/ );
+} );
+
+await test( 'هدر سفارشی روی هدر پیش‌فرض می‌نشیند', () => {
+	const h2 = buildHeaders( { headers: { 'X-Org': 'acme' } }, { 'X-Title': 'Hoosha' } );
+	assert.equal( h2[ 'X-Org' ], 'acme' );
+	assert.equal( h2[ 'X-Title' ], 'Hoosha' );
+} );
+
+await test( 'وصلهٔ پارامتری روی بدنه اثر می‌کند', () => {
+	const out = finalizePayload( { model: 'm', temperature: 1, stream: true }, { dropParams: [ 'temperature' ], setParams: { max_tokens: 10 }, noStream: true } );
+	assert.equal( out.temperature, undefined );
+	assert.equal( out.max_tokens, 10 );
+	assert.equal( out.stream, false );
+} );
+
+await test( 'بازچینش پیام، نقش system را به user تبدیل می‌کند', () => {
+	const out = reshapeMessages( [ { role: 'user', content: 'سلام' } ], 'تو دستیاری', 'system_as_user' );
+	assert.equal( out.system, '' );
+	assert.equal( out.messages.length, 2 );
+	assert.equal( out.messages[ 0 ].role, 'user' );
+} );
+
+await test( 'بازچینش، نتیجهٔ ابزار را به پیام کاربر تبدیل می‌کند', () => {
+	const out = reshapeMessages( [ { role: 'tool', toolCallId: 't1', content: 'خروجی' } ], '', 'no_tool_role' );
+	assert.equal( out.messages[ 0 ].role, 'user' );
+	assert.match( out.messages[ 0 ].content, /خروجی/ );
+} );
+
+// ---------------------------------------------------------------- هاب: انتها به انتها
+
+section( 'هاب — اجرای واقعی روی سرور ساختگی' );
+
+const { Hub } = await import( '../src/hub/index.js' );
+
+/**
+ * یک سرویس‌دهندهٔ ساختگی سازگار با OpenAI.
+ * @param {(count:number, body:any) => {status:number, body:any}} plan
+ */
+async function fakeProvider( plan ) {
+	let count = 0;
+	/** @type {any[]} */
+	const seen = [];
+	const srv = http.createServer( ( req, res ) => {
+		let raw = '';
+		req.on( 'data', ( c ) => ( raw += c ) );
+		req.on( 'end', () => {
+			const body = raw ? JSON.parse( raw ) : {};
+			seen.push( { url: req.url, body, headers: req.headers } );
+			if ( req.url.endsWith( '/models' ) ) {
+				res.writeHead( 200, { 'Content-Type': 'application/json' } );
+				res.end( JSON.stringify( { data: [ { id: 'test-model' }, { id: 'test-mini' } ] } ) );
+				return;
+			}
+			const out = plan( count++, body, req );
+			res.writeHead( out.status, { 'Content-Type': out.status === 200 ? 'text/event-stream' : 'application/json' } );
+			if ( out.status !== 200 ) {
+				res.end( JSON.stringify( out.body ) );
+				return;
+			}
+			for ( const chunk of out.body ) {
+				res.write( `data: ${ JSON.stringify( chunk ) }\n\n` );
+			}
+			res.write( 'data: [DONE]\n\n' );
+			res.end();
+		} );
+	} );
+	await new Promise( ( r ) => srv.listen( 0, '127.0.0.1', r ) );
+	const port = srv.address().port;
+	return { url: `http://127.0.0.1:${ port }`, srv, seen, count: () => count };
+}
+
+const textChunk = ( text ) => [ { choices: [ { delta: { content: text } } ] }, { usage: { prompt_tokens: 10, completion_tokens: 5 } } ];
+
+async function hubWith( conns, models, tweak ) {
+	const home = await fs.mkdtemp( path.join( tmpRoot, 'hub-' ) );
+	const hub = new Hub( { home } );
+	await hub.load();
+	hub.data.enabled = true;
+	for ( const c of conns ) {
+		hub.data.connections[ c.id ] = normalizeConnection( c );
+	}
+	for ( const m of models ) {
+		const key = modelKey( m.connectionId, m.modelId );
+		hub.data.models[ key ] = normalizeModel( { ...m, key } );
+	}
+	if ( tweak ) {
+		tweak( hub );
+	}
+	return hub;
+}
+
+async function collect( gen ) {
+	const out = [];
+	for await ( const ev of gen ) {
+		out.push( ev );
+	}
+	return out;
+}
+
+await test( 'هاب یک درخواست ساده را می‌برد و پاسخ را برمی‌گرداند', async () => {
+	const p = await fakeProvider( () => ( { status: 200, body: textChunk( 'سلام' ) } ) );
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'test-model' } ]
+	);
+	const out = await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'سلام' } ] } ) );
+	assert.equal( out.filter( ( e ) => e.type === 'text' ).map( ( e ) => e.text ).join( '' ), 'سلام' );
+	p.srv.close();
+} );
+
+await test( 'وقتی اولی ۵۰۰ می‌دهد، درخواست بی‌صدا به دومی می‌رود', async () => {
+	const bad = await fakeProvider( () => ( { status: 500, body: { error: 'boom' } } ) );
+	const good = await fakeProvider( () => ( { status: 200, body: textChunk( 'از دومی' ) } ) );
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'خراب', baseUrl: bad.url, apiKey: 'k' }, { id: 'c2', label: 'سالم', baseUrl: good.url, apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm', priority: 1 }, { connectionId: 'c2', modelId: 'm', priority: 2 } ],
+		( h2 ) => { h2.data.routing.strategy = 'priority'; }
+	);
+	const out = await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'x' } ] } ) );
+	assert.equal( out.some( ( e ) => e.type === 'error' ), false, 'کاربر نباید خطا ببیند' );
+	assert.match( out.filter( ( e ) => e.type === 'text' ).map( ( e ) => e.text ).join( '' ), /از دومی/ );
+	bad.srv.close();
+	good.srv.close();
+} );
+
+await test( 'وصلهٔ قاعده‌ای، همان درخواست را نجات می‌دهد و در دفتر ثبت می‌شود', async () => {
+	// سرویسی که فقط روی /v1 جواب می‌دهد — همان اشتباه رایج آدرس پایه.
+	const p = await fakeProvider( ( n, body, req ) =>
+		req.url.startsWith( '/v1/' ) ? { status: 200, body: textChunk( 'درست شد' ) } : { status: 404, body: { error: 'not found' } }
+	);
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ]
+	);
+	const out = await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'x' } ] } ) );
+	assert.match( out.filter( ( e ) => e.type === 'text' ).map( ( e ) => e.text ).join( '' ), /درست شد/ );
+	const learned = hub.ledger.list( 'hub' );
+	assert.equal( learned.length, 1, 'راه‌حل آزموده باید ثبت شود' );
+	assert.equal( learned[ 0 ].patches[ 0 ].op, 'set_base_url' );
+	assert.equal( learned[ 0 ].state, 'temporary', 'ماندگاری تأیید مدیر می‌خواهد' );
+	p.srv.close();
+} );
+
+await test( 'وصلهٔ ماندگارشده، دفعهٔ بعد پیش از اولین تلاش اعمال می‌شود', async () => {
+	let notFound = 0;
+	const p = await fakeProvider( ( n, body, req ) => {
+		if ( ! req.url.startsWith( '/v1/' ) ) {
+			notFound++;
+			return { status: 404, body: { error: 'not found' } };
+		}
+		return { status: 200, body: textChunk( 'خوب شد' ) };
+	} );
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ]
+	);
+
+	await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'اول' } ] } ) );
+	assert.equal( notFound, 1, 'بار اول یک شکست طبیعی است' );
+
+	const sig = hub.ledger.list( 'hub' )[ 0 ].signature;
+	await hub.promotePatch( sig );
+	assert.equal( hub.data.connections.c1.patches.length, 1, 'وصله باید روی اتصال بنشیند' );
+
+	await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'دوم' } ] } ) );
+	assert.equal( notFound, 1, 'بعد از ماندگارشدن، دیگر نباید حتی یک بار شکست بخورد' );
+	p.srv.close();
+} );
+
+await test( 'فراموش‌کردن وصله، آن را از روی اتصال هم برمی‌دارد', async () => {
+	const p = await fakeProvider( ( n, body, req ) =>
+		req.url.startsWith( '/v1/' ) ? { status: 200, body: textChunk( 'ok' ) } : { status: 404, body: { error: 'not found' } }
+	);
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ]
+	);
+	await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'اول' } ] } ) );
+	const sig = hub.ledger.list( 'hub' )[ 0 ].signature;
+	await hub.promotePatch( sig );
+	await hub.forgetPatch( sig );
+	assert.equal( hub.data.connections.c1.patches.length, 0 );
+	assert.equal( hub.ledger.list( 'hub' ).length, 0 );
+	p.srv.close();
+} );
+
+await test( 'وصلهٔ کهنه هنگام ماندگارشدن دوباره سنجیده می‌شود و تکراری نمی‌سازد', async () => {
+	const hub = await hubWith( [ { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'k' } ], [] );
+	// دفتر ممکن است وصله‌ای داشته باشد که با آدرس پایهٔ امروز دیگر امن نیست.
+	hub.ledger.remember( {
+		signature: 's',
+		connectionId: 'c1',
+		patches: [ { op: 'set_base_url', value: 'https://evil.test/v1' }, { op: 'disable_stream' } ],
+		verified: true,
+	} );
+	await hub.promotePatch( 's' );
+	assert.deepEqual( hub.data.connections.c1.patches.map( ( x ) => x.op ), [ 'disable_stream' ] );
+
+	await hub.promotePatch( 's' );
+	assert.equal( hub.data.connections.c1.patches.length, 1, 'دو بار ماندگارکردن نباید وصلهٔ تکراری بسازد' );
+} );
+
+await test( 'عوض‌شدن آدرس پایه، وصله‌های دائمی را پاک می‌کند', async () => {
+	const hub = await hubWith( [ { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'k' } ], [] );
+	hub.data.connections.c1.patches = [ { op: 'set_base_url', value: 'https://a.test/v1' } ];
+	await hub.saveConnection( { id: 'c1', label: 'یک', baseUrl: 'https://b.test', apiKey: 'k', provider: 'openai-compatible', kind: 'openai' } );
+	assert.equal( hub.data.connections.c1.patches.length, 0, 'وصلهٔ آدرس قدیمی نباید روی آدرس تازه بماند' );
+} );
+
+await test( 'پایان اعتبار، اتصال را خالی می‌کند و عیب‌یاب را صدا نمی‌زند', async () => {
+	const p = await fakeProvider( () => ( { status: 402, body: { error: { message: 'insufficient credit balance' } } } ) );
+	let diagCalls = 0;
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ]
+	);
+	hub.diagnoser.callModel = async () => { diagCalls++; return '{}'; };
+	hub.diagnoser.config.minFailures = 1;
+	const out = await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'x' } ] } ) );
+	assert.ok( out.some( ( e ) => e.type === 'error' ) );
+	assert.equal( diagCalls, 0, 'پایان اعتبار خطا نیست، یک واقعیت است' );
+	assert.equal( hub.health.entry( 'c1::m' ).exhausted, true );
+	p.srv.close();
+} );
+
+await test( 'عبور از سقف هزینه، درخواست را رد می‌کند', async () => {
+	const p = await fakeProvider( () => ( { status: 200, body: textChunk( 'نباید برسد' ) } ) );
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ],
+		( h2 ) => {
+			h2.data.budget.daily = 0.001;
+			h2.budget.setLimits( h2.data.budget );
+			h2.budget.record( 0.001 );
+		}
+	);
+	const out = await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'x' } ] } ) );
+	assert.equal( out.filter( ( e ) => e.type === 'text' ).length, 0 );
+	assert.match( out.find( ( e ) => e.type === 'error' ).error, /سقف/ );
+	p.srv.close();
+} );
+
+await test( 'درخواست یکسان بار دوم از کش می‌آید', async () => {
+	const p = await fakeProvider( () => ( { status: 200, body: textChunk( 'یک بار' ) } ) );
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ]
+	);
+	const req = { model: 'auto', messages: [ { role: 'user', content: 'تکراری' } ] };
+	await collect( hub.stream( req ) );
+	const before = p.count();
+	await collect( hub.stream( req ) );
+	assert.equal( p.count(), before, 'بار دوم نباید تماسی گرفته شود' );
+	assert.equal( hub.cache.stats().hits, 1 );
+	p.srv.close();
+} );
+
+await test( 'هاب بدون مدل روشن، صریح می‌گوید چرا کار نمی‌کند', async () => {
+	const hub = await hubWith( [ { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'k' } ], [] );
+	const out = await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'x' } ] } ) );
+	assert.match( out[ 0 ].error, /مدل روشنی/ );
+} );
+
+await test( 'کشف مدل‌ها از سرویس واقعی، رجیستری را پر می‌کند', async () => {
+	const p = await fakeProvider( () => ( { status: 200, body: textChunk( 'x' ) } ) );
+	const hub = await hubWith( [ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'k' } ], [] );
+	const out = await hub.discover( 'c1' );
+	assert.equal( out.ok, true );
+	assert.equal( out.added, 2 );
+	assert.ok( hub.data.models[ 'c1::test-model' ] );
+	p.srv.close();
+} );
+
+await test( 'فهرست ابزارهای در دسترس، جنس درخواست را عوض نمی‌کند', async () => {
+	const { recentToolUse } = await import( '../src/hub/index.js' );
+
+	// همان چیزی که عامل واقعاً می‌فرستد: بیست‌وچند ابزار در `tools`.
+	const allTools = [ 'bash', 'edit_file', 'write_file', 'read_file', 'grep', 'git_status' ].map( ( name ) => ( { name } ) );
+	const asAvailable = classify( { text: 'سلام، خودت را معرفی کن', tools: allTools.map( ( t ) => t.name ) } );
+	assert.equal( asAvailable.category, 'coding', 'این همان اشتباهی است که در اجرای زنده دیدیم' );
+
+	// و این راه درست: فقط ابزارهایی که در همین گفتگو صدا زده شده‌اند.
+	const { usedTools, files } = recentToolUse( [ { role: 'user', content: 'سلام' } ] );
+	assert.deepEqual( usedTools, [] );
+	assert.equal( classify( { text: 'سلام، خودت را معرفی کن', tools: usedTools, files } ).category, 'general' );
+
+	const after = recentToolUse( [ { role: 'assistant', content: '', toolCalls: [ { name: 'edit_file', input: { path: 'src/App.php' } } ] } ] );
+	assert.deepEqual( after.usedTools, [ 'edit_file' ] );
+	assert.deepEqual( after.files, [ 'src/App.php' ] );
+} );
+
+await test( 'وقتی تشخیص مطمئن نیست، دستهٔ عمومی انتخاب می‌شود نه حدس ضعیف', async () => {
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ]
+	);
+	// «کد» و «خراب» هم‌امتیازند؛ حدس‌زدن بین coding و debug یعنی سکه‌انداختن.
+	const weak = hub.explainRoute( { text: 'این کد خراب است' } );
+	assert.ok( weak.classification.confidence < 0.45 );
+	assert.equal( weak.category, 'general', 'حدس ضعیف نباید مسیر را تعیین کند' );
+
+	const strong = hub.explainRoute( { text: 'این تابع باگ دارد، traceback بده و عیب‌یابی کن' } );
+	assert.equal( strong.category, 'debug' );
+} );
+
+await test( 'یک سلام ساده با ابزارهای همراه، کدنویسی تشخیص داده نمی‌شود', async () => {
+	const p = await fakeProvider( () => ( { status: 200, body: textChunk( 'سلام' ) } ) );
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ]
+	);
+	/** @type {any[]} */
+	const seen = [];
+	hub.emit = ( ev ) => seen.push( ev );
+	await collect(
+		hub.stream( {
+			model: 'auto',
+			messages: [ { role: 'user', content: 'سلام، خودت را معرفی کن' } ],
+			tools: [ { name: 'bash' }, { name: 'edit_file' }, { name: 'write_file' } ],
+		} )
+	);
+	const routed = seen.find( ( e ) => e.type === 'hub-route' );
+	assert.equal( routed.category, 'general', `دستهٔ ${ routed.category } غلط است` );
+	p.srv.close();
+} );
+
+await test( 'آزمون مسیر بدون تماس شبکه‌ای جواب می‌دهد', async () => {
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'coder', tags: [ 'coding' ] }, { connectionId: 'c1', modelId: 'other', tags: [ 'persian' ] } ]
+	);
+	const out = hub.explainRoute( { text: 'این تابع را ریفکتور کن', tools: [ 'edit_file' ] } );
+	assert.equal( out.classification.category, 'coding' );
+	assert.equal( out.candidates[ 0 ].modelId, 'coder' );
+} );
+
+await test( 'کلید در هدر واقعی درخواست می‌نشیند، نه در بدنه', async () => {
+	const p = await fakeProvider( () => ( { status: 200, body: textChunk( 'ok' ) } ) );
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: p.url, apiKey: 'secret-key', authStyle: 'x-api-key' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ]
+	);
+	await collect( hub.stream( { model: 'auto', messages: [ { role: 'user', content: 'x' } ] } ) );
+	const call = p.seen[ p.seen.length - 1 ];
+	assert.equal( call.headers[ 'x-api-key' ], 'secret-key' );
+	assert.equal( JSON.stringify( call.body ).includes( 'secret-key' ), false );
+	p.srv.close();
+} );
+
+await test( 'خروجی سازگار با OpenAI، همان مدل‌های هاب را می‌دهد', async () => {
+	const { modelsResponse, toInternalRequest } = await import( '../src/hub/openai-api.js' );
+	const hub = await hubWith(
+		[ { id: 'c1', label: 'یک', baseUrl: 'https://a.test', apiKey: 'k' } ],
+		[ { connectionId: 'c1', modelId: 'm' } ]
+	);
+	const list = modelsResponse( hub );
+	assert.equal( list.data[ 0 ].id, 'auto' );
+	assert.ok( list.data.some( ( m ) => m.id === 'c1::m' ) );
+
+	const inner = toInternalRequest( {
+		model: 'auto',
+		messages: [ { role: 'system', content: 'دستور' }, { role: 'user', content: 'سلام' } ],
+		tools: [ { type: 'function', function: { name: 'bash', parameters: {} } } ],
+	} );
+	assert.equal( inner.system, 'دستور' );
+	assert.equal( inner.messages.length, 1 );
+	assert.equal( inner.tools[ 0 ].name, 'bash' );
+} );
+
+// ---------------------------------------------------------------- هاب: رابط
+
+section( 'هاب — رابط کاربری' );
+
+await test( 'پنج صفحهٔ هاب در تنظیمات هست', () => {
+	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
+	for ( const id of [ "id: 'hub'", "id: 'hub-compat'", "id: 'hub-models'", "id: 'hub-routing'", "id: 'hub-health'" ] ) {
+		assert.ok( settings.includes( id ), `صفحهٔ ${ id } نیست` );
+	}
+	assert.match( settings, /mountHub/ );
+} );
+
+await test( 'صفحهٔ هاب کلید اصلی روشن/خاموش دارد', () => {
+	const hubUi = fssync.readFileSync( path.join( uiDir, 'hub.js' ), 'utf8' );
+	assert.match( hubUi, /action: 'toggle'/ );
+	assert.match( hubUi, /hub-master/ );
+} );
+
+await test( 'صفحهٔ مسیریابی، آزمون «این درخواست به کجا می‌رود» دارد', () => {
+	const hubUi = fssync.readFileSync( path.join( uiDir, 'hub.js' ), 'utf8' );
+	assert.match( hubUi, /action: 'explain'/ );
+	assert.match( hubUi, /ببین کجا می‌رود/ );
+} );
+
+await test( 'دفتر راه‌حل‌ها در رابط دیدنی و برگشت‌پذیر است', () => {
+	const hubUi = fssync.readFileSync( path.join( uiDir, 'hub.js' ), 'utf8' );
+	assert.match( hubUi, /forget-patch/ );
+	assert.match( hubUi, /promote-patch/ );
+} );
+
+await test( 'کلاس‌های تازهٔ هاب در استایل تعریف شده‌اند', () => {
+	for ( const cls of [ '.hub-master', '.tag-row', '.route-result', '.route-list' ] ) {
+		assert.ok( css.includes( cls ), `کلاس ${ cls } در style.css نیست` );
+	}
+} );
+
+// ---------------------------------------------------------------- هاب: اجرای واقعی رابط
+
+section( 'هاب — صفحه‌ها واقعاً رندر می‌شوند' );
+
+const { installFakeDom } = await import( './fake-dom.mjs' );
+
+/** پاسخ ساختگی سرور برای `/api/hub` — شبیه یک نصب پرکار. */
+function hubSnapshotFixture() {
+	const conn = {
+		id: 'c1',
+		label: 'اتصال یک',
+		provider: 'openai',
+		kind: 'openai',
+		baseUrl: 'https://api.test/v1',
+		apiKey: '••••••••1234',
+		hasKey: true,
+		enabled: true,
+		priority: 100,
+		maxConcurrent: 4,
+		dailyCap: null,
+		headers: {},
+		authStyle: 'bearer',
+		patches: [ { op: 'disable_stream' } ],
+	};
+	const custom = { ...conn, id: 'c2', label: 'سازگار دلخواه', provider: 'openai-compatible' };
+	return {
+		active: true,
+		ready: { ok: true, reason: '' },
+		catalog: [
+			{ id: 'openai', label: 'OpenAI', kind: 'openai', baseUrl: 'https://api.openai.com/v1', needsKey: true, editableBaseUrl: true },
+			{ id: 'openai-compatible', label: 'سازگار با OpenAI', kind: 'openai', baseUrl: '', needsKey: true, editableBaseUrl: true, note: 'هر سرویسی' },
+		],
+		strategies: [ { id: 'auto', label: 'خودکار', note: 'امتیازدهی زنده' }, { id: 'priority', label: 'اولویت', note: 'به ترتیب' } ],
+		categories: [ { id: 'coding', label: 'کدنویسی' }, { id: 'general', label: 'عمومی' } ],
+		authStyles: [ { id: 'bearer', label: 'Bearer' }, { id: 'x-api-key', label: 'x-api-key' } ],
+		hub: {
+			enabled: true,
+			connections: { c1: conn, c2: custom },
+			models: {
+				'c1::m1': { key: 'c1::m1', connectionId: 'c1', modelId: 'm1', label: 'مدل یک', enabled: true, context: 200000, priceIn: 3, priceOut: 15, caps: { tools: true, vision: true, reasoning: false }, tags: [ 'coding' ], priority: 100, weight: 1 },
+				'c1::m2': { key: 'c1::m2', connectionId: 'c1', modelId: 'm2', label: 'مدل دو', enabled: false, missing: true, context: 0, priceIn: null, priceOut: null, caps: { tools: false }, tags: [], priority: 100, weight: 1 },
+			},
+			combos: { x: { id: 'x', label: 'کد روزمره', strategy: 'priority', members: [ 'c1::m1' ] } },
+			categoryCombo: { coding: 'x' },
+			routing: { strategy: 'auto', fallback: true, maxAttempts: 3 },
+			budget: { daily: 5, perAdmin: null, perTask: null, warnAt: 0.8 },
+			cache: { enabled: true, ttlMs: 300000 },
+			diagnoser: { enabled: true, connectionId: 'c1', model: 'm2', minFailures: 2, perSignaturePerHour: 1, dailyBudget: null, internet: false, autoPromote: false },
+		},
+		health: { 'c1::m1': { ok: 10, fail: 2, successRate: 0.83, p50: 400, p95: 1200, circuit: 'open', exhausted: false, lastError: 'یک خطا', usedToday: 12 } },
+		learning: { coding: [ { modelKey: 'c1::m1', score: 0.71, n: 12 } ] },
+		budget: { day: '2026-08-17', total: 1.25, admins: {}, tasks: {}, limits: { daily: 5 }, usedRatio: 0.25 },
+		cache: { size: 3, hits: 1, misses: 2, enabled: true },
+		ledger: [ { signature: 'openai|404|model|x', domain: 'hub', patches: [ { op: 'set_base_url' } ], why: 'آدرس /v1 نداشت', origin: 'rule', discovered: '2026-08-10T00:00:00.000Z', ok: 3, fail: 0, state: 'temporary' } ],
+		diagnoser: { enabled: true, hasModel: true, spentToday: 1, dailyBudget: null, signatures: [], journal: [ { at: '2026-08-17T10:00:00.000Z', step: 'rule', why: 'آدرس پایه' } ] },
+		recent: [],
+	};
+}
+
+await test( 'هر پنج صفحهٔ هاب بدون خطا ساخته می‌شوند و محتوا دارند', async () => {
+	/** @type {any[]} */
+	const calls = [];
+	const dom = installFakeDom( {
+		fetch: async ( url, options ) => {
+			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
+			const data = url === '/api/hub' ? hubSnapshotFixture() : { ok: true };
+			return { ok: true, json: async () => data };
+		},
+	} );
+	try {
+		const { mountHub } = await import( `../ui/hub.js?dom=${ Date.now() }` );
+		for ( const page of [ 'hub', 'hub-compat', 'hub-models', 'hub-routing', 'hub-health' ] ) {
+			const box = document.createElement( 'div' );
+			await mountHub( box, page );
+			const text = box.textContent;
+			assert.ok( box.children.length > 1, `صفحهٔ ${ page } خالی است` );
+			assert.equal( /undefined|NaN|\[object Object\]/.test( text ), false, `صفحهٔ ${ page } مقدار خام نشان می‌دهد: ${ text.slice( 0, 120 ) }` );
+		}
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'کلید اصلی هاب واقعاً درخواست خاموش‌کردن می‌فرستد', async () => {
+	/** @type {any[]} */
+	const calls = [];
+	const dom = installFakeDom( {
+		fetch: async ( url, options ) => {
+			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
+			return { ok: true, json: async () => ( url === '/api/hub' && ! options ? hubSnapshotFixture() : options?.method === 'POST' ? { ok: true, active: false } : hubSnapshotFixture() ) };
+		},
+	} );
+	try {
+		const { mountHub } = await import( `../ui/hub.js?toggle=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await mountHub( box, 'hub' );
+		const button = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'خاموش کن' );
+		assert.ok( button, 'دکمهٔ خاموش‌کردن پیدا نشد' );
+		await button.click();
+		await new Promise( ( r ) => setTimeout( r, 20 ) );
+		const toggle = calls.find( ( c ) => c.body?.action === 'toggle' );
+		assert.ok( toggle, 'درخواست toggle فرستاده نشد' );
+		assert.equal( toggle.body.enabled, false );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'دکمهٔ «کشف مدل‌ها» روی کارت اتصال کار می‌کند', async () => {
+	/** @type {any[]} */
+	const calls = [];
+	const dom = installFakeDom( {
+		fetch: async ( url, options ) => {
+			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
+			return { ok: true, json: async () => ( options?.method === 'POST' ? { ok: true, added: 2, kept: 0, missing: 0 } : hubSnapshotFixture() ) };
+		},
+	} );
+	try {
+		const { mountHub } = await import( `../ui/hub.js?disc=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await mountHub( box, 'hub' );
+		const button = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'کشف مدل‌ها' );
+		assert.ok( button, 'دکمهٔ کشف پیدا نشد' );
+		await button.click();
+		await new Promise( ( r ) => setTimeout( r, 20 ) );
+		assert.ok( calls.some( ( c ) => c.body?.action === 'discover' && c.body.id === 'c1' ) );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'صفحهٔ سلامت، مدار باز را نشان می‌دهد و دکمهٔ بازکردن دارد', async () => {
+	/** @type {any[]} */
+	const calls = [];
+	const dom = installFakeDom( {
+		fetch: async ( url, options ) => {
+			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
+			return { ok: true, json: async () => ( options?.method === 'POST' ? { ok: true } : hubSnapshotFixture() ) };
+		},
+	} );
+	try {
+		const { mountHub } = await import( `../ui/hub.js?health=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await mountHub( box, 'hub-health' );
+		// روی خودِ نشان بررسی می‌کنیم، نه روی متن کل صفحه — چون توضیح بالای صفحه هم
+		// عبارت «مدار باز» را دارد و یک assert سرانگشتی با آن سبز می‌ماند.
+		const badge = box.querySelectorAll( '.tag' ).find( ( t ) => t.textContent === 'مدار باز' );
+		assert.ok( badge, 'نشان مدار باز روی ردیف مدل نیست' );
+		assert.ok( box.querySelector( '.bad' ), 'ردیف مدل خراب باید علامت بخورد' );
+		const button = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'بازکردن دوباره' );
+		assert.ok( button, 'دکمهٔ بازکردن مدار نیست' );
+		await button.click();
+		await new Promise( ( r ) => setTimeout( r, 20 ) );
+		assert.ok( calls.some( ( c ) => c.body?.action === 'reset-breaker' && c.body.key === 'c1::m1' ) );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'صفحهٔ سلامت، دفتر راه‌حل‌ها و وصلهٔ دائمی را نشان می‌دهد', async () => {
+	const dom = installFakeDom( { fetch: async () => ( { ok: true, json: async () => hubSnapshotFixture() } ) } );
+	try {
+		const { mountHub } = await import( `../ui/hub.js?ledger=${ Date.now() }` );
+		const health = document.createElement( 'div' );
+		await mountHub( health, 'hub-health' );
+		assert.match( health.textContent, /آدرس \/v1 نداشت/ );
+		assert.match( health.textContent, /موقت/ );
+
+		const conns = document.createElement( 'div' );
+		await mountHub( conns, 'hub' );
+		assert.match( conns.textContent, /وصلهٔ دائمی/ );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'آزمون مسیر در صفحهٔ مسیریابی، نتیجه را روی همان صفحه می‌نشاند', async () => {
+	const answer = {
+		classification: { category: 'coding', confidence: 0.82, reasons: [ 'واژهٔ «تابع»' ] },
+		strategy: 'auto',
+		candidates: [ { key: 'c1::m1', label: 'مدل یک', connectionLabel: 'اتصال یک', score: 0.77, cost: 0.00012 } ],
+		blocked: [ { key: 'c1::m2', reason: 'مدل خاموش است' } ],
+		budget: { allowed: true },
+	};
+	const dom = installFakeDom( {
+		fetch: async ( url, options ) => ( {
+			ok: true,
+			json: async () => ( options?.method === 'POST' ? answer : hubSnapshotFixture() ),
+		} ),
+	} );
+	try {
+		const { mountHub } = await import( `../ui/hub.js?probe=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await mountHub( box, 'hub-routing' );
+		const button = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'ببین کجا می‌رود' );
+		assert.ok( button, 'دکمهٔ آزمون مسیر نیست' );
+		await button.click();
+		await new Promise( ( r ) => setTimeout( r, 20 ) );
+		const result = box.querySelector( '.route-result' );
+		assert.ok( result, 'ظرف نتیجه نیست' );
+		assert.match( result.textContent, /کدنویسی/ );
+		assert.match( result.textContent, /مدل یک/ );
+		assert.match( result.textContent, /مدل خاموش است/ );
+	} finally {
+		dom.restore();
+	}
+} );
 
 // ------------------------------------------------------------------ پایان
 

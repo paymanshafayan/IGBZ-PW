@@ -8,9 +8,15 @@
 
 import { $, el, h, toast, confirmDialog } from './lib/dom.js';
 import { api, post, refreshState, getState } from './lib/api.js';
+import { mountHub } from './hub.js';
 
 const TABS = [
-	{ id: 'provider', label: 'پرووایدر و مدل', ico: '◈' },
+	{ id: 'hub', label: 'پرووایدرهای استاندارد', ico: '◈' },
+	{ id: 'hub-compat', label: 'پرووایدرهای سازگار', ico: '◇' },
+	{ id: 'hub-models', label: 'مدل‌ها', ico: '⬡' },
+	{ id: 'hub-routing', label: 'هاب و مسیریابی', ico: '⇶' },
+	{ id: 'hub-health', label: 'سلامت، مصرف و عیب‌یاب', ico: '✚' },
+	{ id: 'provider', label: 'پروفایل تک‌نفره', ico: '◉' },
 	{ id: 'connectors', label: 'کانکتورها (MCP)', ico: '⇄' },
 	{ id: 'skills', label: 'اسکیل‌ها', ico: '◆' },
 	{ id: 'plugins', label: 'پلاگین‌ها', ico: '▣' },
@@ -26,7 +32,7 @@ const TABS = [
 	{ id: 'appearance', label: 'ظاهر', ico: '◐' },
 ];
 
-let currentTab = 'provider';
+let currentTab = 'hub';
 
 export const SETTINGS_TABS = TABS;
 
@@ -97,7 +103,20 @@ async function renderProvider( box ) {
 	const cfg = s.config;
 	const profiles = Object.entries( cfg.profiles || {} );
 
-	box.appendChild( section( 'پرووایدر و مدل', 'می‌توانی چند پروفایل داشته باشی و بینشان جابه‌جا شوی — مثل Cline.' ) );
+	box.appendChild(
+		section(
+			'پروفایل تک‌نفره',
+			'حالت سادهٔ قدیمی: یک پرووایدر، یک مدل. وقتی هاب روشن و آماده باشد این کنار گذاشته می‌شود و مسیریابی با هاب است.'
+		)
+	);
+	if ( s.hub?.active ) {
+		box.appendChild(
+			h( 'div', { class: 'empty' }, [
+				h( 'p', { text: 'الان هاب فرمان را در دست دارد؛ این پروفایل استفاده نمی‌شود.' } ),
+				h( 'button', { class: 'pill', text: 'رفتن به هاب', onClick: () => openSettings( 'hub' ) } ),
+			] )
+		);
+	}
 
 	// فهرست پروفایل‌ها
 	const list = el( 'div', 'card-list' );
@@ -1279,6 +1298,11 @@ export async function renderSection( tab, box ) {
 }
 
 const RENDER = {
+	hub: ( box ) => mountHub( box, 'hub' ),
+	'hub-compat': ( box ) => mountHub( box, 'hub-compat' ),
+	'hub-models': ( box ) => mountHub( box, 'hub-models' ),
+	'hub-routing': ( box ) => mountHub( box, 'hub-routing' ),
+	'hub-health': ( box ) => mountHub( box, 'hub-health' ),
 	provider: renderProvider,
 	connectors: renderConnectors,
 	skills: renderSkills,

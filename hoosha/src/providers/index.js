@@ -61,3 +61,40 @@ export function validateProfile( profile ) {
 
 	return { ok: missing.length === 0, missing };
 }
+
+/**
+ * ساخت آداپتور از روی یک **اتصال هاب** (نه پروفایل تک‌نفره).
+ *
+ * فرقش با `createProvider` این است که همه‌چیز صریح می‌آید — سبک احراز، هدرهای سفارشی،
+ * مسیر فهرست مدل — و یک لایهٔ `overrides` هم می‌گیرد که وصله‌های عیب‌یاب از آنجا وارد
+ * می‌شوند. هیچ‌کدام از این‌ها در کد آداپتور hard-code نیست، چون اتصال سازگارِ دلخواه
+ * ذاتاً هر شکلی می‌تواند داشته باشد.
+ *
+ * @param {any} conn
+ * @param {{modelId?:string, overrides?:any}} [opts]
+ */
+export function createConnectionProvider( conn, opts = {} ) {
+	/** @type {import('./types.js').ProviderConfig} */
+	const cfg = {
+		providerId: conn.id,
+		kind: conn.kind === 'anthropic' ? 'anthropic' : conn.kind === 'mock' ? 'mock' : 'openai',
+		baseUrl: conn.baseUrl || '',
+		apiKey: conn.apiKey || '',
+		model: opts.modelId || '',
+		authStyle: conn.authStyle,
+		authHeader: conn.authHeader,
+		authPrefix: conn.authPrefix,
+		headers: conn.headers || {},
+		modelsPath: conn.modelsPath || '',
+		overrides: opts.overrides || {},
+	};
+
+	if ( cfg.kind === 'mock' ) {
+		return createMockProvider( cfg );
+	}
+	if ( cfg.kind === 'anthropic' ) {
+		return createAnthropicProvider( cfg );
+	}
+	return createOpenAiProvider( cfg );
+}
+

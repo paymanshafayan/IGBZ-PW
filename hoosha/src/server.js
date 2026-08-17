@@ -15,6 +15,9 @@ import { fileURLToPath } from 'node:url';
 
 import { loadConfig, saveConfig, publicConfig, activeProfile, HOME } from './config.js';
 import { PROVIDERS, createProvider, validateProfile, providerInfo } from './providers/index.js';
+import { CATEGORIES, STRATEGIES, AUTH_STYLES, hubId } from './hub/schema.js';
+import { handleChatCompletions, modelsResponse } from './hub/openai-api.js';
+import { hubReady as hubReadyOf } from './hub/registry.js';
 import { MODES } from './permissions.js';
 import { saveSession, listSessions, loadSession, deleteSession, renameSession } from './session.js';
 import { Runtime } from './runtime.js';
@@ -213,7 +216,8 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			sandbox: await sandboxStatus( cfg ),
 			git: await vcs.status( cfg.workspace ).catch( () => null ),
 			providerInfo: info || null,
-			version: '0.6.0',
+			hub: { active: runtime.hubActive(), enabled: Boolean( runtime.hub?.data?.enabled ), ready: runtime.hub ? hubReadyOf( runtime.hub.data ) : null },
+			version: '0.7.0',
 		};
 	}
 
@@ -294,6 +298,105 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 				return { status: 200, body: { models: [], error: info.message, hint: info.hint } };
 			}
 		},
+
+		// --------------------------------------------------------------- هاب
+		'GET /api/hub': async () => ( {
+			status: 200,
+			body: {
+				...runtime.hub.snapshot(),
+				active: runtime.hubActive(),
+				catalog: PROVIDERS,
+				strategies: STRATEGIES,
+				categories: CATEGORIES,
+				authStyles: AUTH_STYLES,
+			},
+		} ),
+
+		'POST /api/hub': async ( { body } ) => {
+			const hub = runtime.hub;
+			// هر تغییری در تعریف هاب یعنی دنیای عامل عوض شده؛ بدون بازساخت، عامل با
+			// پرووایدر قدیمی کار می‌کند و مدیر فکر می‌کند تنظیمش بی‌اثر بوده.
+			const rebuild = async () => {
+				await runtime.reload();
+				broadcast( { type: 'hub' } );
+			};
+
+			switch ( body?.action ) {
+				case 'toggle': {
+					const out = await hub.update( { enabled: Boolean( body.enabled ) } );
+					await rebuild();
+					return { status: 200, body: { ...out, active: runtime.hubActive(), ready: hub.snapshot().ready } };
+				}
+				case 'save-connection': {
+					const out = await hub.saveConnection( { ...body.connection, id: body.connection?.id || hubId( 'conn' ) } );
+					if ( out.ok ) {
+						await rebuild();
+					}
+					return { status: out.ok ? 200 : 400, body: out };
+				}
+				case 'remove-connection': {
+					const out = await hub.removeConnection( String( body.id || '' ) );
+					await rebuild();
+					return { status: out.ok ? 200 : 404, body: out };
+				}
+				case 'test-connection':
+					return { status: 200, body: await hub.testConnection( String( body.id || '' ), body.model ) };
+				case 'discover': {
+					const out = await hub.discover( String( body.id || '' ) );
+					if ( out.ok ) {
+						await rebuild();
+					}
+					return { status: 200, body: out };
+				}
+				case 'save-model': {
+					const out = await hub.saveModel( body.model || {} );
+					await rebuild();
+					return { status: out.ok ? 200 : 400, body: out };
+				}
+				case 'toggle-model': {
+					const out = await hub.toggleModel( String( body.key || '' ), body.enabled );
+					await rebuild();
+					return { status: out.ok ? 200 : 404, body: out };
+				}
+				case 'save-combo': {
+					const out = await hub.saveCombo( body.combo || {} );
+					await rebuild();
+					return { status: 200, body: out };
+				}
+				case 'remove-combo': {
+					const out = await hub.removeCombo( String( body.id || '' ) );
+					await rebuild();
+					return { status: 200, body: out };
+				}
+				case 'update': {
+					const out = await hub.update( body.patch || {} );
+					await rebuild();
+					return { status: 200, body: out };
+				}
+				case 'explain':
+					return { status: 200, body: hub.explainRoute( { text: String( body.text || '' ), hasImages: Boolean( body.hasImages ), tools: body.tools || [] } ) };
+				case 'forget-patch':
+					return { status: 200, body: await hub.forgetPatch( String( body.signature || '' ) ) };
+				case 'promote-patch': {
+					const out = await hub.promotePatch( String( body.signature || '' ) );
+					await rebuild();
+					return { status: out.ok ? 200 : 404, body: out };
+				}
+				case 'reset-breaker':
+					hub.health.reset( String( body.key || '' ) );
+					await hub.saveState();
+					return { status: 200, body: { ok: true } };
+				case 'clear-cache':
+					hub.cache.clear();
+					return { status: 200, body: { ok: true } };
+				default:
+					return { status: 400, body: { error: 'کنش ناشناخته برای هاب.' } };
+			}
+		},
+
+		// خروجی سازگار با OpenAI (تصمیم ۸) — فهرست مدل‌ها. تکمیل چت چون استریم دارد،
+		// پایین‌تر در خود سرور مدیریت می‌شود.
+		'GET /v1/models': async () => ( { status: 200, body: modelsResponse( runtime.hub ) } ),
 
 		// ------------------------------------------------------------- حالت
 		'POST /api/mode': async ( { body } ) => {
@@ -886,6 +989,17 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 					clearInterval( ping );
 					clients.delete( res );
 				} );
+				return;
+			}
+
+			// تکمیل چت سازگار با OpenAI: پاسخش می‌تواند استریم باشد، پس مثل بقیهٔ مسیرها
+			// از جدول رد نمی‌شود و مستقیم روی `res` می‌نویسد.
+			if ( url.pathname === '/v1/chat/completions' && req.method === 'POST' ) {
+				if ( ! runtime.hubActive() ) {
+					return send( 503, { error: { message: 'هاب روشن یا آماده نیست.', type: 'hub_unavailable' } } );
+				}
+				const body = await readJson( req );
+				await handleChatCompletions( runtime.hub, body, res );
 				return;
 			}
 

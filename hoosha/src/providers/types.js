@@ -12,6 +12,12 @@
  * @property {string} baseUrl
  * @property {string} [apiKey]
  * @property {string} model
+ * @property {'bearer'|'x-api-key'|'header'|'query'|'none'} [authStyle]
+ * @property {string} [authHeader]
+ * @property {string} [authPrefix]
+ * @property {Record<string,string>} [headers]
+ * @property {string} [modelsPath]
+ * @property {import('./wire.js').Overrides} [overrides]  وصله‌های عیب‌یاب؛ شکل درخواست را عوض می‌کنند، نه کد آداپتور را
  */
 
 /**

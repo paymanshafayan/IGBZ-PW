@@ -614,6 +614,179 @@ await step( 'ابزار install از راه گفتگو، یک اسکیل محل�
 } );
 
 
+// ------------------------------------------------------------------- هاب
+
+/**
+ * یک سرویس‌دهندهٔ ساختگی سازگار با OpenAI، برای اینکه مسیر واقعیِ «مدیر در پنل چه
+ * می‌کند» را از اول تا آخر برویم: اتصال بساز، مدل کشف کن، هاب را روشن کن، پیام بده.
+ */
+const http = await import( 'node:http' );
+
+let fakeHits = 0;
+let fakeMode = 'ok';
+const fake = http.createServer( ( req, res ) => {
+	let raw = '';
+	req.on( 'data', ( c ) => ( raw += c ) );
+	req.on( 'end', () => {
+		if ( req.url.endsWith( '/models' ) ) {
+			res.writeHead( 200, { 'Content-Type': 'application/json' } );
+			res.end( JSON.stringify( { data: [ { id: 'live-model' }, { id: 'live-mini' } ] } ) );
+			return;
+		}
+		fakeHits++;
+		if ( fakeMode === 'down' ) {
+			res.writeHead( 500, { 'Content-Type': 'application/json' } );
+			res.end( JSON.stringify( { error: 'boom' } ) );
+			return;
+		}
+		res.writeHead( 200, { 'Content-Type': 'text/event-stream' } );
+		res.write( `data: ${ JSON.stringify( { choices: [ { delta: { content: 'پاسخ از هاب' } } ] } ) }\n\n` );
+		res.write( `data: ${ JSON.stringify( { usage: { prompt_tokens: 8, completion_tokens: 4 } } ) }\n\n` );
+		res.write( 'data: [DONE]\n\n' );
+		res.end();
+	} );
+} );
+await new Promise( ( r ) => fake.listen( 0, '127.0.0.1', r ) );
+const FAKE = `http://127.0.0.1:${ fake.address().port }`;
+
+let connId = '';
+
+await step( 'صفحهٔ هاب خالی ولی سرپا بالا می‌آید', async () => {
+	const out = await get( '/api/hub' );
+	assert.equal( out.active, false );
+	assert.ok( Array.isArray( out.catalog ) && out.catalog.length > 5 );
+	assert.ok( out.strategies.some( ( s ) => s.id === 'auto' ) );
+	assert.ok( out.categories.some( ( c ) => c.id === 'coding' ) );
+} );
+
+await step( 'اتصال تازه ساخته می‌شود و کلیدش خام برنمی‌گردد', async () => {
+	const out = await post( '/api/hub', {
+		action: 'save-connection',
+		connection: { label: 'ساختگی', provider: 'openai-compatible', kind: 'openai', baseUrl: FAKE, apiKey: 'live-secret-key' },
+	} );
+	assert.ok( out.ok, out.error );
+	connId = out.connection.id;
+
+	const snap = await get( '/api/hub' );
+	assert.equal( JSON.stringify( snap ).includes( 'live-secret-key' ), false, 'کلید نباید در پاسخ باشد' );
+	assert.equal( snap.hub.connections[ connId ].hasKey, true );
+} );
+
+await step( 'کشف مدل‌ها رجیستری را پر می‌کند', async () => {
+	const out = await post( '/api/hub', { action: 'discover', id: connId } );
+	assert.ok( out.ok, out.error );
+	assert.equal( out.added, 2 );
+	const snap = await get( '/api/hub' );
+	assert.ok( snap.hub.models[ `${ connId }::live-model` ] );
+} );
+
+await step( 'تست اتصال، پاسخ واقعی می‌گیرد', async () => {
+	const out = await post( '/api/hub', { action: 'test-connection', id: connId } );
+	assert.ok( out.ok, out.error );
+	assert.match( out.message, /پاسخ گرفتم/ );
+} );
+
+await step( 'روشن‌کردن هاب، فرمان را از پروفایل تک‌نفره می‌گیرد', async () => {
+	const out = await post( '/api/hub', { action: 'toggle', enabled: true } );
+	assert.equal( out.active, true, JSON.stringify( out.ready ) );
+	const state = await get( '/api/state' );
+	assert.equal( state.hub.active, true );
+	assert.equal( state.ready.ok, true );
+} );
+
+await step( 'پیام واقعی کاربر از راه هاب مسیریابی و جواب داده می‌شود', async () => {
+	const before = fakeHits;
+	await say( 'یک جملهٔ کوتاه بگو' );
+	await waitFor( ( e ) => e.type === 'idle', 15_000, 'پایان نوبت' );
+	assert.ok( fakeHits > before, 'هیچ تماسی به سرویس‌دهنده نرفت' );
+	const text = events.filter( ( e ) => e.type === 'text' ).map( ( e ) => e.text ).join( '' );
+	assert.match( text, /پاسخ از هاب/ );
+	assert.ok( events.some( ( e ) => e.type === 'hub-route' ), 'رویداد مسیریابی به رابط نرسید' );
+} );
+
+await step( 'آزمون «این درخواست به کجا می‌رود» از پنل جواب می‌دهد', async () => {
+	const out = await post( '/api/hub', { action: 'explain', text: 'این تابع را ریفکتور کن', tools: [ 'edit_file' ] } );
+	assert.equal( out.classification.category, 'coding' );
+	assert.ok( out.candidates.length >= 1 );
+	assert.ok( typeof out.candidates[ 0 ].score === 'number' );
+} );
+
+await step( 'خروجی سازگار با OpenAI: فهرست مدل‌ها', async () => {
+	const out = await get( '/v1/models' );
+	assert.equal( out.object, 'list' );
+	assert.equal( out.data[ 0 ].id, 'auto' );
+	assert.ok( out.data.some( ( m ) => m.id === `${ connId }::live-model` ) );
+} );
+
+await step( 'خروجی سازگار با OpenAI: تکمیل چت بدون استریم', async () => {
+	const res = await fetch( `${ BASE }/v1/chat/completions`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify( { model: 'auto', messages: [ { role: 'user', content: 'سلام' } ] } ),
+	} );
+	const out = await res.json();
+	assert.equal( res.status, 200, JSON.stringify( out ) );
+	assert.equal( out.object, 'chat.completion' );
+	assert.match( out.choices[ 0 ].message.content, /پاسخ از هاب/ );
+	assert.ok( out.usage.total_tokens > 0 );
+} );
+
+await step( 'خروجی سازگار با OpenAI: تکمیل چت با استریم', async () => {
+	const res = await fetch( `${ BASE }/v1/chat/completions`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify( { model: 'auto', stream: true, messages: [ { role: 'user', content: 'یک متن دیگر' } ] } ),
+	} );
+	const body = await res.text();
+	assert.match( body, /chat\.completion\.chunk/ );
+	assert.match( body, /پاسخ از هاب/ );
+	assert.match( body, /\[DONE\]/ );
+} );
+
+await step( 'وقتی سرویس می‌خوابد، هاب علامت می‌زند و خطای گویا می‌دهد', async () => {
+	fakeMode = 'down';
+	await say( 'یک درخواست تازه که قبلاً نپرسیده‌ام' );
+	await waitFor( ( e ) => e.type === 'idle', 20_000, 'پایان نوبت' );
+	const err = events.find( ( e ) => e.type === 'error' );
+	assert.ok( err, 'خطا به رابط نرسید' );
+	const snap = await get( '/api/hub' );
+	const health = snap.health[ `${ connId }::live-model` ] || snap.health[ `${ connId }::live-mini` ];
+	assert.ok( health.fail > 0, 'شکست در دفتر سلامت ثبت نشد' );
+	fakeMode = 'ok';
+} );
+
+await step( 'مدار باز را می‌شود از پنل دوباره بست', async () => {
+	const key = `${ connId }::live-model`;
+	await post( '/api/hub', { action: 'reset-breaker', key } );
+	const snap = await get( '/api/hub' );
+	assert.notEqual( snap.health[ key ]?.circuit, 'open' );
+} );
+
+await step( 'خاموش‌کردن هاب، پروفایل تک‌نفره را برمی‌گرداند', async () => {
+	const out = await post( '/api/hub', { action: 'toggle', enabled: false } );
+	assert.equal( out.active, false );
+	const state = await get( '/api/state' );
+	assert.equal( state.hub.active, false );
+} );
+
+await step( 'وقتی هاب خاموش است، مسیر سازگار با OpenAI بسته است', async () => {
+	const res = await fetch( `${ BASE }/v1/chat/completions`, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify( { model: 'auto', messages: [ { role: 'user', content: 'x' } ] } ),
+	} );
+	assert.equal( res.status, 503 );
+} );
+
+await step( 'حذف اتصال، مدل‌های یتیم را هم می‌برد', async () => {
+	await post( '/api/hub', { action: 'remove-connection', id: connId } );
+	const snap = await get( '/api/hub' );
+	assert.equal( Object.keys( snap.hub.connections ).length, 0 );
+	assert.equal( Object.keys( snap.hub.models ).length, 0 );
+} );
+
+fake.close();
+
 // ------------------------------------------------------------------- پایان
 
 reader.cancel().catch( () => {} );

@@ -21,6 +21,8 @@ import { collectAgents } from './agents.js';
 import { activePlugins, installPlugin } from './plugins.js';
 import { installSkill, findSkillDirs } from './skillstore.js';
 import { makeTaskTool } from './subagent.js';
+import { Hub } from './hub/index.js';
+import { hubReady } from './hub/registry.js';
 
 export class Runtime {
 	/** @param {(ev:any)=>void} emit */
@@ -42,6 +44,19 @@ export class Runtime {
 		this.hooks = new HookRunner( { workspace: process.cwd(), emit } );
 		this.config = null;
 		this.ready = { ok: false, missing: [ 'پرووایدر' ] };
+		/** @type {Hub|null} */
+		this.hub = null;
+	}
+
+	/**
+	 * آیا هاب فرمان را در دست دارد؟
+	 *
+	 * وقتی هاب روشن و آماده باشد، پروفایل تک‌نفره کنار می‌رود. وقتی روشن باشد ولی آماده
+	 * نباشد (مثلاً هیچ مدلی کشف نشده)، **پروفایل قدیمی سرِ کار می‌ماند** — یک تنظیم
+	 * نیمه‌کاره نباید ابزار را از کار بیندازد.
+	 */
+	hubActive() {
+		return Boolean( this.hub?.data?.enabled && hubReady( this.hub.data ).ok );
 	}
 
 	/**
@@ -85,8 +100,19 @@ export class Runtime {
 			servers: { ...( cfg.mcpServers || {} ), ...( await this.#pluginMcpServers() ) },
 		} );
 
+		this.hub = new Hub( {
+			home: HOME,
+			emit: this.emit,
+			fetchDocs: ( query ) => TOOLS.web_search.run( { query }, { workspace: cfg.workspace } ),
+		} );
+		await this.hub.load();
+
 		const profile = cfg.profiles?.[ cfg.activeProfile ];
-		this.ready = profile ? validateProfile( profile ) : { ok: false, missing: [ 'پروفایل' ] };
+		this.ready = this.hubActive()
+			? { ok: true, missing: [] }
+			: profile
+			? validateProfile( profile )
+			: { ok: false, missing: [ 'پروفایل' ] };
 
 		const previous = opts.keepHistory !== false ? this.agent : null;
 		this.agent = this.#makeAgent( {} );
@@ -246,17 +272,20 @@ export class Runtime {
 		const profile = cfg.profiles?.[ cfg.activeProfile ] || {};
 		const info = providerInfo( profile.provider );
 
+		const useHub = this.hubActive();
+
 		let provider;
 		try {
-			provider = createProvider( profile );
+			provider = useHub ? this.hub.adapter() : createProvider( profile );
 		} catch {
 			provider = null;
 		}
 
 		return new Agent( {
 			provider,
-			model: opts.model || profile.model || info?.defaultModel || '',
-			baseUrl: profile.baseUrl || info?.baseUrl || '',
+			// در حالت هاب، «مدل» یعنی درخواستِ مسیریابی؛ خود هاب مدل واقعی را انتخاب می‌کند.
+			model: opts.model || ( useHub ? 'auto' : profile.model || info?.defaultModel || '' ),
+			baseUrl: useHub ? 'hub' : profile.baseUrl || info?.baseUrl || '',
 			workspace: cfg.workspace,
 			rules: cfg.permissions,
 			getTools: () => this.tools( depth, allowedTools ),

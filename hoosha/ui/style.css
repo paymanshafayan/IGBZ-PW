@@ -2725,3 +2725,69 @@ kbd {
 		padding-inline: 18px;
 	}
 }
+
+/* ═══════════════════════════════════════════════ هاب پرووایدر
+   پنج صفحهٔ هاب از همان اجزای تنظیمات ساخته شده‌اند؛ چیزی که اینجا اضافه می‌شود فقط
+   حالت‌هایی است که قبلاً وجود نداشت: کارت روشن/خاموش، ردیف برچسب، و نتیجهٔ آزمون مسیر. */
+
+.hub-master {
+	border-inline-start: 3px solid var(--border);
+	transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.hub-master.on {
+	border-inline-start-color: var(--primary);
+	background: linear-gradient( to left, var(--primary-soft), transparent 55% );
+}
+
+/* خاموشی باید دیده شود ولی داد نزند — کم‌رنگ، نه قرمز. */
+.item.off {
+	opacity: 0.55;
+}
+
+.item.off:hover {
+	opacity: 0.85;
+}
+
+.item.bad {
+	border-color: var(--destructive);
+}
+
+.item.missing {
+	border-style: dashed;
+}
+
+.tag-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 5px;
+	margin-top: 6px;
+}
+
+.row.wrap {
+	flex-wrap: wrap;
+}
+
+.card-list.compact .item {
+	padding: 8px 12px;
+}
+
+.route-result {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid var(--border-soft);
+	animation: rise 0.22s var(--ease);
+}
+
+.route-list {
+	margin: 8px 0 0;
+	padding-inline-start: 20px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.route-list li::marker {
+	color: var(--primary);
+	font-weight: 700;
+}
