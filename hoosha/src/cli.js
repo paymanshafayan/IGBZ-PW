@@ -14,7 +14,13 @@
  */
 
 import { spawn } from 'node:child_process';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { startServer } from './server.js';
+
+const VERSION = '0.5.0';
+const SELF = fileURLToPath( import.meta.url );
+const ROOT = path.resolve( path.dirname( SELF ), '..' );
 
 const args = process.argv.slice( 2 );
 
@@ -71,7 +77,8 @@ if ( args.includes( '--help' ) || args.includes( '-h' ) ) {
 }
 
 if ( args.includes( '--version' ) || args.includes( '-v' ) ) {
-	console.log( '0.5.0' );
+	console.log( `${ VERSION }` );
+	console.log( `اجرا از: ${ ROOT }` );
 	process.exit( 0 );
 }
 
@@ -173,9 +180,13 @@ const shown = host === '0.0.0.0' ? '127.0.0.1' : host;
 const url = `http://${ shown }:${ port }`;
 
 console.log( '' );
-console.log( '  هوشا آمادهٔ کار است' );
+console.log( `  هوشا ${ VERSION } آمادهٔ کار است` );
 console.log( `  آدرس:       ${ url }` );
 console.log( `  پوشهٔ کاری:  ${ config.workspace }` );
+// مسیر واقعیِ کدی که اجرا می‌شود. اگر کسی یک بار `npm install -g .` زده باشد، دستور
+// `hoosha` یک **کپیِ منجمد** را اجرا می‌کند نه مخزن را — و بدون این خط، هیچ راهی نیست که
+// بفهمد چرا تغییراتش را نمی‌بیند.
+console.log( `  اجرا از:     ${ ROOT }` );
 console.log( '' );
 
 if ( ! noOpen ) {
