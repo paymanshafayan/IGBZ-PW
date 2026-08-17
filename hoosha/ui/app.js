@@ -8,6 +8,7 @@
 
 import { $, h, toast, promptDialog, fmtTokens } from './lib/dom.js';
 import { post, refreshState, subscribe, getState } from './lib/api.js';
+import { paintStaleBar } from './lib/stale.js';
 import {
 	mountThread,
 	handleEvent,
@@ -221,6 +222,7 @@ initRail( { onRewind: ( id ) => openRewind( doRewind, id ) } );
 subscribe( ( s ) => {
 	$( '#brand-version' ).textContent = `v${ s.version }`;
 	document.title = `هوشا ${ s.version }`;
+	paintStaleBar( $( '#stale-bar' ), s );
 
 	paintSidebarState( s );
 	paintRail( s );

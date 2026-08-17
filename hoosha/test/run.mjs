@@ -3649,6 +3649,104 @@ await test( 'آزمون مسیر در صفحهٔ مسیریابی، نتیجه �
 	}
 } );
 
+// ---------------------------------------------------------------- نسخه و کپیِ منجمد
+
+section( 'نسخه و تشخیص کپیِ منجمد' );
+
+const { VERSION, ROOT, installInfo } = await import( '../src/version.js' );
+
+await test( 'نسخه از package.json می‌آید، نه از یک رشتهٔ دستی', async () => {
+	const pkg = JSON.parse( await fs.readFile( path.resolve( 'package.json' ), 'utf8' ) );
+	assert.equal( VERSION, pkg.version );
+	assert.notEqual( VERSION, 'نامعلوم' );
+} );
+
+await test( 'هیچ نسخهٔ دستی‌نوشته‌ای در کد نمانده', async () => {
+	// این تست دقیقاً برای همان اشتباهی است که کاربر گزارش کرد: نسخه در سه جا بود،
+	// یکی به‌روز شد و بقیه جا ماندند.
+	for ( const file of [ 'src/cli.js', 'src/server.js' ] ) {
+		const src = await fs.readFile( path.resolve( file ), 'utf8' );
+		const found = src.match( /['"`]\d+\.\d+\.\d+['"`]/g ) || [];
+		assert.deepEqual( found, [], `${ file } نسخه را دستی نوشته: ${ found.join( '، ' ) }` );
+	}
+} );
+
+await test( 'در چک‌اوت واقعی، منجمد گزارش نمی‌شود', () => {
+	const info = installInfo();
+	assert.equal( info.frozen, false );
+	assert.equal( info.git, true, 'مخزن باید تشخیص داده شود' );
+	assert.equal( info.root, ROOT );
+	assert.equal( info.hint, '' );
+} );
+
+await test( 'کپیِ داخل node_modules، منجمد تشخیص داده می‌شود', async () => {
+	// یک نصبِ سراسری واقعی را شبیه‌سازی می‌کنیم: همان فایل‌ها، ولی زیر node_modules.
+	const fake = path.join( tmpRoot, 'global', 'node_modules', 'hoosha' );
+	await fs.mkdir( path.join( fake, 'src' ), { recursive: true } );
+	await fs.copyFile( path.resolve( 'src/version.js' ), path.join( fake, 'src', 'version.js' ) );
+	await fs.writeFile( path.join( fake, 'package.json' ), JSON.stringify( { name: 'hoosha', version: '0.5.0' } ), 'utf8' );
+
+	const mod = await import( new URL( `file://${ path.join( fake, 'src', 'version.js' ) }` ).href );
+	const info = mod.installInfo();
+	assert.equal( info.version, '0.5.0', 'نسخه باید از package.json همان کپی خوانده شود' );
+	assert.equal( info.frozen, true );
+	assert.match( info.hint, /npm link/ );
+} );
+
+await test( 'وضعیت سرور، نسخه و مسیر واقعی کد را برمی‌گرداند', () => {
+	const src = fssync.readFileSync( path.resolve( 'src/server.js' ), 'utf8' );
+	assert.match( src, /version: VERSION/ );
+	assert.match( src, /install: installInfo\(\)/ );
+} );
+
+await test( 'ترمینال، کپیِ منجمد را داد می‌زند نه اینکه فقط مسیر را چاپ کند', () => {
+	const cli = fssync.readFileSync( path.resolve( 'src/cli.js' ), 'utf8' );
+	assert.match( cli, /installInfo\(\)\.frozen/ );
+	assert.match( cli, /npm rm -g hoosha/ );
+} );
+
+await test( 'نوار هشدار واقعاً ظاهر می‌شود و متن درست را می‌گذارد', async () => {
+	const dom = installFakeDom();
+	try {
+		const { paintStaleBar } = await import( `../ui/lib/stale.js?v=${ Date.now() }` );
+		const bar = document.createElement( 'div' );
+
+		const shown = paintStaleBar( bar, {
+			version: '0.5.0',
+			install: { frozen: true, root: '/usr/lib/node_modules/hoosha', hint: 'x' },
+		} );
+		assert.equal( shown, true );
+		assert.equal( bar.hidden, false );
+		assert.match( bar.textContent, /0\.5\.0/ );
+		assert.match( bar.textContent, /npm link/ );
+		assert.match( bar.textContent, /node_modules/ );
+
+		const hidden = paintStaleBar( bar, { version: '0.7.0', install: { frozen: false } } );
+		assert.equal( hidden, false );
+		assert.equal( bar.hidden, true );
+		assert.equal( bar.textContent, '', 'وقتی پنهان است نباید متن قدیمی زیرش بماند' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'نوار هشدار به برنامه وصل است و استایل واقعی دارد', () => {
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /paintStaleBar\( \$\( '#stale-bar' \), s \)/ );
+
+	const html = fssync.readFileSync( path.join( uiDir, 'index.html' ), 'utf8' );
+	assert.match( html, /id="stale-bar" hidden/ );
+
+	const block = cssBlock( '.stale-bar' );
+	assert.match( block, /display:\s*flex/ );
+	assert.match( block, /background:\s*var\(--warn-soft\)/ );
+} );
+
+await test( 'صفحهٔ وضعیت، مسیر کدی که اجرا می‌شود را نشان می‌دهد', () => {
+	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
+	assert.match( settings, /کد از: \$\{ s\.install\?\.root/ );
+} );
+
 // ------------------------------------------------------------------ پایان
 
 await fs.rm( tmpRoot, { recursive: true, force: true } );

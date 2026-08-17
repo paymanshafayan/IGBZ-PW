@@ -15,12 +15,8 @@
 
 import { spawn } from 'node:child_process';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { startServer } from './server.js';
-
-const VERSION = '0.7.0';
-const SELF = fileURLToPath( import.meta.url );
-const ROOT = path.resolve( path.dirname( SELF ), '..' );
+import { VERSION, ROOT, installInfo } from './version.js';
 
 const args = process.argv.slice( 2 );
 
@@ -79,6 +75,9 @@ if ( args.includes( '--help' ) || args.includes( '-h' ) ) {
 if ( args.includes( '--version' ) || args.includes( '-v' ) ) {
 	console.log( `${ VERSION }` );
 	console.log( `اجرا از: ${ ROOT }` );
+	if ( installInfo().frozen ) {
+		console.log( installInfo().hint );
+	}
 	process.exit( 0 );
 }
 
@@ -187,6 +186,15 @@ console.log( `  پوشهٔ کاری:  ${ config.workspace }` );
 // `hoosha` یک **کپیِ منجمد** را اجرا می‌کند نه مخزن را — و بدون این خط، هیچ راهی نیست که
 // بفهمد چرا تغییراتش را نمی‌بیند.
 console.log( `  اجرا از:     ${ ROOT }` );
+
+// یک خط ساکت کافی نبود. اگر این یک کپیِ منجمد است، باید داد بزند — چون علامتش دقیقاً
+// همان چیزی است که کاربر گزارش می‌کند: «نسخهٔ قدیمی بالا می‌آید».
+if ( installInfo().frozen ) {
+	console.log( '' );
+	console.log( '  ⚠  این یک کپیِ نصب‌شده است، نه کد مخزن.' );
+	console.log( '     هر تغییری که در مخزن بدهی، اینجا دیده نمی‌شود.' );
+	console.log( '     درستش:  npm rm -g hoosha   سپس در پوشهٔ مخزن:  npm link' );
+}
 console.log( '' );
 
 if ( ! noOpen ) {

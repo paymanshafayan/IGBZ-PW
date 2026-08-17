@@ -2791,3 +2791,40 @@ kbd {
 	color: var(--primary);
 	font-weight: 700;
 }
+
+/* نوار «کد مخزن نیستم»
+   عمداً بالای همه‌چیز و عمداً زشت: این پیام باید آزاردهنده باشد تا کاربر برود درستش
+   کند، نه اینکه با آن زندگی کند. */
+
+.stale-bar {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-wrap: wrap;
+	gap: 8px;
+	padding: 9px 16px;
+	background: var(--warn-soft);
+	color: var(--foreground);
+	border-bottom: 1px solid var(--warn);
+	font-size: 13px;
+	line-height: 1.7;
+}
+
+.stale-bar b {
+	color: var(--warn);
+}
+
+.stale-bar code {
+	font-family: var(--mono, ui-monospace, monospace);
+	background: var(--muted);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-sm);
+	padding: 1px 7px;
+	direction: ltr;
+	unicode-bidi: embed;
+}
+
+/* نوار که باشد، برنامه باید کوتاه‌تر شود وگرنه ته گفتگو زیر لبهٔ صفحه می‌رود. */
+.stale-bar:not([hidden]) ~ .app {
+	height: calc(100dvh - 40px);
+}

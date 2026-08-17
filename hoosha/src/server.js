@@ -18,6 +18,7 @@ import { PROVIDERS, createProvider, validateProfile, providerInfo } from './prov
 import { CATEGORIES, STRATEGIES, AUTH_STYLES, hubId } from './hub/schema.js';
 import { handleChatCompletions, modelsResponse } from './hub/openai-api.js';
 import { hubReady as hubReadyOf } from './hub/registry.js';
+import { VERSION, installInfo } from './version.js';
 import { MODES } from './permissions.js';
 import { saveSession, listSessions, loadSession, deleteSession, renameSession } from './session.js';
 import { Runtime } from './runtime.js';
@@ -217,7 +218,9 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			git: await vcs.status( cfg.workspace ).catch( () => null ),
 			providerInfo: info || null,
 			hub: { active: runtime.hubActive(), enabled: Boolean( runtime.hub?.data?.enabled ), ready: runtime.hub ? hubReadyOf( runtime.hub.data ) : null },
-			version: '0.7.0',
+			version: VERSION,
+			// تا رابط بتواند بگوید «کدی که داری می‌بینی از کجا آمده» — بدون ترمینال.
+			install: installInfo(),
 		};
 	}
 
