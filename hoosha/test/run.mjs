@@ -872,7 +872,7 @@ const { ShellManager } = await import( '../src/background.js' );
 
 await test( 'شل پس‌زمینه خروجی می‌دهد و خواندنِ دوم، تکراری نیست', async () => {
 	const m = new ShellManager();
-	const sh = m.start( 'echo یک; sleep 0.2; echo دو', tmpRoot );
+	const sh = await m.start( 'echo یک; sleep 0.2; echo دو', tmpRoot );
 	await new Promise( ( r ) => setTimeout( r, 120 ) );
 
 	const first = m.read( sh.id );
@@ -888,7 +888,7 @@ await test( 'شل پس‌زمینه خروجی می‌دهد و خواندنِ �
 
 await test( 'kill_shell وضعیت را به killed می‌برد', async () => {
 	const m = new ShellManager();
-	const sh = m.start( 'sleep 5', tmpRoot );
+	const sh = await m.start( 'sleep 5', tmpRoot );
 	m.kill( sh.id );
 	assert.equal( m.list()[ 0 ].status, 'killed' );
 } );
@@ -1280,6 +1280,232 @@ await test( 'پرامپت و منبع سرور MCP خوانده می‌شوند'
 	assert.equal( await manager.readResource( 'demo', 'demo://note' ), 'محتوای منبع نمونه' );
 
 	await manager.close();
+} );
+
+
+
+// --------------------------------------------------------------- نوت‌بوک
+
+section( 'نوت‌بوک Jupyter' );
+
+const nbmod = await import( '../src/notebook.js' );
+
+function sampleNotebook() {
+	return {
+		nbformat: 4,
+		nbformat_minor: 5,
+		metadata: { kernelspec: { language: 'python' } },
+		cells: [
+			{ cell_type: 'markdown', id: 'c1', metadata: {}, source: [ '# عنوان\n', 'توضیح' ] },
+			{
+				cell_type: 'code',
+				id: 'c2',
+				metadata: {},
+				execution_count: 7,
+				source: [ 'print(1)' ],
+				outputs: [ { output_type: 'stream', name: 'stdout', text: [ '1\n' ] } ],
+			},
+		],
+	};
+}
+
+await test( 'نمایش نوت‌بوک، سلول‌ها را با شناسه و خروجی نشان می‌دهد', () => {
+	const out = nbmod.render( sampleNotebook() );
+	assert.match( out, /2 سلول/ );
+	assert.match( out, /سلول 0 \[markdown\] id=c1/ );
+	assert.match( out, /سلول 1 \[code\] id=c2 اجرا=7/ );
+	assert.match( out, /↳ خروجی:/ );
+	assert.equal( /"cell_type"/.test( out ), false, 'نباید JSON خام بدهد' );
+} );
+
+await test( 'متن سلول به آرایهٔ خط‌ها با \\n در انتهای هر خط تبدیل می‌شود', () => {
+	assert.deepEqual( nbmod.textToSource( 'a\nb' ), [ 'a\n', 'b' ] );
+	assert.deepEqual( nbmod.textToSource( '' ), [] );
+	assert.equal( nbmod.sourceToText( [ 'a\n', 'b' ] ), 'a\nb' );
+} );
+
+await test( 'جایگزینی سلول کد، خروجی و شمارهٔ اجرای قدیمی را پاک می‌کند', () => {
+	const { notebook } = nbmod.apply( sampleNotebook(), { mode: 'replace', cell: 'c2', source: 'print(2)' } );
+	const cell = notebook.cells[ 1 ];
+	assert.equal( nbmod.sourceToText( cell.source ), 'print(2)' );
+	assert.deepEqual( cell.outputs, [], 'خروجی کدِ قدیمی باید پاک شود' );
+	assert.equal( cell.execution_count, null );
+} );
+
+await test( 'افزودن سلول، شناسهٔ تازه می‌سازد و در جای درست می‌نشیند', () => {
+	const { notebook, index } = nbmod.apply( sampleNotebook(), {
+		mode: 'insert',
+		cell: 'c2',
+		cellType: 'markdown',
+		source: 'وسط',
+	} );
+	assert.equal( index, 1 );
+	assert.equal( notebook.cells.length, 3 );
+	assert.equal( notebook.cells[ 1 ].cell_type, 'markdown' );
+	assert.match( notebook.cells[ 1 ].id, /^[0-9a-f]{8}$/ );
+	assert.equal( notebook.cells[ 2 ].id, 'c2' );
+} );
+
+await test( 'حذف سلول با شماره هم کار می‌کند و شناسهٔ ناموجود خطا می‌دهد', () => {
+	const { notebook } = nbmod.apply( sampleNotebook(), { mode: 'delete', cell: 0 } );
+	assert.equal( notebook.cells.length, 1 );
+	assert.equal( notebook.cells[ 0 ].id, 'c2' );
+	assert.throws( () => nbmod.apply( sampleNotebook(), { mode: 'delete', cell: 'نیست' } ), /پیدا نشد/ );
+} );
+
+await test( 'تبدیل سلول کد به مارک‌داون، خروجی را دور می‌ریزد', () => {
+	const { notebook } = nbmod.apply( sampleNotebook(), { mode: 'replace', cell: 'c2', cellType: 'markdown', source: 'متن' } );
+	const cell = notebook.cells[ 1 ];
+	assert.equal( cell.cell_type, 'markdown' );
+	assert.equal( cell.outputs, undefined );
+	assert.equal( cell.execution_count, undefined );
+} );
+
+await test( 'ابزار notebook_edit فایل واقعی را می‌نویسد و read_file آن را خوانا نشان می‌دهد', async () => {
+	const file = 'nb/demo.ipynb';
+	await TOOLS.write_file.run( { path: file, content: JSON.stringify( sampleNotebook() ) }, ctx );
+
+	const out = await TOOLS.notebook_edit.run( { path: file, mode: 'replace', cell: 'c2', source: 'print(99)' }, ctx );
+	assert.match( out, /بازنویسی شد/ );
+	assert.match( out, /print\(99\)/ );
+
+	const onDisk = JSON.parse( await fs.readFile( path.join( tmpRoot, file ), 'utf8' ) );
+	assert.equal( nbmod.sourceToText( onDisk.cells[ 1 ].source ), 'print(99)' );
+
+	const shown = await TOOLS.read_file.run( { path: file }, ctx );
+	assert.match( shown, /سلول 1 \[code\]/ );
+	assert.equal( /"nbformat"/.test( shown ), false );
+} );
+
+await test( 'notebook_edit روی فایل غیر ipynb کار نمی‌کند', async () => {
+	await TOOLS.write_file.run( { path: 'plain.txt', content: 'x' }, ctx );
+	await assert.rejects( () => TOOLS.notebook_edit.run( { path: 'plain.txt', source: 'y' }, ctx ), /\.ipynb/ );
+} );
+
+// -------------------------------------------------------------- سندباکس
+
+section( 'سندباکس' );
+
+const sandboxMod = await import( '../src/sandbox.js' );
+
+await test( 'آرگومان‌های docker run: شبکهٔ بسته، سقف منابع، و سوارکردن پوشهٔ کاری', () => {
+	const args = sandboxMod.buildRunArgs( {
+		sandbox: { enabled: true, image: 'node:22', network: 'none', memory: '1g', cpus: '2', user: false },
+		workspace: '/home/me/proj',
+		command: 'npm test',
+		platform: 'linux',
+	} );
+
+	assert.deepEqual( args.slice( 0, 2 ), [ 'run', '--rm' ] );
+	assert.equal( args[ args.indexOf( '--network' ) + 1 ], 'none' );
+	assert.equal( args[ args.indexOf( '--memory' ) + 1 ], '1g' );
+	assert.equal( args[ args.indexOf( '--cpus' ) + 1 ], '2' );
+	assert.ok( args.includes( '--cap-drop' ) && args.includes( 'ALL' ) );
+	assert.equal( args[ args.indexOf( '--security-opt' ) + 1 ], 'no-new-privileges' );
+	assert.equal( args[ args.indexOf( '-v' ) + 1 ], '/home/me/proj:/work' );
+	assert.equal( args[ args.indexOf( '-w' ) + 1 ], '/work' );
+	assert.deepEqual( args.slice( -4 ), [ 'node:22', 'sh', '-lc', 'npm test' ] );
+} );
+
+await test( 'شبکهٔ باز فقط وقتی باز است که صریحاً خواسته شود', () => {
+	const closed = sandboxMod.buildRunArgs( { sandbox: {}, workspace: '/w', command: 'x', platform: 'linux' } );
+	const open = sandboxMod.buildRunArgs( { sandbox: { network: 'bridge' }, workspace: '/w', command: 'x', platform: 'linux' } );
+	assert.equal( closed[ closed.indexOf( '--network' ) + 1 ], 'none' );
+	assert.equal( open[ open.indexOf( '--network' ) + 1 ], 'bridge' );
+} );
+
+await test( 'نگاشت کاربر روی ویندوز اضافه نمی‌شود ولی روی لینوکس می‌شود', () => {
+	const win = sandboxMod.buildRunArgs( { sandbox: { user: true }, workspace: 'C:/p', command: 'x', platform: 'win32' } );
+	const nix = sandboxMod.buildRunArgs( { sandbox: { user: true }, workspace: '/p', command: 'x', platform: 'linux', uid: 1000, gid: 1000 } );
+	assert.equal( win.includes( '--user' ), false );
+	assert.equal( nix[ nix.indexOf( '--user' ) + 1 ], '1000:1000' );
+} );
+
+await test( 'ریشهٔ فقط‌خواندنی، /tmp نوشتنی می‌گذارد', () => {
+	const args = sandboxMod.buildRunArgs( { sandbox: { readOnlyRoot: true }, workspace: '/w', command: 'x', platform: 'linux' } );
+	assert.ok( args.includes( '--read-only' ) );
+	assert.equal( args[ args.indexOf( '--tmpfs' ) + 1 ], '/tmp:rw,size=256m' );
+} );
+
+await test( 'مسیرهای اضافه سوار می‌شوند', () => {
+	const args = sandboxMod.buildRunArgs( {
+		sandbox: { mounts: [ '/host/cache:/root/.cache' ] },
+		workspace: '/w',
+		command: 'x',
+		platform: 'linux',
+	} );
+	assert.ok( args.join( ' ' ).includes( '/host/cache:/root/.cache' ) );
+} );
+
+await test( 'سندباکسِ روشن بدون موتور کانتینر، فرمان را اجرا نمی‌کند (شکستِ بسته)', async () => {
+	const emptyPath = { PATH: '/nonexistent-hoosha' };
+	assert.equal( await sandboxMod.detectRuntime( 'auto', emptyPath ), null );
+
+	// اجرای واقعی از راه ابزار bash: باید خطا بدهد، نه اینکه ساکت روی میزبان اجرا شود.
+	const realPath = process.env.PATH;
+	process.env.PATH = '/nonexistent-hoosha';
+	try {
+		await assert.rejects(
+			() => TOOLS.bash.run( { command: 'echo نباید_اجرا_شود' }, { ...ctx, sandbox: { enabled: true } } ),
+			/موتور کانتینر پیدا نشد/
+		);
+	} finally {
+		process.env.PATH = realPath;
+	}
+} );
+
+await test( 'با allowHostFallback، همان فرمان روی میزبان اجرا می‌شود', async () => {
+	const realPath = process.env.PATH;
+	process.env.PATH = `/nonexistent-hoosha:${ realPath }`;
+	try {
+		const out = await TOOLS.bash.run(
+			{ command: 'echo برگشت_به_میزبان' },
+			{ ...ctx, sandbox: { enabled: true, allowHostFallback: true } }
+		);
+		assert.match( out, /برگشت_به_میزبان/ );
+	} finally {
+		process.env.PATH = realPath;
+	}
+} );
+
+await test( 'موتور جعلی: فرمان واقعاً از راه docker می‌رود، نه مستقیم', async () => {
+	// یک docker قلابی می‌سازیم که آرگومان‌هایش را ثبت کند و فرمان آخر را اجرا کند.
+	// این تنها راه آزمودن مسیرِ کانتینر در محیطی است که داکر ندارد.
+	const bin = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-fakebin-' ) );
+	const log = path.join( bin, 'argv.txt' );
+	const fake = path.join( bin, 'docker' );
+	await fs.writeFile(
+		fake,
+		[
+			'#!/bin/sh',
+			`printf '%s\\n' "$@" > ${ JSON.stringify( log ) }`,
+			// آخرین آرگومان همان فرمان است؛ `${@: -1}` مال bash است و dash نمی‌فهمد.
+			'for a in "$@"; do last="$a"; done',
+			'eval "$last"',
+			'',
+		].join( '\n' ),
+		{ mode: 0o755 }
+	);
+
+	const realPath = process.env.PATH;
+	process.env.PATH = `${ bin }:${ realPath }`;
+	try {
+		const out = await TOOLS.bash.run(
+			{ command: 'echo داخل_کانتینر' },
+			{ ...ctx, sandbox: { enabled: true, image: 'demo:1', network: 'none' } }
+		);
+		assert.match( out, /داخل_کانتینر/ );
+		assert.match( out, /سندباکس: docker/ );
+
+		const argv = ( await fs.readFile( log, 'utf8' ) ).split( '\n' ).filter( Boolean );
+		assert.equal( argv[ 0 ], 'run' );
+		assert.ok( argv.includes( 'demo:1' ), 'باید همان ایمیج تنظیم‌شده را صدا بزند' );
+		assert.ok( argv.includes( '--network' ) && argv.includes( 'none' ) );
+		assert.ok( argv.some( ( a ) => a.endsWith( ':/work' ) ), 'پوشهٔ کاری باید سوار شود' );
+	} finally {
+		process.env.PATH = realPath;
+		await fs.rm( bin, { recursive: true, force: true } );
+	}
 } );
 
 

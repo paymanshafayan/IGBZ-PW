@@ -191,6 +191,7 @@ export class Runtime {
 			extraPrompt: this.#extraPrompt(),
 			maxSteps: opts.maxSteps,
 			hooks: this.hooks,
+			sandbox: cfg.sandbox || null,
 			checkpoints: depth === 0 ? this.checkpoints : null,
 			onTurnEnd: depth === 0 ? this.onTurnEnd : null,
 			emit: opts.emit || this.emit,

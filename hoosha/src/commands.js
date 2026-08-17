@@ -94,6 +94,7 @@ export const BUILTIN_COMMANDS = [
 	{ name: 'memory', description: 'ویرایش HOOSHA.md (حافظهٔ پروژه)' },
 	{ name: 'init', description: 'ساخت HOOSHA.md برای این پروژه' },
 	{ name: 'permissions', description: 'ویرایش قواعد مجوز' },
+	{ name: 'sandbox', description: 'اجرای فرمان‌ها داخل کانتینر' },
 	{ name: 'usage', description: 'مصرف توکن و هزینه' },
 	{ name: 'cost', description: 'هزینهٔ این نشست' },
 	{ name: 'rewind', description: 'بازگشت به یک چک‌پوینت' },

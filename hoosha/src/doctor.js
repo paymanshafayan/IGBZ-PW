@@ -65,6 +65,15 @@ export async function diagnose( { home, workspace, config, runtime, providerInfo
 	const gitVersion = await run( 'git', [ '--version' ] );
 	checks.push( { name: 'گیت', ok: Boolean( gitVersion ), detail: gitVersion || 'پیدا نشد', hint: 'برای نصب پلاگین از گیت‌هاب لازم است.' } );
 
+	const { sandboxStatus } = await import( './sandbox.js' );
+	const sb = await sandboxStatus( config );
+	checks.push( {
+		name: 'سندباکس',
+		ok: ! sb.enabled || sb.available,
+		detail: sb.enabled ? `روشن · ${ sb.runtimeName || 'موتوری پیدا نشد' } · ${ sb.image }` : 'خاموش (فرمان‌ها روی سیستم اجرا می‌شوند)',
+		hint: sb.enabled && ! sb.available ? 'Docker یا Podman نصب و اجرا نیست؛ با این وضع هیچ فرمانی اجرا نمی‌شود.' : undefined,
+	} );
+
 	const mcpFailed = ( runtime?.mcp?.status || [] ).filter( ( s ) => s.status === 'failed' );
 	checks.push( {
 		name: 'کانکتورهای MCP',

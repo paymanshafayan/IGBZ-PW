@@ -43,6 +43,18 @@ export function defaultConfig() {
 			deny: [],
 		},
 		workspace: process.cwd(),
+		sandbox: {
+			enabled: false,
+			runtime: 'auto',
+			image: 'node:22-bookworm-slim',
+			network: 'none',
+			memory: '2g',
+			cpus: '2',
+			readOnlyRoot: false,
+			mounts: [],
+			allowHostFallback: false,
+			user: true,
+		},
 		ui: { theme: 'dark' },
 	};
 }

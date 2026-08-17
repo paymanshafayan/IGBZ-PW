@@ -29,6 +29,7 @@ import { listFiles, fuzzyFilter, readWorkspaceFile, gitStatus, gitDiff } from '.
 import { estimateCost, estimateContextTokens, recordUsage, readUsage } from './usage.js';
 import { toMarkdown, toJson } from './export.js';
 import { diagnose } from './doctor.js';
+import { sandboxStatus, testSandbox, resolveSandbox } from './sandbox.js';
 import { explain } from './errors.js';
 
 const __dirname = path.dirname( fileURLToPath( import.meta.url ) );
@@ -207,8 +208,9 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			shells: shells.list(),
 			checkpoints: await runtime.checkpoints.list(),
 			memory: Boolean( runtime.projectMemory ),
+			sandbox: await sandboxStatus( cfg ),
 			providerInfo: info || null,
-			version: '0.4.0',
+			version: '0.5.0',
 		};
 	}
 
@@ -550,6 +552,31 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 				},
 			};
 		},
+
+		'POST /api/sandbox': async ( { body } ) => {
+			if ( body.action === 'test' ) {
+				return { status: 200, body: await testSandbox( { sandbox: body.sandbox || runtime.config.sandbox }, runtime.config.workspace ) };
+			}
+			if ( body.action === 'save' ) {
+				const cfg = await loadConfig();
+				cfg.sandbox = resolveSandbox( { sandbox: { ...( cfg.sandbox || {} ), ...( body.sandbox || {} ) } } );
+				await saveConfig( cfg );
+				runtime.config = cfg;
+				if ( runtime.agent ) {
+					runtime.agent.sandbox = cfg.sandbox;
+				}
+				broadcast( {
+					type: 'notice',
+					text: cfg.sandbox.enabled
+						? 'سندباکس روشن شد — از این پس فرمان‌ها داخل کانتینر اجرا می‌شوند.'
+						: 'سندباکس خاموش شد.',
+				} );
+				return { status: 200, body: { ok: true, sandbox: await sandboxStatus( cfg ) } };
+			}
+			return { status: 400, body: { error: 'کنش ناشناخته' } };
+		},
+
+		'GET /api/sandbox': async () => ( { status: 200, body: await sandboxStatus( runtime.config ) } ),
 
 		'GET /api/doctor': async () => {
 			const active = activeProfile( runtime.config ) || {};
@@ -939,6 +966,9 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 
 			case 'permissions':
 				return open( 'settings', 'permissions' );
+
+			case 'sandbox':
+				return open( 'settings', 'sandbox' );
 
 			case 'usage':
 			case 'cost':

@@ -11,7 +11,7 @@
  * لاگ تولید کند و ما نباید حافظهٔ کاربر را بخوریم.
  */
 
-import { spawn } from 'node:child_process';
+import { spawnShell } from './sandbox.js';
 
 const MAX_BUFFER = 200_000;
 
@@ -25,6 +25,7 @@ const MAX_BUFFER = 200_000;
  * @property {string} buffer
  * @property {number} cursor  تا کجا خوانده شده
  * @property {import('node:child_process').ChildProcess} child
+ * @property {'host'|'container'} [mode]
  */
 
 export class ShellManager {
@@ -39,10 +40,12 @@ export class ShellManager {
 	/**
 	 * @param {string} command
 	 * @param {string} cwd
+	 * @param {any} [sandbox]
 	 */
-	start( command, cwd ) {
+	async start( command, cwd, sandbox ) {
 		const id = `sh_${ ++this.seq }`;
-		const child = spawn( command, { shell: true, cwd, env: process.env } );
+		const started = await spawnShell( { command, workspace: cwd, sandbox } );
+		const child = started.child;
 
 		/** @type {Shell} */
 		const shell = {
@@ -54,6 +57,7 @@ export class ShellManager {
 			buffer: '',
 			cursor: 0,
 			child,
+			mode: started.mode,
 		};
 
 		const push = ( chunk ) => {
@@ -83,7 +87,7 @@ export class ShellManager {
 		} );
 
 		this.shells.set( id, shell );
-		this.emit( { type: 'shell_start', id, command } );
+		this.emit( { type: 'shell_start', id, command, mode: started.mode } );
 		return shell;
 	}
 
@@ -137,6 +141,7 @@ export class ShellManager {
 			status: s.status,
 			exitCode: s.exitCode,
 			startedAt: s.startedAt,
+			mode: s.mode || 'host',
 			pending: s.buffer.length - s.cursor,
 		} ) );
 	}

@@ -431,6 +431,77 @@ await step( 'حالت بدون‌رابط: اجرا می‌شود، JSON می‌
 } );
 
 
+
+await step( 'سندباکس: روشن‌کردن از API، شکستِ بسته، و اجرای واقعی با موتور جعلی', async () => {
+	const bin = await fs.mkdtemp( path.join( os.tmpdir(), 'hoosha-live-bin-' ) );
+	const fake = path.join( bin, 'docker' );
+	await fs.writeFile(
+		fake,
+		[ '#!/bin/sh', 'for a in "$@"; do last="$a"; done', 'eval "$last"', '' ].join( '\n' ),
+		{ mode: 0o755 }
+	);
+
+	// ۱) روشن، بدون موتور کانتینر → فرمان باید رد شود، نه اینکه ساکت روی میزبان برود.
+	const realPath = process.env.PATH;
+	process.env.PATH = '/nonexistent-hoosha';
+
+	let out = await post( '/api/sandbox', { action: 'save', sandbox: { enabled: true, image: 'demo:1' } } );
+	assert.ok( out.ok, out.error );
+	assert.equal( out.sandbox.enabled, true );
+	assert.equal( out.sandbox.available, false );
+
+	await post( '/api/permissions', { mode: 'auto', allow: [], ask: [], deny: [] } );
+	await say( '!echo نباید_اجرا_شود' );
+	const failed = await waitFor( ( e ) => e.type === 'tool_result' || e.type === 'tool_error', 10_000, 'نتیجهٔ ابزار' );
+	assert.match( String( failed.output || failed.error ), /موتور کانتینر پیدا نشد/ );
+	await waitIdle();
+
+	// ۲) همان تنظیمات، این بار با موتور جعلی در PATH → باید واقعاً از راه docker برود.
+	process.env.PATH = `${ bin }:${ realPath }`;
+	const status = await get( '/api/sandbox' );
+	assert.equal( status.available, true );
+	assert.equal( status.runtimeName, 'docker' );
+
+	await say( '!echo از_داخل_کانتینر' );
+	const ok = await waitFor( ( e ) => e.type === 'tool_result', 10_000, 'نتیجهٔ ابزار' );
+	assert.match( ok.output, /از_داخل_کانتینر/ );
+	assert.match( ok.output, /سندباکس: docker/ );
+	await waitIdle();
+
+	// ۳) خاموش‌کردن، همه‌چیز را به حالت قبل برمی‌گرداند.
+	out = await post( '/api/sandbox', { action: 'save', sandbox: { enabled: false } } );
+	assert.equal( out.sandbox.enabled, false );
+	await post( '/api/permissions', { mode: 'default', allow: [], ask: [], deny: [] } );
+
+	process.env.PATH = realPath;
+	await fs.rm( bin, { recursive: true, force: true } );
+} );
+
+await step( 'ابزار notebook_edit در فهرست ابزارها هست و روی فایل واقعی کار می‌کند', async () => {
+	const s = await get( '/api/state' );
+	assert.ok( s.tools.some( ( t ) => t.name === 'notebook_edit' ), 'ابزار نوت‌بوک باید ثبت شده باشد' );
+
+	const nb = {
+		nbformat: 4,
+		nbformat_minor: 5,
+		metadata: {},
+		cells: [ { cell_type: 'code', id: 'a1', metadata: {}, execution_count: 3, source: [ 'print(1)' ], outputs: [ { output_type: 'stream', text: [ '1\n' ] } ] } ],
+	};
+	await fs.writeFile( path.join( WORK, 'live.ipynb' ), JSON.stringify( nb ) );
+
+	const { TOOLS } = await import( '../src/tools.js' );
+	const out = await TOOLS.notebook_edit.run(
+		{ path: 'live.ipynb', mode: 'insert', cell_type: 'markdown', source: 'یادداشت' },
+		{ workspace: WORK }
+	);
+	assert.match( out, /افزوده شد/ );
+
+	const after = JSON.parse( await fs.readFile( path.join( WORK, 'live.ipynb' ), 'utf8' ) );
+	assert.equal( after.cells.length, 2 );
+	assert.equal( after.cells[ 1 ].cell_type, 'markdown' );
+} );
+
+
 // ------------------------------------------------------------------- پایان
 
 reader.cancel().catch( () => {} );

@@ -15,6 +15,8 @@ import { spawn } from 'node:child_process';
 
 import { unifiedDiff } from './diff.js';
 import { shells } from './background.js';
+import { spawnShell } from './sandbox.js';
+import { render as renderNotebook, apply as applyNotebookEdit, readNotebook, serialize as serializeNotebook } from './notebook.js';
 
 const MAX_READ_BYTES = 400 * 1024;
 const MAX_OUTPUT_CHARS = 30_000;
@@ -25,6 +27,7 @@ const MAX_OUTPUT_CHARS = 30_000;
  * @property {(text:string)=>void} [log]
  * @property {(relPath:string)=>Promise<any>} [snapshot] پشتیبان‌گیری قبل از تغییر (چک‌پوینت)
  * @property {(payload:any)=>Promise<any>} [ask] پرسیدن از کاربر و منتظر ماندن برای جواب
+ * @property {any} [sandbox] تنظیمات سندباکس اجرای فرمان
  */
 
 /**
@@ -160,6 +163,13 @@ export const TOOLS = {
 			if ( stat.size > MAX_READ_BYTES ) {
 				return `فایل بزرگ‌تر از حد مجاز است (${ stat.size } بایت). با offset و limit بخوان.`;
 			}
+
+			// نوت‌بوک را به‌شکل JSON خام نشان‌دادن، هم کانتکست را می‌سوزاند هم مدل را گمراه می‌کند.
+			if ( file.endsWith( '.ipynb' ) ) {
+				const { nb } = await readNotebook( file );
+				return clip( renderNotebook( nb ) );
+			}
+
 			const text = await fs.readFile( file, 'utf8' );
 			const lines = text.split( '\n' );
 			const start = Math.max( 0, ( input.offset ? input.offset - 1 : 0 ) );
@@ -405,21 +415,22 @@ export const TOOLS = {
 				required: [ 'command' ],
 			},
 		},
-		run( input, ctx ) {
+		async run( input, ctx ) {
 			if ( input.background ) {
-				const shell = shells.start( input.command, ctx.workspace );
-				return Promise.resolve(
-					`در پس‌زمینه اجرا شد. شناسهٔ شل: ${ shell.id }\nبا bash_output و همین شناسه خروجی را بخوان، با kill_shell متوقفش کن.`
-				);
+				const shell = await shells.start( input.command, ctx.workspace, ctx.sandbox );
+				return `در پس‌زمینه اجرا شد. شناسهٔ شل: ${ shell.id }${
+					shell.mode === 'container' ? ' (داخل کانتینر)' : ''
+				}\nبا bash_output و همین شناسه خروجی را بخوان، با kill_shell متوقفش کن.`;
+			}
+
+			const started = await spawnShell( { command: input.command, workspace: ctx.workspace, sandbox: ctx.sandbox } );
+			if ( started.mode === 'container' ) {
+				ctx.log?.( `[سندباکس: ${ started.runtime }]\n` );
 			}
 
 			return new Promise( ( resolve, reject ) => {
 				const timeout = Math.min( input.timeout_ms || 60_000, 600_000 );
-				const child = spawn( input.command, {
-					shell: true,
-					cwd: ctx.workspace,
-					env: process.env,
-				} );
+				const child = started.child;
 
 				let out = '';
 				let err = '';
@@ -443,9 +454,52 @@ export const TOOLS = {
 				child.on( 'close', ( code ) => {
 					clearTimeout( timer );
 					const body = [ out.trim(), err.trim() ].filter( Boolean ).join( '\n--- stderr ---\n' );
-					resolve( clip( `exit=${ code }\n${ body || '(بدون خروجی)' }` ) );
+					const where = started.mode === 'container' ? ` (سندباکس: ${ started.runtime })` : '';
+					resolve( clip( `exit=${ code }${ where }\n${ body || '(بدون خروجی)' }` ) );
 				} );
 			} );
+		},
+	},
+
+	notebook_edit: {
+		risk: 'write',
+		spec: {
+			name: 'notebook_edit',
+			description:
+				'ویرایش سلول‌های یک دفترچهٔ Jupyter (.ipynb): جایگزینی، افزودن یا حذف سلول. برای خواندنش از read_file استفاده کن تا سلول‌ها با شناسه‌شان نمایش داده شوند.',
+			parameters: {
+				type: 'object',
+				properties: {
+					path: { type: 'string', description: 'مسیر فایل .ipynb' },
+					mode: { type: 'string', enum: [ 'replace', 'insert', 'delete' ], description: 'پیش‌فرض replace' },
+					cell: { type: 'string', description: 'شناسهٔ سلول یا شمارهٔ آن؛ برای insert یعنی «قبل از این سلول»' },
+					cell_type: { type: 'string', enum: [ 'code', 'markdown' ] },
+					source: { type: 'string', description: 'متن تازهٔ سلول' },
+				},
+				required: [ 'path' ],
+			},
+		},
+		async run( input, ctx ) {
+			const file = resolveInside( ctx, input.path );
+			if ( ! file.endsWith( '.ipynb' ) ) {
+				throw new Error( 'این ابزار فقط برای فایل‌های .ipynb است.' );
+			}
+
+			const { nb } = await readNotebook( file );
+			const before = renderNotebook( nb );
+
+			const { notebook, message } = applyNotebookEdit( nb, {
+				mode: input.mode || 'replace',
+				cell: input.cell,
+				cellType: input.cell_type,
+				source: input.source,
+			} );
+
+			await ctx.snapshot?.( input.path );
+			await fs.writeFile( file, serializeNotebook( notebook ), 'utf8' );
+
+			const d = unifiedDiff( before, renderNotebook( notebook ), { path: path.relative( ctx.workspace, file ) } );
+			return clip( `${ message } — ${ path.relative( ctx.workspace, file ) } (+${ d.added } −${ d.removed })\n${ d.text }` );
 		},
 	},
 

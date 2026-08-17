@@ -1971,3 +1971,11 @@ body.offline .topbar::after {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+
+.banner.danger {
+	background: rgba(224, 108, 98, 0.1);
+	border-color: rgba(224, 108, 98, 0.45);
+}
+.banner.danger b {
+	color: var(--err);
+}

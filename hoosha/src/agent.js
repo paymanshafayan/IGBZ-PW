@@ -49,6 +49,7 @@ export class Agent {
 		this.autoCompact = opts.autoCompact !== false;
 		this.emit = opts.emit;
 		this.checkpoints = opts.checkpoints || null;
+		this.sandbox = opts.sandbox || null;
 		this.onTurnEnd = opts.onTurnEnd || null;
 
 		/** @type {import('./providers/types.js').Message[]} */
@@ -300,6 +301,7 @@ export class Agent {
 				log: ( t ) => this.emit( { type: 'tool_log', id: call.id, text: t } ),
 				snapshot: ( p ) => this.checkpoints?.recordFile( p ),
 				ask: ( payload ) => this.#askUser( payload ),
+				sandbox: this.sandbox,
 			} );
 			this.emit( { type: 'tool_result', id: call.id, name: call.name, output: out } );
 			await this.hooks?.run( 'PostToolUse', { tool: call.name, input: call.input, output: out } );

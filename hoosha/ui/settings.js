@@ -18,6 +18,7 @@ const TABS = [
 	{ id: 'commands', label: 'دستورها', ico: '/' },
 	{ id: 'hooks', label: 'هوک‌ها', ico: '⚑' },
 	{ id: 'permissions', label: 'مجوزها', ico: '⛨' },
+	{ id: 'sandbox', label: 'سندباکس', ico: '▢' },
 	{ id: 'memory', label: 'حافظهٔ پروژه', ico: '❒' },
 	{ id: 'tools', label: 'ابزارها', ico: '⚒' },
 	{ id: 'usage', label: 'مصرف و هزینه', ico: '⌁' },
@@ -956,6 +957,111 @@ function listEditor( initial, label ) {
 	};
 }
 
+// ═══════════════════════════════════════════════════════════ سندباکس
+
+async function renderSandbox( box ) {
+	const s = getState();
+	const sb = s.sandbox || {};
+
+	box.appendChild(
+		section(
+			'سندباکس اجرای فرمان',
+			'وقتی روشن باشد، ابزار bash و شل‌های پس‌زمینه داخل یک کانتینر اجرا می‌شوند. خواندن و نوشتن فایل روی سیستم خودت می‌ماند (همین حالا هم به پوشهٔ کاری محدود است).'
+		)
+	);
+
+	box.appendChild(
+		h( 'div', { class: `banner ${ sb.enabled && ! sb.available ? 'danger' : '' }` }, [
+			h( 'b', { text: sb.enabled ? ( sb.available ? 'روشن و آماده' : 'روشن ولی موتور کانتینر نیست' ) : 'خاموش' } ),
+			h( 'span', { text: sb.message || '' } ),
+		] )
+	);
+
+	const enabled = h( 'input', { type: 'checkbox', checked: sb.enabled } );
+	const runtime = h( 'select', { class: 'field' }, [
+		h( 'option', { value: 'auto', text: 'خودکار (اول docker، بعد podman)' } ),
+		h( 'option', { value: 'docker', text: 'Docker' } ),
+		h( 'option', { value: 'podman', text: 'Podman' } ),
+	] );
+	runtime.value = sb.runtime || 'auto';
+
+	const image = h( 'input', { class: 'field', dir: 'ltr', value: sb.image || 'node:22-bookworm-slim' } );
+	const network = h( 'select', { class: 'field' }, [
+		h( 'option', { value: 'none', text: 'بسته — بدون اینترنت (امن‌ترین)' } ),
+		h( 'option', { value: 'bridge', text: 'معمولی — اینترنت دارد' } ),
+		h( 'option', { value: 'host', text: 'شبکهٔ میزبان (ناامن؛ فقط اگر می‌دانی چرا)' } ),
+	] );
+	network.value = sb.network || 'none';
+
+	const memory = h( 'input', { class: 'field', dir: 'ltr', value: sb.memory || '2g' } );
+	const cpus = h( 'input', { class: 'field', dir: 'ltr', value: String( sb.cpus ?? '2' ) } );
+	const readOnly = h( 'input', { type: 'checkbox', checked: Boolean( sb.readOnlyRoot ) } );
+	const fallback = h( 'input', { type: 'checkbox', checked: Boolean( sb.allowHostFallback ) } );
+	const mounts = listEditor( sb.mounts || [], 'مسیر اضافه' );
+	const note = h( 'p', { class: 'note' } );
+
+	const payload = () => ( {
+		enabled: enabled.checked,
+		runtime: runtime.value,
+		image: image.value.trim(),
+		network: network.value,
+		memory: memory.value.trim(),
+		cpus: cpus.value.trim(),
+		readOnlyRoot: readOnly.checked,
+		allowHostFallback: fallback.checked,
+		mounts: mounts.value(),
+	} );
+
+	box.appendChild(
+		h( 'div', { class: 'form-card' }, [
+			h( 'label', { class: 'check' }, [ enabled, h( 'span', { text: 'فرمان‌ها را داخل کانتینر اجرا کن' } ) ] ),
+			field( 'موتور کانتینر', runtime ),
+			field( 'ایمیج', image, 'برای پروژهٔ PHP/وردپرس: php:8.3-cli · برای جاوااسکریپت: node:22-bookworm-slim · ایمیج باید از قبل pull شده باشد یا شبکه باز باشد.' ),
+			field( 'شبکه', network ),
+			row( field( 'سقف حافظه', memory ), field( 'سقف CPU', cpus ) ),
+			h( 'label', { class: 'check' }, [ readOnly, h( 'span', { text: 'ریشهٔ کانتینر فقط‌خواندنی باشد (به‌جز /tmp)' } ) ] ),
+			h( 'label', { class: 'check' }, [
+				fallback,
+				h( 'span', { text: 'اگر کانتینر در دسترس نبود، روی سیستم اجرا کن (پیش‌فرض: نه — اجرا نشود)' } ),
+			] ),
+			field( 'مسیرهای اضافه', mounts.node, 'به شکل host:container — مثلاً /home/me/.composer:/root/.composer' ),
+			h( 'div', { class: 'modal-actions' }, [
+				h( 'button', {
+					class: 'pill',
+					text: 'تست سندباکس',
+					onClick: async () => {
+						note.className = 'note';
+						note.textContent = 'در حال آزمودن… (بار اول ممکن است ایمیج دانلود شود و طول بکشد)';
+						const out = await post( '/api/sandbox', { action: 'test', sandbox: payload() } );
+						note.className = `note ${ out.ok ? 'ok' : 'error' }`;
+						note.textContent = out.message || out.error || '';
+					},
+				} ),
+				h( 'span', { class: 'grow' } ),
+				h( 'button', {
+					class: 'pill primary',
+					text: 'ذخیره',
+					onClick: async () => {
+						const out = await post( '/api/sandbox', { action: 'save', sandbox: payload() } );
+						toast( out.error || 'ذخیره شد.', out.error ? 'error' : '' );
+						await openSettings( 'sandbox' );
+					},
+				} ),
+			] ),
+			note,
+		] )
+	);
+
+	box.appendChild(
+		h( 'div', { class: 'form-card' }, [
+			h( 'h4', { text: 'چه چیزی را محافظت می‌کند و چه چیزی را نه' } ),
+			h( 'p', { class: 'note', text: 'محافظت می‌کند: فرمانی که مدل اجرا می‌کند به بقیهٔ دیسک، به شبکه (اگر بسته باشد) و به دسترسی‌های سیستمی نمی‌رسد.' } ),
+			h( 'p', { class: 'note', text: 'محافظت نمی‌کند: خودِ پوشهٔ کاری داخل کانتینر قابل نوشتن است — چون کار عامل همین است. برای برگرداندنش، چک‌پوینت داری.' } ),
+			h( 'p', { class: 'note', text: 'روی ویندوز به Docker Desktop با WSL2 نیاز داری.' } ),
+		] )
+	);
+}
+
 // ═══════════════════════════════════════════════════════ حافظهٔ پروژه
 
 async function renderMemory( box ) {
@@ -1148,6 +1254,7 @@ const RENDER = {
 	commands: renderCommands,
 	hooks: renderHooks,
 	permissions: renderPermissions,
+	sandbox: renderSandbox,
 	memory: renderMemory,
 	tools: renderTools,
 	usage: renderUsage,
