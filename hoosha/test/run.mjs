@@ -3671,6 +3671,18 @@ await test( 'هیچ نسخهٔ دستی‌نوشته‌ای در کد نماند
 	}
 } );
 
+await test( 'قفل وابستگی‌ها با package.json هم‌نسخه است', async () => {
+	// این تست از یک درد واقعی آمد. نسخه را دستی در package.json بالا بردم و
+	// package-lock.json جا ماند. بعد کاربر روی ویندوز `npm install` زد، npm بی‌سروصدا
+	// همان دو خط را در قفل به‌روز کرد، و از آن لحظه `git pull` او با
+	// «local changes would be overwritten» رد می‌شد — برای فایلی که خودش هیچ‌وقت
+	// دستش نزده بود.
+	const pkg = JSON.parse( await fs.readFile( path.resolve( 'package.json' ), 'utf8' ) );
+	const lock = JSON.parse( await fs.readFile( path.resolve( 'package-lock.json' ), 'utf8' ) );
+	assert.equal( lock.version, pkg.version, 'نسخهٔ ریشهٔ قفل با package.json نمی‌خواند' );
+	assert.equal( lock.packages[ '' ].version, pkg.version, 'نسخهٔ بستهٔ ریشه در قفل نمی‌خواند' );
+} );
+
 await test( 'در چک‌اوت واقعی، منجمد گزارش نمی‌شود', () => {
 	const info = installInfo();
 	assert.equal( info.frozen, false );
