@@ -147,7 +147,6 @@ export async function cycleMode() {
 
 export function setBusy( value ) {
 	busy = value;
-	$( '#stop' ).hidden = ! value;
 	syncSendButton();
 	document.body.classList.toggle( 'busy', value );
 
@@ -171,18 +170,34 @@ export function focusComposer() {
 // ──────────────────────────────────────────────────────────── ارسال
 
 /**
- * دکمهٔ ارسال فقط وقتی هست که چیزی برای فرستادن باشد.
+ * سه دکمهٔ انتهای کامپوزر، که در هر لحظه فقط **یکی**شان هست.
  *
- * در تصویر کامپوزرِ خالیِ Claude هیچ دکمهٔ ارسالی دیده نمی‌شود — فقط «+» و میکروفون و
- * موج صدا. دکمه به‌محض تایپ ظاهر می‌شود.
+ * تصویرها این را دقیق نشان می‌دهند و اولش اشتباه پیاده کرده بودم:
+ *
+ *   کادر خالی        →  میکروفون + موج صدا، بدون دکمهٔ ارسال
+ *   کاربر تایپ کرد   →  دکمهٔ ارسال **جای موج صدا** می‌نشیند
+ *   در حال اجرا      →  دکمهٔ توقف جای هر دو
+ *
+ * نکتهٔ ظریف: ارسال کنار موج صدا **اضافه نمی‌شود**، جایش را می‌گیرد. برای همین در
+ * چیدمان، `#send` بلافاصله بعد از `#btn-voice` است تا وقتی یکی پنهان می‌شود، دیگری
+ * دقیقاً همان‌جا بیفتد و بقیهٔ نوار تکان نخورد.
  */
 export function syncSendButton() {
 	const send = $( '#send' );
+	const voice = $( '#btn-voice' );
+	const stop = $( '#stop' );
 	if ( ! send ) {
 		return;
 	}
 	const hasText = Boolean( $( '#input' )?.value.trim() ) || attachments.length > 0;
+
+	if ( stop ) {
+		stop.hidden = ! busy;
+	}
 	send.hidden = busy || ! hasText;
+	if ( voice ) {
+		voice.hidden = busy || hasText;
+	}
 }
 
 function autoGrow() {

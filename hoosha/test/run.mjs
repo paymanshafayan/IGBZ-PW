@@ -4135,6 +4135,71 @@ await test( 'سربرگ تنظیمات برای هر تب دکمهٔ عمل خو
 	}
 } );
 
+await test( 'دکمهٔ ارسال جای موج صدا می‌نشیند، کنارش اضافه نمی‌شود', async () => {
+	const { dom, q } = await bootApp();
+	try {
+		const send = q( '#send' );
+		const voice = q( '#btn-voice' );
+		const stop = q( '#stop' );
+		const mic = q( '#btn-mic' );
+
+		// ۱) کادر خالی: میکروفون و موج صدا هستند، ارسال نیست.
+		assert.equal( mic.hidden, false );
+		assert.equal( voice.hidden, false, 'با کادر خالی موج صدا باید باشد' );
+		assert.equal( send.hidden, true );
+		assert.equal( stop.hidden, true );
+
+		// ۲) کاربر تایپ می‌کند: ارسال می‌آید و موج صدا **می‌رود**.
+		const input = q( '#input' );
+		input.value = 'سلام';
+		for ( const fn of input.listeners.input || [] ) {
+			fn( { target: input } );
+		}
+		assert.equal( send.hidden, false, 'با تایپ باید دکمهٔ ارسال بیاید' );
+		assert.equal( voice.hidden, true, 'و موج صدا باید جایش را بدهد، نه اینکه کنارش بماند' );
+		assert.equal( mic.hidden, false, 'میکروفون سر جایش می‌ماند' );
+
+		// ۳) کادر دوباره خالی: به حالت اول برمی‌گردد.
+		input.value = '   ';
+		for ( const fn of input.listeners.input || [] ) {
+			fn( { target: input } );
+		}
+		assert.equal( send.hidden, true );
+		assert.equal( voice.hidden, false );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'در حال اجرا، فقط دکمهٔ توقف هست', async () => {
+	const { dom, q } = await bootApp();
+	try {
+		const { setBusy } = await import( `../ui/composer.js?busy=${ Math.random() }` );
+		const input = q( '#input' );
+		input.value = 'یک کار طولانی';
+		for ( const fn of input.listeners.input || [] ) {
+			fn( { target: input } );
+		}
+		setBusy( true );
+		assert.equal( q( '#stop' ).hidden, false, 'دکمهٔ توقف باید بیاید' );
+		assert.equal( q( '#send' ).hidden, true, 'ارسال نباید کنار توقف بماند' );
+		assert.equal( q( '#btn-voice' ).hidden, true );
+
+		setBusy( false );
+		assert.equal( q( '#stop' ).hidden, true );
+		assert.equal( q( '#send' ).hidden, false, 'متن هنوز هست، پس ارسال برمی‌گردد' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'ارسال بلافاصله بعد از موج صدا در چیدمان است تا نوار تکان نخورد', () => {
+	// اگر بینشان چیزی باشد، با جابه‌جا شدن، بقیهٔ دکمه‌ها می‌پرند.
+	const bar = /<div class="composer-bar">([\s\S]*?)<\/div>\s*\n/.exec( html )?.[ 1 ] || html;
+	const order = [ ...bar.matchAll( /id="(btn-mic|btn-voice|stop|send)"/g ) ].map( ( m ) => m[ 1 ] );
+	assert.deepEqual( order, [ 'btn-mic', 'btn-voice', 'stop', 'send' ], `ترتیب: ${ order.join( ' → ' ) }` );
+} );
+
 // ------------------------------------------------------------------ پایان
 
 await fs.rm( tmpRoot, { recursive: true, force: true } );
