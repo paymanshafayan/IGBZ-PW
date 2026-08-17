@@ -657,10 +657,13 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 		},
 
 		'POST /api/permission': async ( { body } ) => {
-			if ( body.remember && body.rule ) {
+			// فرمان مرکب، بیش از یک قاعده لازم دارد: «git status && npm test» یعنی دو قاعده.
+			const rules = cleanList( body.rules?.length ? body.rules : body.rule ? [ body.rule ] : [] );
+
+			if ( body.remember && rules.length ) {
 				const cfg = await loadConfig();
 				const bucket = body.decision === 'deny' ? 'deny' : 'allow';
-				cfg.permissions[ bucket ] = [ ...new Set( [ ...( cfg.permissions[ bucket ] || [] ), String( body.rule ) ] ) ];
+				cfg.permissions[ bucket ] = [ ...new Set( [ ...( cfg.permissions[ bucket ] || [] ), ...rules ] ) ];
 				await saveConfig( cfg );
 				runtime.config = cfg;
 				if ( runtime.agent ) {
@@ -670,8 +673,8 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 					type: 'notice',
 					text:
 						bucket === 'allow'
-							? `از این پس «${ body.rule }» بدون پرسش اجرا می‌شود.`
-							: `از این پس «${ body.rule }» همیشه رد می‌شود.`,
+							? `از این پس بدون پرسش اجرا می‌شود: ${ rules.join( '، ' ) }`
+							: `از این پس همیشه رد می‌شود: ${ rules.join( '، ' ) }`,
 				} );
 			}
 			return { status: 200, body: { ok: Boolean( runtime.agent?.resolvePermission( body.id, body.decision ) ) } };

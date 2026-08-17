@@ -12,7 +12,7 @@
  *      ابزار اضافه و کم می‌کنند.
  */
 
-import { decide, describeCall } from './permissions.js';
+import { decide, describeCall, suggestRules } from './permissions.js';
 import { buildContent, textOf } from './content.js';
 import { shouldCompact, compact } from './subagent.js';
 import { explain } from './errors.js';
@@ -285,7 +285,16 @@ export class Agent {
 		}
 
 		if ( verdict.decision === 'ask' ) {
-			this.emit( { type: 'permission_request', id: call.id, name: call.name, summary, input: call.input } );
+			this.emit( {
+				type: 'permission_request',
+				id: call.id,
+				name: call.name,
+				summary,
+				input: call.input,
+				// قاعده‌ها را همین‌جا می‌سازیم تا رابط کاربری مجبور نباشد منطق پوسته را
+				// دوباره پیاده کند — و دو جا از هم جدا نیفتند.
+				rules: suggestRules( call.name, call.input ),
+			} );
 			const answer = await new Promise( ( resolve ) => this.pending.set( call.id, resolve ) );
 			if ( answer !== 'allow' ) {
 				this.emit( { type: 'tool_denied', id: call.id, name: call.name, summary, reason: 'کاربر رد کرد.' } );

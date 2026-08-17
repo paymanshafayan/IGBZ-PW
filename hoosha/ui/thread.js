@@ -477,6 +477,17 @@ function askCard( ev ) {
 
 	card.appendChild( h( 'pre', { class: 'mono ask-body', text: ev.summary || JSON.stringify( ev.input, null, 2 ) } ) );
 
+	// فرمان مرکب: بگو چند کار جداست و هرکدام چیست. کاربر باید بداند به چه چیزی اجازه
+	// می‌دهد، نه فقط به کلمهٔ اولِ رشته.
+	if ( ev.name === 'bash' && ( ev.rules || [] ).length > 1 ) {
+		card.appendChild(
+			h( 'div', { class: 'ask-parts' }, [
+				h( 'span', { class: 'note', text: `این ${ ev.rules.length } فرمان جدا است:` } ),
+				...ev.rules.map( ( r ) => h( 'code', { text: r.replace( /^bash:/, '' ) } ) ),
+			] )
+		);
+	}
+
 	// برای ویرایش فایل، نشان بده دقیقاً چه چیزی عوض می‌شود.
 	if ( ev.name === 'edit_file' && ev.input?.old_string ) {
 		const box = el( 'div', 'diff mono preview' );
@@ -516,7 +527,7 @@ function askCard( ev ) {
 			id: ev.id,
 			decision,
 			remember,
-			rule: remember ? ruleFor( ev ) : undefined,
+			rules: remember ? rulesFor( ev ) : undefined,
 		} );
 	};
 
@@ -531,18 +542,23 @@ function askCard( ev ) {
 	card.scrollIntoView( { block: 'nearest', behavior: 'smooth' } );
 }
 
-function ruleFor( ev ) {
-	if ( ev.name === 'bash' ) {
-		const first = String( ev.input?.command || '' ).trim().split( /\s+/ )[ 0 ];
-		return first ? `bash:${ first }` : 'bash';
+/**
+ * قاعده‌ها را سرور می‌سازد — منطق شکستن فرمان پوسته آنجاست، نه اینجا. این فقط تور ایمنیِ
+ * رویدادهای قدیمیِ ذخیره‌شده است.
+ */
+function rulesFor( ev ) {
+	if ( Array.isArray( ev.rules ) && ev.rules.length ) {
+		return ev.rules;
 	}
-	return ev.name;
+	return [ ev.name ];
 }
 
 function alwaysLabel( ev ) {
-	return ev.name === 'bash'
-		? `همیشه برای «${ String( ev.input?.command || '' ).trim().split( /\s+/ )[ 0 ] }»`
-		: 'همیشه اجازه بده';
+	if ( ev.name !== 'bash' ) {
+		return 'همیشه اجازه بده';
+	}
+	const names = rulesFor( ev ).map( ( r ) => r.replace( /^bash:/, '' ) );
+	return names.length > 1 ? `همیشه برای این ${ names.length } فرمان` : `همیشه برای «${ names[ 0 ] || 'bash' }»`;
 }
 
 // ─────────────────────────────────────────── کارت نقشه و کارت پرسش

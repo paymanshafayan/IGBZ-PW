@@ -2112,3 +2112,20 @@ kbd {
 		display: none;
 	}
 }
+
+.ask-parts {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 10px;
+}
+.ask-parts code {
+	font-family: var(--mono);
+	font-size: 0.78rem;
+	background: var(--bg);
+	border: 1px solid var(--line);
+	border-radius: 5px;
+	padding: 1px 7px;
+	color: var(--warn);
+}

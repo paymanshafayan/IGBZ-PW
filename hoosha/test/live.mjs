@@ -502,6 +502,43 @@ await step( 'ابزار notebook_edit در فهرست ابزارها هست و �
 } );
 
 
+
+await step( 'دروازهٔ تأیید، قاعده‌های درست را می‌فرستد و «همیشه» چند قاعده می‌سازد', async () => {
+	await post( '/api/permissions', { mode: 'default', allow: [], ask: [], deny: [] } );
+
+	await say( '!git status && npm test' );
+	const ask = await waitFor( ( e ) => e.type === 'permission_request', 10_000, 'درخواست مجوز' );
+	assert.deepEqual( ask.rules, [ 'bash:git status', 'bash:npm test' ], 'باید برای هر تکه یک قاعده بدهد' );
+
+	await post( '/api/permission', { id: ask.id, decision: 'deny', remember: true, rules: ask.rules } );
+	await waitIdle();
+
+	const s = await get( '/api/state' );
+	assert.deepEqual( s.config.permissions.deny, [ 'bash:git status', 'bash:npm test' ] );
+
+	await post( '/api/permissions', { mode: 'default', allow: [], ask: [], deny: [] } );
+} );
+
+await step( 'قاعدهٔ یک فرمان، به فرمان مرکب سرایت نمی‌کند', async () => {
+	await post( '/api/permissions', { mode: 'default', allow: [ 'bash:echo' ], ask: [], deny: [] } );
+
+	// این باید بدون پرسش اجرا شود
+	await say( '!echo تک' );
+	const ok = await waitFor( ( e ) => e.type === 'tool_result', 10_000, 'اجرای بدون پرسش' );
+	assert.match( ok.output, /تک/ );
+	await waitIdle();
+
+	// ولی این باید بپرسد، چون «rm» مجاز نیست
+	await say( '!echo دو && rm -rf /tmp/hoosha-should-not-exist' );
+	const gate = await waitFor( ( e ) => e.type === 'permission_request', 10_000, 'درخواست مجوز' );
+	assert.match( gate.summary, /rm/ );
+	await post( '/api/permission', { id: gate.id, decision: 'deny' } );
+	await waitIdle();
+
+	await post( '/api/permissions', { mode: 'default', allow: [], ask: [], deny: [] } );
+} );
+
+
 // ------------------------------------------------------------------- پایان
 
 reader.cancel().catch( () => {} );

@@ -14,6 +14,72 @@ import { TOOLS } from './tools.js';
 
 export const MODES = /** @type {const} */ ( [ 'plan', 'default', 'auto' ] );
 
+/** جداکننده‌های فرمان مرکب در پوسته. */
+const SEPARATORS = /\s*(?:&&|\|\||;|\||\n)\s*/;
+
+/**
+ * فرمان‌هایی که تنها نامشان چیزی نمی‌گوید: `git` هم `status` دارد هم `push --force`.
+ * برای این‌ها، «فرمان پایه» دو کلمه است.
+ */
+const MULTI_WORD = [ 'git', 'npm', 'yarn', 'pnpm', 'bun', 'cargo', 'docker', 'kubectl', 'composer', 'php', 'wp', 'gh' ];
+
+/**
+ * الگوهایی که فرمان را پنهان می‌کنند: جانشینی فرمان و جایگزینی پروسه.
+ * وقتی این‌ها در فرمان باشند، قاعدهٔ پیشوندی بی‌معنی است — چون آنچه اجرا می‌شود در متن
+ * پیدا نیست.
+ */
+const HIDDEN = /\$\(|`|<\(|>\(/;
+
+/**
+ * شکستن فرمان مرکب به تکه‌های واقعی.
+ *
+ * چرا لازم است: قاعدهٔ `bash:git` روی رشتهٔ کامل، به `git status && rm -rf /` هم اجازه
+ * می‌داد، چون رشته با «git» شروع می‌شود. این یک حفرهٔ واقعی بود و در بازبینی
+ * sugyan/claude-code-webui دیدیم که آن‌ها همین را جدی گرفته‌اند.
+ *
+ * @param {string} command
+ */
+export function splitCommand( command ) {
+	return String( command || '' )
+		.split( SEPARATORS )
+		.map( ( s ) => s.trim() )
+		.filter( Boolean );
+}
+
+/**
+ * «فرمان پایه»ی یک تکه — یک کلمه، یا دو کلمه برای فرمان‌های چندبخشی.
+ * @param {string} part
+ */
+export function baseCommand( part ) {
+	const words = String( part || '' ).trim().split( /\s+/ ).filter( Boolean );
+	if ( ! words.length ) {
+		return '';
+	}
+	if ( words.length >= 2 && MULTI_WORD.includes( words[ 0 ] ) ) {
+		return `${ words[ 0 ] } ${ words[ 1 ] }`;
+	}
+	return words[ 0 ];
+}
+
+/**
+ * قاعده‌هایی که دکمهٔ «همیشه اجازه بده» باید بسازد.
+ *
+ * برای فرمان مرکب، **یک قاعده به‌ازای هر تکه** — نه یک قاعده برای کل رشته. وگرنه کاربر
+ * فکر می‌کند به `git` اجازه داده و در عمل به `rm` هم اجازه داده است.
+ *
+ * @param {string} toolName
+ * @param {any} input
+ * @returns {string[]}
+ */
+export function suggestRules( toolName, input ) {
+	if ( toolName !== 'bash' ) {
+		return [ toolName ];
+	}
+	const parts = splitCommand( input?.command );
+	const bases = [ ...new Set( parts.map( baseCommand ).filter( Boolean ) ) ];
+	return bases.length ? bases.map( ( b ) => `bash:${ b }` ) : [ 'bash' ];
+}
+
 /**
  * @param {string} toolName
  * @param {any} input
@@ -31,7 +97,7 @@ export function decide( toolName, input, rules, registry ) {
 	const allow = rules.allow || [];
 	const ask = rules.ask || [];
 
-	if ( matches( deny, toolName, input ) ) {
+	if ( matches( deny, toolName, input, 'any' ) ) {
 		return { decision: 'deny', reason: 'در فهرست ممنوع است.' };
 	}
 
@@ -61,25 +127,56 @@ export function decide( toolName, input, rules, registry ) {
  * قاعده‌ها می‌توانند نام ابزار باشند یا `tool:prefix`.
  * مثال: `bash:git ` یعنی هر فرمان bash که با «git » شروع شود.
  *
+ * برای `bash` یک قاعدهٔ اضافه هست که در نگاه اول به چشم نمی‌آید ولی مهم است:
+ * **هر تکهٔ فرمان مرکب باید جداگانه مجاز باشد.** وگرنه `git status && rm -rf /` با
+ * قاعدهٔ `bash:git` رد می‌شود از دروازه.
+ *
  * @param {string[]} list
  * @param {string} toolName
  * @param {any} input
+ * @param {'all'|'any'} [mode] برای فرمان مرکب: همه باید بخورند، یا یکی کافی است
  */
-function matches( list, toolName, input ) {
-	for ( const rule of list ) {
-		if ( rule === toolName || rule === '*' ) {
-			return true;
-		}
-		const sep = rule.indexOf( ':' );
-		if ( sep > 0 && rule.slice( 0, sep ) === toolName ) {
-			const prefix = rule.slice( sep + 1 );
-			const subject = String( input?.command ?? input?.path ?? input?.url ?? '' );
-			if ( subject.startsWith( prefix ) ) {
-				return true;
-			}
-		}
+function matches( list, toolName, input, mode = 'all' ) {
+	if ( ! list?.length ) {
+		return false;
 	}
-	return false;
+
+	// قاعدهٔ سراسری روی خود ابزار — تصمیم صریح کاربر است، دست‌نخورده می‌ماند.
+	if ( list.includes( '*' ) || list.includes( toolName ) ) {
+		return true;
+	}
+
+	if ( toolName === 'bash' ) {
+		const command = String( input?.command ?? '' );
+
+		// فرمانی که داخلش فرمان پنهان دارد، با قاعدهٔ پیشوندی مجاز نمی‌شود.
+		if ( mode === 'all' && HIDDEN.test( command ) ) {
+			return false;
+		}
+
+		const parts = splitCommand( command );
+		if ( ! parts.length ) {
+			return false;
+		}
+		const hit = ( part ) => list.some( ( rule ) => prefixHit( rule, toolName, part ) );
+		return mode === 'all' ? parts.every( hit ) : parts.some( hit );
+	}
+
+	const subject = String( input?.command ?? input?.path ?? input?.url ?? '' );
+	return list.some( ( rule ) => prefixHit( rule, toolName, subject ) );
+}
+
+/**
+ * @param {string} rule
+ * @param {string} toolName
+ * @param {string} subject
+ */
+function prefixHit( rule, toolName, subject ) {
+	const sep = rule.indexOf( ':' );
+	if ( sep <= 0 || rule.slice( 0, sep ) !== toolName ) {
+		return false;
+	}
+	return subject.startsWith( rule.slice( sep + 1 ) );
 }
 
 /** خلاصهٔ خوانا از یک فراخوانی ابزار، برای نمایش در دروازهٔ تأیید. */
