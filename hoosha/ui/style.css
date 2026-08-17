@@ -326,6 +326,43 @@ body.sidebar-collapsed.rail-open .app {
 	flex-direction: column;
 	gap: 1px;
 }
+.account-row {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+}
+.account-main {
+	flex: 1;
+	min-width: 0;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	background: transparent;
+	border: 0;
+	color: var(--fg-dim);
+	padding: 8px 10px;
+	border-radius: var(--r-sm);
+	cursor: pointer;
+	text-align: start;
+	transition: 0.12s;
+}
+.account-main:hover {
+	background: var(--bg-hover);
+	color: var(--fg);
+}
+.acc-lines {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	line-height: 1.35;
+}
+.acc-lines b {
+	font-weight: 500;
+	font-size: 0.9rem;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
 .avatar-dot {
 	width: 22px;
 	height: 22px;
@@ -339,8 +376,11 @@ body.sidebar-collapsed.rail-open .app {
 	flex: none;
 }
 .acc-text {
-	font-size: 0.82rem;
+	font-size: 0.76rem;
 	color: var(--fg-mute);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
 }
 
 /* ══════════════════════════════════════════════ ستون فهرست نشست‌ها */
@@ -356,8 +396,40 @@ body.sidebar-collapsed.rail-open .app {
 .list-head {
 	display: flex;
 	align-items: center;
+	gap: 4px;
 	padding: 4px 6px 10px;
 	flex: none;
+	position: relative;
+}
+.project-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	background: transparent;
+	border: 0;
+	color: var(--fg-dim);
+	padding: 6px 9px;
+	border-radius: var(--r-sm);
+	cursor: pointer;
+	font-size: 0.88rem;
+	min-width: 0;
+	max-width: 15ch;
+	transition: 0.12s;
+}
+.project-chip:hover {
+	background: var(--bg-hover);
+	color: var(--fg);
+}
+.project-chip span {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.project-menu {
+	top: 42px;
+	bottom: auto;
+	inset-inline-start: 6px;
+	min-width: 260px;
 }
 .list-scroll {
 	flex: 1;
@@ -1126,7 +1198,8 @@ html[data-theme='light'] .diff .del {
 
 .composer-wrap {
 	flex: none;
-	padding: 0 24px 12px;
+	/* خواستهٔ کارفرما: کادر نوشتن ۵۰ پیکسل از کف پنجره فاصله داشته باشد. */
+	padding: 0 24px 50px;
 	max-width: calc(var(--col) + 2rem);
 	width: 100%;
 	margin-inline: auto;
@@ -1193,6 +1266,16 @@ html[data-theme='light'] .diff .del {
 }
 .round-btn.send:hover {
 	filter: brightness(1.08);
+}
+.round-btn.recording {
+	color: var(--err);
+	background: #e06c6222;
+	animation: pulse-mic 1.2s ease-in-out infinite;
+}
+@keyframes pulse-mic {
+	50% {
+		background: #e06c6244;
+	}
 }
 .round-btn.stop {
 	background: var(--fg);

@@ -1,35 +1,16 @@
 <!--
-	نشان هوشا.
+	نشان هوشا — شمسهٔ هشت‌پر.
 
-	خانوادهٔ بصری‌اش همان «جرقه»ای است که Claude دارد، ولی شکلش مالِ خودمان است:
-	هشت پرتوی گرد با دو طول متفاوت — چهار پرتوی بلند در جهت‌های اصلی و چهار پرتوی کوتاه
-	روی قطرها — دور یک هستهٔ روشن. یعنی «فکری که از یک هسته بیرون می‌زند».
-
-	تک‌رنگ هم درست کار می‌کند (currentColor)، پس در نوار کناری، فاوآیکون و حالت تک‌رنگ
-	یکی است.
+	نقش هندسی معماری ایرانی: دو مربع چرخیده روی هم، هشت‌ضلعیِ خالی در میان، و نقطهٔ مرکزی.
+	این فایل با `node tools/make-icons.mjs` ساخته می‌شود؛ دستی ویرایشش نکن.
 -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="هوشا">
 	<defs>
-		<linearGradient id="hoosha-g" x1="6" y1="4" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+		<linearGradient id="hoosha-mark" x1="4" y1="3" x2="28" y2="29" gradientUnits="userSpaceOnUse">
 			<stop offset="0" stop-color="#e8895f" />
 			<stop offset="1" stop-color="#c2593a" />
 		</linearGradient>
 	</defs>
-
-	<g fill="url(#hoosha-g)">
-		<!-- چهار پرتوی بلند -->
-		<rect x="14.7" y="1.6" width="2.6" height="11" rx="1.3" />
-		<rect x="14.7" y="19.4" width="2.6" height="11" rx="1.3" />
-		<rect x="1.6" y="14.7" width="11" height="2.6" rx="1.3" />
-		<rect x="19.4" y="14.7" width="11" height="2.6" rx="1.3" />
-
-		<!-- چهار پرتوی کوتاه روی قطرها -->
-		<rect x="14.9" y="5.6" width="2.2" height="8" rx="1.1" transform="rotate(45 16 16)" />
-		<rect x="14.9" y="18.4" width="2.2" height="8" rx="1.1" transform="rotate(45 16 16)" />
-		<rect x="14.9" y="5.6" width="2.2" height="8" rx="1.1" transform="rotate(-45 16 16)" />
-		<rect x="14.9" y="18.4" width="2.2" height="8" rx="1.1" transform="rotate(-45 16 16)" />
-
-		<!-- هسته -->
-		<circle cx="16" cy="16" r="3.1" />
-	</g>
+	<path d="M16.00 1.40 L20.28 5.68 L26.32 5.68 L26.32 11.72 L30.60 16.00 L26.32 20.28 L26.32 26.32 L20.28 26.32 L16.00 30.60 L11.72 26.32 L5.68 26.32 L5.68 20.28 L1.40 16.00 L5.68 11.72 L5.68 5.68 L11.72 5.68 Z M19.10 8.52 L23.48 12.90 L23.48 19.10 L19.10 23.48 L12.90 23.48 L8.52 19.10 L8.52 12.90 L12.90 8.52 Z" fill="url(#hoosha-mark)" fill-rule="evenodd" />
+	<path d="M18.07 11.01 L18.92 13.08 L20.99 13.93 L20.13 16.00 L20.99 18.07 L18.92 18.92 L18.07 20.99 L16.00 20.13 L13.93 20.99 L13.08 18.92 L11.01 18.07 L11.87 16.00 L11.01 13.93 L13.08 13.08 L13.93 11.01 L16.00 11.87 Z" fill="url(#hoosha-mark)" />
 </svg>

@@ -44,6 +44,7 @@ const MIME = {
 	'.ico': 'image/x-icon',
 	'.woff2': 'font/woff2',
 	'.json': 'application/json; charset=utf-8',
+	'.webmanifest': 'application/manifest+json; charset=utf-8',
 };
 
 /** پنجرهٔ کانتکست تقریبی مدل‌های رایج — فقط برای نوار «چقدر پر شده». */

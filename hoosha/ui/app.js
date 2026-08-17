@@ -17,7 +17,7 @@ import {
 	showWorking,
 	hideWorking,
 } from './thread.js';
-import { initComposer, setBusy, setMode, fillComposer, composerIsEmpty, focusComposer } from './composer.js';
+import { initComposer, setBusy, setMode, fillComposer, composerIsEmpty, focusComposer, toggleDictation } from './composer.js';
 import { initSidebar, refreshSessions, paintSidebarState, markActiveView } from './sidebar.js';
 import { initRail, paintRail } from './rail.js';
 import { mountSettings, renderSection, SETTINGS_TABS } from './settings.js';
@@ -36,6 +36,21 @@ systemDark?.addEventListener?.( 'change', ( e ) => {
 
 // نشان، همان یک جا تعریف می‌شود و همه‌جا از همان می‌آید.
 $( '#brand-mark' ).innerHTML = logoSvg( 20 );
+
+/*
+ * حالتِ کهنهٔ رابط را یک بار دور می‌ریزیم.
+ *
+ * چیدمان عوض شده و کلیدهای قدیمی localStorage می‌توانستند نوار کناری را جمع و ریلِ خالی
+ * را باز نگه دارند — یعنی کاربر یک پنل خالی می‌دید و منویی نمی‌دید. این دقیقاً همان چیزی
+ * بود که کارفرما گزارش کرد.
+ */
+const UI_STATE_VERSION = '3';
+if ( localStorage.getItem( 'hoosha-ui-version' ) !== UI_STATE_VERSION ) {
+	for ( const key of [ 'hoosha-sidebar', 'hoosha-rail', 'hoosha-density', 'hoosha-fontsize' ] ) {
+		localStorage.removeItem( key );
+	}
+	localStorage.setItem( 'hoosha-ui-version', UI_STATE_VERSION );
+}
 
 // ───────────────────────────────────────────────────────── نماها
 
@@ -192,6 +207,10 @@ subscribe( ( s ) => {
 	paintSidebarState( s );
 	paintRail( s );
 	setMode( s.config.permissions?.mode || 'default' );
+
+	const ws = String( s.config.workspace || '' );
+	$( '#project-name' ).textContent = ws.split( /[\\/]/ ).filter( Boolean ).pop() || 'پروژه';
+	$( '#project-chip' ).title = ws;
 
 	const p = s.config.profiles?.[ s.config.activeProfile ] || {};
 	$( '#model-name' ).textContent = p.model || 'مدل تنظیم نشده';
@@ -463,6 +482,80 @@ $( '#session-title' ).onclick = async () => {
 	await refreshSessions();
 };
 
+// ─────────────────────────────────────────────── انتخابگر پروژه
+
+/** پروژه‌های اخیر را در همین مرورگر نگه می‌داریم؛ سرور فقط یکی را می‌شناسد. */
+function recentProjects() {
+	try {
+		return JSON.parse( localStorage.getItem( 'hoosha-projects' ) || '[]' );
+	} catch {
+		return [];
+	}
+}
+
+/** @param {string} dir */
+function rememberProject( dir ) {
+	const list = [ dir, ...recentProjects().filter( ( p ) => p !== dir ) ].slice( 0, 8 );
+	localStorage.setItem( 'hoosha-projects', JSON.stringify( list ) );
+}
+
+async function switchProject( dir ) {
+	const out = await post( '/api/workspace', { path: dir } );
+	if ( out.error ) {
+		toast( out.error, 'error' );
+		return;
+	}
+	rememberProject( dir );
+	await refreshState();
+	toast( `پروژه شد: ${ dir }` );
+}
+
+$( '#project-chip' ).onclick = ( e ) => {
+	e.stopPropagation();
+	const box = $( '#project-menu' );
+	if ( ! box.hidden ) {
+		box.hidden = true;
+		return;
+	}
+
+	const current = getState()?.config?.workspace || '';
+	rememberProject( current );
+
+	const row = ( label, sub, onClick, active ) =>
+		h( 'div', { class: `menu-item ${ active ? 'active' : '' }`, onClick: () => {
+			box.hidden = true;
+			onClick();
+		} }, [
+			h( 'span', { class: 'm-ico', text: '▤' } ),
+			h( 'b', { text: label } ),
+			sub ? h( 'span', { class: 'm-desc', text: sub } ) : null,
+			active ? h( 'span', { class: 'm-check', text: '✓' } ) : null,
+		] );
+
+	box.replaceChildren(
+		h( 'div', { class: 'menu-label', text: 'پروژه‌های اخیر' } ),
+		...recentProjects().map( ( p ) =>
+			row( p.split( /[\\/]/ ).filter( Boolean ).pop() || p, p, () => switchProject( p ), p === current )
+		),
+		h( 'div', { class: 'menu-sep' } ),
+		h( 'div', { class: 'menu-item', onClick: async () => {
+			box.hidden = true;
+			const next = await promptDialog( 'مسیر پروژه:', current );
+			if ( next ) {
+				switchProject( next );
+			}
+		} }, [ h( 'span', { class: 'm-ico', text: '+' } ), h( 'b', { text: 'پروژهٔ دیگر…' } ) ] )
+	);
+	box.hidden = false;
+};
+
+document.addEventListener( 'click', ( e ) => {
+	const box = $( '#project-menu' );
+	if ( box && ! box.hidden && ! box.contains( e.target ) && ! $( '#project-chip' ).contains( e.target ) ) {
+		box.hidden = true;
+	}
+} );
+
 document.addEventListener( 'hoosha:settings', ( e ) => openSettings( e.detail ) );
 document.addEventListener( 'hoosha:view', ( e ) => showView( e.detail ) );
 document.addEventListener( 'hoosha:rewind', () => openRewind( doRewind ) );
@@ -487,6 +580,11 @@ document.addEventListener( 'keydown', ( e ) => {
 	if ( ( e.ctrlKey || e.metaKey ) && e.key.toLowerCase() === 'b' ) {
 		e.preventDefault();
 		$( '#btn-rail' ).click();
+		return;
+	}
+	if ( ( e.ctrlKey || e.metaKey ) && e.key.toLowerCase() === 'm' ) {
+		e.preventDefault();
+		toggleDictation();
 		return;
 	}
 	if ( ( e.ctrlKey || e.metaKey ) && e.key === ',' ) {

@@ -11,6 +11,7 @@
 import { $, h, toast } from './lib/dom.js';
 import { api, post, getState, refreshState } from './lib/api.js';
 import { showWorking, hideWorking } from './thread.js';
+import { speechSupported, startDictation } from './lib/voice.js';
 
 const MODES = [ 'plan', 'default', 'auto' ];
 const MODE_LABEL = { plan: 'پلن', default: 'عادی', auto: 'خودکار' };
@@ -59,6 +60,7 @@ export function initComposer( deps ) {
 	$( '#pill-model' ).onclick = () => toggleModelMenu();
 	$( '#btn-plus' ).onclick = () => togglePlusMenu();
 	$( '#file-input' ).onchange = ( e ) => addFiles( e.target.files );
+	$( '#btn-mic' ).onclick = () => toggleDictation();
 
 	input.addEventListener( 'input', () => {
 		autoGrow();
@@ -538,4 +540,49 @@ export function fillComposer( text, submitNow = false ) {
 
 export function composerIsEmpty() {
 	return ! input.value.trim() && ! attachments.length;
+}
+
+// ─────────────────────────────────────────────────────── دیکتهٔ صوتی
+
+/** @type {any} */
+let recognizer = null;
+let dictationBase = '';
+
+export function toggleDictation() {
+	const btn = $( '#btn-mic' );
+
+	if ( recognizer ) {
+		recognizer.stop();
+		return;
+	}
+
+	if ( ! speechSupported() ) {
+		toast( 'این مرورگر تشخیص گفتار ندارد. Chrome یا Edge را امتحان کن.', 'error' );
+		return;
+	}
+
+	dictationBase = input.value ? `${ input.value.trim() } ` : '';
+	btn.classList.add( 'recording' );
+	toast( 'بگو… دوباره روی میکروفن بزن تا تمام شود.' );
+
+	recognizer = startDictation( {
+		onText: ( text ) => {
+			input.value = dictationBase + text;
+			autoGrow();
+		},
+		onEnd: () => {
+			recognizer = null;
+			btn.classList.remove( 'recording' );
+			input.focus();
+		},
+		onError: ( message ) => {
+			toast( message, 'error' );
+			recognizer = null;
+			btn.classList.remove( 'recording' );
+		},
+	} );
+
+	if ( ! recognizer ) {
+		btn.classList.remove( 'recording' );
+	}
 }

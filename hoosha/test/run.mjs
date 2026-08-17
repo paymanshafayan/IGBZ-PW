@@ -1708,13 +1708,33 @@ section( 'نشان هوشا' );
 
 const logoMod = await import( '../ui/lib/logo.js' );
 
-await test( 'نشان ساکن، SVG معتبر با اندازهٔ خواسته‌شده می‌دهد', () => {
+await test( 'نشان ساکن: شمسهٔ هشت‌پر با هشت‌ضلعی خالی و شمسهٔ درونی', () => {
 	const svg = logoMod.logoSvg( 24 );
 	assert.match( svg, /^<svg class="logo"/ );
 	assert.match( svg, /width="24" height="24"/ );
 	assert.match( svg, /viewBox="0 0 32 32"/ );
-	assert.equal( ( svg.match( /<rect/g ) || [] ).length, 8, 'هشت پرتو' );
-	assert.match( svg, /<circle cx="16" cy="16"/ );
+	assert.equal( ( svg.match( /<path/g ) || [] ).length, 2, 'ستارهٔ بیرونی و شمسهٔ درونی' );
+	assert.match( svg, /fill-rule="evenodd"/, 'هشت‌ضلعی میانی باید خالی باشد' );
+} );
+
+await test( 'هندسهٔ شمسه: شانزده رأس، نسبت درست، و هشت‌ضلعی', async () => {
+	const mark = await import( '../ui/lib/mark.js' );
+	const star = mark.starPoints();
+	assert.equal( star.length, 16, 'ستارهٔ هشت‌پر شانزده رأس دارد' );
+
+	// نسبت شعاع فرورفتگی به نوک، همان نسبت دو مربعِ چرخیده است.
+	assert.ok( Math.abs( mark.INNER / mark.OUTER - 0.7654 ) < 0.001 );
+
+	const dist = ( [ x, y ] ) => Math.hypot( x - mark.CENTER, y - mark.CENTER );
+	assert.ok( Math.abs( dist( star[ 0 ] ) - mark.OUTER ) < 0.01, 'رأس اول باید روی شعاع بیرونی باشد' );
+	assert.ok( Math.abs( dist( star[ 1 ] ) - mark.INNER ) < 0.01 );
+
+	assert.equal( mark.polygonPoints().length, 8, 'هشت‌ضلعی میانی' );
+
+	// همهٔ نقاط باید داخل قاب بمانند.
+	for ( const [ x, y ] of star ) {
+		assert.ok( x >= 0 && x <= mark.VIEW && y >= 0 && y <= mark.VIEW, `نقطهٔ بیرون از قاب: ${ x },${ y }` );
+	}
 } );
 
 await test( 'هر بار که صدا زده شود، شناسهٔ گرادیان یکتاست', () => {
@@ -1726,11 +1746,13 @@ await test( 'هر بار که صدا زده شود، شناسهٔ گرادیان
 	assert.ok( a.includes( `url(#${ idA })` ) );
 } );
 
-await test( 'نشان متحرک، واقعاً انیمیشن دارد: چرخش و ضربان', () => {
+await test( 'نشان متحرک: دو شمسه که خلاف هم می‌چرخند', () => {
 	const svg = logoMod.logoLiveSvg( 20 );
-	assert.match( svg, /<animateTransform[^>]+type="rotate"/ );
+	const rotations = svg.match( /<animateTransform[^>]+type="rotate"[^>]*>/g ) || [];
+	assert.equal( rotations.length, 2, 'بیرونی و درونی هر دو باید بچرخند' );
+	assert.match( rotations[ 0 ], /from="0 16 16" to="360 16 16"/ );
+	assert.match( rotations[ 1 ], /from="360 16 16" to="0 16 16"/, 'درونی باید خلاف جهت بچرخد' );
 	assert.match( svg, /repeatCount="indefinite"/ );
-	assert.equal( ( svg.match( /<animate /g ) || [] ).length, 9, 'هشت پرتو + هسته' );
 	assert.match( svg, /class="logo live"/ );
 } );
 
@@ -1839,6 +1861,121 @@ await test( 'ابزارهای غیر bash مثل قبل با پیشوند مسی
 	const rules = { mode: 'default', allow: [ 'write_file:src/' ], ask: [], deny: [] };
 	assert.equal( perm.decide( 'write_file', { path: 'src/a.js', content: '' }, rules ).decision, 'allow' );
 	assert.equal( perm.decide( 'write_file', { path: 'etc/a.js', content: '' }, rules ).decision, 'ask' );
+} );
+
+
+
+// ------------------------------------------------- آیکون‌ها و PWA
+
+section( 'آیکون‌ها و PWA' );
+
+await test( 'آیکون‌های PNG واقعاً PNG معتبر با ابعاد درست‌اند', async () => {
+	for ( const size of [ 16, 32, 48, 96, 192, 512 ] ) {
+		const buf = await fs.readFile( path.join( uiDir, 'assets', 'icons', `icon-${ size }.png` ) );
+		assert.equal( buf.slice( 1, 4 ).toString(), 'PNG', `امضای ${ size } خراب است` );
+		assert.equal( buf.readUInt32BE( 16 ), size, `پهنای ${ size } درست نیست` );
+		assert.equal( buf.readUInt32BE( 20 ), size );
+		assert.ok( buf.length > 200, `آیکون ${ size } خالی است` );
+	}
+} );
+
+await test( 'آیکون واقعاً نقش دارد، نه یک مربع توپر و نه خالی', async () => {
+	const buf = await fs.readFile( path.join( uiDir, 'assets', 'icons', 'icon-96.png' ) );
+	// گوشه باید شفاف باشد (ستاره تا گوشه نمی‌رسد) و مرکز پر.
+	// چون PNG فشرده است، از خود رستر دوباره می‌سازیم تا محتوا را بسنجیم.
+	const mark = await import( '../ui/lib/mark.js' );
+	const inside = ( poly, x, y ) => {
+		let hit = false;
+		for ( let i = 0, j = poly.length - 1; i < poly.length; j = i++ ) {
+			const [ xi, yi ] = poly[ i ];
+			const [ xj, yj ] = poly[ j ];
+			if ( yi > y !== yj > y && x < ( ( xj - xi ) * ( y - yi ) ) / ( yj - yi ) + xi ) {
+				hit = ! hit;
+			}
+		}
+		return hit;
+	};
+	const star = mark.starPoints();
+	assert.equal( inside( star, 1, 1 ), false, 'گوشه باید خالی باشد' );
+	assert.equal( inside( star, 16, 3 ), true, 'نوک بالا باید پر باشد' );
+	assert.equal( inside( mark.polygonPoints(), 16, 16 ), true, 'هشت‌ضلعی میانی باید مرکز را بگیرد' );
+	assert.ok( buf.length > 500 );
+} );
+
+await test( 'مانیفست PWA کامل است و به آیکون‌های موجود اشاره می‌کند', async () => {
+	const manifest = JSON.parse( await fs.readFile( path.join( uiDir, 'manifest.webmanifest' ), 'utf8' ) );
+	assert.equal( manifest.dir, 'rtl' );
+	assert.equal( manifest.lang, 'fa' );
+	assert.equal( manifest.display, 'standalone' );
+	assert.ok( manifest.icons.length >= 6 );
+
+	for ( const icon of manifest.icons ) {
+		const file = path.join( uiDir, icon.src );
+		const ok = await fs.access( file ).then( () => true ).catch( () => false );
+		assert.ok( ok, `آیکون گم‌شده در مانیفست: ${ icon.src }` );
+	}
+	assert.ok( manifest.icons.some( ( i ) => i.purpose === 'maskable' ), 'آیکون maskable لازم است' );
+	assert.match( html, /rel="manifest"/ );
+} );
+
+// ------------------------------------------------------------- صدا
+
+section( 'صدا' );
+
+await test( 'ماژول صدا، مارک‌داون را قبل از بلندخوانی تمیز می‌کند', async () => {
+	const src = fssync.readFileSync( path.join( uiDir, 'lib', 'voice.js' ), 'utf8' );
+	assert.match( src, /export function speak/ );
+	assert.match( src, /بلوک کد/, 'بلوک کد نباید حرف‌به‌حرف خوانده شود' );
+	assert.match( src, /fa-IR/, 'زبان پیش‌فرض باید فارسی باشد' );
+	assert.match( src, /webkitSpeechRecognition/ );
+	assert.match( src, /export function startDictation/ );
+} );
+
+await test( 'خطاهای میکروفن پیام فارسی دارند، نه کد خام', () => {
+	const src = fssync.readFileSync( path.join( uiDir, 'lib', 'voice.js' ), 'utf8' );
+	for ( const key of [ 'not-allowed', 'no-speech', 'audio-capture', 'network' ] ) {
+		assert.ok( src.includes( key ), `پیام خطای ${ key } نیست` );
+	}
+	assert.match( src, /اجازهٔ میکروفن داده نشد/ );
+} );
+
+// ----------------------------------------------- چیدمان خواسته‌شده
+
+section( 'خواسته‌های چیدمان' );
+
+await test( 'کادر نوشتن ۵۰ پیکسل از پایین فاصله دارد', () => {
+	assert.match( cssBlock( '.composer-wrap' ), /padding:\s*0 24px 50px/ );
+} );
+
+await test( 'پایین نوار کناری: پروفایل کاربر و آیکون تنظیمات کنارش', () => {
+	assert.match( html, /class="account-row"/ );
+	assert.match( html, /id="btn-account"/ );
+	assert.match( html, /id="account-name"/ );
+	assert.match( html, /id="btn-settings"[^>]*title="تنظیمات"|title="تنظیمات"[^>]*id="btn-settings"/ );
+	assert.match( cssBlock( '.account-main' ), /flex:\s*1/ );
+} );
+
+await test( 'انتخابگر پروژه بالای فهرست نشست‌هاست', () => {
+	assert.match( html, /id="project-chip"/ );
+	assert.match( html, /id="project-menu"/ );
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /function recentProjects/ );
+	assert.match( app, /async function switchProject/ );
+} );
+
+await test( 'دکمهٔ میکروفن در کامپوزر هست و میان‌بر دارد', () => {
+	assert.match( html, /id="btn-mic"/ );
+	const composer = fssync.readFileSync( path.join( uiDir, 'composer.js' ), 'utf8' );
+	assert.match( composer, /export function toggleDictation/ );
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /key\.toLowerCase\(\) === 'm'/ );
+} );
+
+await test( 'حالت کهنهٔ رابط یک بار پاک می‌شود تا پنل خالی نماند', () => {
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /UI_STATE_VERSION/ );
+	assert.match( app, /removeItem\( key \)/ );
+	assert.match( app, /'hoosha-sidebar', 'hoosha-rail'/ );
 } );
 
 

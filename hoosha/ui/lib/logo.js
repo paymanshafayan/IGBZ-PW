@@ -1,62 +1,49 @@
 /**
- * نشان هوشا، به‌شکل تابع — تا هرجای رابط لازم شد بدون کپی‌کردن SVG استفاده شود.
- *
- * دو حالت دارد: ساکن (لوگو) و متحرک (وقتی مدل مشغول است). حالت متحرک با SMIL نوشته شده،
- * پس اگر کاربر «کاهش حرکت» را در سیستمش روشن کرده باشد، در CSS خاموشش می‌کنیم.
+ * نشان هوشا به‌شکل تابع — از همان هندسه‌ای که فایل‌های SVG و آیکون‌های PNG از آن ساخته
+ * شده‌اند. یک منبع، سه خروجی.
  */
 
-const GRAD = ( id ) => `
-	<defs>
-		<linearGradient id="${ id }" x1="6" y1="4" x2="26" y2="28" gradientUnits="userSpaceOnUse">
-			<stop offset="0" stop-color="#e8895f" />
-			<stop offset="1" stop-color="#c2593a" />
-		</linearGradient>
-	</defs>`;
-
-const RAYS = `
-	<rect x="14.7" y="1.6" width="2.6" height="11" rx="1.3" />
-	<rect x="14.7" y="19.4" width="2.6" height="11" rx="1.3" />
-	<rect x="1.6" y="14.7" width="11" height="2.6" rx="1.3" />
-	<rect x="19.4" y="14.7" width="11" height="2.6" rx="1.3" />
-	<rect x="14.9" y="5.6" width="2.2" height="8" rx="1.1" transform="rotate(45 16 16)" />
-	<rect x="14.9" y="18.4" width="2.2" height="8" rx="1.1" transform="rotate(45 16 16)" />
-	<rect x="14.9" y="5.6" width="2.2" height="8" rx="1.1" transform="rotate(-45 16 16)" />
-	<rect x="14.9" y="18.4" width="2.2" height="8" rx="1.1" transform="rotate(-45 16 16)" />
-	<circle cx="16" cy="16" r="3.1" />`;
+import { VIEW, CENTER, COLORS, markPath, innerStarPath } from './mark.js';
 
 let seq = 0;
 
+const GRAD = ( id ) => `
+	<defs>
+		<linearGradient id="${ id }" x1="4" y1="3" x2="28" y2="29" gradientUnits="userSpaceOnUse">
+			<stop offset="0" stop-color="${ COLORS.from }" />
+			<stop offset="1" stop-color="${ COLORS.to }" />
+		</linearGradient>
+	</defs>`;
+
 /**
- * نشان ساکن.
+ * شمسهٔ ساکن.
  * @param {number} size
  * @param {string} [cls]
  */
 export function logoSvg( size = 22, cls = 'logo' ) {
 	const id = `hg${ ++seq }`;
-	return `<svg class="${ cls }" viewBox="0 0 32 32" width="${ size }" height="${ size }" aria-hidden="true">${ GRAD( id ) }<g fill="url(#${ id })">${ RAYS }</g></svg>`;
+	return `<svg class="${ cls }" viewBox="0 0 ${ VIEW } ${ VIEW }" width="${ size }" height="${ size }" aria-hidden="true">${ GRAD( id ) }
+		<path d="${ markPath() }" fill="url(#${ id })" fill-rule="evenodd" />
+		<path d="${ innerStarPath() }" fill="url(#${ id })" />
+	</svg>`;
 }
 
 /**
- * نشان متحرک — چرخش آرام + روشن و خاموش‌شدن نوبتی پرتوها.
+ * شمسهٔ متحرک — بیرونی و درونی خلاف هم می‌چرخند و نور می‌گیرند.
  * @param {number} size
  */
 export function logoLiveSvg( size = 20 ) {
 	const id = `hl${ ++seq }`;
-	const pulse = ( begin, from = 1, to = 0.25 ) =>
-		`<animate attributeName="opacity" values="${ from };${ to };${ from }" dur="1.2s" begin="${ begin }s" repeatCount="indefinite" />`;
-
-	return `<svg class="logo live" viewBox="0 0 32 32" width="${ size }" height="${ size }" aria-hidden="true">${ GRAD( id ) }
+	return `<svg class="logo live" viewBox="0 0 ${ VIEW } ${ VIEW }" width="${ size }" height="${ size }" aria-hidden="true">${ GRAD( id ) }
 		<g fill="url(#${ id })">
-			<animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 16 16" to="360 16 16" dur="3s" repeatCount="indefinite" />
-			<rect x="14.7" y="1.6" width="2.6" height="11" rx="1.3">${ pulse( 0 ) }</rect>
-			<rect x="19.4" y="14.7" width="11" height="2.6" rx="1.3">${ pulse( 0.15 ) }</rect>
-			<rect x="14.7" y="19.4" width="2.6" height="11" rx="1.3">${ pulse( 0.3 ) }</rect>
-			<rect x="1.6" y="14.7" width="11" height="2.6" rx="1.3">${ pulse( 0.45 ) }</rect>
-			<rect x="14.9" y="5.6" width="2.2" height="8" rx="1.1" transform="rotate(45 16 16)">${ pulse( 0.07, 0.9, 0.2 ) }</rect>
-			<rect x="14.9" y="18.4" width="2.2" height="8" rx="1.1" transform="rotate(45 16 16)">${ pulse( 0.37, 0.9, 0.2 ) }</rect>
-			<rect x="14.9" y="5.6" width="2.2" height="8" rx="1.1" transform="rotate(-45 16 16)">${ pulse( 0.52, 0.9, 0.2 ) }</rect>
-			<rect x="14.9" y="18.4" width="2.2" height="8" rx="1.1" transform="rotate(-45 16 16)">${ pulse( 0.22, 0.9, 0.2 ) }</rect>
-			<circle cx="16" cy="16" r="3.1"><animate attributeName="r" values="3.1;2.2;3.1" dur="1.2s" repeatCount="indefinite" /></circle>
+			<path d="${ markPath() }" fill-rule="evenodd" opacity="0.9">
+				<animateTransform attributeName="transform" type="rotate" from="0 ${ CENTER } ${ CENTER }" to="360 ${ CENTER } ${ CENTER }" dur="9s" repeatCount="indefinite" />
+				<animate attributeName="opacity" values="0.9;0.45;0.9" dur="2s" repeatCount="indefinite" />
+			</path>
+			<path d="${ innerStarPath() }" opacity="0.95">
+				<animateTransform attributeName="transform" type="rotate" from="360 ${ CENTER } ${ CENTER }" to="0 ${ CENTER } ${ CENTER }" dur="5s" repeatCount="indefinite" />
+				<animate attributeName="opacity" values="0.95;0.5;0.95" dur="1.4s" repeatCount="indefinite" />
+			</path>
 		</g>
 	</svg>`;
 }

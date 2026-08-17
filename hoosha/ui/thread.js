@@ -8,6 +8,7 @@
 import { $, el, h, esc, copyText, promptDialog } from './lib/dom.js';
 import { markdown, wireCodeCopy } from './lib/markdown.js';
 import { logoLiveSvg } from './lib/logo.js';
+import { speak, stopSpeaking, isSpeaking, ttsSupported } from './lib/voice.js';
 import { post } from './lib/api.js';
 
 let chat = null;
@@ -127,6 +128,19 @@ export function addMessage( role, text, asMarkdown = true, images = [] ) {
 			onResend( role === 'user' ? body.textContent || '' : lastUserText() )
 		)
 	);
+
+	// بلندخوانی — برای وقتی که جواب بلند است و حوصلهٔ خواندن نیست.
+	if ( role === 'assistant' && ttsSupported() ) {
+		actions.appendChild(
+			iconBtn( 'بخوان', 'M4 8v4h3l4 3V5L7 8zM14 7.5a4 4 0 010 5M16.5 5.5a7 7 0 010 9', () => {
+				if ( isSpeaking() ) {
+					stopSpeaking();
+					return;
+				}
+				speak( body.dataset.raw || body.textContent || '' );
+			} )
+		);
+	}
 
 	col.appendChild( actions );
 	append( wrap );

@@ -167,8 +167,9 @@ function paintPinned( s ) {
 /** @param {any} s */
 export function paintSidebarState( s ) {
 	const p = s.config.profiles?.[ s.config.activeProfile ] || {};
-	$( '#chip-provider' ).textContent = p.provider || '—';
-	$( '#account-initial' ).textContent = ( p.provider || 'ه' ).slice( 0, 1 ).toUpperCase();
+	$( '#account-name' ).textContent = p.label || s.config.activeProfile || 'پروفایل';
+	$( '#chip-provider' ).textContent = `${ p.provider || '—' }${ p.model ? ` · ${ p.model }` : '' }`;
+	$( '#account-initial' ).textContent = ( p.label || p.provider || 'ه' ).slice( 0, 1 ).toUpperCase();
 	paintPinned( s );
 	paint();
 }
