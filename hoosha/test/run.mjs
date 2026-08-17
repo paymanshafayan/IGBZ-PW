@@ -4411,6 +4411,43 @@ await test( 'همه‌جا نشان هوشا رسم می‌شود، نه ستا�
 	}
 } );
 
+await test( 'اجرا از ریشهٔ مخزن ممکن است — هر دو راه‌انداز سر جایشان‌اند', async () => {
+	/*
+	 * این تست از یک خطای واقعی کاربر آمد:
+	 *
+	 *     Error: Cannot find module '...\IGBZ-WP\src\cli.js'
+	 *     code: 'MODULE_NOT_FOUND', requireStack: []
+	 *
+	 * یعنی `node src/cli.js` را از ریشهٔ مخزن زده بود، نه از داخل `hoosha`. پیام Node
+	 * هیچ اشاره‌ای به پوشه ندارد، پس راهنما کافی نبود و یک راه‌انداز لازم شد.
+	 */
+	const root = path.resolve( '..' );
+	for ( const file of [ 'hoosha.cmd', 'hoosha.sh' ] ) {
+		const full = path.join( root, file );
+		assert.ok( fssync.existsSync( full ), `${ file } در ریشهٔ مخزن نیست` );
+		const src = fssync.readFileSync( full, 'utf8' );
+		assert.match( src, /cli\.js/, `${ file } باید cli را صدا بزند` );
+		assert.match( src, /node_modules/, `${ file } باید نبودِ وابستگی‌ها را هم بپوشاند` );
+		// گزینه‌ها باید رد شوند، وگرنه --port و --dir بی‌اثر می‌مانند.
+		assert.match( src, /%\*|"\$@"/, `${ file } باید آرگومان‌ها را پاس بدهد` );
+	}
+
+	// و راه‌انداز POSIX واقعاً کار کند.
+	const { execFileSync } = await import( 'node:child_process' );
+	const out = execFileSync( path.join( root, 'hoosha.sh' ), [ '--version' ], { encoding: 'utf8', cwd: os.tmpdir() } );
+	const pkg = JSON.parse( fssync.readFileSync( path.resolve( 'package.json' ), 'utf8' ) );
+	assert.ok( out.includes( pkg.version ), `خروجی: ${ out.trim() }` );
+	assert.match( out, /اجرا از:/, 'باید مسیر واقعی کد را هم چاپ کند' );
+} );
+
+await test( 'راهنما همان خطای واقعی را توضیح می‌دهد', async () => {
+	const readme = await fs.readFile( path.resolve( 'README.md' ), 'utf8' );
+	assert.match( readme, /MODULE_NOT_FOUND/ );
+	assert.match( readme, /requireStack: \[\]/ );
+	assert.match( readme, /hoosha\.cmd/ );
+	assert.match( readme, /hoosha\.sh/ );
+} );
+
 // ------------------------------------------------------------------ پایان
 
 await fs.rm( tmpRoot, { recursive: true, force: true } );

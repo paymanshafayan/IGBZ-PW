@@ -13,10 +13,43 @@
 
 نیاز: **Node.js نسخهٔ ۲۰ یا بالاتر** ([nodejs.org](https://nodejs.org)).
 
+**ساده‌ترین راه — از ریشهٔ مخزن، بدون هیچ `cd`:**
+
+```powershell
+.\hoosha.cmd                       # ویندوز
+```
+
+```bash
+./hoosha.sh                        # لینوکس و مک
+```
+
+این دو اسکریپت خودشان به پوشهٔ درست می‌روند، اگر `node_modules` نباشد یک بار `npm ci`
+می‌زنند، و بعد هوشا را بالا می‌آورند. هر گزینه‌ای که بدهی مستقیم رد می‌شود:
+`.\hoosha.cmd --port 7788 --no-open`
+
+**راه دستی:**
+
 ```bash
 cd hoosha
 npm ci            # نه npm install — دلیلش پایین‌تر
 node src/cli.js
+```
+
+### خطای `MODULE_NOT_FOUND` یعنی پوشهٔ اشتباه
+
+اگر `node src/cli.js` را از **ریشهٔ مخزن** بزنی (به‌جای داخل `hoosha`), این را می‌گیری:
+
+```
+Error: Cannot find module '...\IGBZ-WP\src\cli.js'
+code: 'MODULE_NOT_FOUND', requireStack: []
+```
+
+`requireStack: []` یعنی خودِ فایل ورودی پیدا نشده، نه یک وابستگی. سه راه حل:
+
+```powershell
+.\hoosha.cmd                       # از ریشه، توصیه‌شده
+node hoosha\src\cli.js             # از ریشه، دستی
+cd hoosha; node src\cli.js          # از داخل پوشه
 ```
 
 **چرا `npm ci` و نه `npm install`:** `npm install` قفل وابستگی‌ها
