@@ -1354,6 +1354,10 @@ async function renderStatus( box ) {
 			h( 'p', { class: 'mono', text: `پوشهٔ کاری: ${ s.config.workspace }` } ),
 			h( 'p', { class: 'mono', text: `نسخه: هوشا ${ s.version }` } ),
 			h( 'p', { class: 'mono', text: `کد از: ${ s.install?.root || '—' }` } ),
+			h( 'p', {
+				class: 'mono',
+				text: `ساخت: ${ s.install?.buildLine || '—' }${ s.install?.build?.branch ? ` · شاخهٔ ${ s.install.build.branch }` : '' }`,
+			} ),
 			s.install?.frozen
 				? h( 'p', { class: 'note error', text: s.install.hint } )
 				: h( 'p', { class: 'note ok', text: 'این همان کد مخزن است؛ هر git pull بلافاصله اثر می‌گذارد.' } ),

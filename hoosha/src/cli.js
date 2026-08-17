@@ -16,7 +16,7 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { startServer } from './server.js';
-import { VERSION, ROOT, installInfo } from './version.js';
+import { VERSION, ROOT, installInfo, buildLine } from './version.js';
 
 const args = process.argv.slice( 2 );
 
@@ -73,7 +73,7 @@ if ( args.includes( '--help' ) || args.includes( '-h' ) ) {
 }
 
 if ( args.includes( '--version' ) || args.includes( '-v' ) ) {
-	console.log( `${ VERSION }` );
+	console.log( buildLine() );
 	console.log( `اجرا از: ${ ROOT }` );
 	if ( installInfo().frozen ) {
 		console.log( installInfo().hint );
@@ -179,7 +179,7 @@ const shown = host === '0.0.0.0' ? '127.0.0.1' : host;
 const url = `http://${ shown }:${ port }`;
 
 console.log( '' );
-console.log( `  هوشا ${ VERSION } آمادهٔ کار است` );
+console.log( `  هوشا ${ buildLine() }` );
 console.log( `  آدرس:       ${ url }` );
 console.log( `  پوشهٔ کاری:  ${ config.workspace }` );
 // مسیر واقعیِ کدی که اجرا می‌شود. اگر کسی یک بار `npm install -g .` زده باشد، دستور

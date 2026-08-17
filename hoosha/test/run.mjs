@@ -4448,6 +4448,49 @@ await test( 'راهنما همان خطای واقعی را توضیح می‌د
 	assert.match( readme, /hoosha\.sh/ );
 } );
 
+await test( 'مهر ساخت هست و با هر کامیت عوض می‌شود، نه با حافظهٔ من', async () => {
+	/*
+	 * شکایت کارفرما: «باز هم نسخهٔ قبلی را نشان می‌دهد (۰.۷.۰)».
+	 *
+	 * درست بود: شش کامیت و بیش از هزار خط تغییر رفته بود و عدد نسخه دست‌نخورده مانده
+	 * بود. عدد نسخه به یاد ماندنِ من وابسته است؛ شناسهٔ کامیت نیست. پس هر دو نشان
+	 * داده می‌شوند.
+	 */
+	const { BUILD, buildLine, installInfo } = await import( '../src/version.js' );
+
+	assert.match( BUILD.commit, /^[0-9a-f]{7}$/, `شناسهٔ کامیت خوانده نشد: «${ BUILD.commit }»` );
+	assert.match( BUILD.date, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/, `تاریخ ساخت: «${ BUILD.date }»` );
+	assert.ok( BUILD.branch.length > 0, 'نام شاخه خوانده نشد' );
+
+	const line = buildLine();
+	assert.ok( line.includes( VERSION ), 'خط ساخت باید نسخه را داشته باشد' );
+	assert.ok( line.includes( BUILD.commit ), 'و شناسهٔ کامیت را' );
+
+	// و از راه وضعیت به رابط می‌رسد.
+	const info = installInfo();
+	assert.equal( info.buildLine, line );
+	assert.equal( info.build.commit, BUILD.commit );
+} );
+
+await test( 'رابط، مهر ساخت را نشان می‌دهد', async () => {
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /s\.install\?\.buildLine/, 'کنار شمارهٔ نسخه باید ساخت هم بیاید' );
+
+	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
+	assert.match( settings, /ساخت: \$\{ s\.install\?\.buildLine/, 'صفحهٔ وضعیت باید ساخت را کامل نشان دهد' );
+
+	const cli = fssync.readFileSync( path.resolve( 'src/cli.js' ), 'utf8' );
+	assert.match( cli, /buildLine\(\)/, 'بنر ترمینال هم' );
+	assert.equal( /هوشا \$\{ VERSION \} آمادهٔ کار/.test( cli ), false, 'بنر نباید فقط نسخه را بگوید' );
+} );
+
+await test( 'نسخه با کاری که شده جلو رفته است', async () => {
+	// اگر رابط سه بار بازسازی شود و عدد نسخه تکان نخورد، کاربر راهی برای فهمیدن ندارد.
+	const pkg = JSON.parse( await fs.readFile( path.resolve( 'package.json' ), 'utf8' ) );
+	const [ major, minor ] = pkg.version.split( '.' ).map( Number );
+	assert.ok( major > 0 || minor >= 8, `نسخه ${ pkg.version } از کاری که انجام شده عقب است` );
+} );
+
 // ------------------------------------------------------------------ پایان
 
 await fs.rm( tmpRoot, { recursive: true, force: true } );
