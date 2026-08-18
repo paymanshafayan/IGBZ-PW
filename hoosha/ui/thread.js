@@ -10,6 +10,7 @@ import { markdown, wireCodeCopy } from './lib/markdown.js';
 import { logoLiveSvg, logoSvg } from './lib/logo.js';
 import { speak, stopSpeaking, isSpeaking, ttsSupported } from './lib/voice.js';
 import { post } from './lib/api.js';
+import { iconSvg } from './lib/icons.js';
 
 let chat = null;
 let streamEl = null;
@@ -34,7 +35,7 @@ export function mountThread( opts ) {
 		title: 'برو به آخر',
 		hidden: true,
 		onClick: () => scrollToEnd(),
-	}, [ h( 'span', { text: '↓' } ) ] );
+	}, [ h( 'span', { html: iconSvg( 'jump-down', 14 ) } ) ] );
 	/*
 	 * داخل کانتینر خودش، نه چسبیده به نمای گفتگو.
 	 *
@@ -61,13 +62,13 @@ export function clearThread() {
 /**
  * دکمهٔ کوچک آیکونی — همان ردیفی که در Claude زیر هر پاسخ می‌آید.
  * @param {string} title
- * @param {string} d مسیر SVG
+ * @param {string} name نام آیکون در `lib/icons.js`
  * @param {()=>void} onClick
  */
-function iconBtn( title, d, onClick ) {
+function iconBtn( title, name, onClick ) {
 	const b = el( 'button', 'btn icon sm quiet' );
 	b.title = title;
-	b.innerHTML = `<svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${ d }"/></svg>`;
+	b.innerHTML = iconSvg( name, 15 );
 	b.onclick = onClick;
 	return b;
 }
@@ -139,12 +140,12 @@ export function addMessage( role, text, asMarkdown = true, images = [] ) {
 
 	const actions = el( 'div', 'msg-actions' );
 	actions.appendChild(
-		iconBtn( 'کپی', 'M7 7V4.5A1.5 1.5 0 018.5 3h7A1.5 1.5 0 0117 4.5v7a1.5 1.5 0 01-1.5 1.5H13M3 8.5A1.5 1.5 0 014.5 7h7A1.5 1.5 0 0113 8.5v7a1.5 1.5 0 01-1.5 1.5h-7A1.5 1.5 0 013 15.5z', () =>
+		iconBtn( 'کپی', 'copy', () =>
 			copyText( body.dataset.raw || body.textContent || '' )
 		)
 	);
 	actions.appendChild(
-		iconBtn( 'دوباره', 'M16 6v4h-4M4 14v-4h4M15.5 9a5.5 5.5 0 00-9.6-2.6M4.5 11a5.5 5.5 0 009.6 2.6', () =>
+		iconBtn( 'دوباره', 'retry', () =>
 			onResend( role === 'user' ? body.textContent || '' : lastUserText() )
 		)
 	);
@@ -152,7 +153,7 @@ export function addMessage( role, text, asMarkdown = true, images = [] ) {
 	// بلندخوانی — برای وقتی که جواب بلند است و حوصلهٔ خواندن نیست.
 	if ( role === 'assistant' && ttsSupported() ) {
 		actions.appendChild(
-			iconBtn( 'بخوان', 'M4 8v4h3l4 3V5L7 8zM14 7.5a4 4 0 010 5M16.5 5.5a7 7 0 010 9', () => {
+			iconBtn( 'بخوان', 'speak', () => {
 				if ( isSpeaking() ) {
 					stopSpeaking();
 					return;
@@ -253,7 +254,7 @@ export function hideWorking() {
 }
 
 export function addNotice( text ) {
-	append( h( 'div', { class: 'notice' }, [ h( 'span', { class: 'notice-ico', text: '•' } ), h( 'span', { text } ) ] ) );
+	append( h( 'div', { class: 'notice' }, [ h( 'span', { class: 'notice-ico', html: iconSvg( 'circle-dot', 12 ) } ), h( 'span', { text } ) ] ) );
 }
 
 /**
@@ -283,10 +284,10 @@ export function thinkingBlock() {
 	// لایهٔ محوکنندهٔ بالای کادر روی همین ظرف می‌نشیند، نه روی متنِ اسکرول‌شونده.
 	const view = h( 'div', { class: 'thinking-view' }, [ body ] );
 	const head = h( 'div', { class: 'thinking-head' }, [
-		h( 'span', { class: 'spin', text: '◜' } ),
+		h( 'span', { class: 'spin', html: iconSvg( 'spinner', 13 ) } ),
 		h( 'b', { text: 'در حال استدلال' } ),
 		h( 'span', { class: 'grow' } ),
-		h( 'span', { class: 'm-ico', text: '▾' } ),
+		h( 'span', { class: 'm-ico', html: iconSvg( 'chevron-down', 13 ) } ),
 	] );
 	const box = h( 'div', { class: 'thinking' }, [ head, view ] );
 	head.addEventListener( 'click', () => {
@@ -642,7 +643,7 @@ function alwaysLabel( ev ) {
 
 function planCard( ev ) {
 	const card = el( 'div', 'plan-card' );
-	card.appendChild( h( 'div', { class: 'plan-head' }, [ h( 'span', { text: '◇' } ), h( 'b', { text: 'نقشهٔ کار آماده است' } ) ] ) );
+	card.appendChild( h( 'div', { class: 'plan-head' }, [ h( 'span', { html: iconSvg( 'circle-dot', 14 ) } ), h( 'b', { text: 'نقشهٔ کار آماده است' } ) ] ) );
 
 	const body = el( 'div', 'plan-body' );
 	body.innerHTML = markdown( ev.plan || '' );
@@ -677,7 +678,7 @@ function planCard( ev ) {
 
 function questionCard( ev ) {
 	const card = el( 'div', 'q-card' );
-	card.appendChild( h( 'div', { class: 'q-head' }, [ h( 'span', { text: '?' } ), h( 'b', { text: ev.question || 'یک انتخاب لازم است' } ) ] ) );
+	card.appendChild( h( 'div', { class: 'q-head' }, [ h( 'span', { html: iconSvg( 'help', 15 ) } ), h( 'b', { text: ev.question || 'یک انتخاب لازم است' } ) ] ) );
 
 	const list = el( 'div', 'q-options' );
 	const send = async ( value ) => {
@@ -818,11 +819,11 @@ export function handleEvent( ev ) {
 			break;
 
 		case 'subagent_start':
-			append( h( 'div', { class: 'subagent open' }, [ h( 'span', { text: '⌗' } ), h( 'b', { text: ev.label } ), h( 'span', { class: 'note', text: 'زیرعامل شروع شد' } ) ] ) );
+			append( h( 'div', { class: 'subagent open' }, [ h( 'span', { html: iconSvg( 'subagents', 14 ) } ), h( 'b', { text: ev.label } ), h( 'span', { class: 'note', text: 'زیرعامل شروع شد' } ) ] ) );
 			break;
 
 		case 'subagent_end':
-			append( h( 'div', { class: 'subagent done' }, [ h( 'span', { text: '⌗' } ), h( 'b', { text: ev.label } ), h( 'span', { class: 'note', text: 'زیرعامل تمام شد' } ) ] ) );
+			append( h( 'div', { class: 'subagent done' }, [ h( 'span', { html: iconSvg( 'subagents', 14 ) } ), h( 'b', { text: ev.label } ), h( 'span', { class: 'note', text: 'زیرعامل تمام شد' } ) ] ) );
 			break;
 
 		case 'tool_log':

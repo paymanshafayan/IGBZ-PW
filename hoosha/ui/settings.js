@@ -6,9 +6,10 @@
  * حافظهٔ پروژه، مصرف و هزینه، و تشخیص خرابی.
  */
 
-import { $, el, h, toast, confirmDialog } from './lib/dom.js';
+import { $, el, h, toast, timeAgo, confirmDialog } from './lib/dom.js';
 import { api, post, refreshState, getState } from './lib/api.js';
 import { mountHub } from './hub.js';
+import { iconSvg } from './lib/icons.js';
 
 /**
  * دو گروه، دقیقاً مثل ناوبری داخل مودال تنظیمات Claude: «Settings» و «Customize».
@@ -20,35 +21,35 @@ const GROUPS = [
 		// اضافه شود، و اول می‌آید چون اولین کاری است که مدیر روی نصب تازه می‌کند.
 		label: 'پرووایدر و مدل',
 		items: [
-			{ id: 'hub', label: 'پرووایدرهای استاندارد', ico: '◈' },
-			{ id: 'hub-compat', label: 'پرووایدرهای سازگار', ico: '◇' },
-			{ id: 'hub-models', label: 'مدل‌ها', ico: '⬡' },
-			{ id: 'hub-routing', label: 'هاب و مسیریابی', ico: '⇶' },
-			{ id: 'hub-health', label: 'سلامت و عیب‌یاب', ico: '✚' },
-			{ id: 'provider', label: 'پروفایل تک‌نفره', ico: '◉' },
+			{ id: 'hub', label: 'پرووایدرهای استاندارد', ico: 'provider' },
+			{ id: 'hub-compat', label: 'پرووایدرهای سازگار', ico: 'plug-alt' },
+			{ id: 'hub-models', label: 'مدل‌ها', ico: 'model' },
+			{ id: 'hub-routing', label: 'هاب و مسیریابی', ico: 'hub' },
+			{ id: 'hub-health', label: 'سلامت و عیب‌یاب', ico: 'health' },
+			{ id: 'provider', label: 'پروفایل تک‌نفره', ico: 'profile' },
 		],
 	},
 	{
 		label: 'تنظیمات',
 		items: [
-			{ id: 'permissions', label: 'مجوزها', ico: '⛨' },
-			{ id: 'sandbox', label: 'سندباکس', ico: '▢' },
-			{ id: 'usage', label: 'مصرف و هزینه', ico: '⌁' },
-			{ id: 'status', label: 'وضعیت و تشخیص', ico: '✚' },
-			{ id: 'appearance', label: 'ظاهر', ico: '◐' },
+			{ id: 'permissions', label: 'مجوزها', ico: 'permissions' },
+			{ id: 'sandbox', label: 'سندباکس', ico: 'sandbox' },
+			{ id: 'usage', label: 'مصرف و هزینه', ico: 'usage' },
+			{ id: 'status', label: 'وضعیت و تشخیص', ico: 'health' },
+			{ id: 'appearance', label: 'ظاهر', ico: 'appearance' },
 		],
 	},
 	{
 		label: 'سفارشی‌سازی',
 		items: [
-			{ id: 'skills', label: 'اسکیل‌ها', ico: '◆' },
-			{ id: 'connectors', label: 'کانکتورها', ico: '⇄' },
-			{ id: 'plugins', label: 'پلاگین‌ها', ico: '▣' },
-			{ id: 'agents', label: 'زیرعامل‌ها', ico: '⌗' },
-			{ id: 'commands', label: 'دستورها', ico: '/' },
-			{ id: 'hooks', label: 'هوک‌ها', ico: '⚑' },
-			{ id: 'memory', label: 'حافظهٔ پروژه', ico: '❒' },
-			{ id: 'tools', label: 'ابزارها', ico: '⚒' },
+			{ id: 'skills', label: 'اسکیل‌ها', ico: 'skills' },
+			{ id: 'connectors', label: 'کانکتورها', ico: 'connectors' },
+			{ id: 'plugins', label: 'پلاگین‌ها', ico: 'plugins' },
+			{ id: 'agents', label: 'زیرعامل‌ها', ico: 'subagents' },
+			{ id: 'commands', label: 'دستورها', ico: 'commands' },
+			{ id: 'hooks', label: 'هوک‌ها', ico: 'hooks' },
+			{ id: 'memory', label: 'حافظهٔ پروژه', ico: 'memory' },
+			{ id: 'tools', label: 'ابزارها', ico: 'tools' },
 		],
 	},
 ];
@@ -117,7 +118,7 @@ function paintSettingsNav() {
 						paintSettingsNav();
 						await paintSettingsBody();
 					},
-				}, [ h( 'span', { class: 'si-ico', text: t.ico } ), h( 'span', { text: t.label } ) ] )
+				}, [ h( 'span', { class: 'si-ico', html: iconSvg( t.ico, 16 ) } ), h( 'span', { text: t.label } ) ] )
 			);
 		}
 	}
@@ -597,7 +598,7 @@ function kvEditor( initial, label ) {
 	const addRow = ( k = '', v = '' ) => {
 		const key = h( 'input', { class: 'field small', dir: 'ltr', value: k, placeholder: 'کلید' } );
 		const val = h( 'input', { class: 'field small', dir: 'ltr', value: v, placeholder: 'مقدار' } );
-		const del = h( 'button', { class: 'btn quiet', text: '×', onClick: () => line.remove() } );
+		const del = h( 'button', { class: 'btn quiet', html: iconSvg( 'times', 13 ), title: 'حذف', onClick: () => line.remove() } );
 		const line = h( 'div', { class: 'kv-row' }, [ key, val, del ] );
 		host.insertBefore( line, adder );
 		return line;
@@ -716,7 +717,8 @@ async function renderPlugins( box ) {
 						note.textContent = out.error;
 						return;
 					}
-					toast( `«${ out.plugin.name }» نصب شد.` );
+					// پاسخ ناقص نباید رابط را بترکاند؛ اسم اگر نبود، خود ورودی را می‌گوییم.
+					toast( `«${ out.plugin?.name || source.value.trim() }» نصب شد.` );
 					await openSettings( 'plugins' );
 				},
 			} ) ) ),
@@ -1088,7 +1090,7 @@ function listEditor( initial, label ) {
 	const host = el( 'div', 'kv' );
 	const addRow = ( v = '' ) => {
 		const input = h( 'input', { class: 'field small', dir: 'ltr', value: v, placeholder: 'bash:git' } );
-		const del = h( 'button', { class: 'btn quiet', text: '×', onClick: () => line.remove() } );
+		const del = h( 'button', { class: 'btn quiet', html: iconSvg( 'times', 13 ), title: 'حذف', onClick: () => line.remove() } );
 		const line = h( 'div', { class: 'kv-row' }, [ input, del ] );
 		host.insertBefore( line, adder );
 	};
@@ -1420,6 +1422,109 @@ export async function renderSection( tab, box ) {
 	await fn( box );
 }
 
+/*
+ * سه بخشِ فضای کار که تا امروز رندرکننده نداشتند.
+ *
+ * در فهرست تب‌ها بودند و کلیک روی هرکدام «بخش ناشناخته: todos» می‌داد — یعنی سه دکمهٔ
+ * مرده در رابط. داده‌شان از اول در `/api/state` بود؛ فقط کسی نمایششان نمی‌داد.
+ */
+
+/** @param {HTMLElement} box */
+async function renderTodos( box ) {
+	const s = getState() || {};
+	const list = s.todos || [];
+	box.replaceChildren( h( 'p', { class: 'set-row-desc', text: 'فهرست کاری که عامل برای خودش می‌نویسد؛ با پیشرفت کار به‌روز می‌شود.' } ) );
+	if ( ! list.length ) {
+		box.appendChild( el( 'div', 'empty', 'هنوز کاری ثبت نشده.' ) );
+		return;
+	}
+	const card = h( 'div', { class: 'card-list' } );
+	for ( const todo of list ) {
+		const state = todo.state === 'done' ? 'انجام شد' : todo.state === 'doing' ? 'در حال انجام' : 'در نوبت';
+		card.appendChild(
+			h( 'div', { class: 'item' }, [
+				h( 'span', { class: 'm-ico', html: iconSvg( todo.state === 'done' ? 'check' : todo.state === 'doing' ? 'spinner' : 'circle-dot', 14 ) } ),
+				h( 'div', { class: 'item-main' }, [ h( 'b', { 'data-no-t': '', text: todo.text || todo.title || '—' } ) ] ),
+				h( 'span', { class: `tag ${ todo.state === 'done' ? 'ok' : '' }`, text: state } ),
+			] )
+		);
+	}
+	box.appendChild( card );
+}
+
+/** @param {HTMLElement} box */
+async function renderShells( box ) {
+	const out = await api( '/api/shells' );
+	const list = out.shells || [];
+	box.replaceChildren( h( 'p', { class: 'set-row-desc', text: 'فرمان‌هایی که در پس‌زمینه اجرا شده‌اند. خروجی هرکدام را می‌شود خواند و اجرای در حال کار را بست.' } ) );
+	if ( ! list.length ) {
+		box.appendChild( el( 'div', 'empty', 'شل پس‌زمینه‌ای در کار نیست.' ) );
+		return;
+	}
+	const card = h( 'div', { class: 'card-list' } );
+	for ( const sh of list ) {
+		const output = h( 'pre', { class: 'tool-body mono', hidden: true } );
+		card.appendChild(
+			h( 'div', { class: 'item', style: 'flex-direction:column;align-items:stretch' }, [
+				h( 'div', { class: 'row' }, [
+					h( 'div', { class: 'item-main' }, [ h( 'b', { class: 'mono', 'data-no-t': '', text: sh.command || sh.id } ) ] ),
+					h( 'span', { class: `tag ${ sh.running ? '' : 'ok' }`, text: sh.running ? 'در حال اجرا' : 'تمام شده' } ),
+					h( 'button', {
+						class: 'btn outline sm',
+						text: 'خروجی',
+						onClick: async () => {
+							const res = await post( '/api/shells', { action: 'read', id: sh.id } );
+							output.textContent = res.output || res.stdout || '(خروجی خالی)';
+							output.hidden = ! output.hidden;
+						},
+					} ),
+					sh.running
+						? h( 'button', {
+								class: 'btn outline sm danger',
+								text: 'بستن کار',
+								onClick: async () => {
+									await post( '/api/shells', { action: 'kill', id: sh.id } );
+									await renderShells( box );
+								},
+						  } )
+						: null,
+				] ),
+				output,
+			] )
+		);
+	}
+	box.appendChild( card );
+}
+
+/** @param {HTMLElement} box */
+async function renderCheckpoints( box ) {
+	const out = await api( '/api/checkpoints' );
+	const list = out.checkpoints || [];
+	box.replaceChildren( h( 'p', { class: 'set-row-desc', text: 'پیش از هر تغییر فایل، یک نقطهٔ بازگشت ساخته می‌شود. از همین‌جا می‌شود به هرکدام برگشت.' } ) );
+	if ( ! list.length ) {
+		box.appendChild( el( 'div', 'empty', 'هنوز چک‌پوینتی ساخته نشده.' ) );
+		return;
+	}
+	const card = h( 'div', { class: 'card-list' } );
+	for ( const cp of [ ...list ].reverse() ) {
+		card.appendChild(
+			h( 'div', { class: 'item' }, [
+				h( 'span', { class: 'm-ico', html: iconSvg( 'checkpoint', 14 ) } ),
+				h( 'div', { class: 'item-main' }, [
+					h( 'b', { 'data-no-t': '', text: cp.label || cp.id } ),
+					h( 'p', { class: 'note', text: timeAgo( cp.at || cp.createdAt || Date.now() ) } ),
+				] ),
+				h( 'button', {
+					class: 'btn outline sm',
+					text: 'بازگشت به این نقطه',
+					onClick: () => document.dispatchEvent( new CustomEvent( 'hoosha:rewind', { detail: { id: cp.id } } ) ),
+				} ),
+			] )
+		);
+	}
+	box.appendChild( card );
+}
+
 const RENDER = {
 	hub: ( box ) => mountHub( box, 'hub' ),
 	'hub-compat': ( box ) => mountHub( box, 'hub-compat' ),
@@ -1440,4 +1545,7 @@ const RENDER = {
 	usage: renderUsage,
 	status: renderStatus,
 	appearance: renderAppearance,
+	todos: renderTodos,
+	shells: renderShells,
+	checkpoints: renderCheckpoints,
 };

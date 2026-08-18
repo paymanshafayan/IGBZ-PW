@@ -15,6 +15,7 @@
 
 import { $, h, toast, promptDialog, confirmDialog } from './lib/dom.js';
 import { api, post, getState, refreshState } from './lib/api.js';
+import { iconSvg } from './lib/icons.js';
 
 /** @type {(view:string)=>void} */
 let openView = () => {};
@@ -106,10 +107,10 @@ function close() {
 
 function row( ico, label, desc, onClick, checked ) {
 	return h( 'div', { class: `btn quiet row menu-item ${ checked ? 'active' : '' }`, onClick }, [
-		h( 'span', { class: 'm-ico', text: ico } ),
+		h( 'span', { class: 'm-ico', html: iconSvg( ico, 16 ) } ),
 		h( 'b', { text: label } ),
 		desc ? h( 'span', { class: 'm-desc', text: desc } ) : null,
-		checked ? h( 'span', { class: 'm-check', text: '✓' } ) : null,
+		checked ? h( 'span', { class: 'm-check', html: iconSvg( 'check', 13 ) } ) : null,
 	] );
 }
 
@@ -119,13 +120,13 @@ function repoMenu() {
 
 	menu( [
 		h( 'div', { class: 'menu-label', text: 'مخزن' } ),
-		git ? h( 'div', { class: 'btn quiet row menu-item' }, [ h( 'span', { class: 'm-ico', text: '⌗' } ), h( 'b', { text: git.name } ), h( 'span', { class: 'm-desc', text: git.remote } ) ] ) : null,
+		git ? h( 'div', { class: 'btn quiet row menu-item' }, [ h( 'span', { class: 'm-ico', html: iconSvg( 'branch', 16 ) } ), h( 'b', { text: git.name } ), h( 'span', { class: 'm-desc', text: git.remote } ) ] ) : null,
 		h( 'div', { class: 'menu-sep' } ),
-		row( '+', 'اتصال مخزن تازه', 'کلون از آدرس گیت', async () => {
+		row( 'plus', 'اتصال مخزن تازه', 'کلون از آدرس گیت', async () => {
 			close();
 			await connectRepo();
 		} ),
-		row( '▤', 'تغییر پوشهٔ کاری', 'بدون کلون', async () => {
+		row( 'repo', 'تغییر پوشهٔ کاری', 'بدون کلون', async () => {
 			close();
 			const next = await promptDialog( 'مسیر پوشه:', s?.config?.workspace || '' );
 			if ( ! next ) {
@@ -135,7 +136,7 @@ function repoMenu() {
 			toast( out.error || 'پوشهٔ کاری عوض شد.', out.error ? 'error' : '' );
 			await refreshState();
 		} ),
-		git ? row( '±', 'دیدن همهٔ تغییرات', '', () => {
+		git ? row( 'diff', 'دیدن همهٔ تغییرات', '', () => {
 			close();
 			openView( 'changes' );
 		} ) : null,
@@ -186,7 +187,7 @@ async function branchMenu() {
 			)
 		),
 		h( 'div', { class: 'menu-sep' } ),
-		row( '+', 'شاخهٔ تازه', 'از همین‌جا منشعب می‌شود', async () => {
+		row( 'plus', 'شاخهٔ تازه', 'از همین‌جا منشعب می‌شود', async () => {
 			close();
 			const name = await promptDialog( 'نام شاخهٔ تازه:', `hoosha/${ Date.now().toString( 36 ) }` );
 			if ( ! name ) {
@@ -209,20 +210,20 @@ function actionMenu() {
 
 	menu( [
 		h( 'div', { class: 'menu-label', text: 'بستن کار' } ),
-		row( '✓', `ثبت ${ git.files.length } تغییر`, git.protected ? 'شاخهٔ تازه ساخته می‌شود' : git.branch, async () => {
+		row( 'commit', `ثبت ${ git.files.length } تغییر`, git.protected ? 'شاخهٔ تازه ساخته می‌شود' : git.branch, async () => {
 			close();
 			await doCommit();
 		} ),
-		row( '↑', 'فرستادن به ریموت', git.ahead ? `${ git.ahead } کامیت آماده` : 'چیزی برای فرستادن نیست', async () => {
+		row( 'push', 'فرستادن به ریموت', git.ahead ? `${ git.ahead } کامیت آماده` : 'چیزی برای فرستادن نیست', async () => {
 			close();
 			await doPush();
 		} ),
-		row( '⇄', 'درخواست ادغام', 'با gh ساخته می‌شود', async () => {
+		row( 'pull-request', 'درخواست ادغام', 'با gh ساخته می‌شود', async () => {
 			close();
 			await doPr();
 		} ),
 		h( 'div', { class: 'menu-sep' } ),
-		row( '±', 'دیدن تغییرات', '', () => {
+		row( 'diff', 'دیدن تغییرات', '', () => {
 			close();
 			openView( 'changes' );
 		} ),

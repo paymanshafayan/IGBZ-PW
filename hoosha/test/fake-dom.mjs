@@ -114,6 +114,17 @@ class FakeNode {
 	matches( sel ) {
 		return matches( this, sel );
 	}
+	/** @param {FakeNode} node */
+	contains( node ) {
+		let n = node;
+		while ( n ) {
+			if ( n === this ) {
+				return true;
+			}
+			n = n.parentNode;
+		}
+		return false;
+	}
 	insertBefore( node, before ) {
 		const i = this.children.indexOf( before );
 		node.parentNode = this;
@@ -217,13 +228,42 @@ class FakeNode {
 	 * اولی را می‌زد و نتیجه‌اش این بود که کلیک روی ناوبری «هیچ کاری نمی‌کرد» — در حالی
 	 * که کد سالم بود و هارنس ناقص.
 	 */
+	/**
+	 * کلیک، با **بالا رفتن** تا ریشه — مثل مرورگر.
+	 *
+	 * نسخهٔ قبلی فقط روی خودِ گره صدا می‌زد و همین یک باگ واقعی را از دید تست پنهان کرد:
+	 * منوی راست‌کلیک با شنوندهٔ `document` بسته می‌شد، پس در مرورگر زیرمنو باز و همان
+	 * لحظه بسته می‌شد در حالی که تست سبز بود.
+	 */
 	click() {
-		const ev = { preventDefault() {}, stopPropagation() {}, target: this };
-		for ( const fn of this.listeners.click || [] ) {
-			fn( ev );
+		let stopped = false;
+		const ev = {
+			preventDefault() {},
+			stopPropagation() {
+				stopped = true;
+			},
+			target: this,
+			currentTarget: this,
+		};
+		let node = this;
+		while ( node ) {
+			ev.currentTarget = node;
+			for ( const fn of node.listeners?.click || [] ) {
+				fn( ev );
+			}
+			if ( typeof node.onclick === 'function' ) {
+				node.onclick( ev );
+			}
+			if ( stopped ) {
+				return;
+			}
+			node = node.parentNode;
 		}
-		if ( typeof this.onclick === 'function' ) {
-			this.onclick( ev );
+		// و در آخر، شنونده‌های خودِ document.
+		if ( ! stopped && globalThis.document?.listeners?.click ) {
+			for ( const fn of globalThis.document.listeners.click ) {
+				fn( ev );
+			}
 		}
 	}
 }

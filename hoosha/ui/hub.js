@@ -12,6 +12,7 @@
 
 import { el, h, toast, confirmDialog } from './lib/dom.js';
 import { api, post } from './lib/api.js';
+import { iconSvg } from './lib/icons.js';
 
 /** @type {any} */
 let snap = null;
@@ -603,9 +604,9 @@ function renderRouting( box, page ) {
 					h( 'div', { class: 'item' }, [
 						h( 'span', { class: 'tag', text: String( i + 1 ) } ),
 						h( 'div', { class: 'item-main' }, [ h( 'p', { class: 'mono', text: key } ) ] ),
-						h( 'button', { class: 'btn outline', text: '↑', onClick: () => { if ( i > 0 ) { [ chosen[ i - 1 ], chosen[ i ] ] = [ chosen[ i ], chosen[ i - 1 ] ]; drawPicked(); } } } ),
-						h( 'button', { class: 'btn outline', text: '↓', onClick: () => { if ( i < chosen.length - 1 ) { [ chosen[ i + 1 ], chosen[ i ] ] = [ chosen[ i ], chosen[ i + 1 ] ]; drawPicked(); } } } ),
-						h( 'button', { class: 'btn quiet danger', text: '×', onClick: () => { chosen.splice( i, 1 ); drawPicked(); } } ),
+						h( 'button', { class: 'btn outline', html: iconSvg( 'up', 13 ), title: 'بالا', onClick: () => { if ( i > 0 ) { [ chosen[ i - 1 ], chosen[ i ] ] = [ chosen[ i ], chosen[ i - 1 ] ]; drawPicked(); } } } ),
+						h( 'button', { class: 'btn outline', html: iconSvg( 'down', 13 ), title: 'پایین', onClick: () => { if ( i < chosen.length - 1 ) { [ chosen[ i + 1 ], chosen[ i ] ] = [ chosen[ i ], chosen[ i + 1 ] ]; drawPicked(); } } } ),
+						h( 'button', { class: 'btn quiet danger', html: iconSvg( 'times', 13 ), title: 'حذف', onClick: () => { chosen.splice( i, 1 ); drawPicked(); } } ),
 					] )
 				);
 			} );

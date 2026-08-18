@@ -1,4 +1,5 @@
 /** ابزارهای کوچک DOM — بدون فریم‌ورک، چون نه build داریم نه می‌خواهیم داشته باشیم. */
+import { iconSvg } from './icons.js';
 
 export const $ = ( s, root = document ) => root.querySelector( s );
 export const $$ = ( s, root = document ) => [ ...root.querySelectorAll( s ) ];
@@ -226,7 +227,7 @@ export function contextMenu( { x, y, items } ) {
 		if ( back ) {
 			rows.push(
 				h( 'button', { class: 'btn quiet row menu-item', onClick: () => draw( back, null ) }, [
-					h( 'span', { class: 'm-ico', text: '‹' } ),
+					h( 'span', { class: 'm-ico', html: iconSvg( 'chevron-right', 14 ) } ),
 					h( 'span', { text: 'بازگشت' } ),
 				] ),
 				h( 'div', { class: 'menu-sep' } )
@@ -249,7 +250,7 @@ export function contextMenu( { x, y, items } ) {
 						item.onPick();
 					},
 				}, [
-					h( 'span', { class: 'm-ico', text: item.ico || '' } ),
+					h( 'span', { class: 'm-ico', html: item.ico ? iconSvg( item.ico, 16 ) : '' } ),
 					h( 'span', { text: item.label } ),
 					item.submenu ? h( 'span', { class: 'm-end', text: '›' } ) : item.hint ? h( 'span', { class: 'm-end', text: item.hint } ) : null,
 				] )
@@ -269,8 +270,16 @@ export function contextMenu( { x, y, items } ) {
 	menu.style.left = `${ Math.max( 8, Math.min( x, vw - w - 8 ) ) }px`;
 	menu.style.top = `${ Math.max( 8, Math.min( y, vh - h1 - 8 ) ) }px`;
 
+	/*
+	 * بستن با کلیکِ بیرون — نه با هر کلیکی.
+	 *
+	 * نسخهٔ اول یک شنوندهٔ `{ once: true }` روی document می‌گذاشت؛ کلیک روی خودِ ردیف‌های
+	 * منو هم به document می‌رسید و منو را همان لحظه می‌بست. نتیجه این بود که «افزودن به
+	 * پروژه» در مرورگر کار نمی‌کرد: زیرمنو باز می‌شد و بلافاصله می‌رفت. (تست هم آن را
+	 * نمی‌گرفت، چون کلیکِ هارنس اصلاً بالا نمی‌رفت — آن هم درست شد.)
+	 */
 	setTimeout( () => {
-		document.addEventListener( 'click', closeContextMenu, { once: true } );
+		document.addEventListener( 'click', onCtxClick );
 		document.addEventListener( 'keydown', onCtxKey );
 	}, 0 );
 	return menu;
@@ -282,8 +291,16 @@ function onCtxKey( e ) {
 	}
 }
 
+function onCtxClick( e ) {
+	const menu = $( '#ctx-menu' );
+	if ( menu && ! menu.contains( e.target ) ) {
+		closeContextMenu();
+	}
+}
+
 /** بستن منوی راست‌کلیک، اگر بازی هست. */
 export function closeContextMenu() {
 	document.removeEventListener( 'keydown', onCtxKey );
+	document.removeEventListener( 'click', onCtxClick );
 	$( '#ctx-menu' )?.remove();
 }

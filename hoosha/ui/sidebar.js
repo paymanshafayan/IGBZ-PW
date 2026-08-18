@@ -13,6 +13,7 @@ import { $, h, timeAgo, toast, confirmDialog, promptDialog, contextMenu } from '
 import { api, post, getState } from './lib/api.js';
 import { logoSvg } from './lib/logo.js';
 import { t, lang, LANGS } from './lib/i18n.js';
+import { iconSvg } from './lib/icons.js';
 
 let onResume = () => {};
 let onView = () => {};
@@ -116,7 +117,7 @@ function paint() {
 			h( 'button', {
 				class: 'btn icon round quiet reveal row-menu',
 				title: t( 'گزینه‌ها' ),
-				text: '⋯',
+				html: iconSvg( 'more', 15 ),
 				onClick: ( e ) => {
 					e.stopPropagation();
 					const box2 = e.currentTarget?.getBoundingClientRect?.() || { left: 60, bottom: 80 };
@@ -172,12 +173,12 @@ function sessionMenu( item, x, y ) {
 		x,
 		y,
 		items: [
-			{ ico: '📌', label: isPinned ? t( 'برداشتن سنجاق' ) : t( 'سنجاق' ), hint: 'P', onPick: () => togglePin( item.id ) },
-			{ ico: '✎', label: t( 'تغییر نام' ), hint: 'R', onPick: () => renameSession( item ) },
-			{ ico: '▤', label: t( 'افزودن به پروژه' ), submenu: () => projectItems( item ) },
-			{ ico: '↗', label: t( 'باز کردن در تب تازه' ), onPick: () => openInNewTab( item.id ) },
+			{ ico: 'pin', label: isPinned ? t( 'برداشتن سنجاق' ) : t( 'سنجاق' ), hint: 'P', onPick: () => togglePin( item.id ) },
+			{ ico: 'edit', label: t( 'تغییر نام' ), hint: 'R', onPick: () => renameSession( item ) },
+			{ ico: 'folder-plus', label: t( 'افزودن به پروژه' ), submenu: () => projectItems( item ) },
+			{ ico: 'open-external', label: t( 'باز کردن در تب تازه' ), onPick: () => openInNewTab( item.id ) },
 			'-',
-			{ ico: '🗑', label: t( 'حذف' ), hint: 'D', danger: true, onPick: () => removeSession( item ) },
+			{ ico: 'trash', label: t( 'حذف' ), hint: 'D', danger: true, onPick: () => removeSession( item ) },
 		],
 	} );
 }
@@ -210,10 +211,10 @@ function projectItems( item ) {
 	} ) );
 
 	if ( ! rows.length ) {
-		return [ { ico: '▫', label: t( 'هنوز پروژه‌ای نیست' ), onPick: () => onView( 'projects' ) } ];
+		return [ { ico: 'circle-dot', label: t( 'هنوز پروژه‌ای نیست' ), onPick: () => onView( 'projects' ) } ];
 	}
 	if ( item.project ) {
-		rows.push( '-', { ico: '×', label: t( 'برداشتن از پروژه' ), onPick: () => assignProject( item, '' ) } );
+		rows.push( '-', { ico: 'times', label: t( 'برداشتن از پروژه' ), onPick: () => assignProject( item, '' ) } );
 	}
 	return rows;
 }
@@ -277,7 +278,7 @@ function toggleAccountMenu() {
 			menu.hidden = true;
 			onClick();
 		} }, [
-			h( 'span', { class: 'm-ico', text: ico } ),
+			h( 'span', { class: 'm-ico', html: iconSvg( ico, 16 ) } ),
 			h( 'span', { text: label } ),
 			end ? h( 'span', { class: 'm-end', text: end } ) : null,
 		] );
@@ -287,15 +288,15 @@ function toggleAccountMenu() {
 
 	menu.replaceChildren(
 		h( 'div', { class: 'menu-mail', text: String( s.config?.workspace || '' ) } ),
-		item( '⚙', t( 'تنظیمات' ), 'Ctrl+,', () => onCommand( 'settings' ) ),
-		item( '◐', t( 'ظاهر' ), '', () => onCommand( 'theme' ) ),
-		item( '⟐', t( 'زبان' ), other.label, () => onCommand( 'lang' ) ),
-		item( '?', t( 'راهنما و میان‌برها' ), '?', () => onCommand( 'shortcuts' ) ),
+		item( 'settings', t( 'تنظیمات' ), 'Ctrl+,', () => onCommand( 'settings' ) ),
+		item( 'theme', t( 'ظاهر' ), '', () => onCommand( 'theme' ) ),
+		item( 'language', t( 'زبان' ), other.label, () => onCommand( 'lang' ) ),
+		item( 'help', t( 'راهنما و میان‌برها' ), '?', () => onCommand( 'shortcuts' ) ),
 		h( 'div', { class: 'menu-sep' } ),
-		item( '⌁', t( 'مصرف و هزینه' ), '', () => onCommand( 'usage' ) ),
-		item( '✚', t( 'وضعیت و تشخیص' ), '', () => onCommand( 'status' ) ),
+		item( 'usage', t( 'مصرف و هزینه' ), '', () => onCommand( 'usage' ) ),
+		item( 'status', t( 'وضعیت و تشخیص' ), '', () => onCommand( 'status' ) ),
 		h( 'div', { class: 'menu-sep' } ),
-		item( '↺', t( 'بارگذاری دوباره' ), '', () => onCommand( 'reload' ) )
+		item( 'reload', t( 'بارگذاری دوباره' ), '', () => onCommand( 'reload' ) )
 	);
 	menu.hidden = false;
 }

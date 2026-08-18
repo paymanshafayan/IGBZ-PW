@@ -26,6 +26,7 @@ import { openSettingsModal, renderSection, initSettings, SETTINGS_TABS } from '.
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 import { logoSvg } from './lib/logo.js';
 import { initGitBar, paintGitBar, renderChanges } from './gitbar.js';
+import { iconSvg } from './lib/icons.js';
 
 // زبان اول از همه: جهت صفحه و فونت به آن بسته‌اند و اگر بعد از رندر عوض شود، پرش دارد.
 initLang();
@@ -88,7 +89,11 @@ async function switchLang( code ) {
 	}
 	const g = $( '#greet-text' );
 	if ( g ) {
-		g.textContent = t( greeting() );
+		g.textContent = t( WELCOME_TITLE );
+	}
+	const sub = $( '#greet-sub' );
+	if ( sub ) {
+		sub.textContent = t( WELCOME_SUB );
 	}
 }
 
@@ -218,7 +223,7 @@ async function renderChatsPage( host ) {
 				] ),
 				h( 'button', {
 					class: 'btn icon round quiet reveal row-menu',
-					text: '⋯',
+					html: iconSvg( 'more', 15 ),
 					title: 'تغییر نام یا حذف',
 					onClick: async ( e ) => {
 						e.stopPropagation();
@@ -645,6 +650,16 @@ function paletteDeps() {
 	};
 }
 
+/**
+ * پیام خوش‌آمد گفتگوی تازه.
+ *
+ * قبلاً یک سلامِ وابسته به ساعت بود («عصر بخیر، چه خبر؟») که دو ایراد داشت: با عوض‌شدن
+ * زبان درست نمی‌شد چون در چهار حالتِ ساعتی چهار رشتهٔ جدا بود، و نگاه‌کردن به ساعتِ
+ * سیستم برای متنی که قرار است ثابت بماند، پیچیدگیِ بی‌فایده است.
+ *
+ * حالا یک پیام ثابت است با نشان بزرگ هوشا، و تا اولین پیام کاربر سر جایش می‌ماند —
+ * `append()` در thread.js با آمدن اولین چیزِ گفتگو برش می‌دارد.
+ */
 function showWelcome() {
 	const chat = $( '#chat' );
 	if ( $( '#welcome' ) ) {
@@ -652,28 +667,16 @@ function showWelcome() {
 	}
 	chat.appendChild(
 		h( 'div', { class: 'welcome', id: 'welcome' }, [
-			h( 'div', { class: 'greet' }, [
-				h( 'span', { class: 'greet-mark', html: logoSvg( 34 ) } ),
-				h( 'span', { text: t( greeting() ) } ),
-			] ),
+			h( 'span', { class: 'greet-mark', id: 'greet-mark', html: logoSvg( 84 ) } ),
+			h( 'h2', { class: 'greet', id: 'greet-text', text: t( WELCOME_TITLE ) } ),
+			h( 'p', { class: 'greet-sub', id: 'greet-sub', text: t( WELCOME_SUB ) } ),
 		] )
 	);
 	syncEmptyState();
 }
 
-/** سلامِ وابسته به ساعت — همان «Evening, how are things?» در تصویر. */
-export function greeting( hour = new Date().getHours() ) {
-	if ( hour < 5 ) {
-		return 'شب‌بخیر، چه خبر؟';
-	}
-	if ( hour < 12 ) {
-		return 'صبح‌بخیر، چه خبر؟';
-	}
-	if ( hour < 17 ) {
-		return 'ظهر بخیر، چه خبر؟';
-	}
-	return 'عصر بخیر، چه خبر؟';
-}
+export const WELCOME_TITLE = 'به هوشا خوش آمدی';
+export const WELCOME_SUB = 'چه کاری برایت انجام بدهم؟';
 
 // ─────────────────────────────────────────────────── دکمه‌ها و منوها
 
@@ -704,17 +707,17 @@ $( '#btn-more' ).onclick = ( e ) => {
 		h( 'div', { class: 'btn quiet row menu-item', onClick: () => {
 			box.hidden = true;
 			onClick();
-		} }, [ h( 'span', { class: 'm-ico', text: ico } ), h( 'b', { text: label } ) ] );
+		} }, [ h( 'span', { class: 'm-ico', html: iconSvg( ico, 16 ) } ), h( 'b', { text: label } ) ] );
 
 	box.replaceChildren(
-		item( '✎', 'تغییر نام گفتگو', renameSession ),
-		item( '⤓', 'خروجی مارک‌داون', () => doExport( 'md' ) ),
-		item( '⤓', 'خروجی JSON', () => doExport( 'json' ) ),
+		item( 'edit', 'تغییر نام گفتگو', renameSession ),
+		item( 'export', 'خروجی مارک‌داون', () => doExport( 'md' ) ),
+		item( 'export', 'خروجی JSON', () => doExport( 'json' ) ),
 		h( 'div', { class: 'menu-sep' } ),
-		item( '↶', 'بازگشت به چک‌پوینت', () => openRewind( doRewind ) ),
-		item( '⌫', 'پاک‌کردن گفتگو', () => post( '/api/message', { text: '/clear' } ) ),
+		item( 'rewind', 'بازگشت به چک‌پوینت', () => openRewind( doRewind ) ),
+		item( 'trash', 'پاک‌کردن گفتگو', () => post( '/api/message', { text: '/clear' } ) ),
 		h( 'div', { class: 'menu-sep' } ),
-		item( '?', 'میان‌برها', () => openShortcuts() )
+		item( 'help', 'میان‌برها', () => openShortcuts() )
 	);
 	box.hidden = false;
 };
@@ -739,7 +742,7 @@ document.addEventListener( 'click', ( e ) => {
 
 document.addEventListener( 'hoosha:settings', ( e ) => openSettings( e.detail ) );
 document.addEventListener( 'hoosha:view', ( e ) => showView( e.detail ) );
-document.addEventListener( 'hoosha:rewind', () => openRewind( doRewind ) );
+document.addEventListener( 'hoosha:rewind', ( e ) => openRewind( doRewind, e?.detail?.id ) );
 
 // ───────────────────────────────────────────────── میان‌برهای صفحه
 
@@ -816,13 +819,10 @@ async function boot() {
 		renderTranscript( s.transcript );
 	} else {
 		showWelcome();
-		const g = $( '#greet-text' );
-		if ( g ) {
-			g.textContent = t( greeting() );
-		}
-		const gm = $( '#greet-mark' );
-		if ( gm && ! gm.innerHTML.trim() ) {
-			gm.innerHTML = logoSvg( 34 );
+		// نشانِ خوش‌آمدِ ایستا در index.html خالی است تا صفحه قبل از جاوااسکریپت هم رسم شود.
+		const mark = $( '#greet-mark' );
+		if ( mark && ! mark.innerHTML.trim() ) {
+			mark.innerHTML = logoSvg( 84 );
 		}
 	}
 	syncEmptyState();

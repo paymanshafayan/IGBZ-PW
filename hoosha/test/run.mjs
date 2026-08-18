@@ -1800,7 +1800,10 @@ await test( 'تم، تا وقتی کاربر انتخاب نکرده از سیس
 await test( 'دکمه‌های زیر پیام آیکون‌اند نه متن', () => {
 	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
 	assert.match( thread, /function iconBtn/ );
-	assert.match( thread, /<svg viewBox="0 0 20 20"/ );
+	// آیکون‌ها حالا از Font Awesome می‌آیند، نه مسیرهای دست‌ساز.
+	assert.match( thread, /iconBtn\( 'کپی', 'copy'/ );
+	assert.match( thread, /iconBtn\( 'دوباره', 'retry'/ );
+	assert.match( thread, /b\.innerHTML = iconSvg\( name, 15 \)/ );
 	assert.equal( /'act-btn', 'کپی'/.test( thread ), false, 'دکمه باید آیکون باشد نه کلمه' );
 } );
 
@@ -3901,7 +3904,7 @@ async function bootApp( overrides = {}, domOpts = {} ) {
 						: url.startsWith( '/api/git' )
 						? { git: state.git, stat: [] }
 						: url === '/api/hub'
-						? {
+						? domOpts.hub || {
 								active: false,
 								ready: { ok: false, reason: '—' },
 								catalog: [], strategies: [], categories: [], authStyles: [],
@@ -3930,7 +3933,7 @@ async function bootApp( overrides = {}, domOpts = {} ) {
 await test( 'برنامه با index.html واقعی بالا می‌آید و صفحهٔ خالی درست است', async () => {
 	const { dom, q } = await bootApp();
 	try {
-		assert.match( q( '#greet-text' ).textContent, /چه خبر؟/, 'تیتر خوش‌آمد نیامد' );
+		assert.match( q( '#greet-text' ).textContent, /خوش آمدی/, 'تیتر خوش‌آمد نیامد' );
 		assert.ok( q( '#greet-mark' ).innerHTML.includes( 'svg' ), 'نشان هوشا در تیتر رسم نشد' );
 		assert.equal( q( '#brand-version' ).textContent, 'v0.7.0' );
 		assert.ok( q( '#view-chat' ).classList.contains( 'empty' ), 'گفتگوی خالی باید حالت مرکزی بگیرد' );
@@ -4113,7 +4116,7 @@ await test( 'اجزای فرم به سبک Claude درآمده‌اند: تخت�
 
 await test( 'نشان هوشا سر جایش است و فیروزه‌ای است', () => {
 	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
-	assert.match( app, /class: 'greet-mark', html: logoSvg\( 34 \)/, 'نشان باید کنار تیتر خوش‌آمد باشد — همان‌جا که Claude ستاره‌اش را می‌گذارد' );
+	assert.match( app, /class: 'greet-mark', id: 'greet-mark', html: logoSvg\( 84 \)/, 'نشان بزرگ باید بالای پیام خوش‌آمد باشد' );
 
 	const side = fssync.readFileSync( path.join( uiDir, 'sidebar.js' ), 'utf8' );
 	assert.match( side, /logoSvg\( 18, 'logo avatar-logo' \)/, 'آواتار حساب باید نشان هوشا باشد' );
@@ -5231,6 +5234,139 @@ await test( '«باز کردن در تب تازه» نشانی نشست را م�
 	}
 } );
 
+// ------------------------------------------------------------- آیکون‌ها
+
+section( 'آیکون‌های Font Awesome' );
+
+await test( 'آیکون‌ها از FA Pro می‌آیند و هیچ گلیف متنی نمانده', () => {
+	/*
+	 * کارفرما آرشیو FA Pro را در `_bin` گذاشت. به‌جای بار کردن فونت کامل (نزدیک نیم
+	 * مگابایت برای هشتاد آیکون)، فقط همان‌ها از SVGها بیرون کشیده و درون‌خطی می‌شوند.
+	 */
+	const icons = fssync.readFileSync( path.join( uiDir, 'lib', 'icons.js' ), 'utf8' );
+	assert.match( icons, /Font Awesome Pro 5\.15\.4/, 'منبع آیکون‌ها باید نوشته شود' );
+	assert.match( icons, /export function iconSvg/ );
+	assert.match( icons, /fill="currentColor"/, 'آیکون باید رنگ متن را بگیرد' );
+
+	const names = [ ...icons.matchAll( /^\t'([\w-]+)': \[/gm ) ].map( ( m ) => m[ 1 ] );
+	assert.ok( names.length >= 60, `فقط ${ names.length } آیکون ساخته شده` );
+	for ( const want of [ 'chats', 'projects', 'tools', 'changes', 'search', 'send', 'mic', 'pin', 'trash', 'folder-plus' ] ) {
+		assert.ok( names.includes( want ), `آیکون ${ want } نیست` );
+	}
+
+	// سازندهٔ فایل هم باید در مخزن باشد، وگرنه دفعهٔ بعد کسی نمی‌داند از کجا آمده.
+	assert.ok( fssync.existsSync( path.resolve( 'tools/build-icons.mjs' ) ) );
+
+	// و هیچ گلیف متنی‌ای به‌جای آیکون نمانده باشد.
+	const glyphs = /[⌗◆◇◈◉⬡⇶✚⛨▢▣❒⚒⚑⌁◐⋯⤓↶⌫⎙▤±⏱◜]/;
+	for ( const { file, text } of uiSources ) {
+		const hits = [ ...text.matchAll( new RegExp( `(?:text|ico):\\s*'[^']*${ glyphs.source }[^']*'`, 'g' ) ) ];
+		assert.deepEqual( hits.map( ( h ) => h[ 0 ] ), [], `${ file } هنوز گلیف متنی دارد` );
+	}
+} );
+
+await test( 'در برنامهٔ زنده، آیکون‌ها واقعاً رسم می‌شوند', async () => {
+	const { dom, q } = await bootApp();
+	try {
+		// نوار کناری: هر ردیف ناوبری یک svg دارد.
+		const hasSvg = ( node ) => Boolean( node ) && ( /<svg/i.test( node.innerHTML || '' ) || node.all().some( ( n ) => n.tagName === 'SVG' ) );
+		for ( const view of [ 'chats', 'projects', 'tools', 'changes' ] ) {
+			assert.ok( hasSvg( document.querySelector( `.nav-item[data-view="${ view }"]` ) ), `آیکون ناوبری ${ view } رسم نشد` );
+		}
+		assert.ok( hasSvg( q( '#btn-search' ) ), 'آیکون جستجو' );
+		assert.ok( hasSvg( q( '#send' ) ), 'آیکون ارسال' );
+		assert.ok( hasSvg( q( '#btn-plus' ) ), 'آیکون +' );
+
+		// منوی تنظیمات: آیکون هر تب.
+		document.querySelector( '.nav-item[data-view="customize"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 160 ) );
+		const withIcon = [ ...document.querySelectorAll( '.si-ico' ) ].filter( ( n ) => /<svg/.test( n.innerHTML ) );
+		assert.ok( withIcon.length >= 19, `فقط ${ withIcon.length } تب آیکون دارد` );
+	} finally {
+		dom.restore();
+	}
+} );
+
+// ------------------------------------------------------- خوش‌آمد و فونت
+
+section( 'خوش‌آمد و فونت' );
+
+await test( 'پیام خوش‌آمد ثابت است، ترجمه می‌شود و نشان بزرگ دارد', async () => {
+	/*
+	 * قبلاً یک سلامِ وابسته به ساعت بود («عصر بخیر، چه خبر؟») که کارفرما درست گفت
+	 * انگلیسی نمی‌شود: چهار رشتهٔ جدا بود که هرکدام باید جداگانه ترجمه می‌شد.
+	 */
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	// کامنت‌ها را کنار بگذار، وگرنه توضیحِ همین تغییر، تست را قرمز می‌کند.
+	const appCode = app.replace( /\/\*[\s\S]*?\*\//g, '' ).replace( /\/\/[^\n]*/g, '' );
+	assert.equal( /چه خبر؟/.test( appCode ), false, 'سلام ساعتی باید رفته باشد' );
+	assert.equal( /چه خبر؟/.test( html ), false );
+	assert.match( app, /WELCOME_TITLE = 'به هوشا خوش آمدی'/ );
+	assert.match( app, /class: 'greet-mark', id: 'greet-mark', html: logoSvg\( 84 \)/, 'نشان باید بزرگ باشد' );
+
+	const { dom, q } = await bootApp();
+	try {
+		assert.match( q( '#greet-text' ).textContent, /خوش آمدی/ );
+		assert.ok( q( '#greet-mark' ).innerHTML.includes( 'svg' ), 'نشان بزرگ رسم نشد' );
+
+		const { setLang } = await import( '../ui/lib/i18n.js' );
+		setLang( 'en' );
+		await new Promise( ( r ) => setTimeout( r, 60 ) );
+		assert.match( q( '#greet-text' ).textContent, /Welcome to Hoosha/, 'با تغییر زبان باید عوض شود' );
+		assert.match( q( '#greet-sub' ).textContent, /What can I do/ );
+
+		// و تا اولین پیام سر جایش می‌ماند.
+		const thread = await import( '../ui/thread.js' );
+		assert.ok( q( '#welcome' ), 'خوش‌آمد نباید زودتر برود' );
+		thread.addMessage( 'user', 'سلام' );
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+		assert.equal( q( '#welcome' ), null, 'با اولین پیام باید برود' );
+		setLang( 'fa' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'متن فارسی همه‌جا وزیرمتن است — حتی در تیتر و مونو', () => {
+	// شکایت کارفرما: «برخی متن‌های فارسی هنوز از فونت وزیر استفاده نمی‌کنند.»
+	const root = cssBlock( ':root' );
+	assert.match( root, /--sans: 'Vazirmatn'/ );
+	assert.match( root, /--serif: 'Vazirmatn'/, 'تیترها هم باید وزیر باشند، نه Lora که حرف فارسی ندارد' );
+	assert.match( root, /--mono:[^;]*'Vazirmatn'/, 'حرف فارسیِ داخل قالب مونو هم باید وزیر باشد' );
+
+	// و در انگلیسی، همان فونت‌های لاتین برمی‌گردند.
+	const en = css.slice( css.indexOf( "html[data-lang='en']" ), css.indexOf( '}', css.indexOf( "html[data-lang='en']" ) ) );
+	assert.match( en, /--serif: 'Lora'/ );
+	assert.equal( /Vazirmatn/.test( en ), false, 'انگلیسی نباید با وزیر نوشته شود' );
+} );
+
+await test( 'سه تب فضای کار که رندرکننده نداشتند، حالا واقعاً چیزی نشان می‌دهند', async () => {
+	// کلیک روی «فهرست کار» و «شل‌ها» و «چک‌پوینت‌ها» می‌داد: «بخش ناشناخته: todos».
+	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
+	for ( const id of [ 'todos', 'shells', 'checkpoints' ] ) {
+		assert.match( settings, new RegExp( `\\n\\t${ id }: render` ), `بخش ${ id } رندرکننده ندارد` );
+	}
+
+	const { dom } = await bootApp( {
+		todos: [ { text: 'کار اول', state: 'doing' } ],
+		shells: [ { id: 'sh1', command: 'npm test', running: true } ],
+		checkpoints: [ { id: 'k1', label: 'قبل از ویرایش', at: Date.now() } ],
+	} );
+	try {
+		document.querySelector( '.nav-item[data-view="workspace"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 150 ) );
+		for ( const label of [ 'فهرست کار', 'شل‌های پس‌زمینه', 'چک‌پوینت‌ها' ] ) {
+			const tab = [ ...document.querySelectorAll( '.btn.tab' ) ].find( ( b ) => b.textContent.includes( label ) );
+			assert.ok( tab, `تب «${ label }» نیست` );
+			tab.click();
+			await new Promise( ( r ) => setTimeout( r, 120 ) );
+			assert.equal( /بخش ناشناخته/.test( document.querySelector( '#panel-body' ).textContent ), false, `تب «${ label }» هنوز مرده است` );
+		}
+	} finally {
+		dom.restore();
+	}
+} );
+
 // ------------------------------------------------------- انگلیسیِ تمام‌وقت
 
 section( 'انگلیسی بدون ته‌ماندهٔ فارسی' );
@@ -5273,7 +5409,7 @@ await test( 'در حالت انگلیسی هیچ متن فارسی روی صفح
 	 * ترجمه نمی‌شود — ترجمهٔ حرفِ کاربر، خودش یک باگ است.
 	 */
 	const { dom } = await bootApp( {
-		git: { name: 'IGBZ-WP', branch: 'main', protected: false, dirty: true, ahead: 1, added: 4, removed: 2, files: [ { path: 'a.js', state: 'M' } ] },
+		git: { name: 'IGBZ-WP', branch: 'main', protected: true, dirty: true, ahead: 1, added: 4, removed: 2, files: [ { path: 'a.js', state: 'M' } ] },
 		tools: [ { name: 'read_file', description: 'خواندن فایل', risk: 'read' }, { name: 'bash', description: 'اجرای فرمان', risk: 'exec' } ],
 		skills: [ { name: 'wp', description: 'وردپرس', source: 'user', enabled: true } ],
 		agents: [ { name: 'reviewer', description: 'بازبین کد', scope: 'project', source: 'project', tools: [ 'read_file' ] } ],
@@ -5284,6 +5420,38 @@ await test( 'در حالت انگلیسی هیچ متن فارسی روی صفح
 		checkpoints: [ { id: 'k1', label: 'قبل از ویرایش', at: Date.now() } ],
 		shells: [ { id: 'sh1', command: 'npm test', running: true } ],
 		todos: [ { text: 'کار اول', state: 'doing' } ],
+	}, {
+		/*
+		 * هاب با دادهٔ واقعی، وگرنه صفحه‌های عمیقش اصلاً رندر نمی‌شوند و تست، ترجمه‌های
+		 * نبوده را «سبز» گزارش می‌کند. (یک جهش دقیقاً همین را لو داد.)
+		 * برچسب‌های ساختگی لاتین‌اند تا با محتوای کاربر اشتباه نشوند.
+		 */
+		hub: {
+			active: true,
+			ready: { ok: true, reason: '' },
+			catalog: [ { id: 'openai', label: 'OpenAI', needsKey: true, baseUrl: 'https://api.openai.com/v1' } ],
+			strategies: [ { id: 'first', label: 'اولین سالم' }, { id: 'cheap', label: 'ارزان‌ترین' } ],
+			categories: [ { id: 'code', label: 'کدنویسی' }, { id: 'chat', label: 'گفتگو' } ],
+			authStyles: [ { id: 'bearer', label: 'Authorization: Bearer' } ],
+			hub: {
+				enabled: true,
+				connections: { c1: { id: 'c1', provider: 'openai', label: 'Main', enabled: true, compat: false, baseUrl: 'https://api.openai.com/v1' } },
+				models: { m1: { id: 'm1', connection: 'c1', model: 'gpt-4.1', label: 'GPT', enabled: true, tags: [ 'code' ] } },
+				combos: { k1: { id: 'k1', label: 'Combo', strategy: 'first', models: [ 'm1' ] } },
+				categoryCombo: { code: 'k1' },
+				routing: { fallback: true, maxAttempts: 3 },
+				budget: { daily: 5 },
+				cache: { enabled: true },
+				diagnoser: { enabled: true, model: 'm1', connection: 'c1' },
+			},
+			health: { m1: { p95: 900, success: 0.98, circuit: 'closed', calls: 12, ok: 10, fail: 2, today: 3 } },
+			learning: { code: [ { modelKey: 'm1', score: 0.8, n: 5 } ] },
+			budget: { spentToday: 0.2, daily: 5 },
+			cache: { entries: 3, hits: 2, misses: 1, errors: 0 },
+			ledger: [ { id: 'l1', signature: 'sig', fix: 'set_base_url', permanent: true, at: Date.now(), tries: 2, source: 'قاعده' } ],
+			diagnoser: { calls: 1, lastModel: 'm1', enabled: true },
+			recent: [ { at: Date.now(), category: 'code', model: 'm1', ok: true, ms: 800 } ],
+		},
 	} );
 	try {
 		const { setLang } = await import( '../ui/lib/i18n.js' );
@@ -5335,6 +5503,12 @@ await test( 'در حالت انگلیسی هیچ متن فارسی روی صفح
 			document.querySelector( `.nav-item[data-view="${ view }"]` ).click();
 			await new Promise( ( r ) => setTimeout( r, 120 ) );
 			collect( view );
+			// زیرتب‌های فضای کار — سه‌تایشان تا امروز اصلاً رندرکننده نداشتند.
+			for ( const tab of document.querySelectorAll( '.btn.tab' ) ) {
+				tab.click();
+				await new Promise( ( r ) => setTimeout( r, 90 ) );
+				collect( `${ view }/${ tab.textContent.trim().slice( 0, 14 ) }` );
+			}
 		}
 
 		document.querySelector( '.nav-item[data-view="customize"]' ).click();
@@ -5343,8 +5517,18 @@ await test( 'در حالت انگلیسی هیچ متن فارسی روی صفح
 		assert.ok( tabs.length >= 19, `فقط ${ tabs.length } تب تنظیمات باز شد` );
 		for ( const item of tabs ) {
 			item.click();
-			await new Promise( ( r ) => setTimeout( r, 90 ) );
+			await new Promise( ( r ) => setTimeout( r, 110 ) );
 			collect( `تنظیمات/${ item.textContent.trim().slice( 0, 18 ) }` );
+			// فرم «تازه»ی هر تب هم باز شود؛ نصف رشته‌های فارسی همان تو هستند.
+			for ( const b of document.querySelectorAll( '#set-body .btn.solid' ) ) {
+				if ( /نصب|حذف|پاک|اجرا|تست|کشف/.test( b.textContent ) ) {
+					continue;
+				}
+				b.click();
+				await new Promise( ( r ) => setTimeout( r, 90 ) );
+				collect( `تنظیمات/فرم/${ item.textContent.trim().slice( 0, 14 ) }` );
+				break;
+			}
 		}
 
 		// و منوهای داخلی — همان‌هایی که کارفرما گفت «حل کن».

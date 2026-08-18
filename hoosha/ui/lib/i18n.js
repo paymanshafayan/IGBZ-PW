@@ -45,10 +45,6 @@ const EN = {
 
 	// گفتگو
 	'امروز چه کمکی از من برمی‌آید؟': 'How can I help you today?',
-	'صبح‌بخیر، چه خبر؟': 'Morning, how are things?',
-	'ظهر بخیر، چه خبر؟': 'Afternoon, how are things?',
-	'عصر بخیر، چه خبر؟': 'Evening, how are things?',
-	'شب‌بخیر، چه خبر؟': 'Late night, how are things?',
 	'هوشا هم اشتباه می‌کند. کارهای مهم را خودت بازبینی کن.': 'Hoosha can make mistakes. Double-check anything that matters.',
 	'ارسال': 'Send',
 	'توقف (Esc)': 'Stop (Esc)',
@@ -181,6 +177,146 @@ const EN = {
 	"شاخهٔ تازه": "New branch",
 	"از همین‌جا منشعب می‌شود": "Branches from here",
 	"نام شاخهٔ تازه:": "Name of the new branch:",
+
+	"به هوشا خوش آمدی": "Welcome to Hoosha",
+	"چه کاری برایت انجام بدهم؟": "What can I do for you?",
+
+	"اتصال تازه": "New connection",
+	"کانکتور تازه": "New connector",
+	"زیرعامل تازه": "New subagent",
+	"دستور تازه": "New command",
+	"پروفایل تازه": "New profile",
+	"متغیر محیطی": "Environment variable",
+	"هدر": "Header",
+	"شاخهٔ تازه ساخته می‌شود": "A new branch will be created",
+	"آدرس": "URL",
+	"آدرس اینترنتی (HTTP)": "A web address (HTTP)",
+	"آدرس پایه": "Base URL",
+	"اجرای فرمان محلی (stdio)": "A local command (stdio)",
+	"ابزارهای این سرور با پیشوند mcp__<نام>__ ظاهر می‌شوند.": "This server’s tools appear with the mcp__<name>__ prefix.",
+	"ابزارهای مجاز": "Allowed tools",
+	"اجباری — همان چیزی که سرویس‌دهنده می‌دهد.": "Required — exactly what the provider gives you.",
+	"ارسال پیام": "Send the message",
+	"از کاتالوگ می‌آید؛ لازم نیست چیزی وارد کنی.": "Comes from the catalog; you do not need to type anything.",
+	"الان هاب فرمان را در دست دارد؛ این پروفایل استفاده نمی‌شود.": "The hub is in charge right now; this profile is not used.",
+	"اولویت": "Priority",
+	"اگر سرویس مسیر غیراستاندارد دارد.": "If the service uses a non-standard path.",
+	"این اتصال روشن باشد": "Keep this connection on",
+	"با فاصله جدا کن.": "Separate with spaces.",
+	"باز کردن بازگشت (rewind)": "Open rewind",
+	"باز/بستن ریل کناری": "Collapse or open the sidebar",
+	"برای سرویس‌های سازگار با OpenAI/Anthropic (مثل OpenRouter، Ollama، LM Studio) اینجا را پر کن.": "Fill this in for OpenAI/Anthropic-compatible services (OpenRouter, Ollama, LM Studio).",
+	"تست": "Test",
+	"تست اتصال": "Test the connection",
+	"توضیح": "Description",
+	"توقف کار در حال اجرا": "Stop the running task",
+	"جستجو در مدل‌ها…": "Search models…",
+	"خالی = مدل پیش‌فرض": "Empty = the default model",
+	"خاموش کن": "Turn off",
+	"خط تازه": "New line",
+	"در فایل تنظیمات محلی و با دسترسی ۶۰۰ ذخیره می‌شود و هیچ‌وقت به رابط برنمی‌گردد.": "Stored in the local config file with 600 permissions, and never sent back to the interface.",
+	"ذخیره شد.": "Saved.",
+	"قواعد ذخیره شد.": "Rules saved.",
+	"ذخیره و کشف مدل‌ها": "Save and discover models",
+	"رفتن به هاب": "Go to the hub",
+	"سالم": "Healthy",
+	"سبک احراز": "Auth style",
+	"سراسری (همهٔ پروژه‌ها)": "Global (every project)",
+	"سرویس": "Service",
+	"سرویس‌دهنده": "Provider",
+	"سقف روزانه (تعداد تماس)": "Daily cap (calls)",
+	"سقف هم‌زمانی": "Concurrency cap",
+	"فراموش کن": "Forget",
+	"فرمان": "Command",
+	"فرمان با هاب": "The hub is in charge",
+	"فقط این پروژه": "This project only",
+	"فقط برای سبک «هدر دلخواه» و «پارامتر آدرس».": "Only for the “custom header” and “query parameter” styles.",
+	"ماندگار کن": "Make permanent",
+	"موقت": "Temporary",
+	"متغیرهای محیطی": "Environment variables",
+	"متن دستور (پرامپت)": "Command body (prompt)",
+	"مثلاً Authorization: Bearer …": "For example Authorization: Bearer …",
+	"مثلاً files": "For example files",
+	"محدوده": "Scope",
+	"مسیر فهرست مدل": "Models path",
+	"مسیریابی با هاب انجام می‌شود؛ پروفایل تک‌نفره کنار گذاشته شده.": "The hub does the routing; the single profile is set aside.",
+	"میکروفن: گفتن به‌جای نوشتن": "Microphone: speak instead of typing",
+	"نام": "Name",
+	"نام (انگلیسی)": "Name (English)",
+	"نام هدر یا پارامتر احراز": "Auth header or parameter name",
+	"نام پروفایل": "Profile name",
+	"نوع اتصال": "Connection type",
+	"هاب روشن است": "The hub is on",
+	"هدرها": "Headers",
+	"هدرهای سفارشی": "Custom headers",
+	"هر خط یک هدر: نام: مقدار": "One header per line: name: value",
+	"هرچه که در فهرست‌ها می‌خواهی ببینی — مثلاً «OpenRouter حساب اصلی».": "Whatever you want to see in the lists — e.g. “OpenRouter main account”.",
+	"همهٔ مدل‌های روشن": "Every enabled model",
+	"همین راهنما (وقتی کادر خالی است)": "This help (when the box is empty)",
+	"همین متن به مدل نشان داده می‌شود تا بداند کِی صدایش بزند.": "This text is shown to the model so it knows when to call it.",
+	"هنوز چک‌پوینتی ساخته نشده.": "No checkpoint has been made yet.",
+	"هیچ‌کدام انتخاب نشود یعنی همهٔ ابزارها.": "Selecting none means every tool.",
+	"وصله روی خود اتصال می‌نشیند و دفعهٔ بعد پیش از اولین تلاش اعمال می‌شود.": "The patch lands on the connection itself and is applied before the next first attempt.",
+	"وصلهٔ ثبت‌شده": "Recorded patch",
+	"ویرایش آخرین پیام (وقتی کادر خالی است)": "Edit the last message (when the box is empty)",
+	"پارامترها": "Parameters",
+	"پالت فرمان": "Command palette",
+	"پرامپت سیستمی": "System prompt",
+	"چرخش حالت: پلن → عادی → خودکار": "Cycle mode: plan → normal → automatic",
+	"کد را مرور می‌کند و ایراد می‌گیرد": "Reviews the code and points out problems",
+	"کشف مدل‌ها": "Discover models",
+	"کلید API": "API key",
+	"کلید در فایل تنظیمات محلی ذخیره می‌شود؛ به جایی فرستاده نمی‌شود.": "The key is stored in the local config file; it goes nowhere else.",
+	"گرفتن فهرست مدل‌ها": "Fetch the model list",
+	"— پیش‌فرض —": "— default —",
+	"اشاره به فایل": "Mention a file",
+	"هنوز کاری ثبت نشده.": "No task recorded yet.",
+	"شل پس‌زمینه‌ای در کار نیست.": "No background shell is running.",
+	"در حال اجرا": "Running",
+	"تمام شده": "Finished",
+	"خروجی": "Output",
+	"(خروجی خالی)": "(no output)",
+	"بازگشت به این نقطه": "Rewind to this point",
+	"انجام شد": "Done",
+	"در حال انجام": "In progress",
+	"در نوبت": "Queued",
+	"فهرست کاری که عامل برای خودش می‌نویسد؛ با پیشرفت کار به‌روز می‌شود.": "The task list the agent writes for itself; it updates as the work moves.",
+	"فرمان‌هایی که در پس‌زمینه اجرا شده‌اند. خروجی هرکدام را می‌شود خواند و اجرای در حال کار را بست.": "Commands that ran in the background. You can read each one’s output and stop what is still running.",
+	"پیش از هر تغییر فایل، یک نقطهٔ بازگشت ساخته می‌شود. از همین‌جا می‌شود به هرکدام برگشت.": "Before every file change a rewind point is made. You can return to any of them from here.",
+
+	"اسکیل": "Skill",
+	"هوک": "Hook",
+	"مدل": "Model",
+	"روشن": "on",
+	"منبع": "Source",
+	"قاعده": "rule",
+	"بدون ابزار": "no tools",
+	"نوبت": "rounds",
+	"هم‌زمانی": "Concurrency",
+
+	// برچسب‌هایی که سرور می‌فرستد (راهبردها و دسته‌های هاب)
+	"ارزان‌ترین": "Cheapest",
+	"استدلال بلند": "Long reasoning",
+	"بدون احراز": "No auth",
+	"بینایی": "Vision",
+	"تحلیل داده": "Data analysis",
+	"ترجمه": "Translation",
+	"خلاصه‌سازی ارزان": "Cheap summarising",
+	"خودکار (امتیازدهی زنده)": "Automatic (live scoring)",
+	"دو انتخاب تصادفی": "Two random picks",
+	"سریع‌ترین": "Fastest",
+	"عمومی": "General",
+	"عیب‌یابی": "Debugging",
+	"متن فارسی": "Persian text",
+	"نوبتی": "Round-robin",
+	"هدر دلخواه": "Custom header",
+	"وزنی": "Weighted",
+	"پارامتر آدرس": "Query parameter",
+	"پاسخ به مشتری": "Customer reply",
+	"پرکردن اولی": "Fill the first",
+	"کدنویسی": "Coding",
+	"کم‌کارترین": "Least busy",
+	"اولین سالم": "First healthy",
 
 	// ── پنل‌ها و منوهای عمیق (جاروی زنده اینها را می‌گیرد) ──────────────
 	'هوشا': 'Hoosha',
@@ -465,6 +601,25 @@ const PATTERNS = [
 	[ /^اسکیل: (\d+) · دستور: (\d+) · MCP$/, 'Skills: $1 · Commands: $2 · MCP' ],
 	[ /^مارکت‌پلیس: (.+)$/, 'Marketplace: $1' ],
 	[ /^مثلاً: (.+)$/, 'For example: $1' ],
+	[ /^ورودی (.+)$/, 'input $1' ],
+	[ /^خروجی (.+)$/, 'output $1' ],
+	[ /^اولویت (.+)$/, 'priority $1' ],
+	[ /^هم‌زمانی (.+)$/, 'concurrency $1' ],
+	[ /^(\d+) موفق$/, '$1 ok' ],
+	[ /^(\d+) ناموفق$/, '$1 failed' ],
+	[ /^نرخ (.+)$/, 'rate $1' ],
+	[ /^امروز (.+)$/, 'today $1' ],
+	[ /^از (.+)$/, 'from $1' ],
+	[ /^(.+) بار جواب داد$/, 'answered $1 times' ],
+	[ /^«(.*)» نصب شد\.$/, '“$1” installed.' ],
+	[ /^«(.*)» حذف شد\.$/, '“$1” removed.' ],
+
+	[ /^(\d+) از (\d+) روشن$/, '$1 of $2 on' ],
+	[ /^(\d+) مدل$/, '$1 models' ],
+	[ /^(\d+) روشن$/, '$1 on' ],
+	[ /^(\d+) نوبت$/, '$1 rounds' ],
+	[ /^\((\d+) نوبت\)$/, '($1 rounds)' ],
+
 	[ /^(\d+) پاسخ در کش$/, '$1 cached replies' ],
 	[ /^(\d+) اصابت$/, '$1 hits' ],
 	[ /^(\d+) خطا$/, '$1 errors' ],
@@ -505,14 +660,12 @@ function core( text, dict ) {
 		return hit;
 	}
 
-	const ascii = text.replace( FA_DIGITS, toAsciiDigit );
-	for ( const [ re, into ] of PATTERNS ) {
-		if ( re.test( ascii ) ) {
-			return ascii.replace( re, into );
-		}
-	}
-
-	// «الف · ب · ج» — هر تکه یک جملهٔ مستقل است.
+	/*
+	 * اول شکستن، بعد الگو.
+	 *
+	 * برعکسش یک بار دردسر شد: الگوی `^ورودی (.+)$` کل رشتهٔ «ورودی … · خروجی … » را
+	 * می‌بلعید و بقیهٔ تکه‌ها ترجمه‌نشده می‌ماندند.
+	 */
 	for ( const sep of SPLITS ) {
 		if ( ! text.includes( sep ) ) {
 			continue;
@@ -523,12 +676,43 @@ function core( text, dict ) {
 		}
 	}
 
+	/*
+	 * برای الگوها، رقم و نشانه‌گذاری را لاتین می‌کنیم ولی نیم‌فاصله را دست نمی‌زنیم —
+	 * خودِ الگوها نیم‌فاصله دارند. (`نرخ NaN٪` یک بار همین‌جا از تور در رفت: خروجی الگو
+	 * هنوز `٪` داشت و «فارسی» شمرده می‌شد.)
+	 */
+	const ascii = text.replace( FA_DIGITS, toAsciiDigit ).replace( /٪/g, '%' ).replace( /٫/g, '.' );
+	for ( const [ re, into ] of PATTERNS ) {
+		if ( ! re.test( ascii ) ) {
+			continue;
+		}
+		const out = ascii.replace( re, into );
+		// اگر باز هم فارسی ماند، این الگو جواب نبوده — سراغ بعدی.
+		if ( ! FA_CHAR.test( out ) ) {
+			return out;
+		}
+	}
+
+	// «+ چیزی» — دکمه‌های افزودن. علامت می‌ماند، بقیه ترجمه می‌شود.
+	const plus = text.match( /^\+\s*(.+)$/ );
+	if ( plus ) {
+		const rest = core( plus[ 1 ], dict );
+		if ( ! FA_CHAR.test( rest ) ) {
+			return `+ ${ rest }`;
+		}
+	}
+
 	// «برچسب: مقدار» — فقط برچسب ترجمه می‌شود، مقدار دست‌نخورده می‌ماند.
 	const colon = text.match( /^([^:]{1,40}):\s*(.+)$/ );
 	if ( colon ) {
-		const label = dict[ colon[ 1 ].trim() ];
+		const head = colon[ 1 ].trim();
+		// برچسب یا ترجمه دارد، یا اصلاً فارسی نیست (مثل نام مدل) — در هر دو حالت می‌ماند.
+		const label = dict[ head ] || ( ! FA_CHAR.test( head ) ? head : '' );
 		if ( label ) {
-			return `${ label }: ${ core( colon[ 2 ].trim(), dict ) }`;
+			const value = core( colon[ 2 ].trim(), dict );
+			if ( ! FA_CHAR.test( value ) ) {
+				return `${ label }: ${ value }`;
+			}
 		}
 	}
 

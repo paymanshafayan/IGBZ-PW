@@ -12,6 +12,7 @@ import { $, h, toast } from './lib/dom.js';
 import { api, post, getState, refreshState } from './lib/api.js';
 import { showWorking, hideWorking } from './thread.js';
 import { speechSupported, startDictation, speak, stopSpeaking, isSpeaking } from './lib/voice.js';
+import { iconSvg } from './lib/icons.js';
 
 const MODES = [ 'plan', 'default', 'auto' ];
 const MODE_LABEL = { plan: 'پلن', default: 'عادی', auto: 'خودکار' };
@@ -255,11 +256,11 @@ function paintQueue() {
 	queue.forEach( ( q, i ) => {
 		box.appendChild(
 			h( 'div', { class: 'queued' }, [
-				h( 'span', { text: '⏱' } ),
+				h( 'span', { html: iconSvg( 'clock', 13 ) } ),
 				h( 'span', { class: 'q-text', text: q.text || `${ q.images.length } تصویر` } ),
 				h( 'button', {
 					class: 'btn icon sm quiet',
-					text: '×',
+					html: iconSvg( 'times', 13 ),
 					onClick: () => {
 						queue.splice( i, 1 );
 						paintQueue();
@@ -316,7 +317,7 @@ function paintAttachments() {
 				h( 'button', {
 					class: 'btn icon sm quiet',
 					type: 'button',
-					text: '×',
+					html: iconSvg( 'times', 13 ),
 					onClick: () => {
 						attachments.splice( i, 1 );
 						paintAttachments();
@@ -331,10 +332,10 @@ function paintAttachments() {
 
 function menuItem( ico, label, desc, onClick, checked ) {
 	return h( 'div', { class: 'btn quiet row menu-item', onClick }, [
-		h( 'span', { class: 'm-ico', text: ico } ),
+		h( 'span', { class: 'm-ico', html: iconSvg( ico, 16 ) } ),
 		h( 'b', { text: label } ),
 		desc ? h( 'span', { class: 'm-desc', text: desc } ) : null,
-		checked ? h( 'span', { class: 'm-check', text: '✓' } ) : null,
+		checked ? h( 'span', { class: 'm-check', html: iconSvg( 'check', 13 ) } ) : null,
 	] );
 }
 
@@ -355,20 +356,20 @@ function togglePlusMenu() {
 
 	// ترتیب و گروه‌بندی از روی تصویر منوی «+» در Claude است؛ چهار قلم اول همان‌هاست.
 	box.replaceChildren(
-		menuItem( '⎙', 'افزودن فایل یا تصویر', 'Ctrl+U — یا فقط بچسبان', () => {
+		menuItem( 'camera', 'افزودن فایل یا تصویر', 'Ctrl+U — یا فقط بچسبان', () => {
 			close();
 			$( '#file-input' ).click();
 		} ),
-		menuItem( '@', 'اشاره به فایل پروژه', 'جستجوی فازی', () => {
+		menuItem( 'at', 'اشاره به فایل پروژه', 'جستجوی فازی', () => {
 			close();
 			insertAtCursor( '@' );
 			refreshMenu();
 		} ),
-		menuItem( '▤', 'پروژه', shortPath( s?.config?.workspace ), go( 'workspace' ) ),
-		menuItem( '◆', 'اسکیل‌ها', `${ ( s?.skills || [] ).length } نصب‌شده`, go( 'skills' ) ),
-		menuItem( '⇄', 'کانکتورها', `${ ( s?.connectors || [] ).length } تعریف‌شده`, go( 'connectors' ) ),
-		menuItem( '⚒', 'ابزارها', `${ ( s?.tools || [] ).length } در دسترس`, go( 'tools' ) ),
-		menuItem( '⌗', 'زیرعامل‌ها', `${ ( s?.agents || [] ).length } تعریف‌شده`, go( 'agents' ) ),
+		menuItem( 'projects', 'پروژه', shortPath( s?.config?.workspace ), go( 'workspace' ) ),
+		menuItem( 'skills', 'اسکیل‌ها', `${ ( s?.skills || [] ).length } نصب‌شده`, go( 'skills' ) ),
+		menuItem( 'connectors', 'کانکتورها', `${ ( s?.connectors || [] ).length } تعریف‌شده`, go( 'connectors' ) ),
+		menuItem( 'tools', 'ابزارها', `${ ( s?.tools || [] ).length } در دسترس`, go( 'tools' ) ),
+		menuItem( 'subagents', 'زیرعامل‌ها', `${ ( s?.agents || [] ).length } تعریف‌شده`, go( 'agents' ) ),
 		h( 'div', { class: 'menu-sep' } ),
 		h( 'div', { class: 'menu-label', text: 'حالت کار' } ),
 		...MODES.map( ( m ) =>
@@ -444,7 +445,7 @@ async function toggleModelMenu() {
 
 	box.appendChild( h( 'div', { class: 'menu-sep' } ) );
 	box.appendChild(
-		menuItem( '⚙', 'تنظیمات پرووایدر', 'کلید، آدرس، پروفایل‌ها', () => {
+		menuItem( 'settings', 'تنظیمات پرووایدر', 'کلید، آدرس، پروفایل‌ها', () => {
 			box.hidden = true;
 			document.dispatchEvent( new CustomEvent( 'hoosha:settings', { detail: 'provider' } ) );
 		} )

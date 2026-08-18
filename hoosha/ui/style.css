@@ -64,8 +64,16 @@
 	 * غریب می‌نشیند؛ و برعکسش بدتر است. پس با `data-lang` عوض می‌شود.
 	 */
 	--sans: 'Vazirmatn', 'Segoe UI', Tahoma, -apple-system, BlinkMacSystemFont, sans-serif;
-	--serif: 'Lora', 'Noto Naskh Arabic', 'Times New Roman', Georgia, 'Vazirmatn', serif;
-	--mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, Menlo, monospace;
+	/*
+	 * در فارسی، «سریف» هم وزیرمتن است.
+	 *
+	 * قبلاً Lora اول صف بود و چون حرف فارسی ندارد، تیترها به فونت پیش‌فرض ویندوز
+	 * (Times New Roman) می‌افتادند — همان چیزی که کارفرما دید: «برخی متن‌های فارسی از
+	 * وزیر استفاده نمی‌کنند». همین قاعده برای مونو هم هست: حرف فارسیِ داخل یک قالب
+	 * مونو باید باز هم وزیرمتن باشد، نه فونت جانشینِ سیستم.
+	 */
+	--serif: 'Vazirmatn', 'Noto Naskh Arabic', Georgia, serif;
+	--mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, Menlo, 'Vazirmatn', monospace;
 	--sidebar-w: 280px;
 	/* عرض ریل وقتی نوار کناری جمع می‌شود — آیکون‌ها می‌مانند. */
 	--rail-w: 56px;
@@ -236,6 +244,7 @@ html[data-theme='dark'] {
 html[data-lang='en'] {
 	--sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 	--serif: 'Lora', Georgia, 'Times New Roman', serif;
+	--mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, Menlo, monospace;
 }
 
 * {
@@ -442,13 +451,17 @@ textarea {
 	padding-inline: 16px;
 }
 
+/*
+ * خوش‌آمد گفتگوی تازه: نشان بزرگ، یک تیتر و یک زیرنویس — و تا اولین پیام کاربر
+ * سر جایش می‌ماند.
+ */
 .welcome {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
 	justify-content: center;
 	min-height: 0;
-	gap: 22px;
+	gap: 14px;
 	padding-bottom: 8px;
 	animation: rise 0.5s var(--ease);
 }
@@ -479,16 +492,19 @@ textarea {
 	}
 }
 .greet {
-	display: flex;
-	align-items: center;
-	gap: 12px;
 	font-family: var(--serif);
-	font-size: clamp(2.5rem, 4vw, 3.25rem);
+	font-size: clamp(1.9rem, 3vw, 2.5rem);
 	font-weight: 400;
-	line-height: 1.35;
+	line-height: 1.4;
 	letter-spacing: -0.01em;
+	margin: 0;
 	text-align: center;
-	margin-bottom: 32px;
+}
+.greet-sub {
+	margin: 0;
+	color: var(--muted-foreground);
+	font-size: 1rem;
+	text-align: center;
 }
 .greet-mark {
 	display: inline-flex;
