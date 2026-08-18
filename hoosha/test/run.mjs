@@ -5440,12 +5440,35 @@ await test( 'دستگیرهٔ کلید در حالت روشن ناپدید نم�
 } );
 
 await test( 'خوش‌آمد وسط می‌ماند و از بالای صفحه بیرون نمی‌زند', () => {
-	// روی نمایشگر کوتاه، `flex: 0 0 auto` باعث می‌شد بالای پیام بیرون بزند و اسکرول هم نبود.
+	// ریشهٔ بیرون‌زدگی (بار چهارم) دو چیز بود:
+	//   ۱) `justify-content: center` روی ستونی که از ظرفش بلندتر است، نیمی از سرریز را
+	//      «بالای مبدأ» می‌فرستد — جایی که اسکرول به دست نمی‌رسد. مرکز‌چینیِ امن با
+	//      مارجینِ auto است: جا که نبود، مارجین‌ها صفر می‌شوند و گروه از بالا می‌چسبد.
+	//   ۲) فرزندان `.composer-wrap` با چیدمان بلاکِ ضمنی، پس از جهش‌های DOMِ رانتایم
+	//      حفرهٔ نامرئی (~۵۰۰px) می‌گرفتند و کل ستون را متورم می‌کردند؛ ستونِ flex صریح
+	//      این مسیر را کلاً می‌بندد (با بازسازی گره‌ها هم آزموده شد).
+	const empty = cssBlock( '.view-chat.empty' );
+	assert.equal( /justify-content:\s*center/.test( empty ), false, 'center روی ستون سرریزشده، تلهٔ قدیمی است' );
+	assert.match( empty, /overflow-y:\s*auto/, 'خودِ نمای خالی باید مرجع اسکرول نهایی باشد' );
+
+	const slot = cssBlock( '.view-chat.empty .welcome-slot' );
+	assert.match( slot, /margin-block-start:\s*auto/, 'نیمهٔ بالایی مرکز‌چینیِ امن' );
+	assert.match( slot, /flex:\s*0 0 auto/, 'در حالت خالی ظرف خوش‌آمد جمع نمی‌شود؛ کل گروه اسکرول می‌گیرد' );
+
+	const wrapEmpty = cssBlock( '.view-chat.empty .composer-wrap' );
+	assert.match( wrapEmpty, /margin-block-end:\s*auto/, 'نیمهٔ پایینی مرکز‌چینیِ امن' );
+	assert.match( wrapEmpty, /margin-top:\s*50px/, 'خواستهٔ کارفرما: ~۵۰px پایین‌تر از خوش‌آمد' );
+
+	const welcome = cssBlock( '.welcome' );
+	assert.equal( /justify-content:\s*center/.test( welcome ), false, 'مرکزِ محتوای بلندتر از ظرف، بالای مبدأ می‌ریخت' );
+
+	const wrap = cssBlock( '.composer-wrap' );
+	assert.match( wrap, /display:\s*flex/, 'سپر باگ چیدمان: ستونِ flex صریح' );
+	assert.match( wrap, /flex-direction:\s*column/ );
+
 	const thread = cssBlock( '.view-chat.empty .thread' );
-	assert.match( thread, /flex:\s*0 1 auto/ );
-	assert.match( thread, /overflow-y:\s*auto/ );
-	assert.match( thread, /min-height:\s*0/ );
-	assert.match( cssBlock( '.view-chat.empty' ), /justify-content:\s*center/ );
+	assert.match( thread, /flex:\s*0 0 0/, 'رشتهٔ خالی صفر فضا می‌گیرد' );
+	assert.match( thread, /overflow:\s*hidden/, 'و چیزی از آن بیرون نمی‌ریزد' );
 } );
 
 await test( 'سندباکس پیش‌فرض روشن است و بدون اجازه روی پروژه نمی‌افتد', async () => {
