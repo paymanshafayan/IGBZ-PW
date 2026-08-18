@@ -32,11 +32,12 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 ### Standing constraints
 
 - **The user writes in Persian. Reply in Persian.**
-- **No change without an approved plan.** The client must see a written plan and approve it
-  explicitly before *any* file in this repository is touched — code, docs, settings, commits,
-  pushes, PRs. Work that changes nothing (reading, checking, reporting, answering questions) is
-  free. This rule itself was stored at the client's request; its storage is the only pre-approved
-  change.
+- **Approval before starting any change.** The client must explicitly approve before work
+  *starts* on any change to this repository — code, docs, settings, however small. Present what
+  you intend to change and wait for the go-ahead. Work that changes nothing (reading, checking,
+  reporting, testing, answering questions) is free. **Committing, pushing and opening PRs after
+  an approved change is free** and needs no separate approval (client's clarification,
+  2026-08-18 / ۱۴۰۵/۰۵/۲۷; the original ۱۴۰۵/۰۵/۲۴ wording also gated commits and pushes).
 - **Never modify the `IGBZ-NopCommerce` project.** It was a read-only review, and that review is
   finished (`REVIEW-IGBZ-NopCommerce.md`).
 - Tenancy is **single-site with `tenant_id` columns**. Not WordPress Multisite.
