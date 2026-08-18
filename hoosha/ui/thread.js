@@ -265,6 +265,19 @@ export function addNotice( text ) {
  *
  * @returns {HTMLElement & { _body: HTMLElement }}
  */
+/**
+ * بستنِ بلوک استدلال.
+ *
+ * قبلاً فقط کلاس `done` می‌گرفت و تا رفرش صفحه سر جایش می‌ماند — شکایت کارفرما. متن
+ * استدلال چیزی نیست که بعد از رسیدنِ جواب به درد بخورد.
+ */
+export function dropThinking() {
+	if ( thinkEl ) {
+		thinkEl.remove();
+		thinkEl = null;
+	}
+}
+
 export function thinkingBlock() {
 	const body = h( 'div', { class: 'thinking-body' } );
 	const head = h( 'div', { class: 'thinking-head' }, [
@@ -714,6 +727,8 @@ export function handleEvent( ev ) {
 				thinkEl = thinkingBlock();
 			}
 			thinkEl._body.textContent += ev.text;
+			// همیشه آخرین خط‌ها دیده شوند؛ بالایی‌ها از کادر بیرون می‌روند.
+			thinkEl._body.scrollTop = thinkEl._body.scrollHeight;
 			if ( atBottom() ) {
 				scrollToEnd();
 			}
@@ -726,6 +741,8 @@ export function handleEvent( ev ) {
 
 		case 'text': {
 			hideWorking();
+			// استدلال، داربستِ ساختنِ جواب است؛ با آمدن خودِ جواب، جمع می‌شود.
+			dropThinking();
 			if ( ! streamEl ) {
 				streamEl = addMessage( 'assistant', '' );
 				streamEl._raw = '';
@@ -745,12 +762,8 @@ export function handleEvent( ev ) {
 				streamEl.closest( '.msg' )?.remove();
 			}
 			streamEl = null;
-			if ( thinkEl ) {
-				thinkEl.classList.add( 'done' );
-				thinkEl.querySelector( 'b' ).textContent = 'فکر کرد';
-				thinkEl.querySelector( '.spin' )?.remove();
-				thinkEl = null;
-			}
+			// اگر نوبت بدون متن تمام شد (مثلاً فقط ابزار)، باز هم چیزی نمی‌ماند.
+			dropThinking();
 			break;
 
 		case 'system':

@@ -750,17 +750,26 @@ code .f {
 		transform: rotate(360deg);
 	}
 }
-.thinking.done .thinking-head {
-	color: var(--muted-foreground);
-}
+/*
+ * متن استدلال: پنجره‌ای پنج‌خطی که خطِ تازه از پایین می‌آید و خطِ بالایی از کادر
+ * بیرون می‌رود.
+ *
+ * `max-height` دقیقاً پنج برابر `line-height` است تا عدد از هوا نیامده باشد، و
+ * ماسکِ ۱۰ پیکسلیِ بالا باعث می‌شود خط‌ها موقع رسیدن به سقف محو شوند نه اینکه وسط
+ * حرف قیچی شوند. (ماسک را به‌جای یک لایهٔ سفید گذاشتم چون در تم تیره، سفید همان‌جا
+ * یک نوار روشنِ زشت می‌شد.)
+ */
 .thinking-body {
 	margin: 6px 0 0;
 	white-space: pre-wrap;
 	color: var(--muted-foreground);
 	font-size: 0.85rem;
-	max-height: 300px;
-	overflow: auto;
 	font-family: var(--serif);
+	line-height: 1.6;
+	max-height: 8em;
+	overflow: hidden;
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
+	mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
 }
 
 /* ═══════════════════════════════════════════════ کارت‌های ابزار */

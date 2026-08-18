@@ -4952,6 +4952,62 @@ await test( 'در پهنای کم، نوار کناری واقعاً می‌تو
 	assert.equal( /sidebar-open/.test( css.replace( /\/\*[\s\S]*?\*\//g, '' ) ), false, 'کلاس مردهٔ sidebar-open نباید برگردد' );
 } );
 
+await test( 'کادر استدلال پنج‌خطی است، بالایش محو می‌شود و آخرین خط‌ها را نشان می‌دهد', () => {
+	const body = cssBlock( '.thinking-body' );
+	// پنج خط، نه یک عدد دلبخواه: ۵ × line-height.
+	assert.match( body, /line-height:\s*1\.6/ );
+	assert.match( body, /max-height:\s*8em/ );
+	assert.match( body, /overflow:\s*hidden/ );
+	assert.equal( /max-height:\s*300px/.test( body ), false, 'سقف قدیمی ۳۰۰ پیکسل باید رفته باشد' );
+
+	// محوشدن ۱۰ پیکسلی بالای کادر.
+	// تلهٔ آشنا: `-webkit-mask-image` هم با /mask-image:/ جور درمی‌آید، پس مرز لازم است.
+	assert.match( body, /[\s;]mask-image:\s*linear-gradient\(to bottom, transparent 0, #000 10px\)/ );
+	assert.match( body, /-webkit-mask-image:\s*linear-gradient\(to bottom, transparent 0, #000 10px\)/, 'برای وبکیت هم لازم است' );
+
+	// و در جاوااسکریپت، هر خط تازه کادر را به آخر می‌برد.
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.match( thread, /_body\.scrollTop = thinkEl\._body\.scrollHeight/ );
+} );
+
+await test( 'کادر استدلال با آمدن جواب پاک می‌شود، نه اینکه تا رفرش بماند', async () => {
+	/*
+	 * شکایت کارفرما: «الان تا زمان رفرش صفحه روی صفحهٔ چت می‌ماند.» پس این تست خودِ
+	 * جریان رویداد را اجرا می‌کند: شروع پاسخ ← استدلال ← متن.
+	 */
+	const { dom } = await bootApp();
+	try {
+		const thread = await import( '../ui/thread.js' );
+		thread.handleEvent( { type: 'assistant_start' } );
+		thread.handleEvent( { type: 'thinking', text: 'خط اول\nخط دوم\n' } );
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+
+		const box = document.querySelector( '.thinking' );
+		assert.ok( box, 'کادر استدلال ساخته نشد' );
+		assert.match( document.querySelector( '.thinking-body' ).textContent, /خط دوم/ );
+		assert.ok( document.querySelector( '.thinking-body' ).scrollTop > 0, 'کادر باید به آخرین خط اسکرول شود' );
+
+		thread.handleEvent( { type: 'text', text: 'جواب مدل' } );
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+		assert.equal( document.querySelector( '.thinking' ), null, 'کادر استدلال باید قبل از نمایش جواب برود' );
+		assert.match( document.body.textContent, /جواب مدل/ );
+
+		// و اگر نوبتی بدون هیچ متنی تمام شود، باز هم چیزی جا نمی‌ماند.
+		thread.handleEvent( { type: 'thinking', text: 'دوباره فکر' } );
+		await new Promise( ( r ) => setTimeout( r, 30 ) );
+		assert.ok( document.querySelector( '.thinking' ), 'کادر تازه باید ساخته شود' );
+		thread.handleEvent( { type: 'assistant_end' } );
+		await new Promise( ( r ) => setTimeout( r, 30 ) );
+		assert.equal( document.querySelector( '.thinking' ), null, 'پایان نوبت هم باید کادر را ببرد' );
+
+		// و کلاس مردهٔ done پشت سرش نماند.
+		assert.equal( /thinking\.done|classList\.add\( 'done' \)/.test( fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' ) ), false );
+		assert.equal( /\.thinking\.done/.test( css ), false, 'قاعدهٔ .thinking.done دیگر به چیزی نمی‌خورد' );
+	} finally {
+		dom.restore();
+	}
+} );
+
 await test( 'بلوک استدلال واقعاً وجود دارد — thinkingBlock دیگر تعریف‌نشده نیست', () => {
 	// باگ واقعی: thread.js این را صدا می‌زد و هیچ‌جا تعریف نشده بود؛ هر رویداد thinking
 	// یک ReferenceError می‌داد و ادامهٔ رندرِ همان پاسخ می‌ایستاد.
