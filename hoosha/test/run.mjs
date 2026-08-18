@@ -15,13 +15,36 @@ import path from 'node:path';
 import http from 'node:http';
 
 let passed = 0;
+let skipped = 0;
 const failures = [];
+
+/*
+ * اجرای بخشی از سوئیت، حین کار:
+ *
+ *     node test/run.mjs --only رابط
+ *     node test/run.mjs --only 'دکمه|آیکون'
+ *
+ * الگو هم با نام بخش جور می‌شود هم با نام تست. بدون این پرچم، همه‌چیز اجرا می‌شود —
+ * و پیش از هر کامیت همین حالتِ کامل است که ملاک است. این پرچم برای **حلقهٔ کار** است،
+ * نه برای تحویل: سوئیتِ نصفه‌اجراشده هیچ چیزی را تأیید نمی‌کند.
+ */
+const onlyArg = ( () => {
+	const i = process.argv.indexOf( '--only' );
+	const inline = process.argv.find( ( a ) => a.startsWith( '--only=' ) );
+	return i > -1 ? process.argv[ i + 1 ] : inline ? inline.slice( 7 ) : '';
+} )();
+const ONLY = onlyArg ? new RegExp( onlyArg, 'i' ) : null;
+let currentSection = '';
 
 /**
  * @param {string} name
  * @param {() => any} fn
  */
 async function test( name, fn ) {
+	if ( ONLY && ! ONLY.test( name ) && ! ONLY.test( currentSection ) ) {
+		skipped++;
+		return;
+	}
 	try {
 		await fn();
 		passed++;
@@ -33,6 +56,10 @@ async function test( name, fn ) {
 }
 
 function section( title ) {
+	currentSection = title;
+	if ( ONLY && ! ONLY.test( title ) ) {
+		return;
+	}
 	process.stdout.write( `\n${ title }\n` );
 }
 
@@ -5601,4 +5628,13 @@ if ( failures.length ) {
 	}
 	process.exit( 1 );
 }
-process.stdout.write( `${ passed } تست، همه موفق\n` );
+process.stdout.write( `${ passed } تست، همه موفق${ skipped ? ` (${ skipped } رد شد — با --only اجرا شد)` : '' }\n` );
+
+/*
+ * صریح خارج شو.
+ *
+ * چند تست سرور موقتی و تایمر باز می‌کنند و بستنشان دستِ تستِ بعدی است؛ وقتی با `--only`
+ * بخشی اجرا شود، آن تستِ بعدی رد می‌شود و پروسه بعد از چاپ گزارش، بی‌صدا معطل می‌ماند.
+ * گزارش که چاپ شد، کار تمام است.
+ */
+process.exit( 0 );
