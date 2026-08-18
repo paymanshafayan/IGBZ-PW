@@ -96,6 +96,64 @@ final class Activator {
 		if ( $from > 0 && $from < 16 ) {
 			self::migrate_to_v16();
 		}
+		if ( $from > 0 && $from < 17 ) {
+			self::migrate_to_v17();
+		}
+	}
+
+	/**
+	 * v17: the ratified VIP expiry policy, and the table behind the save button.
+	 *
+	 * The client settled the three questions that had been open since the channel shipped: the
+	 * window is set centrally by the IGBZ senior admin, it is a week by default, and when it runs
+	 * out the content really leaves the server. Two stored settings contradicted that ruling on
+	 * every install made before it, so they are corrected here rather than only in the defaults —
+	 * seed_defaults() fills gaps, it does not overwrite a value that already exists.
+	 *
+	 * The two keys are treated differently on purpose:
+	 *
+	 *   - `vip.default_expiry_days` is only rewritten when it is zero or less. Zero means "keep
+	 *     posts forever", which the ruling forbids; a positive number is a window somebody chose
+	 *     deliberately, and the ruling is about who owns the setting, not about erasing their
+	 *     choice.
+	 *   - `vip.default_expiry_action` is forced to `delete`. `hide` is no longer a policy the
+	 *     product offers — the promise made to the customer on the purchase page is that the post
+	 *     leaves the server — so leaving an install on `hide` would make that promise false.
+	 *
+	 * Existing rows are then brought in line: every post still carrying `hide` is switched, and a
+	 * published post with no expiry at all gets one counted from its own publish time. That
+	 * back-fill is written as a read plus per-row updates because a correlated UPDATE does not
+	 * survive the SQLite translator on Playground installs.
+	 */
+	private static function migrate_to_v17(): void {
+		$settings = new Settings();
+
+		if ( $settings->int( 'vip.default_expiry_days', 0 ) <= 0 ) {
+			$settings->set( 'vip.default_expiry_days', 7 );
+		}
+		$settings->set( 'vip.default_expiry_action', 'delete' );
+
+		$db    = new Db();
+		$posts = $db->table( 'vip_posts' );
+
+		$db->query( "UPDATE {$posts} SET expiry_action = %s WHERE expiry_action <> %s", 'delete', 'delete' );
+
+		$days = max( 1, $settings->int( 'vip.default_expiry_days', 7 ) );
+		$rows = $db->results(
+			"SELECT id, published_at FROM {$posts} WHERE status = %s AND expires_at IS NULL LIMIT 500",
+			'published'
+		);
+
+		foreach ( $rows as $row ) {
+			$base = (string) ( $row['published_at'] ?? '' );
+			$from = '' === $base ? time() : (int) strtotime( $base . ' UTC' );
+
+			$db->update(
+				'vip_posts',
+				[ 'expires_at' => gmdate( 'Y-m-d H:i:s', $from + ( $days * DAY_IN_SECONDS ) ) ],
+				[ 'id' => (int) $row['id'] ]
+			);
+		}
 	}
 
 	/**
@@ -603,10 +661,11 @@ final class Activator {
 			'lms.revoke_on_refund'          => true,
 			'vip.enabled'                   => true,
 			'vip.feed_page_size'            => 12,
-			'vip.default_expiry_days'       => 0,
-			'vip.default_expiry_action'     => 'hide',
+			'vip.default_expiry_days'       => 7,
+			'vip.default_expiry_action'     => 'delete',
 			'vip.purge_media_on_expiry'     => true,
 			'vip.media_link_ttl'            => 900,
+			'vip.offline_link_ttl'          => 3600,
 			'vip.comments_enabled'          => true,
 			'vip.comment_max_length'        => 1000,
 			'vip.comment_rate_seconds'      => 15,

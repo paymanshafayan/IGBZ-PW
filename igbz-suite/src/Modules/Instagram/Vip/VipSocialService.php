@@ -7,11 +7,15 @@ use IGBZ\Suite\Support\Settings;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * The Instagram social layer: likes, comments, replies and view counts.
+ * The Instagram social layer: likes, saves, comments, replies and view counts.
  *
  * Counts are denormalised onto vip_posts. A feed page renders three counts per post, and computing
  * them with COUNT(*) subqueries would make the cheapest screen in the app the most expensive query
  * in the plugin.
+ *
+ * The save is not decoration. VIP posts are removed from the server a week after publication, and
+ * the save — followed by the app pulling the media through the offline endpoint — is the only way
+ * a customer keeps what they paid for. See DESIGN-VIP-EXPIRY.md.
  */
 final class VipSocialService {
 
@@ -92,6 +96,136 @@ final class VipSocialService {
 		$this->db->update( 'vip_posts', [ 'likes_count' => $count ], [ 'id' => $post_id ] );
 
 		return $count;
+	}
+
+	// ------------------------------------------------------------------ saves
+
+	/**
+	 * Toggle the save (bookmark) on a post.
+	 *
+	 * The save exists because a VIP post is deleted from the server a week after it is published:
+	 * the promise made to the customer on the purchase page is that they can keep their own copy,
+	 * and this is the server half of it. A saved row on its own would be worthless once the media
+	 * is purged — the app has to fetch the bytes through /vip/posts/{id}/offline and store them —
+	 * so `offline_at` records that it did, and the app can show which saves are really safe.
+	 *
+	 * Only somebody who may open the post may save it: a bookmark on a locked post would promise
+	 * a copy that can never be fetched.
+	 *
+	 * @return array{saved:bool,offline_at:?string}
+	 * @throws \RuntimeException When the caller is not entitled to the post.
+	 */
+	public function toggle_save( int $post_id, int $user_id ): array {
+		$post = $this->db->row( 'SELECT * FROM ' . $this->db->table( 'vip_posts' ) . ' WHERE id = %d', $post_id );
+		if ( ! $post ) {
+			throw new \RuntimeException( 'igbz_vip_not_found' );
+		}
+
+		if ( ! $this->access->check_row( $user_id, $post )->allowed ) {
+			throw new \RuntimeException( 'igbz_vip_locked' );
+		}
+
+		$existing = $this->db->row(
+			'SELECT id, offline_at FROM ' . $this->db->table( 'vip_post_saves' ) . ' WHERE post_id = %d AND user_id = %d',
+			$post_id,
+			$user_id
+		);
+
+		if ( $existing ) {
+			$this->db->delete( 'vip_post_saves', [ 'id' => (int) $existing['id'] ] );
+
+			do_action( 'igbz_vip_post_saved', $post_id, $user_id, false );
+
+			return [ 'saved' => false, 'offline_at' => null ];
+		}
+
+		$this->db->insert(
+			'vip_post_saves',
+			[
+				'post_id'    => $post_id,
+				'user_id'    => $user_id,
+				'created_at' => current_time( 'mysql', true ),
+			]
+		);
+
+		do_action( 'igbz_vip_post_saved', $post_id, $user_id, true );
+
+		return [ 'saved' => true, 'offline_at' => null ];
+	}
+
+	public function has_saved( int $post_id, int $user_id ): bool {
+		if ( $user_id <= 0 ) {
+			return false;
+		}
+		return (int) $this->db->scalar(
+			'SELECT COUNT(*) FROM ' . $this->db->table( 'vip_post_saves' ) . ' WHERE post_id = %d AND user_id = %d',
+			$post_id,
+			$user_id
+		) > 0;
+	}
+
+	/**
+	 * Record that the app has stored its own copy of this post.
+	 *
+	 * Saving and downloading are two steps, and only the second one survives the purge. Marking
+	 * the moment the bytes were handed over is what lets the app tell the customer which of their
+	 * saved posts will still be there next week.
+	 */
+	public function mark_offline( int $post_id, int $user_id ): void {
+		$now = current_time( 'mysql', true );
+
+		$existing = $this->db->row(
+			'SELECT id FROM ' . $this->db->table( 'vip_post_saves' ) . ' WHERE post_id = %d AND user_id = %d',
+			$post_id,
+			$user_id
+		);
+
+		if ( $existing ) {
+			$this->db->update( 'vip_post_saves', [ 'offline_at' => $now ], [ 'id' => (int) $existing['id'] ] );
+			return;
+		}
+
+		// Downloading implies saving. Asking the customer to tap two buttons to keep one post is
+		// the kind of detail that turns into a support ticket the week the post disappears.
+		$this->db->insert(
+			'vip_post_saves',
+			[
+				'post_id'    => $post_id,
+				'user_id'    => $user_id,
+				'offline_at' => $now,
+				'created_at' => $now,
+			]
+		);
+	}
+
+	/**
+	 * The ids this user has saved, newest first.
+	 *
+	 * @return array<int,int>
+	 */
+	public function saved_post_ids( int $user_id, int $limit = 50, int $offset = 0 ): array {
+		if ( $user_id <= 0 ) {
+			return [];
+		}
+
+		$rows = $this->db->column(
+			'SELECT post_id FROM ' . $this->db->table( 'vip_post_saves' ) . ' WHERE user_id = %d ORDER BY id DESC LIMIT %d OFFSET %d',
+			$user_id,
+			max( 1, min( 100, $limit ) ),
+			max( 0, $offset )
+		);
+
+		return array_map( 'intval', $rows );
+	}
+
+	public function saved_count( int $user_id ): int {
+		if ( $user_id <= 0 ) {
+			return 0;
+		}
+		return (int) $this->db->scalar(
+			'SELECT COUNT(*) FROM ' . $this->db->table( 'vip_post_saves' ) . ' WHERE user_id = %d',
+			$user_id
+		);
 	}
 
 	// --------------------------------------------------------------- comments

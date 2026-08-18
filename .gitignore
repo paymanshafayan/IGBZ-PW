@@ -13,6 +13,7 @@
 !/_devenv/wordpress-*.zip
 !/_devenv/woocommerce-*.zip
 
+
 # Everything the test environment builds from those zips is disposable.
 /_devenv/.work/
 
@@ -32,3 +33,24 @@ Thumbs.db
 .php-cs-fixer.cache
 /phpcs.xml
 /.phpcs.xml
+
+# هوشا — وابستگی‌ها، خروجی ساخت، و محیط دورریختنی
+hoosha/node_modules/
+hoosha/dist/
+hoosha/.work/
+
+# ---------------------------------------------------------------------------
+# _bin/ — باینری‌های آپلودی دستی. این بخش عمداً آخر فایل است: در گیت، آخرین قاعدهٔ
+# منطبق برنده است، پس هیچ قاعدهٔ بالاتری (مثل *.zip) نمی‌تواند اینها را دوباره
+# نادیده بگیرد. دلیل وجودشان در _bin/README.md آمده.
+# ---------------------------------------------------------------------------
+!_bin/
+!_bin/**
+!_bin/*.zip
+!_bin/*.rar
+!_bin/*.7z
+!_bin/*.tar.gz
+!_bin/*.tgz
+!_bin/*.part-*
+!_bin/*.sha256
+!_bin/*.[0-9][0-9][0-9]

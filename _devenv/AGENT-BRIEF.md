@@ -56,7 +56,8 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 ```bash
 bash _devenv/setup.sh     # build (~30s if npm is warm)
 bash _devenv/run.sh       # site on http://127.0.0.1:9400, auto-logged-in as admin
-bash _devenv/test.sh      # 1172 assertions + syntax check on 234 files
+bash _devenv/test.sh      # 1209 assertions + syntax check on 235 files
+bash _devenv/makepot.sh   # rebuild languages/igbz-suite.pot (--check to only report staleness)
 ```
 
 `_devenv/` contains committed WordPress and WooCommerce zips precisely because **`/tmp` is wiped
@@ -120,33 +121,43 @@ which returns early with an admin notice if WooCommerce is absent, then runs
 > **Ordering trap:** anything needed *during activation* must be registered at file-load time, not
 > inside `on_plugins_loaded()`. This is why `Cron::register_schedules()` is called at load time.
 
-**Modules** (`Modules::all()`): `multitenant`, `instagram`, `hub`, `rest_api`. Default enabled:
-`multitenant`. Option: `igbz_enabled_modules`.
+**Modules** (`Modules::all()`): `multitenant`, `instagram`, `hub`, `rest_api`, `fx`. Default
+enabled: `multitenant`. Option: `igbz_enabled_modules`.
 
-**Container ids**
+**Container ids** (the authoritative per-module table is in `igbz-suite/README.md` → *Architecture*)
 - core: `settings, logger, db, http, tenancy`
-- multitenant: `tenants, wallet, plans, bnpl.providers, bnpl, affiliate, lms, payments, otp, marketplace`
+- multitenant: `tenants, wallet, plans, bnpl.providers, bnpl, affiliate, lms, lms.vod, payments,
+  otp, legal.nid, marketplace, marketplace.sync, marketplace.mappings, marketplace.basalam,
+  logistics, logistics.courier, logistics.labels, master.payment, domain, webpresence, seo,
+  translation, translation.adapter, i18n, gamification, gamification.carts`
 - instagram: `ig.prompts, ig.credentials, ig.manus_client, ig.manus, ig.scheduler, ig.insights, ig.manychat, ig.subscribers, ig.funnels`,
+  plus the DM provider switch (`dm.provider = manychat|chatplace`): `ig.dm, ig.dm_manychat, ig.dm_custom`,
   plus the registration flow: `ig.skus, ig.translations, ig.manychat_bridge, ig.intake, ig.publisher, ig.intake_worker, ig.stt, ig.stt_http, ig.stt_manus`,
-  plus the VIP channel: `vip.access, vip.media, vip.posts, vip.social, vip.messages, vip.billing`
+  plus the VIP channel: `vip.access, vip.media, vip.posts, vip.social, vip.messages, vip.billing`,
+  plus phases 8/14: `ai.studio, ai.credits, giveaways`
 - hub: `hub.stats, hub.directory, hub.vip, hub.domains, hub.blocks, hub.signup`
 - rest_api: `api.tokens, api.auth, api.devices, api.google_auth, api.push, api.notifications`
+- fx: `fx.wallet, fx.accounts, fx.rates, fx.meter, fx.topup, fx.billing, fx.payouts, fx.ramp, fx.reports`
 
-**Admin screens** (top-level `igbz`): `igbz`, `igbz-settings`, `igbz-tenants`, `igbz-wallet`,
-`igbz-plans`, `igbz-bnpl`, `igbz-affiliate`, `igbz-courses`, `igbz-payments`, `igbz-ig-accounts`,
-`igbz-ig-intake`, `igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`,
-`igbz-vip`, `igbz-hub`, `igbz-mobile-api`.
+**Admin screens** — 28 of them, all under the top-level `igbz`: `igbz`, `igbz-settings`,
+`igbz-tenants`, `igbz-wallet`, `igbz-plans`, `igbz-bnpl`, `igbz-affiliate`, `igbz-courses`,
+`igbz-payments`, `igbz-master-payment`, `igbz-logistics`, `igbz-marketplaces`, `igbz-seo`,
+`igbz-translator`, `igbz-gamification`, `igbz-domains`, `igbz-fx`, `igbz-ig-accounts`,
+`igbz-ig-content`, `igbz-ig-funnels`, `igbz-ig-subscribers`, `igbz-ig-insights`, `igbz-ig-intake`,
+`igbz-vip`, `igbz-ai-studio`, `igbz-giveaways`, `igbz-hub`, `igbz-mobile-api`.
 
 **REST**: 199 routes across `igbz/v1` (incl. 14 `/intake/*`, 29 `/vip/*`, `/fx/*`, `/courier/*`,
 `/domains/*`, `/master-payment/*`, `/ai/*`) and `igbz-hub/v1`.
 
-**Schema**: 69 tables in `src/Support/Schema.php` (DB version 16; the ladder: v8 `ig_intake`,
+**Schema**: 70 tables in `src/Support/Schema.php` (DB version 17; the ladder: v8 `ig_intake`,
 v10 nine `vip_*` tables, v11 LMS wiring, v12 `ig_content.ig_shortcode` + funnel reward relabel,
 v13 dropped the never-used `jobs` queue, v14 six `fx_*` tables, v15 phases 6–14 tables, v16 the
-master-payment/courier/domain/label/legal completion pass). All carry `tenant_id` except
+master-payment/courier/domain/label/legal completion pass, v17 `vip_post_saves` plus the ratified
+VIP expiry policy). All carry `tenant_id` except
 `tenants`, `tenant_domains`, `tenant_members`, `plans`, `logs`, `lesson_progress`,
-`vip_post_likes`, `vip_post_views`, `fx_rates`, `fx_prices`, `ig_label_group_items`,
-`ig_courier_tracking`, `ig_courier_chat` (whitelist in `tests/SchemaTest.php`). Product/order
+`vip_post_likes`, `vip_post_saves`, `vip_post_views`, `fx_rates`, `fx_prices`,
+`ig_label_group_items`, `ig_courier_tracking`, `ig_courier_chat` (whitelist in
+`tests/SchemaTest.php`). Product/order
 tenant scoping uses the meta key `_igbz_tenant_id`.
 
 **Payments**: WooCommerce payment methods `igbz_wallet`, `igbz_bnpl`, and adapter ids
@@ -209,8 +220,8 @@ Confirmed live on **WP 6.5.5 / WC 9.4.2 / PHP 8.2.32** *and re-confirmed on* **W
 / PHP 8.3.32** (SQLite in both cases). Moving between the two is purely a matter of swapping the
 zips in `_devenv/` and re-running `setup.sh --force`; no plugin code differs between them.
 
-- 1172 assertions in 23 test cases; 234 files lint clean.
-- 28/28 admin screens return 200 with no notices; 69/69 tables (`/?igbz_health=1`); 3 cron hooks
+- 1209 assertions in 23 test cases; 235 files lint clean.
+- 28/28 admin screens return 200 with no notices; 70/70 tables (`/?igbz_health=1`); 3 cron hooks
   scheduled.
 - All 14+ payment gateways register with WooCommerce and their settings screens render; the
   direct banks show a Test connection button.
@@ -480,10 +491,24 @@ accepted. The heavy machinery — `FLAG_SECURE`, `isCaptured`, emulator detectio
 links, watermarking — belongs to the **LMS/courses** section only. Applying it to VIP would be
 re-litigating a decision already made.
 
-**Nine tables**, all `vip_*`: `plans`, `memberships`, `posts`, `post_likes`, `post_comments`,
-`post_views`, `entitlements`, `threads`, `messages`. `vip_post_likes` and `vip_post_views` carry
-**no `tenant_id`** on purpose — they are pure join rows and the tenant belongs to the post. They are
-whitelisted in `SchemaTest::$unscoped`; adding a tenant column to them is a regression, not a fix.
+**Ten tables**, all `vip_*`: `plans`, `memberships`, `posts`, `post_likes`, `post_saves`,
+`post_comments`, `post_views`, `entitlements`, `threads`, `messages`. `vip_post_likes`,
+`vip_post_saves` and `vip_post_views` carry **no `tenant_id`** on purpose — they are pure join rows
+and the tenant belongs to the post. They are whitelisted in `SchemaTest::$unscoped`; adding a tenant
+column to them is a regression, not a fix.
+
+**Expiry is platform policy (v17).** A post is deleted from the server after
+`vip.default_expiry_days` (7), the window is the IGBZ senior admin's alone, and the store admin's
+editor no longer offers `expires_at`/`expiry_action` — it states them. Both facts are printed to
+the buyer *above* the buy buttons, because the whole risk is somebody paying on day six. The save
+icon is the compensation, and it is real: `vip_post_saves` plus `GET /vip/posts/{id}/offline`, which
+hands an entitled member a longer-lived signed link so the app can keep a private copy. `offline_at`
+records that the bytes were actually fetched — a bookmark alone does not survive the purge. **This
+offline path is VIP-only; the LMS must never get one.** Rationale: `DESIGN-VIP-EXPIRY.md`.
+
+> `VipLandingPage::render()` ends in `exit`, so it cannot be called from the test process — doing so
+> kills the whole suite (the buffered page then leaks into the runner's output, which is the
+> symptom you will see). Test the pieces through reflection and check placement on the live site.
 
 **Services** (`src/Modules/Instagram/Vip/`), wired in `InstagramModule::bind_services()` as
 `vip.access`, `vip.media`, `vip.posts`, `vip.social`, `vip.messages`, `vip.billing`:
@@ -722,7 +747,33 @@ to enqueue. The DDL is in the git history if a future subsystem wants it.
 
 ---
 
-## 8. Git
+## 8. Translations (`.pot`)
+
+`wp-cli i18n make-pot` is not installable here (no Composer, and wordpress.org is blocked), so the
+template is rebuilt by **`bash _devenv/makepot.sh`** — `_devenv/makepot.php` run through the same
+php-wasm CLI the tests use. `--check` reports staleness without writing, which is what you want in
+a review pass.
+
+Things to know before you touch it:
+
+- It scans **`src/` only** and recognises the five gettext calls this plugin actually uses:
+  `__`, `_e`, `esc_html__`, `esc_html_e`, `esc_attr__`, `esc_attr_e` and `_n`. If you introduce
+  `_x`/`_nx`, add them to `FUNCTIONS` in the script *and* teach it to emit `msgctxt` — it does not
+  today, because no string in this plugin has ever needed one.
+- **Only literal strings are extracted.** A call whose text or domain is built from a variable or a
+  concatenation is skipped with a warning on stderr, exactly as wp-cli would skip it. A warning
+  there means the string is untranslatable in practice, not that the tool failed.
+- The output format is pinned to the file that shipped before — sorted by msgid, references sorted
+  one per line, no wrapping, no `msgctxt`, no translator comments — so a rebuild produces a
+  readable diff instead of a whole-file rewrite. It was validated by regenerating the template at
+  commit `b917913` and diffing: the only differences were the `FunnelsPage` strings that the
+  shipped `.pot` had missed since `92df5da`.
+- `POT-Creation-Date` is the one line that always changes; the staleness check ignores it, so an
+  up-to-date template is left untouched rather than re-stamped.
+
+---
+
+## 9. Git
 
 Work happens on the session branch; push only to that branch. Never rewrite `main`.
 Keep generated artifacts out of git — `_devenv/.work/` is ignored, and the two zips in `_devenv/`

@@ -85,7 +85,7 @@ real endpoints.
 
 1. Copy the `igbz-suite` directory into `wp-content/plugins/`, or zip it and upload it through
    **Plugins → Add New → Upload Plugin**.
-2. Activate **IGBZ Suite**. On activation the plugin creates its 47 database tables, registers its
+2. Activate **IGBZ Suite**. On activation the plugin creates its 70 database tables, registers its
    roles and capabilities, schedules its cron events and seeds default settings.
 3. Go to **IGBZ → Settings → Modules** and enable the modules you need. Only *Multi-Tenant Stores*
    is on by default.
@@ -420,7 +420,7 @@ more. No watermarking, no device binding, no screen-capture defence — those be
 | `vip.access` | Entitlement: author, active subscription, single-post purchase, or free post |
 | `vip.posts` | CRUD, scheduling, expiry, shortcodes, feed assembly with locked/unlocked shaping |
 | `vip.media` | HMAC-signed, short-lived media URLs; re-checks entitlement at serve time |
-| `vip.social` | Likes, comments and replies, saves, view counts, pinned comments |
+| `vip.social` | Likes, saves (and the offline-copy stamp), comments and replies, view counts, pinned comments |
 | `vip.messages` | Per-post direct messages to the admin, threaded |
 | `vip.billing` | Subscriptions, single-post purchases, tips |
 
@@ -441,18 +441,28 @@ lands when a member picks our app.
 entitlement is checked again when the bytes are served, not only when the link is minted. A forged
 signature gets 403; an expired one gets 410.
 
-**Expiry.** Posts carry `expires_at`, and a five-minute cron sweep applies either
-`VipPostService::EXPIRY_HIDE` or `EXPIRY_DELETE` per the `vip.default_expiry_action` setting
-(currently `hide`). **The policy itself is not ratified** — default window, hide vs hard delete, and
-whether a single-post buyer keeps access after expiry are open questions for the client. See
-`PROJECT-STATE.md` §2.
+**Expiry — ratified policy.** A VIP post lives for `vip.default_expiry_days` (**7** by default)
+and is then **removed from the server**: the five-minute sweep purges the media and marks the row
+`deleted`. The window belongs to the **IGBZ senior admin** (Settings → VIP channel); a store admin
+cannot set it per post — the editor states it instead, and suggests posting the content to their own
+Instagram Close Friends if they want to keep it (advice to a human; no Instagram API is involved).
+
+The buyer is told before they pay: the share page prints the exact deletion date **above** the buy
+buttons, and points at the save icon. Saving is real — `vip_post_saves` plus
+`GET /vip/posts/{id}/offline`, which hands an entitled member a longer-lived signed link
+(`vip.offline_link_ttl`, 3600s) so the app can keep a private copy in its own storage. The saved row
+and the purchase record both survive the purge; only the content goes. Full rationale in
+`DESIGN-VIP-EXPIRY.md`.
+
+> The offline copy is a **VIP-only** relaxation, agreed because the post is deleted in a week. The
+> LMS has no offline path and must not gain one.
 
 **Admin dashboard.** `igbz-vip` has five tabs — Posts, Comments, Inbox, Members, Plans — so the
 channel is run like an Instagram page: publish and schedule, read and reply to comments and DMs,
 and see revenue and membership figures.
 
-Nine `vip_*` tables (DB v10) and 29 `/vip/*` REST routes. `tests/VipChannelTest.php` covers 21
-scenarios.
+Ten `vip_*` tables (DB v10, plus `vip_post_saves` in v17) and 32 `/vip/*` REST routes.
+`tests/VipChannelTest.php` covers 25 scenarios.
 
 ---
 
@@ -655,10 +665,10 @@ singletons; an unknown id throws.
 A module's services only exist while that module is enabled, so guard cross-module calls with
 `igbz()->has( 'wallet' )`.
 
-**Tenancy** is single-site with a `tenant_id` column, not WordPress Multisite. All **69 tables
-(DB v16)** carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`, `plans`,
+**Tenancy** is single-site with a `tenant_id` column, not WordPress Multisite. All **70 tables
+(DB v17)** carry `tenant_id` except `tenants`, `tenant_domains`, `tenant_members`, `plans`,
 `logs`, `lesson_progress` (scope inherited through `enrollment_id`), `vip_post_likes`,
-`vip_post_views`, `fx_rates`, `fx_prices`, `ig_label_group_items`, `ig_courier_tracking` and
+`vip_post_saves`, `vip_post_views`, `fx_rates`, `fx_prices`, `ig_label_group_items`, `ig_courier_tracking` and
 `ig_courier_chat` (the exact whitelist lives in `tests/SchemaTest.php`). Products and orders are
 scoped with the `_igbz_tenant_id` meta key, where `0` or absent means platform-shared.
 
@@ -720,7 +730,7 @@ php igbz-suite/tests/run.php
 ```
 
 `tests/bootstrap.php` provides doubles for the WordPress functions the tested classes touch, plus a
-fake `$wpdb`. **1172 assertions across 23 cases**, plus a syntax check over 234 files
+fake `$wpdb`. **1209 assertions across 23 cases**, plus a syntax check over 235 files
 (`bash _devenv/test.sh` runs both).
 
 Coverage is deliberately aimed at the code where a bug costs money or leaks data: `Crypto`,

@@ -1,6 +1,7 @@
 # IGBZ-WP — مرجع ماژول‌ها (شرح کارکرد و مستندات فنی)
 
-**آخرین به‌روزرسانی:** ۱۴۰۵/۰۵/۲۵ (2026-08-16) · **نسخهٔ افزونه:** 1.0.0 · **دیتابیس:** v16 — ۶۹ جدول
+**آخرین به‌روزرسانی:** ۱۴۰۵/۰۵/۲۷ (2026-08-18) · **نسخهٔ افزونه:** 1.0.0 · **دیتابیس:** v17 — ۷۰ جدول
+· **هوشا:** ۰.۹.۲ (`hoosha/`، بخش ۷.۵ در `PROJECT-STATE.md`)
 
 این سند مرجع کامل «چه ماژول/زیرسیستمی وجود دارد، چه می‌کند و مستندات فنی‌اش چیست» است.
 مرجع وضعیت کلی پروژه `PROJECT-STATE.md` است و این سند هم‌عرض آن — ساختار و جزئیات فنی.
@@ -350,9 +351,9 @@ wildcard نیست.
 | مورد | جزئیات |
 |---|---|
 | سرویس‌ها | `vip.access`، `vip.posts`، `vip.media`، `vip.social`، `vip.messages`، `vip.billing` |
-| جداول | `vip_plans`، `vip_memberships`، `vip_posts`، `vip_post_likes`، `vip_post_comments`، `vip_post_views`، `vip_entitlements`، `vip_threads`، `vip_messages` |
+| جداول | `vip_plans`، `vip_memberships`، `vip_posts`، `vip_post_likes`، `vip_post_saves`، `vip_post_comments`، `vip_post_views`، `vip_entitlements`، `vip_threads`، `vip_messages` |
 | صفحهٔ ادمین | VIP channel (`igbz-vip`) — ۵ تب: Posts / Comments / Inbox / Members / Plans |
-| REST | ۲۹ مسیر `/igbz/v1/vip/*` + صفحهٔ اشتراک‌گذاری `/vip/p/{shortcode}` |
+| REST | ۳۲ مسیر `/igbz/v1/vip/*` (شامل `save`، `offline`، `saved`) + صفحهٔ اشتراک‌گذاری `/vip/p/{shortcode}` |
 | کرون | ۵ دقیقه: `publish_due()` + `expire_due()`؛ ساعتی: `expire_memberships()` |
 | هوک‌ها | `igbz_vip_post_published`، `igbz_vip_post_liked`، `igbz_vip_comment_added`، `igbz_vip_message_sent`، `igbz_vip_tip_received`، `igbz_vip_membership_*` |
 | مستندات | `DESIGN-VIP.md` |
@@ -360,7 +361,8 @@ wildcard نیست.
 فید خصوصی شبیه اینستاگرام داخل اپ خودمان: پست عمومی فقط تیزر؛ محتوای واقعی روی استوریج
 خودمان با بررسی استحقاق در لحظهٔ سرو (لینک HMAC کوتاه‌عمر). لایک/کامنت/ریپلای/سیو/بازدید/
 دایرکت داخل پست + اشتراک/خرید تک‌پست/حمایت مالی. **سطح امنیت سبک** (معادل Close Friends —
-عمداً؛ امنیت سنگین فقط LMS). سیاست انقضای پست هنوز منتظر تصمیم کارفرماست.
+عمداً؛ امنیت سنگین فقط LMS). سیاست انقضا تصویب شد: ۷ روز به تعیین مدیر ارشد، سپس حذف از
+سرور، با اطلاع‌رسانی به ادمین و مشتری و امکان نگهداری نسخهٔ آفلاین در اپ — `DESIGN-VIP-EXPIRY.md`.
 
 ### ۳.۵ استودیوی AI و اعتبار (پل موقت هوشواره)
 
@@ -435,7 +437,7 @@ nop (توکن ۳۰ روزهٔ بدون تازه‌سازی). کاتالوگ، ح
 | `DeviceController` | `/devices/*` + `/notifications/send` |
 | `ProductIntakeController` | `/intake/*` (فرم، عکس، وضعیت) |
 | `StoreAdminController` | `/admin/*` (categories، customers، orders، summary) |
-| `VipController` / `VipAdminController` | `/vip/*` (۲۹ مسیر) |
+| `VipController` / `VipAdminController` | `/vip/*` (۳۲ مسیر) |
 | `FxController` | `/fx/*` (balance، topup، ledger، prices، bills) + وبهوک payout |
 | `AiStudioController` | `/ai/*` (credits، studio/generate) |
 | `CourierController` | `/courier/*` + `/shipments/*` + `/checkout/cod-pay` |
@@ -475,7 +477,7 @@ nop (توکن ۳۰ روزهٔ بدون تازه‌سازی). کاتالوگ، ح
 
 ---
 
-## ۷. جداول دیتابیس (۶۹ جدول — v16) به‌تفکیک زیرسیستم
+## ۷. جداول دیتابیس (۷۰ جدول — v17) به‌تفکیک زیرسیستم
 
 > شمارش مرجع: `grep -c '$sql[] = "CREATE TABLE' src/Support/Schema.php` و health check.
 
@@ -495,13 +497,13 @@ nop (توکن ۳۰ روزهٔ بدون تازه‌سازی). کاتالوگ، ح
 | قانونی | `ig_nid_verifications`، `ig_legal_agreements` |
 | گیمیفیکیشن | `ig_abandoned_carts` |
 | اینستاگرام | `ig_accounts`، `ig_content`، `ig_insights`، `ig_funnels`، `ig_subscribers`، `ig_funnel_hits`، `ig_intake` |
-| VIP | `vip_plans`، `vip_memberships`، `vip_posts`، `vip_post_likes`، `vip_post_comments`، `vip_post_views`، `vip_entitlements`، `vip_threads`، `vip_messages` |
+| VIP | `vip_plans`، `vip_memberships`، `vip_posts`، `vip_post_likes`، `vip_post_saves`، `vip_post_comments`، `vip_post_views`، `vip_entitlements`، `vip_threads`، `vip_messages` |
 | AI/قرعه‌کشی | `ig_ai_credit_ledger`، `ig_giveaways` |
 | اپ | `api_tokens`، `devices` |
 | FX | `fx_wallets`، `fx_ledger`، `fx_rates`، `fx_prices`، `fx_accounts`، `fx_bills` |
 
 **بدون `tenant_id` (عمداً):** `tenants`، `tenant_domains`، `tenant_members`، `plans`، `logs`،
-`lesson_progress`، `vip_post_likes`، `vip_post_views`، `fx_rates`، `fx_prices`،
+`lesson_progress`، `vip_post_likes`، `vip_post_saves`، `vip_post_views`، `fx_rates`، `fx_prices`،
 `ig_label_group_items`، `ig_courier_tracking`، `ig_courier_chat` (whitelist در
 `tests/SchemaTest.php` — بدون تأیید آگاهانه چیزی از آن خارج نشود).
 
@@ -565,13 +567,14 @@ VIP channel، AI studio، Giveaways
 
 ## ۱۲. تست‌ها و لینت
 
-- **۱۱۷۲ اظهارنظر در ۲۳ کیس** (`bash _devenv/test.sh` — بدون نیاز به سایت). کیس‌ها:
+- **۱۲۰۹ اظهارنظر در ۲۳ کیس** (`bash _devenv/test.sh` — بدون نیاز به سایت). کیس‌ها:
   Crypto، Settings، Schema (tenant scoping + dbDelta + whitelist)، Jwt، BnplQuote، Money،
   Gateway، Modules، PromptBuilder، Upsert، CronSchedule، AccountCredentials،
   PublishVerification، FunnelDelivery، ProductIntake، DirectMessage، VipChannel، Lms،
   PostIdentity، **FxTest**، **PhasesTest**، **Phases2Test** (escrow، تحویل پیک/COD، برچسب،
   مسیریابی)، **IpgAdaptersTest** (گیت تنظیمات، RSA، SOAP).
-- **۲۳۴ فایل PHP بدون خطای syntax.**
+- **۲۳۵ فایل PHP بدون خطای syntax.**
+- قالب ترجمه با `bash _devenv/makepot.sh` بازسازی می‌شود؛ `--check` فقط کهنگی را گزارش می‌کند.
 - هر کیس جدید باید `igbz_test_reset_settings()` را صدا بزند و در `$cases` در
   `tests/run.php` ثبت شود (کشف خودکار وجود ندارد).
 
@@ -598,3 +601,7 @@ VIP channel، AI studio، Giveaways
 | `PROMPTS-SEO-HUSHVARE.md` / `PROMPT-IG-GROWTH-HUSHVARE.md` | پرامپت‌های هوشواره |
 | `_devenv/AGENT-BRIEF.md` | جزئیات فنی عمیق و تله‌ها |
 | `igbz-suite/README.md` | مرجع فنی افزونه (نصب/تنظیمات/REST) |
+| `hoosha/README.md` | **هوشا** — ابزار عاملِ خودمان (نسخهٔ ۰.۹.۲): نصب، هاب پرووایدر، ابزارها، MCP، معماری، تست |
+| `hoosha/DESIGN-PROVIDER-HUB.md` | هاب پرووایدر و عیب‌یاب چهارپله |
+| `hoosha/DESIGN-UI-PARITY.md` | تاریخچهٔ رابط هوشا و باگ‌هایی که سر راه پیدا شد |
+| `DESIGN-DEPLOY-HOOSHA.md` | استقرار هوشا روی سرور (پیشنهاد، پیاده‌نشده) |
