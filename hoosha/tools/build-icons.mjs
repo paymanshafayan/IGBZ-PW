@@ -33,11 +33,11 @@ const OUT = path.resolve( 'ui/lib/icons.js' );
 const ICONS = {
 	// ناوبری نوار کناری
 	'chats': 'light/comments',
-	'projects': 'light/folder-open',
-	'tools': 'light/toolbox',
-	'changes': 'light/code-branch',
-	'customize': 'light/sliders-h',
-	'workspace': 'light/browser',
+	'projects': 'light/layer-group',
+	'tools': 'light/tools',
+	'changes': 'light/code',
+	'customize': 'light/briefcase',
+	'workspace': 'light/laptop-code',
 	'new-chat': 'light/plus',
 	'search': 'light/search',
 	'collapse': 'light/columns',

@@ -3927,9 +3927,9 @@ async function bootApp( overrides = {}, domOpts = {} ) {
 					url === '/api/state'
 						? state
 						: url === '/api/sessions'
-						? { sessions: [ { id: 's1', title: 'سلام', messages: 3, updatedAt: Date.now() } ] }
+						? { sessions: domOpts.sessions || [ { id: 's1', title: 'سلام', messages: 3, updatedAt: Date.now() } ] }
 						: url.startsWith( '/api/git' )
-						? { git: state.git, stat: [] }
+						? { git: state.git, stat: [], locked: false, known: domOpts.gitRepos, branches: [], log: [] }
 						: url === '/api/hub'
 						? domOpts.hub || {
 								active: false,
@@ -5389,6 +5389,149 @@ await test( 'سه تب فضای کار که رندرکننده نداشتند، 
 			await new Promise( ( r ) => setTimeout( r, 120 ) );
 			assert.equal( /بخش ناشناخته/.test( document.querySelector( '#panel-body' ).textContent ), false, `تب «${ label }» هنوز مرده است` );
 		}
+	} finally {
+		dom.restore();
+	}
+} );
+
+// --------------------------------------------- خواسته‌های این دور
+
+section( 'مخزن نشست، سندباکس، و جزئیات چیدمان' );
+
+await test( 'آیکون ناوبری همان‌هایی است که کارفرما خواست', () => {
+	const icons = fssync.readFileSync( path.resolve( 'tools/build-icons.mjs' ), 'utf8' );
+	// نام‌های FA6 در نسخهٔ ۵ نیستند؛ نزدیک‌ترین معادل همان بستهٔ خودمان انتخاب شده.
+	for ( const [ name, file ] of [
+		[ 'customize', 'light/briefcase' ],
+		[ 'chats', 'light/comments' ],
+		[ 'projects', 'light/layer-group' ],
+		[ 'tools', 'light/tools' ],
+		[ 'changes', 'light/code' ],
+		[ 'workspace', 'light/laptop-code' ],
+	] ) {
+		assert.ok( icons.includes( `'${ name }': '${ file }'` ), `آیکون ${ name } عوض نشده` );
+	}
+	// و نشان برنامه کنار نامش، بالای نوار کناری.
+	assert.match( html, /<span class="brand-mark" id="brand-mark"><\/span>هوشا/ );
+	assert.match( fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' ), /brandMark\.innerHTML = logoSvg\( 22 \)/ );
+} );
+
+await test( 'دستگیرهٔ کلید در حالت روشن ناپدید نمی‌شود', () => {
+	/*
+	 * باگ: جابه‌جایی با `translateX(-20px)` بود و در چیدمان چپ‌به‌راست دستگیره از ریل
+	 * بیرون می‌رفت. `.switch` قاعدهٔ جداگانهٔ ltr داشت، `.check` نداشت.
+	 */
+	assert.match( cssBlock( ".check input[type='checkbox']:checked::after" ), /inset-inline-start:\s*24px/ );
+	assert.match( cssBlock( '.switch input:checked + i::after' ), /inset-inline-start:\s*24px/ );
+	const bare = css.replace( /\/\*[\s\S]*?\*\//g, '' );
+	assert.equal( /translateX\(-?20px\)/.test( bare ), false, 'هیچ کلیدی نباید با transform جابه‌جا شود' );
+	assert.equal( /html\[dir='ltr'\] \.switch input:checked/.test( bare ), false, 'قاعدهٔ جداگانهٔ ltr دیگر لازم نیست' );
+} );
+
+await test( 'خوش‌آمد وسط می‌ماند و از بالای صفحه بیرون نمی‌زند', () => {
+	// روی نمایشگر کوتاه، `flex: 0 0 auto` باعث می‌شد بالای پیام بیرون بزند و اسکرول هم نبود.
+	const thread = cssBlock( '.view-chat.empty .thread' );
+	assert.match( thread, /flex:\s*0 1 auto/ );
+	assert.match( thread, /overflow-y:\s*auto/ );
+	assert.match( thread, /min-height:\s*0/ );
+	assert.match( cssBlock( '.view-chat.empty' ), /justify-content:\s*center/ );
+} );
+
+await test( 'سندباکس پیش‌فرض روشن است و بدون اجازه روی پروژه نمی‌افتد', async () => {
+	// خواستهٔ کارفرما: پیش‌فرض روی سندباکس، نه روی پروژهٔ اصلی.
+	const { defaultConfig } = await import( `../src/config.js?d=${ Math.random() }` );
+	const cfg = defaultConfig();
+	assert.equal( cfg.sandbox.enabled, true, 'سندباکس باید پیش‌فرض روشن باشد' );
+	assert.equal( cfg.sandbox.allowHostFallback, false, 'نبودِ کانتینر نباید بی‌صدا روی خود پروژه بیفتد' );
+	assert.equal( cfg.permissions.mode, 'default', 'نوشتن و اجرا همچنان تأیید می‌خواهد' );
+} );
+
+await test( 'فهرست مخزن‌های مجاز از gh می‌آید و نبودش دلیل می‌دهد', async () => {
+	const vcs = await import( `../src/git.js?r=${ Math.random() }` );
+	assert.equal( typeof vcs.repos, 'function' );
+
+	// با یک `gh` جعلی در PATH، خروجی واقعی تجزیه می‌شود.
+	const bin = path.join( tmpRoot, 'bin-gh' );
+	await fs.mkdir( bin, { recursive: true } );
+	await fs.writeFile(
+		path.join( bin, 'gh' ),
+		'#!/bin/sh\necho \'[{"nameWithOwner":"me/one","defaultBranchRef":{"name":"main"},"url":"https://x/one","isPrivate":true,"updatedAt":"2026-01-01"}]\'\n',
+		{ mode: 0o755 }
+	);
+	const realPath = process.env.PATH;
+	process.env.PATH = `${ bin }:${ realPath }`;
+	try {
+		const out = await vcs.repos( 5 );
+		assert.equal( out.ok, true );
+		assert.deepEqual( out.repos, [ { nameWithOwner: 'me/one', defaultBranch: 'main', url: 'https://x/one', private: true, updatedAt: '2026-01-01' } ] );
+	} finally {
+		process.env.PATH = realPath;
+	}
+
+	// و وقتی gh نیست، پیام گویا می‌دهد نه فهرست خالیِ بی‌توضیح.
+	process.env.PATH = path.join( tmpRoot, 'empty-bin' );
+	await fs.mkdir( process.env.PATH, { recursive: true } );
+	try {
+		const out = await vcs.repos( 5 );
+		assert.equal( out.ok, false );
+		assert.match( out.message, /gh/ );
+	} finally {
+		process.env.PATH = realPath;
+	}
+} );
+
+await test( 'مخزن و شاخه پس از اولین پیام قفل می‌شوند و با گفتگوی تازه باز', () => {
+	const server = fssync.readFileSync( path.resolve( 'src/server.js' ), 'utf8' );
+	assert.match( server, /let gitLocked = false;/ );
+	assert.match( server, /'POST \/api\/message'[\s\S]{0,400}gitLocked = true;/, 'اولین پیام باید قفل کند' );
+	assert.match( server, /sessionId = `s_\$\{ Date\.now\(\)\.toString\( 36 \) \}`;\n\t\t\tgitLocked = false;/, 'گفتگوی تازه باید باز کند' );
+	assert.match( server, /\[ 'branch', 'use-repo' \]\.includes\( body\.action \) && gitLocked/, 'سرور باید تغییر قفل‌شده را رد کند' );
+	assert.match( server, /body\.action === 'use-repo'/ );
+
+	const bar = fssync.readFileSync( path.join( uiDir, 'gitbar.js' ), 'utf8' );
+	assert.match( bar, /export function setGitLock/ );
+	assert.match( bar, /node\.disabled = locked;/ );
+	assert.match( fssync.readFileSync( path.join( uiDir, 'composer.js' ), 'utf8' ), /setGitLock\( true \);/ );
+	assert.match( fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' ), /setGitLock\( false \);/ );
+} );
+
+await test( 'نوار گیت در گفتگوی تازه مخزن‌های مجاز را نشان می‌دهد و بعد از پیام قفل می‌شود', async () => {
+	const { dom, q } = await bootApp( {
+		git: { name: 'IGBZ-WP', branch: 'main', protected: false, dirty: false, ahead: 0, added: 0, removed: 0, files: [] },
+	}, {
+		gitRepos: { ok: true, repos: [ { nameWithOwner: 'me/one', defaultBranch: 'main', url: 'https://x/one', private: false, updatedAt: '' } ] },
+	} );
+	try {
+		q( '#git-repo' ).click();
+		await new Promise( ( r ) => setTimeout( r, 120 ) );
+		const menuText = q( '#git-menu' ).textContent;
+		assert.match( menuText, /me\/one/, `فهرست مخزن‌های مجاز نیامد: ${ menuText.slice( 0, 80 ) }` );
+
+		// بعد از قفل، همان منو دلیلش را می‌گوید و دکمه‌ها غیرفعال‌اند.
+		const { setGitLock } = await import( '../ui/gitbar.js' );
+		setGitLock( true );
+		await new Promise( ( r ) => setTimeout( r, 60 ) );
+		assert.equal( q( '#git-repo' ).disabled, true, 'دکمهٔ مخزن باید قفل شود' );
+		assert.equal( q( '#git-branch' ).disabled, true );
+		q( '#git-repo' ).click();
+		await new Promise( ( r ) => setTimeout( r, 60 ) );
+		assert.match( q( '#git-menu' ).textContent, /قفل/ );
+		setGitLock( false );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( '«افزودن به پروژه» اثرش در نوار کناری دیده می‌شود', async () => {
+	/*
+	 * کار می‌کرد ولی هیچ‌جا دیده نمی‌شد — و چیزی که دیده نمی‌شود، از نظر کاربر انجام
+	 * نشده است. حالا نام پروژه زیر عنوان گفتگو در همان نوار کناری می‌آید.
+	 */
+	const { dom } = await bootApp( {}, { sessions: [ { id: 's1', title: 'گفتگو', updatedAt: Date.now(), messages: 2, project: '/repo/alpha' } ] } );
+	try {
+		const label = document.querySelector( '.rt-project' );
+		assert.ok( label, 'نام پروژه در ردیف گفتگوی اخیر نیست' );
+		assert.equal( label.textContent, 'alpha' );
 	} finally {
 		dom.restore();
 	}

@@ -105,15 +105,25 @@ function paint() {
 
 	// در نوار کناری فقط چند تای آخر؛ بقیه در صفحهٔ «گفتگوها».
 	for ( const item of ordered.slice( 0, 14 ) ) {
+		const project = item.project ? item.project.split( /[\\/]/ ).filter( Boolean ).pop() : '';
 		const row = h( 'div', { class: `recent-item ${ s?.sessionId === item.id ? 'active' : '' }` }, [
-			pins.has( item.id ) ? h( 'span', { class: 'pin-dot', title: t( 'سنجاق‌شده' ), text: '📌' } ) : null,
+			pins.has( item.id ) ? h( 'span', { class: 'pin-dot', title: t( 'سنجاق‌شده' ), html: iconSvg( 'pin', 11 ) } ) : null,
 			h( 'button', {
 				class: 'btn quiet row rt',
 				'data-no-t': '',
 				title: `${ item.title }\n${ timeAgo( item.updatedAt ) }`,
-				text: item.title || t( 'بدون عنوان' ),
 				onClick: () => onResume( item.id ),
-			} ),
+			}, [
+				h( 'span', { class: 'rt-title', text: item.title || t( 'بدون عنوان' ) } ),
+				/*
+				 * نام پروژه، همان‌جا که کاربر آن را ست کرده.
+				 *
+				 * «افزودن به پروژه» کار می‌کرد ولی هیچ اثری دیده نمی‌شد — نه در نوار
+				 * کناری و نه در منو — و کارفرما درست گفت «کار نمی‌کند». چیزی که دیده
+				 * نمی‌شود، از نظر کاربر انجام نشده است.
+				 */
+				project ? h( 'span', { class: 'rt-project', 'data-no-t': '', text: project } ) : null,
+			] ),
 			h( 'button', {
 				class: 'btn icon round quiet reveal row-menu',
 				title: t( 'گزینه‌ها' ),

@@ -318,6 +318,15 @@ const EN = {
 	"کم‌کارترین": "Least busy",
 	"اولین سالم": "First healthy",
 
+	"مخزن‌های مجاز": "Repositories you allowed",
+	"فهرست مخزن‌ها در دسترس نیست.": "The repository list is unavailable.",
+	"مخزنی به هوشا مجوز نداده‌ای.": "You have not granted Hoosha access to any repository.",
+	"در حال خواندن مخزن‌های مجاز…": "Reading the allowed repositories…",
+	"گفتگو شروع شده؛ مخزن تا گفتگوی تازه قفل است.": "The chat has started; the repository is locked until a new chat.",
+	"گفتگو شروع شده؛ شاخه تا گفتگوی تازه قفل است.": "The chat has started; the branch is locked until a new chat.",
+	"خصوصی": "private",
+	"تا گفتگوی تازه قفل است": "locked until a new chat",
+
 	// ── پنل‌ها و منوهای عمیق (جاروی زنده اینها را می‌گیرد) ──────────────
 	'هوشا': 'Hoosha',
 	'برو به آخر': 'Jump to latest',

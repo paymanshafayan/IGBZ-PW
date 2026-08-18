@@ -331,7 +331,8 @@ textarea {
 /* ══════════════════════════════════════════════════════ نوار کناری */
 
 
-.wordmark .mark {
+.wordmark .mark,
+.wordmark .brand-mark {
 	display: inline-flex;
 	filter: drop-shadow(0 2px 6px var(--primary-soft));
 	transition: transform 0.4s var(--ease);
@@ -462,7 +463,7 @@ textarea {
 	justify-content: center;
 	min-height: 0;
 	gap: 14px;
-	padding-bottom: 8px;
+	padding: 24px 16px 8px;
 	animation: rise 0.5s var(--ease);
 }
 
@@ -474,9 +475,17 @@ textarea {
 .view-chat.empty {
 	justify-content: center;
 }
+/*
+ * در حالت خالی، گروهِ «خوش‌آمد + کادر نوشتن» وسط عمودی می‌نشیند.
+ *
+ * `flex: 0 1 auto` مهم است: با `0 0 auto` ناحیهٔ خوش‌آمد کوچک نمی‌شد و روی نمایشگر
+ * کوتاه از **بالای** صفحه می‌زد بیرون — جایی که اسکرول هم نداشت. حالا اگر جا کم بیاید
+ * همان ناحیه اسکرول می‌خورد و مرکزیت به‌هم نمی‌ریزد.
+ */
 .view-chat.empty .thread {
-	flex: 0 0 auto;
-	overflow: visible;
+	flex: 0 1 auto;
+	min-height: 0;
+	overflow-y: auto;
 	padding-bottom: 0;
 }
 .view-chat.empty .disclaimer {
@@ -2264,6 +2273,23 @@ body.sidebar-collapsed .account-menu {
 	background: var(--accent);
 	font-weight: 500;
 }
+/* عنوان گفتگو و — اگر پروژه‌ای دارد — نام پروژه، زیرش. */
+.rt-title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.rt-project {
+	font-size: 11px;
+	color: var(--muted-foreground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.btn.locked {
+	opacity: 0.75;
+	cursor: default;
+}
 .recent-item .btn.rt {
 	flex: 1;
 	min-width: 0;
@@ -2272,6 +2298,11 @@ body.sidebar-collapsed .account-menu {
 	font-size: inherit;
 	overflow: hidden;
 	text-overflow: ellipsis;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0;
+	line-height: 1.35;
+	padding-block: 4px;
 }
 .recent-item .btn.rt:hover {
 	background: transparent;
@@ -3073,16 +3104,13 @@ body.sidebar-collapsed .account-menu {
 	border-radius: 50%;
 	background: #fff;
 	box-shadow: var(--shadow-1);
-	transition: transform 0.18s var(--ease);
+	transition: inset-inline-start 0.18s var(--ease);
 }
 .switch input:checked + i {
 	background: var(--primary);
 }
 .switch input:checked + i::after {
-	transform: translateX(-20px);
-}
-html[dir='ltr'] .switch input:checked + i::after {
-	transform: translateX(17px);
+	inset-inline-start: 24px;
 }
 .switch input:focus-visible + i {
 	box-shadow: var(--glow);
@@ -3208,13 +3236,20 @@ html[dir='ltr'] .switch input:checked + i::after {
 	border-radius: 50%;
 	background: #fff;
 	box-shadow: var(--shadow-1);
-	transition: transform 0.18s var(--ease);
+	transition: inset-inline-start 0.18s var(--ease);
 }
 .check input[type='checkbox']:checked {
 	background: var(--primary);
 }
+/*
+ * جابه‌جایی دستگیره با `inset-inline-start` است، نه `transform`.
+ *
+ * قبلاً `translateX(-20px)` بود و در چیدمان چپ‌به‌راست دستگیره از ریل بیرون می‌رفت و
+ * ناپدید می‌شد — یعنی کلیدِ روشن، خالی دیده می‌شد. `.switch` یک قاعدهٔ جداگانه برای
+ * ltr داشت و `.check` نداشت؛ با inset، هر دو جهت خودبه‌خود درست‌اند.
+ */
 .check input[type='checkbox']:checked::after {
-	transform: translateX(-20px);
+	inset-inline-start: 24px;
 }
 .check input[type='checkbox']:focus-visible {
 	box-shadow: var(--glow);

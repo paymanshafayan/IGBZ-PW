@@ -13,6 +13,7 @@ import { api, post, getState, refreshState } from './lib/api.js';
 import { showWorking, hideWorking } from './thread.js';
 import { speechSupported, startDictation, speak, stopSpeaking, isSpeaking } from './lib/voice.js';
 import { iconSvg } from './lib/icons.js';
+import { setGitLock } from './gitbar.js';
 
 const MODES = [ 'plan', 'default', 'auto' ];
 const MODE_LABEL = { plan: 'پلن', default: 'عادی', auto: 'خودکار' };
@@ -221,6 +222,8 @@ async function submit() {
 	if ( ! text && ! attachments.length ) {
 		return;
 	}
+	// با اولین پیام، مخزن و شاخهٔ این گفتگو قفل می‌شوند — همان قاعده‌ای که سرور هم دارد.
+	setGitLock( true );
 	const images = attachments.map( ( a ) => ( { name: a.name, mediaType: a.mediaType, data: a.data } ) );
 
 	input.value = '';

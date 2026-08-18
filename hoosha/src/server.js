@@ -93,6 +93,14 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 	let transcript = [];
 	let sessionId = `s_${ Date.now().toString( 36 ) }`;
 	let sessionTitle = '';
+	/*
+	 * انتخاب مخزن و شاخه فقط **پیش از اولین پیام** آزاد است.
+	 *
+	 * قاعده‌ای که کارفرما گذاشت: در ابتدای هر گفتگو، مخزن و شاخه انتخاب می‌شوند؛ با
+	 * فرستادن اولین پیام قفل می‌شوند و تا گفتگوی تازه باز نمی‌شوند. دلیلش روشن است:
+	 * وسط کار عوض‌کردن مخزن یعنی نیمی از گفتگو دربارهٔ کدی است که دیگر آنجا نیست.
+	 */
+	let gitLocked = false;
 	/** @type {{content:string,status:string}[]} */
 	let todos = [];
 	/** @type {any[]} */
@@ -605,7 +613,8 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 
 			const st = await vcs.status( dir );
 			if ( ! st ) {
-				return { status: 200, body: { git: null } };
+				const known = url.searchParams.get( 'repos' ) !== null ? await vcs.repos() : undefined;
+				return { status: 200, body: { git: null, locked: gitLocked, known } };
 			}
 
 			const [ stat, list, history ] = await Promise.all( [
@@ -615,12 +624,47 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			] );
 
 			const diff = wantDiff !== null ? await vcs.diff( dir, { base, file: wantDiff || undefined } ) : undefined;
-			return { status: 200, body: { git: st, stat, branches: list, log: history, diff } };
+			const known = url.searchParams.get( 'repos' ) !== null ? await vcs.repos() : undefined;
+			return { status: 200, body: { git: st, stat, branches: list, log: history, diff, locked: gitLocked, known } };
 		},
 
 		'POST /api/git': async ( { body } ) => {
 			const dir = runtime.config.workspace;
 			try {
+				if ( [ 'branch', 'use-repo' ].includes( body.action ) && gitLocked ) {
+					return { status: 409, body: { error: 'گفتگو شروع شده؛ مخزن و شاخه تا گفتگوی تازه قفل‌اند.' } };
+				}
+				/*
+				 * انتخاب مخزن از فهرست مجاز.
+				 *
+				 * اگر همان‌جایی که هست کلون شده باشد، فقط پوشهٔ کاری عوض می‌شود؛ وگرنه یک
+				 * بار کلون می‌شود کنار خانهٔ هوشا. هیچ‌وقت روی پوشهٔ فعلی چیزی بازنویسی
+				 * نمی‌شود.
+				 */
+				if ( body.action === 'use-repo' ) {
+					const wanted = String( body.repo || '' ).trim();
+					if ( ! wanted ) {
+						return { status: 400, body: { error: 'نام مخزن خالی است.' } };
+					}
+					const folder = wanted.split( '/' ).pop().replace( /[^\w.-]/g, '-' );
+					const into = path.join( HOME, 'repos' );
+					await fs.mkdir( into, { recursive: true } );
+					const target = path.join( into, folder );
+					const already = await vcs.isRepo( target );
+					if ( ! already ) {
+						const out = await vcs.clone( { url: `https://github.com/${ wanted }.git`, into, name: folder, branch: body.branch } );
+						if ( out?.ok === false ) {
+							return { status: 400, body: { error: out.message || 'کلون نشد.' } };
+						}
+					} else if ( body.branch ) {
+						await vcs.branch( target, String( body.branch ), { create: false } );
+					}
+					runtime.config.workspace = target;
+					await saveConfig( runtime.config );
+					await runtime.reload( { keepHistory: true } );
+					broadcast( { type: 'workspace', path: target } );
+					return { status: 200, body: { ok: true, git: await vcs.status( target ), workspace: target } };
+				}
 				if ( body.action === 'branch' ) {
 					const out = await vcs.branch( dir, String( body.name || '' ), { create: Boolean( body.create ) } );
 					broadcast( { type: 'git', branch: out.branch } );
@@ -787,6 +831,8 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 		// ------------------------------------------------------------- چت
 		'POST /api/message': async ( { body } ) => {
 			const text = String( body.text || '' ).trim();
+			// از همین لحظه، مخزن و شاخهٔ این گفتگو قفل است.
+			gitLocked = true;
 			const images = normalizeImages( body.images );
 			if ( ! text && ! images.length ) {
 				return { status: 400, body: { error: 'متن خالی است.' } };
@@ -883,6 +929,7 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 			sessionTitle = '';
 			sessionCost = { inputTokens: 0, outputTokens: 0, cost: 0 };
 			sessionId = `s_${ Date.now().toString( 36 ) }`;
+			gitLocked = false;
 			await runtime.reload( { keepHistory: false } );
 			rebindCheckpoints();
 			broadcast( { type: 'reset', sessionId } );

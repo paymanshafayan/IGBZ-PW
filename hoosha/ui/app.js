@@ -25,8 +25,14 @@ import { initSidebar, refreshSessions, paintSidebarState, markActiveView, allSes
 import { openSettingsModal, renderSection, initSettings, SETTINGS_TABS } from './settings.js';
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 import { logoSvg } from './lib/logo.js';
-import { initGitBar, paintGitBar, renderChanges } from './gitbar.js';
+import { initGitBar, paintGitBar, setGitLock, renderChanges } from './gitbar.js';
 import { iconSvg } from './lib/icons.js';
+
+// نشان کنار نام برنامه، بالای نوار کناری.
+const brandMark = $( '#brand-mark' );
+if ( brandMark ) {
+	brandMark.innerHTML = logoSvg( 22 );
+}
 
 // زبان اول از همه: جهت صفحه و فونت به آن بسته‌اند و اگر بعد از رندر عوض شود، پرش دارد.
 initLang();
@@ -525,6 +531,7 @@ function connectEvents() {
 
 			case 'reset':
 				clearThread();
+				setGitLock( false );
 				showWelcome();
 				refreshState();
 				refreshSessions();
@@ -684,6 +691,7 @@ $( '#btn-new' ).onclick = async () => {
 	showView( 'chat' );
 	await post( '/api/new', {} );
 	clearThread();
+	setGitLock( false );
 	showWelcome();
 	await refreshState();
 	await refreshSessions();

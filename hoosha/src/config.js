@@ -43,8 +43,16 @@ export function defaultConfig() {
 			deny: [],
 		},
 		workspace: process.cwd(),
+		/*
+		 * سندباکس پیش‌فرض **روشن** است.
+		 *
+		 * خواستهٔ صریح کارفرما: «حالت پیش‌فرض را روی سندباکس بگذار، نه روی پروژهٔ اصلی؛
+		 * بدون مجوز مدیر، هوشا حق تغییر پروژهٔ گیت را ندارد.» پس فرمان‌ها داخل کانتینر
+		 * اجرا می‌شوند و `allowHostFallback` خاموش است: اگر کانتینری نباشد، فرمان
+		 * **اجرا نمی‌شود** — نه اینکه بی‌صدا روی خودِ پروژه بیفتد.
+		 */
 		sandbox: {
-			enabled: false,
+			enabled: true,
 			runtime: 'auto',
 			image: 'node:22-bookworm-slim',
 			network: 'none',

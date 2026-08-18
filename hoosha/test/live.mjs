@@ -34,6 +34,21 @@ async function step( name, fn ) {
 	}
 }
 
+/*
+ * سندباکس در پیکربندی این آزمون **خاموش** است.
+ *
+ * پیش‌فرض برنامه از این نسخه روشن است (خواستهٔ کارفرما: بدون اجازه، دست به پروژهٔ واقعی
+ * نزن) و چون این ماشین داکر ندارد، هر فرمانی «بسته» رد می‌شود. آزمون زنده باید مسیر
+ * واقعی اجرای فرمان را بسنجد، پس همان تصمیمی را می‌گیرد که یک مدیر می‌گیرد: صریح
+ * خاموشش می‌کند. خودِ پیش‌فرض، در تست واحد سنجیده می‌شود.
+ */
+await fs.mkdir( HOME, { recursive: true } );
+await fs.writeFile(
+	path.join( HOME, 'config.json' ),
+	JSON.stringify( { sandbox: { enabled: false } }, null, 2 ),
+	'utf8'
+);
+
 const { startServer } = await import( '../src/server.js' );
 const { server } = await startServer( { port: PORT, host: '127.0.0.1', workspace: WORK } );
 

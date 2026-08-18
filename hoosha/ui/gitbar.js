@@ -46,10 +46,27 @@ export function initGitBar( deps ) {
 	} );
 }
 
+/**
+ * قفل انتخاب مخزن/شاخه.
+ *
+ * پیش از اولین پیامِ هر گفتگو باز است و بعد از آن بسته. مقدارش را سرور می‌گوید (چون
+ * او می‌داند پیامی رد و بدل شده یا نه)؛ اینجا فقط نگهش می‌داریم تا نوار بتواند
+ * بی‌درنگ خودش را ببندد.
+ */
+let locked = false;
+
+/** @param {boolean} value */
+export function setGitLock( value ) {
+	locked = Boolean( value );
+	paintGitBar( getState() );
+}
+
 /** @param {any} s */
 export function paintGitBar( s ) {
 	const bar = $( '#git-bar' );
 	const git = s?.git;
+	const hasChat = ( s?.transcript || [] ).length > 0;
+	locked = locked || hasChat;
 
 	if ( ! git ) {
 		// مخزن نیست: به‌جای پنهان‌کردن، راه وصل‌شدن را نشان بده.
@@ -74,6 +91,21 @@ export function paintGitBar( s ) {
 	$( '#git-branch' ).title = git.protected
 		? `${ git.branch } — شاخهٔ محافظت‌شده؛ هوشا رویش نمی‌نویسد`
 		: git.branch;
+
+	/*
+	 * بعد از اولین پیام، مخزن و شاخه دیگر عوض نمی‌شوند.
+	 *
+	 * دکمه‌ها را پنهان نمی‌کنیم — کاربر باید ببیند روی چه چیزی کار می‌کند — فقط
+	 * غیرفعال می‌شوند و دلیلش در تیتر می‌آید.
+	 */
+	for ( const id of [ '#git-repo', '#git-branch' ] ) {
+		const node = $( id );
+		node.disabled = locked;
+		node.classList.toggle( 'locked', locked );
+		if ( locked ) {
+			node.title = `${ node.title } — تا گفتگوی تازه قفل است`;
+		}
+	}
 
 	$( '#git-plus' ).textContent = `+${ git.added }`;
 	$( '#git-minus' ).textContent = `−${ git.removed }`;
@@ -114,26 +146,60 @@ function row( ico, label, desc, onClick, checked ) {
 	] );
 }
 
-function repoMenu() {
+async function repoMenu() {
 	const s = getState();
 	const git = s?.git;
 
+	if ( locked ) {
+		menu( [ h( 'div', { class: 'btn quiet row menu-item', text: 'گفتگو شروع شده؛ مخزن تا گفتگوی تازه قفل است.' } ) ] );
+		return;
+	}
+
+	menu( [ h( 'div', { class: 'btn quiet row menu-item', text: 'در حال خواندن مخزن‌های مجاز…' } ) ] );
+
+	/*
+	 * فهرست از گیت‌هاب می‌آید، نه از حافظهٔ مرورگر: «مخزن‌هایی که به هوشا مجوز داده
+	 * شده». هر کدام شاخهٔ پیش‌فرض خودش را همراه دارد و انتخابش همان شاخه را می‌آورد.
+	 */
+	const out = await api( '/api/git?repos' );
+	const known = out.known || { ok: false, repos: [] };
+
 	menu( [
-		h( 'div', { class: 'menu-label', text: 'مخزن' } ),
-		git ? h( 'div', { class: 'btn quiet row menu-item' }, [ h( 'span', { class: 'm-ico', html: iconSvg( 'branch', 16 ) } ), h( 'b', { text: git.name } ), h( 'span', { class: 'm-desc', text: git.remote } ) ] ) : null,
+		h( 'div', { class: 'menu-label', text: 'مخزن‌های مجاز' } ),
+		...( known.repos || [] ).slice( 0, 15 ).map( ( r ) =>
+			row(
+				'repo',
+				r.nameWithOwner,
+				`${ r.defaultBranch }${ r.private ? ' · خصوصی' : '' }`,
+				async () => {
+					close();
+					toast( `${ r.nameWithOwner } آماده می‌شود…` );
+					const res = await post( '/api/git', { action: 'use-repo', repo: r.nameWithOwner, branch: r.defaultBranch } );
+					toast( res.error || `روی ${ r.nameWithOwner } هستیم.`, res.error ? 'error' : '' );
+					await refreshState();
+				},
+				git?.name === r.nameWithOwner.split( '/' ).pop() || git?.remote?.includes( r.nameWithOwner )
+			)
+		),
+		! known.ok
+			? h( 'div', { class: 'btn quiet row menu-item', text: known.message || 'فهرست مخزن‌ها در دسترس نیست.' } )
+			: null,
+		known.ok && ! ( known.repos || [] ).length
+			? h( 'div', { class: 'btn quiet row menu-item', text: 'مخزنی به هوشا مجوز نداده‌ای.' } )
+			: null,
 		h( 'div', { class: 'menu-sep' } ),
 		row( 'plus', 'اتصال مخزن تازه', 'کلون از آدرس گیت', async () => {
 			close();
 			await connectRepo();
 		} ),
-		row( 'repo', 'تغییر پوشهٔ کاری', 'بدون کلون', async () => {
+		row( 'folder-plus', 'تغییر پوشهٔ کاری', 'بدون کلون', async () => {
 			close();
 			const next = await promptDialog( 'مسیر پوشه:', s?.config?.workspace || '' );
 			if ( ! next ) {
 				return;
 			}
-			const out = await post( '/api/workspace', { path: next } );
-			toast( out.error || 'پوشهٔ کاری عوض شد.', out.error ? 'error' : '' );
+			const res = await post( '/api/workspace', { path: next } );
+			toast( res.error || 'پوشهٔ کاری عوض شد.', res.error ? 'error' : '' );
 			await refreshState();
 		} ),
 		git ? row( 'diff', 'دیدن همهٔ تغییرات', '', () => {
@@ -161,6 +227,10 @@ async function connectRepo() {
 }
 
 async function branchMenu() {
+	if ( locked ) {
+		menu( [ h( 'div', { class: 'btn quiet row menu-item', text: 'گفتگو شروع شده؛ شاخه تا گفتگوی تازه قفل است.' } ) ] );
+		return;
+	}
 	menu( [ h( 'div', { class: 'btn quiet row menu-item', text: 'در حال خواندن شاخه‌ها…' } ) ] );
 
 	const out = await api( '/api/git' );

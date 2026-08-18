@@ -414,6 +414,57 @@ export async function pullRequest( dir, { title, body = '', base } ) {
 }
 
 /**
+ * مخزن‌هایی که هوشا اجازهٔ دسترسی به آن‌ها را دارد.
+ *
+ * منبع، خودِ `gh` است: هر مخزنی که توکنِ نصب‌شدهٔ کاربر به آن دسترسی دارد. یعنی فهرست
+ * دقیقاً همان چیزی است که کاربر در گیت‌هاب به این ماشین مجوز داده — نه یک فهرست دستی
+ * که فردا کهنه شود.
+ *
+ * اگر `gh` نباشد یا لاگین نشده باشد، به‌جای فهرست خالی، **دلیلش** برمی‌گردد؛ رابط باید
+ * بتواند بگوید چرا چیزی نیست.
+ *
+ * @param {number} [limit]
+ * @returns {Promise<{ok:boolean, repos:{nameWithOwner:string, defaultBranch:string, url:string, private:boolean, updatedAt:string}[], message?:string}>}
+ */
+export async function repos( limit = 100 ) {
+	return new Promise( ( resolve ) => {
+		execFile(
+			'gh',
+			[ 'repo', 'list', '--limit', String( limit ), '--json', 'nameWithOwner,defaultBranchRef,url,isPrivate,updatedAt' ],
+			{ maxBuffer: MAX_BUFFER },
+			( err, stdout, stderr ) => {
+				if ( err ) {
+					const message = redact( String( stderr || err.message ) );
+					resolve( {
+						ok: false,
+						repos: [],
+						message: /not found|ENOENT/i.test( message )
+							? 'ابزار gh نصب نیست؛ بدون آن فهرست مخزن‌های مجاز در دسترس نیست.'
+							: message,
+					} );
+					return;
+				}
+				try {
+					const raw = JSON.parse( String( stdout || '[]' ) );
+					resolve( {
+						ok: true,
+						repos: raw.map( ( r ) => ( {
+							nameWithOwner: r.nameWithOwner,
+							defaultBranch: r.defaultBranchRef?.name || 'main',
+							url: r.url,
+							private: Boolean( r.isPrivate ),
+							updatedAt: r.updatedAt || '',
+						} ) ),
+					} );
+				} catch ( e ) {
+					resolve( { ok: false, repos: [], message: redact( String( e?.message || e ) ) } );
+				}
+			}
+		);
+	} );
+}
+
+/**
  * آخرین کامیت‌ها — برای پنل تغییرات.
  * @param {string} dir
  * @param {number} [limit]
