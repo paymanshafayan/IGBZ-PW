@@ -784,6 +784,22 @@ async function boot() {
 	const s = await refreshState();
 	await refreshSessions();
 
+	/*
+	 * `?session=<id>` — همان چیزی که «باز کردن در تب تازه» می‌سازد.
+	 *
+	 * بدون این، آن گزینه فقط یک تب خالی باز می‌کرد؛ دکمه‌ای که کاری نمی‌کند از نبودنش
+	 * بدتر است.
+	 */
+	const wanted = new URLSearchParams( location.search || '' ).get( 'session' );
+	if ( wanted ) {
+		history.replaceState?.( null, '', location.pathname );
+		await resumeSession( wanted );
+		markActiveView( 'chat' );
+		connectEvents();
+		focusComposer();
+		return;
+	}
+
 	if ( s.transcript?.length ) {
 		renderTranscript( s.transcript );
 	} else {

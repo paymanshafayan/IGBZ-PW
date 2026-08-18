@@ -9,7 +9,7 @@
  *   ۲) ردیف‌های اخیر فقط **عنوان**اند؛ نه کارت، نه قاب، نه زیرنویس.
  */
 
-import { $, h, timeAgo, toast, confirmDialog, promptDialog } from './lib/dom.js';
+import { $, h, timeAgo, toast, confirmDialog, promptDialog, contextMenu } from './lib/dom.js';
 import { api, post, getState } from './lib/api.js';
 import { logoSvg } from './lib/logo.js';
 import { t, lang, LANGS } from './lib/i18n.js';
@@ -98,47 +98,113 @@ function paint() {
 		return;
 	}
 
+	// سنجاق‌شده‌ها بالا می‌مانند؛ بقیه به ترتیب زمان.
+	const pins = pinned();
+	const ordered = [ ...sessions ].sort( ( a, b ) => Number( pins.has( b.id ) ) - Number( pins.has( a.id ) ) );
+
 	// در نوار کناری فقط چند تای آخر؛ بقیه در صفحهٔ «گفتگوها».
-	for ( const item of sessions.slice( 0, 14 ) ) {
-		box.appendChild(
-			h( 'div', { class: `recent-item ${ s?.sessionId === item.id ? 'active' : '' }` }, [
-				h( 'button', {
-					class: 'btn quiet row rt',
-					'data-no-t': '',
-					title: `${ item.title }\n${ timeAgo( item.updatedAt ) }`,
-					text: item.title || t( 'بدون عنوان' ),
-					onClick: () => onResume( item.id ),
-				} ),
-				h( 'button', {
-					class: 'btn icon round quiet reveal row-menu',
-					title: 'گزینه‌ها',
-					text: '⋯',
-					onClick: async ( e ) => {
-						e.stopPropagation();
-						await rowMenu( item );
-					},
-				} ),
-			] )
-		);
+	for ( const item of ordered.slice( 0, 14 ) ) {
+		const row = h( 'div', { class: `recent-item ${ s?.sessionId === item.id ? 'active' : '' }` }, [
+			pins.has( item.id ) ? h( 'span', { class: 'pin-dot', title: t( 'سنجاق‌شده' ), text: '📌' } ) : null,
+			h( 'button', {
+				class: 'btn quiet row rt',
+				'data-no-t': '',
+				title: `${ item.title }\n${ timeAgo( item.updatedAt ) }`,
+				text: item.title || t( 'بدون عنوان' ),
+				onClick: () => onResume( item.id ),
+			} ),
+			h( 'button', {
+				class: 'btn icon round quiet reveal row-menu',
+				title: t( 'گزینه‌ها' ),
+				text: '⋯',
+				onClick: ( e ) => {
+					e.stopPropagation();
+					const box2 = e.currentTarget?.getBoundingClientRect?.() || { left: 60, bottom: 80 };
+					sessionMenu( item, box2.left, box2.bottom + 4 );
+				},
+			} ),
+		] );
+		// راست‌کلیک، همان منو را سرِ جای نشانگر باز می‌کند — خواستهٔ کارفرما.
+		row.oncontextmenu = ( e ) => {
+			e.preventDefault?.();
+			sessionMenu( item, e.clientX ?? 60, e.clientY ?? 80 );
+			return false;
+		};
+		box.appendChild( row );
 	}
 }
 
-/** منوی سه‌نقطهٔ هر گفتگو. */
-async function rowMenu( item ) {
-	const title = await promptDialog( 'نام تازهٔ گفتگو (خالی = حذف گفتگو):', item.title || '' );
-	if ( title === null ) {
+const PIN_KEY = 'hoosha-pinned';
+
+/** شناسهٔ گفتگوهای سنجاق‌شده. سمت مرورگر نگه داشته می‌شود؛ سرور از آن خبر ندارد. */
+function pinned() {
+	try {
+		return new Set( JSON.parse( localStorage.getItem( PIN_KEY ) || '[]' ) );
+	} catch {
+		return new Set();
+	}
+}
+
+/** @param {string} id */
+function togglePin( id ) {
+	const set = pinned();
+	if ( set.has( id ) ) {
+		set.delete( id );
+	} else {
+		set.add( id );
+	}
+	localStorage.setItem( PIN_KEY, JSON.stringify( [ ...set ] ) );
+	paint();
+}
+
+/**
+ * منوی یک گفتگو — چه از سه‌نقطه باز شود چه از راست‌کلیک.
+ *
+ * فهرست از روی تصویر Claude است، منهای دو قلم که در هوشا معنا ندارند: «علامت
+ * خوانده‌نشده» (هوشا وضعیت خوانده/نخوانده ندارد) و «انتقال به گروه» (گروه نداریم).
+ * گذاشتنِ دکمهٔ بی‌کار، بدتر از نگذاشتنش است.
+ *
+ * @param {{id:string, title?:string}} item
+ */
+function sessionMenu( item, x, y ) {
+	const isPinned = pinned().has( item.id );
+	contextMenu( {
+		x,
+		y,
+		items: [
+			{ ico: '📌', label: isPinned ? t( 'برداشتن سنجاق' ) : t( 'سنجاق' ), hint: 'P', onPick: () => togglePin( item.id ) },
+			{ ico: '✎', label: t( 'تغییر نام' ), hint: 'R', onPick: () => renameSession( item ) },
+			{ ico: '↗', label: t( 'باز کردن در تب تازه' ), onPick: () => openInNewTab( item.id ) },
+			'-',
+			{ ico: '🗑', label: t( 'حذف' ), hint: 'D', danger: true, onPick: () => removeSession( item ) },
+		],
+	} );
+}
+
+/** @param {string} id */
+function openInNewTab( id ) {
+	const url = `${ location.origin }/?session=${ encodeURIComponent( id ) }`;
+	if ( typeof window.open === 'function' ) {
+		window.open( url, '_blank' );
+	}
+}
+
+async function renameSession( item ) {
+	const title = await promptDialog( t( 'نام تازهٔ گفتگو' ), item.title || '' );
+	if ( title === null || ! title.trim() ) {
 		return;
 	}
-	if ( title.trim() === '' ) {
-		if ( ! ( await confirmDialog( 'این گفتگو حذف شود؟', { danger: true } ) ) ) {
-			return;
-		}
-		const out = await post( '/api/sessions', { action: 'delete', id: item.id } );
-		if ( out.error ) {
-			toast( out.error, 'error' );
-		}
-	} else {
-		await post( '/api/sessions', { action: 'rename', id: item.id, title } );
+	await post( '/api/sessions', { action: 'rename', id: item.id, title } );
+	await refreshSessions();
+}
+
+async function removeSession( item ) {
+	if ( ! ( await confirmDialog( t( 'این گفتگو حذف شود؟' ), { danger: true } ) ) ) {
+		return;
+	}
+	const out = await post( '/api/sessions', { action: 'delete', id: item.id } );
+	if ( out.error ) {
+		toast( out.error, 'error' );
 	}
 	await refreshSessions();
 }
@@ -188,9 +254,13 @@ export function paintSidebarState( s ) {
 	const p = s.config.profiles?.[ s.config.activeProfile ] || {};
 	const hub = s.hub?.active;
 	$( '#account-name' ).textContent = hub ? t( 'هاب پرووایدر' ) : p.label || s.config.activeProfile || t( 'پروفایل' );
-	$( '#chip-provider' ).textContent = hub
-		? t( 'مسیریابی خودکار' )
-		: `${ p.provider || '—' }${ p.model ? ` · ${ p.model }` : '' }`;
+	/*
+	 * فقط نام سرویس، بدون نام مدل.
+	 *
+	 * نام مدل هم اینجا بود هم روی خود کامپوزر؛ دوبار نوشتنش ردیف حساب را شلوغ می‌کرد و
+	 * با شناسه‌های بلند (`openrouter/…`) از کادر می‌زد بیرون. خواستهٔ صریح کارفرما.
+	 */
+	$( '#chip-provider' ).textContent = hub ? t( 'مسیریابی خودکار' ) : p.provider || '—';
 	// آواتار، نشان خودِ هوشاست — همان‌جایی که در Claude دایرهٔ حساب می‌نشیند.
 	const dot = $( '#account-initial' );
 	if ( ! dot.innerHTML.includes( 'svg' ) ) {

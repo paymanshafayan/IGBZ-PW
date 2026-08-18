@@ -29,13 +29,19 @@ export function mountThread( opts ) {
 	onOpenFile = opts.onOpenFile;
 
 	const jump = h( 'button', {
-		class: 'btn icon round outline jump-down',
+		class: 'btn icon round jump-down',
 		id: 'jump-down',
 		title: 'برو به آخر',
 		hidden: true,
 		onClick: () => scrollToEnd(),
 	}, [ h( 'span', { text: '↓' } ) ] );
-	chat.parentElement.appendChild( jump );
+	/*
+	 * داخل کانتینر خودش، نه چسبیده به نمای گفتگو.
+	 *
+	 * قبلاً با `translateX(50%)` وسط‌چین می‌شد و لحن `outline` در هاور همان transform را
+	 * با `translateY(-1px)` بازنویسی می‌کرد — یعنی دکمه با نزدیک‌شدن نشانگر به چپ می‌پرید.
+	 */
+	( document.getElementById( 'jump-slot' ) || chat.parentElement ).appendChild( jump );
 
 	chat.addEventListener( 'scroll', () => {
 		jump.hidden = atBottom();

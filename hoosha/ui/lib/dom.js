@@ -199,3 +199,64 @@ export async function copyText( text ) {
 		toast( 'کپی نشد — دسترسی کلیپ‌بورد نداریم.', 'error' );
 	}
 }
+
+/**
+ * منوی راست‌کلیک — یک منوی شناور سرِ جای نشانگر.
+ *
+ * خواستهٔ کارفرما از روی رابط Claude: راست‌کلیک روی هر گفتگو باید منو باز کند. منو
+ * `position: fixed` است چون باید از هر ظرفِ اسکرول‌داری بیرون بزند، و با کلیک بیرون،
+ * Escape یا اسکرول بسته می‌شود.
+ *
+ * @param {{x:number, y:number, items:({label:string, ico?:string, hint?:string, danger?:boolean, onPick:()=>any}|'-')[]}} opts
+ */
+export function contextMenu( { x, y, items } ) {
+	closeContextMenu();
+
+	const menu = h( 'div', { class: 'pop-menu ctx-menu', id: 'ctx-menu' } );
+	for ( const item of items ) {
+		if ( item === '-' ) {
+			menu.appendChild( h( 'div', { class: 'menu-sep' } ) );
+			continue;
+		}
+		menu.appendChild(
+			h( 'button', {
+				class: `btn quiet row menu-item ${ item.danger ? 'danger' : '' }`,
+				onClick: () => {
+					closeContextMenu();
+					item.onPick();
+				},
+			}, [
+				h( 'span', { class: 'm-ico', text: item.ico || '' } ),
+				h( 'span', { text: item.label } ),
+				item.hint ? h( 'span', { class: 'm-end', text: item.hint } ) : null,
+			] )
+		);
+	}
+
+	document.body.appendChild( menu );
+	// نگذار از لبهٔ پایین/کنار صفحه بیرون بزند.
+	const w = 240;
+	const h1 = Math.min( items.length * 34 + 12, 420 );
+	const vw = globalThis.innerWidth || 1280;
+	const vh = globalThis.innerHeight || 800;
+	menu.style.left = `${ Math.max( 8, Math.min( x, vw - w - 8 ) ) }px`;
+	menu.style.top = `${ Math.max( 8, Math.min( y, vh - h1 - 8 ) ) }px`;
+
+	setTimeout( () => {
+		document.addEventListener( 'click', closeContextMenu, { once: true } );
+		document.addEventListener( 'keydown', onCtxKey );
+	}, 0 );
+	return menu;
+}
+
+function onCtxKey( e ) {
+	if ( e.key === 'Escape' ) {
+		closeContextMenu();
+	}
+}
+
+/** بستن منوی راست‌کلیک، اگر بازی هست. */
+export function closeContextMenu() {
+	document.removeEventListener( 'keydown', onCtxKey );
+	$( '#ctx-menu' )?.remove();
+}

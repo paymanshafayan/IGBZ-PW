@@ -354,6 +354,9 @@ export function installFakeDom( opts = {} ) {
 		},
 		body: new FakeNode( 'body' ),
 		documentElement: new FakeNode( 'html' ),
+		getElementById( id ) {
+			return this.body.querySelectorAll( `#${ id }` )[ 0 ] || null;
+		},
 		querySelector( sel ) {
 			return this.body.querySelector( sel );
 		},
@@ -383,6 +386,8 @@ export function installFakeDom( opts = {} ) {
 	};
 
 	const previous = {
+		location: globalThis.location,
+		history: globalThis.history,
 		document: globalThis.document,
 		fetch: globalThis.fetch,
 		localStorage: globalThis.localStorage,
@@ -391,6 +396,8 @@ export function installFakeDom( opts = {} ) {
 	};
 
 	globalThis.document = document;
+	globalThis.location = { origin: 'http://localhost:7788', pathname: '/', search: opts.search || '', href: 'http://localhost:7788/', reload() {} };
+	globalThis.history = { replaceState() {}, pushState() {} };
 	globalThis.MutationObserver = FakeMutationObserver;
 	globalThis.CustomEvent = class {
 		constructor( type, init ) {
@@ -416,6 +423,8 @@ export function installFakeDom( opts = {} ) {
 			globalThis.localStorage = previous.localStorage;
 			globalThis.CustomEvent = previous.CustomEvent;
 			globalThis.MutationObserver = previous.MutationObserver;
+			globalThis.location = previous.location;
+			globalThis.history = previous.history;
 			observers.length = 0;
 		},
 	};

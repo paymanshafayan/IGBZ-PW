@@ -343,7 +343,6 @@ textarea {
 	display: flex;
 	flex-direction: column;
 	gap: 1px;
-	margin-top: 8px;
 }
 .session-list {
 	display: flex;
@@ -1127,9 +1126,10 @@ code .f {
 	color: var(--second);
 	background: var(--second-soft);
 }
+/* حالت خودکار قبلاً نارنجی بود؛ رنگِ «الان فعال است» در هوشا فیروزه است. */
 #pill-mode[data-mode='auto'] {
-	color: var(--warn);
-	background: var(--warn-soft);
+	color: var(--primary);
+	background: var(--primary-soft);
 }
 
 /* ─────────────────────────────────── نوار گیت زیر کامپوزر */
@@ -1230,18 +1230,24 @@ code .f {
 	text-overflow: ellipsis;
 }
 
+.jump-slot {
+	position: relative;
+	height: 0;
+}
 .btn.jump-down {
 	position: absolute;
-	inset-inline-start: 50%;
-	bottom: 160px;
-	transform: translateX(50%);
+	inset-inline: 0;
+	bottom: 10px;
+	margin-inline: auto;
+	margin-block: 0;
 	z-index: 15;
 	background: var(--popover);
+	border-color: var(--border);
 	box-shadow: var(--shadow-2);
 }
 .btn.jump-down:hover {
 	color: var(--primary);
-	transform: translateX(50%) translateY(-2px);
+	transform: translateY(-2px);
 }
 .view-chat {
 	position: relative;
@@ -1272,6 +1278,32 @@ code .f {
 		transform: translateY(6px) scale(0.98);
 	}
 }
+/*
+ * منوی راست‌کلیک.
+ *
+ * `fixed` است چون سرِ جای نشانگر باز می‌شود و باید از هر ظرفِ اسکرول‌دار — نوار کناری،
+ * فهرست گفتگوها — بیرون بزند.
+ */
+.ctx-menu {
+	position: fixed;
+	inset: auto;
+	bottom: auto;
+	min-width: 240px;
+	max-width: 320px;
+}
+.ctx-menu .btn.menu-item {
+	border-radius: 8px;
+	padding: 0 10px;
+}
+
+/* نشان سنجاق کنار گفتگوهای سنجاق‌شده */
+.pin-dot {
+	flex: none;
+	font-size: 11px;
+	line-height: 1;
+	opacity: 0.75;
+}
+
 .pop-menu.model-menu {
 	inset-inline: 26px;
 }
@@ -2070,7 +2102,7 @@ body.sidebar-collapsed .account-menu {
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	padding: 16px 16px 8px;
+	padding: 16px 16px 0;
 }
 
 /* در Claude، «Claude» یک واژه‌نشانِ ساده است: بدون آیکون، بدون شمارهٔ نسخه. */
@@ -2105,7 +2137,8 @@ body.sidebar-collapsed .account-menu {
  */
 .btn.row.new-chat {
 	width: auto;
-	margin: 8px 12px 16px;
+	/* فاصلهٔ پایین صفر — خواستهٔ کارفرما؛ ردیف‌های ناوبری بلافاصله زیرش می‌آیند. */
+	margin: 8px 12px 0;
 	font-size: 14.5px;
 	font-weight: 500;
 }
@@ -2176,7 +2209,6 @@ body.sidebar-collapsed .account-menu {
 	background: transparent;
 	border: 0;
 	color: var(--foreground);
-	padding: 6px 8px;
 	border-radius: 8px;
 	cursor: pointer;
 	text-align: start;
@@ -2184,6 +2216,7 @@ body.sidebar-collapsed .account-menu {
 	transition: background 0.14s var(--ease);
 	position: relative;
 	margin-inline: 12px;
+	padding: 0 8px;
 }
 .recent-item:hover {
 	background: var(--accent);
@@ -2195,7 +2228,6 @@ body.sidebar-collapsed .account-menu {
 .recent-item .btn.rt {
 	flex: 1;
 	min-width: 0;
-	min-height: 0;
 	padding: 0;
 	color: inherit;
 	font-size: inherit;
@@ -2326,6 +2358,15 @@ body.sidebar-collapsed .account-menu {
 	flex: 1;
 	min-height: 0;
 	overflow-y: auto;
+}
+/*
+ * هر بخشِ صفحه از بخش بعدی فاصله دارد.
+ *
+ * در صفحهٔ «تغییرات»، ردیف دکمه‌ها مستقیم به پنل زیرش چسبیده بود (تصویر کارفرما): ظرفِ
+ * دکمه‌ها `gap` داشت ولی هیچ‌چیز فاصلهٔ *بین بخش‌ها* را نمی‌داد.
+ */
+.page-inner > * + * {
+	margin-top: 16px;
 }
 .page-inner {
 	max-width: 56rem;

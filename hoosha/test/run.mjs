@@ -3862,7 +3862,7 @@ section( 'رابط — بوت واقعی روی index.html' );
 /** @type {string[]} همهٔ درخواست‌هایی که رابط در آخرین بوت زده است. */
 let fetchLog = [];
 
-async function bootApp( overrides = {} ) {
+async function bootApp( overrides = {}, domOpts = {} ) {
 	const { installFakeDom, parseHtml } = await import( './fake-dom.mjs' );
 	fetchLog = [];
 	const state = {
@@ -3887,6 +3887,7 @@ async function bootApp( overrides = {} ) {
 	};
 
 	const dom = installFakeDom( {
+		...domOpts,
 		fetch: async ( url, options ) => {
 			fetchLog.push( `${ options?.method || 'GET' } ${ url }` );
 			return {
@@ -4791,7 +4792,7 @@ await test( 'هر دکمه ۱۰ پیکسل فاصله دارد و هیچ‌جا 
 	// ردیف‌های ناوبری استثنا هستند: روی هم می‌نشینند.
 	assert.match( cssBlock( '.btn.row' ), /margin:\s*0/ );
 	// ولی «گفتگوی تازه» و ردیف‌های ناوبری جای خودشان را نگه می‌دارند.
-	assert.match( cssBlock( '.btn.row.new-chat' ), /margin:\s*8px 12px 16px/ );
+	assert.match( cssBlock( '.btn.row.new-chat' ), /margin:\s*8px 12px 0/, 'فاصلهٔ پایینِ «گفتگوی تازه» باید صفر باشد' );
 	assert.match( cssBlock( '.btn.row.nav-item' ), /margin-inline:\s*12px/ );
 } );
 
@@ -4962,6 +4963,116 @@ await test( 'بلوک استدلال واقعاً وجود دارد — thinking
 	assert.match( css, /\.thinking-head \.spin\s*\{/ );
 } );
 
+// ---------------------------------------------- ده اصلاح چیدمانی کارفرما
+
+section( 'اصلاح‌های چیدمانی' );
+
+await test( 'نوار کناری همان اعدادی را دارد که کارفرما خواست', () => {
+	// هر کدام یک خواستهٔ صریح است؛ عدد را از خود پیام برداشته‌ام.
+	assert.match( cssBlock( '.btn.row.new-chat' ), /margin:\s*8px 12px 0/ );
+	assert.equal( /margin-top:\s*8px/.test( cssBlock( '.side-nav' ) ), false, '.side-nav نباید فاصلهٔ بالا داشته باشد' );
+	assert.match( cssBlock( '.side-top' ), /padding:\s*16px 16px 0/ );
+	assert.equal( /min-height/.test( cssBlock( '.recent-item .btn.rt' ) ), false, 'عنوان گفتگوی اخیر نباید قد حداقلی داشته باشد' );
+	assert.match( cssBlock( '.recent-item' ), /padding:\s*0 8px/ );
+} );
+
+await test( 'ردیف حساب فقط نام سرویس را نشان می‌دهد، نه نام مدل', () => {
+	const sidebar = fssync.readFileSync( path.join( uiDir, 'sidebar.js' ), 'utf8' );
+	assert.match( sidebar, /#chip-provider' \)\.textContent = hub \? t\( 'مسیریابی خودکار' \) : p\.provider \|\| '—'/ );
+	assert.equal( /chip-provider[\s\S]{0,160}p\.model/.test( sidebar ), false, 'نام مدل نباید در ردیف حساب باشد' );
+} );
+
+await test( 'بخش‌های صفحه به هم نمی‌چسبند (تصویر «تغییرات»)', () => {
+	// در تصویر، ردیف Commit/Push/Pull request مستقیم روی پنل زیرش نشسته بود.
+	assert.match( cssBlock( '.page-inner > * + *' ), /margin-top:\s*16px/ );
+} );
+
+await test( 'دکمهٔ «برو به آخر» کانتینر خودش را دارد و در هاور نمی‌پرد', () => {
+	/*
+	 * باگ: کلاس `outline` در هاور `transform: translateY(-1px)` می‌گذاشت و همان،
+	 * `translateX(50%)`ِ وسط‌چین‌کننده را پاک می‌کرد — دکمه با نزدیک‌شدن نشانگر به کنار
+	 * می‌پرید. حالا وسط‌چینی با `inset-inline: 0` + `margin-inline: auto` است و اصلاً
+	 * transform ندارد.
+	 */
+	assert.match( html, /<div class="jump-slot" id="jump-slot"><\/div>/ );
+	const slotAt = html.indexOf( 'id="jump-slot"' );
+	const composerAt = html.indexOf( '<form id="composer"' );
+	assert.ok( slotAt > -1 && slotAt < composerAt, 'کانتینر باید بالای کادر نوشتن باشد' );
+
+	assert.match( cssBlock( '.jump-slot' ), /position:\s*relative/ );
+	assert.match( cssBlock( '.jump-slot' ), /height:\s*0/ );
+	const jump = cssBlock( '.btn.jump-down' );
+	assert.match( jump, /inset-inline:\s*0/ );
+	assert.match( jump, /margin-inline:\s*auto/ );
+	assert.equal( /translateX/.test( jump ), false, 'وسط‌چینی نباید با transform باشد' );
+
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.match( thread, /class: 'btn icon round jump-down'/, 'کلاس outline باید از دکمه برداشته شود' );
+	assert.match( thread, /getElementById\( 'jump-slot' \)/ );
+} );
+
+await test( 'حالت خودکار فیروزه است، نه نارنجی', () => {
+	const auto = cssBlock( "#pill-mode[data-mode='auto']" );
+	assert.match( auto, /color:\s*var\(--primary\)/ );
+	assert.match( auto, /background:\s*var\(--primary-soft\)/ );
+	assert.equal( /--warn/.test( auto ), false, 'نارنجی باید رفته باشد' );
+} );
+
+await test( 'راست‌کلیک روی گفتگوی اخیر، منو باز می‌کند', async () => {
+	// خواستهٔ کارفرما از روی تصویر Claude. تست، خودِ رویداد را می‌فرستد نه ادعای کد را.
+	const { dom, q } = await bootApp();
+	try {
+		const row = document.querySelector( '.recent-item' );
+		assert.ok( row, 'ردیف گفتگوی اخیر نیست' );
+		assert.equal( typeof row.oncontextmenu, 'function', 'راست‌کلیک اصلاً بسته نشده' );
+
+		let prevented = false;
+		row.oncontextmenu( { preventDefault: () => ( prevented = true ), clientX: 120, clientY: 200 } );
+		assert.equal( prevented, true, 'منوی خود مرورگر باید جلویش گرفته شود' );
+
+		const menu = q( '#ctx-menu' );
+		assert.ok( menu, 'منوی راست‌کلیک باز نشد' );
+		const labels = menu.querySelectorAll( '.menu-item' ).map( ( b ) => b.textContent.replace( /[📌✎↗🗑]/g, '' ).trim() );
+		for ( const want of [ 'سنجاق', 'تغییر نام', 'باز کردن در تب تازه', 'حذف' ] ) {
+			assert.ok( labels.some( ( l ) => l.includes( want ) ), `«${ want }» در منو نیست: ${ labels.join( ' | ' ) }` );
+		}
+		assert.equal( menu.style.left, '120px' );
+		assert.equal( menu.style.top, '200px' );
+
+		// سنجاق واقعاً ذخیره می‌شود و ردیف نشان می‌گیرد.
+		const pin = menu.querySelectorAll( '.menu-item' )[ 0 ];
+		pin.click();
+		await new Promise( ( r ) => setTimeout( r, 60 ) );
+		assert.ok( localStorage.getItem( 'hoosha-pinned' )?.includes( 's1' ), 'سنجاق ذخیره نشد' );
+		assert.ok( document.querySelector( '.pin-dot' ), 'نشان سنجاق روی ردیف نیامد' );
+		assert.equal( q( '#ctx-menu' ), null, 'منو بعد از انتخاب باید بسته شود' );
+
+		// و همان منو از دکمهٔ سه‌نقطه هم باز می‌شود.
+		document.querySelector( '.row-menu' ).click();
+		await new Promise( ( r ) => setTimeout( r, 60 ) );
+		assert.ok( q( '#ctx-menu' ), 'سه‌نقطه هم باید همان منو را باز کند' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( '«باز کردن در تب تازه» نشانی نشست را می‌سازد و برنامه آن را می‌فهمد', async () => {
+	const sidebar = fssync.readFileSync( path.join( uiDir, 'sidebar.js' ), 'utf8' );
+	assert.match( sidebar, /\/\?session=\$\{ encodeURIComponent\( id \) \}/ );
+
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
+	assert.match( app, /new URLSearchParams\( location\.search \|\| '' \)\.get\( 'session' \)/ );
+
+	// و در اجرا واقعاً همان نشست را باز می‌کند.
+	const { dom } = await bootApp( {}, { search: '?session=s1' } );
+	try {
+		await new Promise( ( r ) => setTimeout( r, 120 ) );
+		assert.ok( fetchLog.some( ( x ) => x === 'POST /api/resume' ), `resume صدا نشد: ${ fetchLog.join( ' | ' ) }` );
+	} finally {
+		dom.restore();
+	}
+} );
+
 // ------------------------------------------------------- انگلیسیِ تمام‌وقت
 
 section( 'انگلیسی بدون ته‌ماندهٔ فارسی' );
@@ -5093,6 +5204,13 @@ await test( 'در حالت انگلیسی هیچ متن فارسی روی صفح
 			collect( `منوی ${ id }` );
 		}
 		assert.ok( menus >= 10, `فقط ${ menus } منو باز شد؛ سناریو ناقص است` );
+
+		// و منوی راست‌کلیک گفتگو — تازه‌ترین منویی که اضافه شد.
+		const row = document.querySelector( '.recent-item' );
+		row?.oncontextmenu?.( { preventDefault() {}, clientX: 100, clientY: 150 } );
+		await new Promise( ( r ) => setTimeout( r, 90 ) );
+		assert.ok( document.querySelector( '#ctx-menu' ), 'منوی راست‌کلیک باز نشد' );
+		collect( 'منوی راست‌کلیک' );
 
 		const report = [ ...leftovers ].map( ( [ text, where ] ) => `${ where } → ${ text.slice( 0, 60 ) }` ).sort();
 		assert.deepEqual( report, [], `${ report.length } متن فارسی در حالت انگلیسی ماند:\n  ${ report.join( '\n  ' ) }` );
