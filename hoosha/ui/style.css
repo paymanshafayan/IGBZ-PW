@@ -87,7 +87,7 @@
 	--btn-gap: 10px;
 	--composer-h: 70px;
 	--composer-max: 168px;
-	--composer-box: 138px;
+	--composer-box: 114px;
 	--ease: cubic-bezier(0.22, 0.9, 0.32, 1);
 }
 
@@ -2304,7 +2304,7 @@ body.sidebar-collapsed .account-menu {
 	border-radius: 8px;
 	cursor: pointer;
 	text-align: start;
-	font-size: 13.5px;
+	font-size: 13px;
 	transition: background 0.14s var(--ease);
 	position: relative;
 	margin-inline: 12px;
@@ -2345,8 +2345,8 @@ body.sidebar-collapsed .account-menu {
 	flex-direction: column;
 	align-items: flex-start;
 	gap: 0;
-	line-height: 1.35;
-	padding-block: 4px;
+	line-height: 1.7;
+	padding-block: 5px;
 }
 .recent-item .btn.rt:hover {
 	background: transparent;
@@ -2923,10 +2923,9 @@ body.sidebar-collapsed .account-menu {
 	cursor: text;
 	z-index: 1;
 	background: var(--card);
-	border: 1px solid transparent;
+	border: 1px solid var(--border);
 	border-radius: 20px;
-	box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, #000 3.5%, transparent),
-		0 0 0 1px color-mix(in srgb, var(--foreground) 15%, transparent);
+	box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, #000 3.5%, transparent);
 	transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease), box-shadow 0.2s var(--ease),
 		opacity 0.2s var(--ease);
 }

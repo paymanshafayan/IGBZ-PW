@@ -4624,7 +4624,7 @@ await test( 'کادر پیام ارتفاع مهارشده دارد و صفحه 
 	const root = cssBlock( ':root' );
 	assert.match( root, /--composer-h:\s*70px/, 'همان عددی که در طرح آمده' );
 	assert.match( root, /--composer-max:\s*168px/ );
-	assert.match( root, /--composer-box:\s*138px/, 'ارتفاع کارت: ۱۲+۷۰+۸+۳۶+۱۲' );
+	assert.match( root, /--composer-box:\s*114px/, 'ارتفاع محتوا: ۷۰+۸+۳۶ — کادرِ اجباریِ بلندتر برداشته شد (طبق طرح claude-ui: کل باکس ~۱۴۰px)' );
 
 	const box = cssBlock( '.composer textarea' );
 	assert.match( box, /min-height:\s*var\(--composer-h\)/ );
@@ -5622,17 +5622,28 @@ await test( 'خوش‌آمد ظرف خودش را دارد، بیرون از ن�
 await test( 'کادر چت همان اعداد و ترنزیشنی را دارد که کارفرما فرستاد', () => {
 	const card = cssBlock( '.composer' );
 	assert.match( card, /border-radius:\s*20px/ );
-	assert.match( card, /border:\s*1px solid transparent/ );
+	assert.match( card, /border:\s*1px solid var\(--border\)/, 'قاب واقعیِ یک‌پیکسلی به رنگ طرح (#e5e5e5)، نه شفاف' );
 	assert.match( card, /margin-inline:\s*8px/ );
 	assert.match( card, /z-index:\s*1/ );
 	assert.match( card, /cursor:\s*text/ );
 	assert.match( card, /box-sizing:\s*content-box/ );
 	assert.match( card, /box-shadow:\s*0 0\.25rem 1\.25rem color-mix/ );
+	assert.equal( /box-shadow:[^;]*0 0 0 1px/.test( card ), false, 'حلقهٔ قابِ سایه‌ای رفت؛ قاب واقعی جایش را گرفت' );
 	assert.match( card, /transition:\s*background-color 0\.2s/ );
 	assert.equal( /transition:[^;]*\ball\b/.test( card ), false, 'ترنزیشن روی همه‌چیز نه' );
 
 	// و کادر، پنجاه پیکسل پایین‌تر از خوش‌آمد.
 	assert.match( cssBlock( '.view-chat.empty .composer-wrap' ), /margin-top:\s*50px/ );
+} );
+
+await test( 'ردیف «اخیر»: فونت کوچک‌تر و حروف دیگر نصفه دیده نمی‌شوند', () => {
+	// فونت وزیرمتن دنبالهٔ عمودی بلندی دارد (چ/پ/ج/ی پایین‌تر از خط می‌روند)؛
+	// line-height تنگ + overflow:hidden حروف را از پایین قیچی می‌کرد.
+	const item = cssBlock( '.recent-item' );
+	assert.match( item, /font-size:\s*13px/, 'یک درجه کوچک‌تر از ۱۳٫۵ — خواستهٔ کارفرما' );
+	const rt = cssBlock( '.recent-item .btn.rt' );
+	assert.match( rt, /line-height:\s*1\.7/, 'ارتفاع خط برای دنبالهٔ حروف فارسی' );
+	assert.match( rt, /padding-block:\s*5px/ );
 } );
 
 // ------------------------------------------------------- انگلیسیِ تمام‌وقت
