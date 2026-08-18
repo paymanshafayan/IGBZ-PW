@@ -216,52 +216,66 @@ export function contextMenu( { x, y, items } ) {
 	const menu = h( 'div', { class: 'pop-menu ctx-menu', id: 'ctx-menu' } );
 
 	/**
-	 * یک لایه از منو را می‌کشد.
+	 * یک ردیف منو.
 	 *
-	 * زیرمنو به‌جای بازشدن در کنار، **جای همین منو** می‌نشیند و یک ردیف «بازگشت» بالایش
-	 * می‌آید. دلیلش ساده است: منوی کناری کنار لبهٔ صفحه جا نمی‌شود و با صفحه‌کلید هم
-	 * دردسر دارد؛ این شکل، همان کار را بدون هیچ‌کدامِ آن‌ها انجام می‌دهد.
+	 * ردیفی که زیرمنو دارد، **کنار** خودش یک منوی دوم باز می‌کند — نه اینکه جای منوی
+	 * اول را بگیرد. (نسخهٔ قبل جایگزین می‌کرد و کارفرما درست گفت که آن چیزی نیست که
+	 * می‌خواهد.)
 	 */
-	const draw = ( list, back ) => {
-		const rows = [];
-		if ( back ) {
-			rows.push(
-				h( 'button', { class: 'btn quiet row menu-item', onClick: () => draw( back, null ) }, [
-					h( 'span', { class: 'm-ico', html: iconSvg( 'chevron-right', 14 ) } ),
-					h( 'span', { text: 'بازگشت' } ),
-				] ),
-				h( 'div', { class: 'menu-sep' } )
-			);
+	const rowOf = ( item ) => {
+		if ( item === '-' ) {
+			return h( 'div', { class: 'menu-sep' } );
 		}
-		for ( const item of list ) {
-			if ( item === '-' ) {
-				rows.push( h( 'div', { class: 'menu-sep' } ) );
-				continue;
-			}
-			rows.push(
-				h( 'button', {
-					class: `btn quiet row menu-item ${ item.danger ? 'danger' : '' }`,
-					onClick: () => {
-						if ( item.submenu ) {
-							draw( item.submenu(), list );
-							return;
-						}
-						closeContextMenu();
-						item.onPick();
-					},
-				}, [
-					h( 'span', { class: 'm-ico', html: item.ico ? iconSvg( item.ico, 16 ) : '' } ),
-					h( 'span', { text: item.label } ),
-					item.submenu ? h( 'span', { class: 'm-end', text: '›' } ) : item.hint ? h( 'span', { class: 'm-end', text: item.hint } ) : null,
-				] )
-			);
+		const node = h( 'button', {
+			class: `btn quiet row menu-item ${ item.danger ? 'danger' : '' }`,
+			onClick: ( e ) => {
+				e?.stopPropagation?.();
+				if ( item.submenu ) {
+					openSub( node, item.submenu() );
+					return;
+				}
+				closeContextMenu();
+				item.onPick();
+			},
+		}, [
+			h( 'span', { class: 'm-ico', html: item.ico ? iconSvg( item.ico, 16 ) : '' } ),
+			h( 'span', { text: item.label } ),
+			item.submenu
+				? h( 'span', { class: 'm-end', html: iconSvg( 'chevron-right', 12 ) } )
+				: item.hint
+				? h( 'span', { class: 'm-end', text: item.hint } )
+				: null,
+		] );
+		if ( item.submenu ) {
+			node.addEventListener( 'mouseenter', () => openSub( node, item.submenu() ) );
 		}
-		menu.replaceChildren( ...rows );
+		return node;
 	};
 
-	draw( items, null );
+	/** منوی دوم، چسبیده به همان ردیف. */
+	function openSub( anchor, items2 ) {
+		closeSub();
+		const sub = h( 'div', { class: 'pop-menu ctx-menu ctx-sub', id: 'ctx-sub' }, items2.map( rowOf ) );
+		document.body.appendChild( sub );
 
+		const box = anchor.getBoundingClientRect?.() || { top: 0, left: 0, right: 0, width: 240 };
+		const width = 240;
+		const vw = globalThis.innerWidth || 1280;
+		const vh = globalThis.innerHeight || 800;
+		const rtl = ( document.documentElement?.dir || 'rtl' ) === 'rtl';
+		// در راست‌به‌چپ، «کنار» یعنی سمت چپ؛ اگر جا نبود، آن طرف.
+		let left = rtl ? box.left - width - 4 : box.right + 4;
+		if ( left < 8 || left + width > vw - 8 ) {
+			left = rtl ? box.right + 4 : box.left - width - 4;
+		}
+		sub.style.left = `${ Math.max( 8, Math.min( left, vw - width - 8 ) ) }px`;
+		sub.style.top = `${ Math.max( 8, Math.min( box.top, vh - Math.min( items2.length * 34 + 12, 420 ) - 8 ) ) }px`;
+		return sub;
+	}
+
+	menu.replaceChildren( ...items.map( rowOf ) );
 	document.body.appendChild( menu );
+
 	// نگذار از لبهٔ پایین/کنار صفحه بیرون بزند.
 	const w = 240;
 	const h1 = Math.min( items.length * 34 + 12, 420 );
@@ -274,15 +288,18 @@ export function contextMenu( { x, y, items } ) {
 	 * بستن با کلیکِ بیرون — نه با هر کلیکی.
 	 *
 	 * نسخهٔ اول یک شنوندهٔ `{ once: true }` روی document می‌گذاشت؛ کلیک روی خودِ ردیف‌های
-	 * منو هم به document می‌رسید و منو را همان لحظه می‌بست. نتیجه این بود که «افزودن به
-	 * پروژه» در مرورگر کار نمی‌کرد: زیرمنو باز می‌شد و بلافاصله می‌رفت. (تست هم آن را
-	 * نمی‌گرفت، چون کلیکِ هارنس اصلاً بالا نمی‌رفت — آن هم درست شد.)
+	 * منو هم به document می‌رسید و منو را همان لحظه می‌بست.
 	 */
 	setTimeout( () => {
 		document.addEventListener( 'click', onCtxClick );
 		document.addEventListener( 'keydown', onCtxKey );
 	}, 0 );
 	return menu;
+}
+
+/** بستن فقط منوی دوم. */
+function closeSub() {
+	$( '#ctx-sub' )?.remove();
 }
 
 function onCtxKey( e ) {
@@ -293,7 +310,8 @@ function onCtxKey( e ) {
 
 function onCtxClick( e ) {
 	const menu = $( '#ctx-menu' );
-	if ( menu && ! menu.contains( e.target ) ) {
+	const sub = $( '#ctx-sub' );
+	if ( menu && ! menu.contains( e.target ) && ! sub?.contains( e.target ) ) {
 		closeContextMenu();
 	}
 }
@@ -302,5 +320,6 @@ function onCtxClick( e ) {
 export function closeContextMenu() {
 	document.removeEventListener( 'keydown', onCtxKey );
 	document.removeEventListener( 'click', onCtxClick );
+	closeSub();
 	$( '#ctx-menu' )?.remove();
 }

@@ -214,33 +214,60 @@ function projectItems( item ) {
 	const all = [ ...new Set( [ current, ...list ].filter( Boolean ) ) ];
 
 	const rows = all.map( ( dir ) => ( {
-		ico: item.project === dir ? '✓' : '▫',
+		ico: item.project === dir ? 'check' : 'projects',
 		label: dir.split( /[\\/]/ ).filter( Boolean ).pop() || dir,
 		hint: dir === current ? t( 'پروژهٔ فعلی' ) : '',
 		onPick: () => assignProject( item, dir ),
 	} ) );
 
-	if ( ! rows.length ) {
-		return [ { ico: 'circle-dot', label: t( 'هنوز پروژه‌ای نیست' ), onPick: () => onView( 'projects' ) } ];
-	}
+	/*
+	 * «پروژهٔ تازه» صفحهٔ پروژه‌ها را باز می‌کند و یادش می‌ماند که این گفتگو منتظر
+	 * است؛ به‌محض ساخته‌شدن پروژه، گفتگو به همان اضافه می‌شود. این‌طور کاربر وسط راه
+	 * دو جا کار نمی‌کند.
+	 */
+	rows.push( '-', {
+		ico: 'folder-plus',
+		label: t( 'پروژهٔ تازه' ),
+		onPick: () => {
+			document.dispatchEvent( new CustomEvent( 'hoosha:new-project-for', { detail: { id: item.id } } ) );
+			onView( 'projects' );
+		},
+	} );
+
 	if ( item.project ) {
-		rows.push( '-', { ico: 'times', label: t( 'برداشتن از پروژه' ), onPick: () => assignProject( item, '' ) } );
+		rows.push( { ico: 'times', label: t( 'برداشتن از پروژه' ), onPick: () => assignProject( item, '' ) } );
 	}
 	return rows;
 }
 
 /**
+ * گفتگو را به یک پروژه می‌سپارد و **همان‌جا ادامه‌اش می‌دهد**.
+ *
+ * خواستهٔ کارفرما: «در انتها کاربر چت را در پروژهٔ انتخاب‌شده ادامه می‌دهد.» پس فقط
+ * برچسب‌زدن کافی نیست؛ پوشهٔ کاری هم به همان پروژه می‌رود و گفتگو باز می‌شود.
+ *
  * @param {{id:string}} item
  * @param {string} dir
  */
-async function assignProject( item, dir ) {
+export async function assignProject( item, dir ) {
 	const out = await post( '/api/sessions', { action: 'project', id: item.id, project: dir } );
 	if ( out.error ) {
 		toast( out.error, 'error' );
 		return;
 	}
+
+	if ( dir && dir !== getState()?.config?.workspace ) {
+		const moved = await post( '/api/workspace', { path: dir } );
+		if ( moved.error ) {
+			toast( moved.error, 'error' );
+		}
+	}
+
 	toast( dir ? `${ t( 'افزوده شد به' ) } ${ dir.split( /[\\/]/ ).filter( Boolean ).pop() || dir }` : t( 'از پروژه برداشته شد' ) );
 	await refreshSessions();
+	if ( dir ) {
+		onResume( item.id );
+	}
 }
 
 /** @param {string} id */

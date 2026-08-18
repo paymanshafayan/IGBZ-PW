@@ -327,6 +327,8 @@ const EN = {
 	"خصوصی": "private",
 	"تا گفتگوی تازه قفل است": "locked until a new chat",
 
+	"پروژه را بساز؛ گفتگو خودش به آن اضافه می‌شود.": "Create the project — the chat will join it by itself.",
+
 	// ── پنل‌ها و منوهای عمیق (جاروی زنده اینها را می‌گیرد) ──────────────
 	'هوشا': 'Hoosha',
 	'برو به آخر': 'Jump to latest',

@@ -21,7 +21,7 @@ import {
 	addError,
 } from './thread.js';
 import { initComposer, setBusy, setMode, fillComposer, composerIsEmpty, focusComposer, toggleDictation } from './composer.js';
-import { initSidebar, refreshSessions, paintSidebarState, markActiveView, allSessions, groupOf } from './sidebar.js';
+import { initSidebar, refreshSessions, paintSidebarState, markActiveView, allSessions, groupOf, assignProject } from './sidebar.js';
 import { openSettingsModal, renderSection, initSettings, SETTINGS_TABS } from './settings.js';
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 import { logoSvg } from './lib/logo.js';
@@ -265,6 +265,21 @@ function rememberProject( dir ) {
 	localStorage.setItem( 'hoosha-projects', JSON.stringify( list ) );
 }
 
+/**
+ * گفتگویی که منتظر ساخته‌شدن یک پروژهٔ تازه است.
+ *
+ * از منوی راست‌کلیک می‌آید: کاربر «پروژهٔ تازه» را می‌زند، صفحهٔ پروژه‌ها باز می‌شود، و
+ * هر پروژه‌ای که ساخت، همین گفتگو به آن می‌رود. بدون این، کاربر باید بعد از ساخت
+ * پروژه دوباره برگردد و دستی وصلش کند.
+ */
+let projectWaitsFor = null;
+document.addEventListener( 'hoosha:new-project-for', ( e ) => {
+	projectWaitsFor = e?.detail?.id || null;
+	if ( projectWaitsFor ) {
+		toast( t( 'پروژه را بساز؛ گفتگو خودش به آن اضافه می‌شود.' ) );
+	}
+} );
+
 async function switchProject( dir ) {
 	const out = await post( '/api/workspace', { path: dir } );
 	if ( out.error ) {
@@ -273,6 +288,13 @@ async function switchProject( dir ) {
 	}
 	rememberProject( dir );
 	await refreshState();
+
+	if ( projectWaitsFor ) {
+		const id = projectWaitsFor;
+		projectWaitsFor = null;
+		await assignProject( { id }, dir );
+		return;
+	}
 	toast( `پروژه شد: ${ dir }` );
 }
 
@@ -668,11 +690,11 @@ function paletteDeps() {
  * `append()` در thread.js با آمدن اولین چیزِ گفتگو برش می‌دارد.
  */
 function showWelcome() {
-	const chat = $( '#chat' );
-	if ( $( '#welcome' ) ) {
+	const slot = $( '#welcome-slot' );
+	if ( ! slot || $( '#welcome' ) ) {
 		return;
 	}
-	chat.appendChild(
+	slot.appendChild(
 		h( 'div', { class: 'welcome', id: 'welcome' }, [
 			h( 'span', { class: 'greet-mark', id: 'greet-mark', html: logoSvg( 84 ) } ),
 			h( 'h2', { class: 'greet', id: 'greet-text', text: t( WELCOME_TITLE ) } ),

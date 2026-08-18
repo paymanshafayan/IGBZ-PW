@@ -89,6 +89,7 @@ export function scrollToEnd() {
 
 function append( node ) {
 	const stick = atBottom();
+	// خوش‌آمد در ظرف خودش بیرون از رشتهٔ گفتگو است؛ با آمدن اولین چیز، برداشته می‌شود.
 	$( '#welcome' )?.remove();
 	chat.appendChild( node );
 	if ( stick ) {

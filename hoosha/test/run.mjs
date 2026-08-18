@@ -1543,6 +1543,7 @@ await test( 'موتور جعلی: فرمان واقعاً از راه docker م�
 section( 'رابط کاربری' );
 
 const uiDir = path.resolve( 'ui' );
+const { ICONS: ICONS_MAP } = await import( '../ui/lib/icons.js' );
 const css = await fs.readFile( path.join( uiDir, 'style.css' ), 'utf8' );
 const html = await fs.readFile( path.join( uiDir, 'index.html' ), 'utf8' );
 
@@ -5201,21 +5202,31 @@ await test( '«افزودن به پروژه» در منوی گفتگو کار م
 		const items = () => document.querySelectorAll( '#ctx-menu .menu-item' );
 		const addTo = [ ...items() ].find( ( b ) => /افزودن به پروژه/.test( b.textContent ) );
 		assert.ok( addTo, `«افزودن به پروژه» در منو نیست: ${ [ ...items() ].map( ( b ) => b.textContent ).join( ' | ' ) }` );
-		assert.match( addTo.textContent, /›/, 'باید نشانهٔ زیرمنو داشته باشد' );
 
 		addTo.click();
 		await new Promise( ( r ) => setTimeout( r, 40 ) );
-		assert.ok( document.querySelector( '#ctx-menu' ), 'زیرمنو نباید منو را ببندد' );
 
-		const labels = [ ...items() ].map( ( b ) => b.textContent );
-		assert.ok( labels.some( ( l ) => /بازگشت/.test( l ) ), 'ردیف بازگشت لازم است' );
-		assert.ok( labels.some( ( l ) => /alpha/.test( l ) ), `فهرست پروژه‌ها نیامد: ${ labels.join( ' | ' ) }` );
+		/*
+		 * زیرمنو **کنار** منوی اول باز می‌شود، نه جایش — خواستهٔ صریح کارفرما بعد از
+		 * اینکه نسخهٔ «جایگزین‌شونده» را دید.
+		 */
+		assert.ok( document.querySelector( '#ctx-menu' ), 'منوی اول باید سر جایش بماند' );
+		const sub = document.querySelector( '#ctx-sub' );
+		assert.ok( sub, 'منوی دوم باز نشد' );
 
-		const alpha = [ ...items() ].find( ( b ) => /alpha/.test( b.textContent ) );
+		const subRows = sub.querySelectorAll( '.menu-item' ).map( ( b ) => b.textContent );
+		assert.ok( subRows.some( ( l ) => /alpha/.test( l ) ), `فهرست پروژه‌ها نیامد: ${ subRows.join( ' | ' ) }` );
+		assert.ok( subRows.some( ( l ) => /پروژهٔ تازه/.test( l ) ), 'ردیف «پروژهٔ تازه» لازم است' );
+
+		const alpha = sub.querySelectorAll( '.menu-item' ).find( ( b ) => /alpha/.test( b.textContent ) );
 		const before = fetchLog.length;
 		alpha.click();
-		await new Promise( ( r ) => setTimeout( r, 80 ) );
-		assert.ok( fetchLog.slice( before ).includes( 'POST /api/sessions' ), 'انتخاب پروژه به سرور نرفت' );
+		await new Promise( ( r ) => setTimeout( r, 100 ) );
+		const after = fetchLog.slice( before );
+		assert.ok( after.includes( 'POST /api/sessions' ), 'انتخاب پروژه به سرور نرفت' );
+		// و گفتگو در همان پروژه ادامه پیدا می‌کند: پوشهٔ کاری هم می‌رود آنجا.
+		assert.ok( after.includes( 'POST /api/workspace' ), `پوشهٔ کاری عوض نشد: ${ after.join( ' | ' ) }` );
+		assert.ok( after.includes( 'POST /api/resume' ), 'گفتگو باید در همان پروژه باز شود' );
 		assert.equal( document.querySelector( '#ctx-menu' ), null, 'بعد از انتخاب، منو بسته می‌شود' );
 	} finally {
 		dom.restore();
@@ -5535,6 +5546,70 @@ await test( '«افزودن به پروژه» اثرش در نوار کناری 
 	} finally {
 		dom.restore();
 	}
+} );
+
+await test( 'آیکون هر دکمهٔ کامپوزر همانی است که باید — میکروفون، میکروفون است', () => {
+	/*
+	 * باگ واقعی: اسکریپت جایگزینی آیکون‌ها «اولین svg بعد از این نقطه» را عوض می‌کرد.
+	 * لنگرِ `jump-slot` یک div خالی بود، پس svgِ بعدی — که میکروفون بود — قربانی شد و
+	 * دکمهٔ میکروفون، فلشِ دانلود گرفت.
+	 */
+	const box = ( id ) => {
+		const at = html.indexOf( `id="${ id }"` );
+		assert.notEqual( at, -1, `دکمهٔ ${ id } نیست` );
+		const end = html.indexOf( '</button>', at );
+		const seg = html.slice( at, end );
+		const m = seg.match( /viewBox="([^"]+)"/ );
+		assert.ok( m, `${ id } آیکون ندارد` );
+		return m[ 1 ];
+	};
+	const want = ( name ) => ICONS_MAP[ name ][ 0 ];
+	for ( const [ id, name ] of [
+		[ 'btn-mic', 'mic' ],
+		[ 'btn-voice', 'waveform' ],
+		[ 'btn-plus', 'plus' ],
+		[ 'send', 'send' ],
+		[ 'stop', 'stop' ],
+		[ 'btn-search', 'search' ],
+		[ 'btn-export', 'export' ],
+	] ) {
+		assert.equal( box( id ), want( name ), `آیکون ${ id } اشتباه است` );
+	}
+	// و مطمئن شو میکروفون با فلشِ پایین اشتباه نشده باشد.
+	assert.notEqual( ICONS_MAP.mic[ 0 ], ICONS_MAP[ 'jump-down' ][ 0 ] );
+	assert.notEqual( box( 'btn-mic' ), ICONS_MAP[ 'jump-down' ][ 0 ] );
+} );
+
+await test( 'خوش‌آمد ظرف خودش را دارد، بیرون از ناحیهٔ اسکرول گفتگو', () => {
+	// دو بار داخل `.thread` بود و هر بار از بالای صفحه می‌زد بیرون.
+	assert.match( html, /<div class="welcome-slot" id="welcome-slot">/ );
+	const slotAt = html.indexOf( 'id="welcome-slot"' );
+	const jumpAt = html.indexOf( 'id="jump-slot"' );
+	const threadEnd = html.indexOf( '</div>', html.indexOf( 'id="chat"' ) );
+	assert.ok( slotAt > threadEnd, 'ظرف خوش‌آمد باید بیرون از رشتهٔ گفتگو باشد' );
+	assert.ok( slotAt < jumpAt, 'و بالای ردیف دکمهٔ «برو به آخر»' );
+
+	const slot = cssBlock( '.welcome-slot' );
+	assert.match( slot, /flex:\s*0 1 auto/ );
+	assert.match( slot, /overflow-y:\s*auto/ );
+	assert.match( cssBlock( '.welcome-slot:empty' ), /display:\s*none/, 'ظرف خالی نباید جا بگیرد' );
+	assert.match( fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' ), /const slot = \$\( '#welcome-slot' \)/ );
+} );
+
+await test( 'کادر چت همان اعداد و ترنزیشنی را دارد که کارفرما فرستاد', () => {
+	const card = cssBlock( '.composer' );
+	assert.match( card, /border-radius:\s*20px/ );
+	assert.match( card, /border:\s*1px solid transparent/ );
+	assert.match( card, /margin-inline:\s*8px/ );
+	assert.match( card, /z-index:\s*1/ );
+	assert.match( card, /cursor:\s*text/ );
+	assert.match( card, /box-sizing:\s*content-box/ );
+	assert.match( card, /box-shadow:\s*0 0\.25rem 1\.25rem color-mix/ );
+	assert.match( card, /transition:\s*background-color 0\.2s/ );
+	assert.equal( /transition:[^;]*\ball\b/.test( card ), false, 'ترنزیشن روی همه‌چیز نه' );
+
+	// و کادر، پنجاه پیکسل پایین‌تر از خوش‌آمد.
+	assert.match( cssBlock( '.view-chat.empty .composer-wrap' ), /margin-top:\s*50px/ );
 } );
 
 // ------------------------------------------------------- انگلیسیِ تمام‌وقت

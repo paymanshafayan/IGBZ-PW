@@ -453,6 +453,25 @@ textarea {
 }
 
 /*
+ * ظرف خوش‌آمد، بیرون از ناحیهٔ اسکرول‌شوندهٔ گفتگو.
+ *
+ * دو بار تلاش کردم داخل `.thread` نگهش دارم و هر بار روی نمایشگر کوتاه از **بالای**
+ * صفحه می‌زد بیرون: آن ناحیه هم‌زمان باید اسکرول گفتگو را داشته باشد و هم وسط‌چینِ
+ * خوش‌آمد باشد، و این دو با هم جمع نمی‌شوند. حالا ظرف جداست: خودش کوچک می‌شود، خودش
+ * اسکرول می‌گیرد، و مرکزیتش به رشتهٔ گفتگو ربطی ندارد.
+ */
+.welcome-slot {
+	flex: 0 1 auto;
+	min-height: 0;
+	overflow-y: auto;
+	display: flex;
+	justify-content: center;
+}
+.welcome-slot:empty {
+	display: none;
+}
+
+/*
  * خوش‌آمد گفتگوی تازه: نشان بزرگ، یک تیتر و یک زیرنویس — و تا اولین پیام کاربر
  * سر جایش می‌ماند.
  */
@@ -493,6 +512,8 @@ textarea {
 }
 .view-chat.empty .composer-wrap {
 	padding-bottom: 0;
+	/* خواستهٔ کارفرما: کادر چت حدود ۵۰ پیکسل پایین‌تر از پیام خوش‌آمد بنشیند. */
+	margin-top: 50px;
 }
 @keyframes rise {
 	from {
@@ -1338,6 +1359,10 @@ code .f {
 	bottom: auto;
 	min-width: 240px;
 	max-width: 320px;
+}
+/* منوی دوم، کنار ردیفِ پدرش. */
+.ctx-sub {
+	z-index: 31;
 }
 .ctx-menu .btn.menu-item {
 	border-radius: 8px;
@@ -2862,18 +2887,29 @@ body.sidebar-collapsed .account-menu {
 /* ───────────────────────────────────────────────── کامپوزر */
 
 .composer {
+	/*
+	 * اعداد از تکه‌ای که کارفرما فرستاد: شعاع ۲۰، قاب یک‌پیکسلیِ شفاف، سایهٔ نرمِ
+	 * دولایه، و ترنزیشن ۰٫۲ ثانیه فقط روی رنگ/قاب/سایه/شفافیت (نه روی همه‌چیز، که
+	 * جابه‌جایی کادر را هم کش بدهد).
+	 */
 	padding: 12px;
-	/* ارتفاع کارت در حالت عادی ثابت است، نه تابع محتوا. */
+	margin-inline: 8px;
 	min-height: var(--composer-box);
 	max-height: calc(var(--composer-max) + 68px);
 	display: flex;
 	flex-direction: column;
+	align-items: stretch;
 	gap: 0;
-	transition: border-color 0.16s var(--ease), box-shadow 0.16s var(--ease);
+	box-sizing: content-box;
+	cursor: text;
+	z-index: 1;
 	background: var(--card);
-	border: 1px solid var(--border);
-	border-radius: 24px;
-	box-shadow: var(--shadow-2);
+	border: 1px solid transparent;
+	border-radius: 20px;
+	box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, #000 3.5%, transparent),
+		0 0 0 1px color-mix(in srgb, var(--foreground) 15%, transparent);
+	transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease), box-shadow 0.2s var(--ease),
+		opacity 0.2s var(--ease);
 }
 .composer:focus-within {
 	border-color: transparent;
