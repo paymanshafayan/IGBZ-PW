@@ -2930,8 +2930,13 @@ body.sidebar-collapsed .account-menu {
 		opacity 0.2s var(--ease);
 }
 .composer:focus-within {
-	border-color: transparent;
-	box-shadow: 0 0 0 3px var(--ring);
+	/*
+	 * قاب در فوکوس هم می‌ماند؛ ناپدیدشدنش (شفاف + رینگ) شبیه کادر قدیمی بود و
+	 * کارفرما آن را باگ دید (۱۴۰۵/۰۵/۲۷). رینگ ۳px کرم فقط اضافه می‌شود.
+	 */
+	border-color: var(--border);
+	box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, #000 3.5%, transparent),
+		0 0 0 3px var(--ring);
 }
 .composer textarea {
 	width: 100%;
