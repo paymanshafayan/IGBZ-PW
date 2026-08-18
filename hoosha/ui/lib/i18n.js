@@ -171,6 +171,17 @@ const EN = {
 	"نام تازهٔ گفتگو": "New chat name",
 	"این گفتگو حذف شود؟": "Delete this chat?",
 
+	"افزودن به پروژه": "Add to project",
+	"برداشتن از پروژه": "Remove from project",
+	"هنوز پروژه‌ای نیست": "No projects yet",
+	"افزوده شد به": "Added to",
+	"از پروژه برداشته شد": "Removed from the project",
+	"بازگشت": "Back",
+
+	"شاخهٔ تازه": "New branch",
+	"از همین‌جا منشعب می‌شود": "Branches from here",
+	"نام شاخهٔ تازه:": "Name of the new branch:",
+
 	// ── پنل‌ها و منوهای عمیق (جاروی زنده اینها را می‌گیرد) ──────────────
 	'هوشا': 'Hoosha',
 	'برو به آخر': 'Jump to latest',

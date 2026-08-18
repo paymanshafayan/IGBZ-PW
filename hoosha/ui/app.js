@@ -132,7 +132,15 @@ async function showView( next ) {
 
 	const meta = PAGES[ view ];
 	const box = $( '#panel-body' );
-	const host = h( 'div', {} );
+	/*
+	 * محتوای صفحه داخل همین ظرف می‌نشیند و **همین** ظرف است که به بخش‌هایش فاصله
+	 * می‌دهد.
+	 *
+	 * دور قبل فاصله را روی `.page-inner` گذاشتم و هیچ اثری نداشت: بین `.page-inner` و
+	 * بخش‌های صفحه یک div بی‌کلاس بود، پس سلکتور فرزندِ مستقیم به آن‌ها نمی‌رسید و
+	 * دکمه‌های «تغییرات» همچنان به پنل زیرشان چسبیده بودند.
+	 */
+	const host = h( 'div', { class: 'page-body' } );
 
 	box.replaceChildren(
 		h( 'div', { class: 'page-head' }, [
@@ -198,6 +206,10 @@ async function renderChatsPage( host ) {
 			h( 'div', { class: 'row-item', onClick: () => resumeSession( item.id ) }, [
 				h( 'div', { class: 'row-main' }, [
 					h( 'span', { class: 'row-title', 'data-no-t': '', text: item.title || t( 'بدون عنوان' ) } ),
+					// نسبتِ گفتگو به پروژه، اگر داده شده — همان‌جایی که ست می‌شود دیده هم بشود.
+					item.project
+						? h( 'span', { class: 'row-sub mono', 'data-no-t': '', title: item.project, text: item.project.split( /[\\/]/ ).filter( Boolean ).pop() || item.project } )
+						: null,
 				] ),
 				h( 'div', { class: 'row-meta' }, [
 					s?.sessionId === item.id ? h( 'span', { class: 'tag ok', text: t( 'باز' ) } ) : null,

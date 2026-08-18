@@ -213,25 +213,52 @@ export function contextMenu( { x, y, items } ) {
 	closeContextMenu();
 
 	const menu = h( 'div', { class: 'pop-menu ctx-menu', id: 'ctx-menu' } );
-	for ( const item of items ) {
-		if ( item === '-' ) {
-			menu.appendChild( h( 'div', { class: 'menu-sep' } ) );
-			continue;
+
+	/**
+	 * یک لایه از منو را می‌کشد.
+	 *
+	 * زیرمنو به‌جای بازشدن در کنار، **جای همین منو** می‌نشیند و یک ردیف «بازگشت» بالایش
+	 * می‌آید. دلیلش ساده است: منوی کناری کنار لبهٔ صفحه جا نمی‌شود و با صفحه‌کلید هم
+	 * دردسر دارد؛ این شکل، همان کار را بدون هیچ‌کدامِ آن‌ها انجام می‌دهد.
+	 */
+	const draw = ( list, back ) => {
+		const rows = [];
+		if ( back ) {
+			rows.push(
+				h( 'button', { class: 'btn quiet row menu-item', onClick: () => draw( back, null ) }, [
+					h( 'span', { class: 'm-ico', text: '‹' } ),
+					h( 'span', { text: 'بازگشت' } ),
+				] ),
+				h( 'div', { class: 'menu-sep' } )
+			);
 		}
-		menu.appendChild(
-			h( 'button', {
-				class: `btn quiet row menu-item ${ item.danger ? 'danger' : '' }`,
-				onClick: () => {
-					closeContextMenu();
-					item.onPick();
-				},
-			}, [
-				h( 'span', { class: 'm-ico', text: item.ico || '' } ),
-				h( 'span', { text: item.label } ),
-				item.hint ? h( 'span', { class: 'm-end', text: item.hint } ) : null,
-			] )
-		);
-	}
+		for ( const item of list ) {
+			if ( item === '-' ) {
+				rows.push( h( 'div', { class: 'menu-sep' } ) );
+				continue;
+			}
+			rows.push(
+				h( 'button', {
+					class: `btn quiet row menu-item ${ item.danger ? 'danger' : '' }`,
+					onClick: () => {
+						if ( item.submenu ) {
+							draw( item.submenu(), list );
+							return;
+						}
+						closeContextMenu();
+						item.onPick();
+					},
+				}, [
+					h( 'span', { class: 'm-ico', text: item.ico || '' } ),
+					h( 'span', { text: item.label } ),
+					item.submenu ? h( 'span', { class: 'm-end', text: '›' } ) : item.hint ? h( 'span', { class: 'm-end', text: item.hint } ) : null,
+				] )
+			);
+		}
+		menu.replaceChildren( ...rows );
+	};
+
+	draw( items, null );
 
 	document.body.appendChild( menu );
 	// نگذار از لبهٔ پایین/کنار صفحه بیرون بزند.

@@ -20,7 +20,7 @@ import { handleChatCompletions, modelsResponse } from './hub/openai-api.js';
 import { hubReady as hubReadyOf } from './hub/registry.js';
 import { VERSION, installInfo } from './version.js';
 import { MODES } from './permissions.js';
-import { saveSession, listSessions, loadSession, deleteSession, renameSession } from './session.js';
+import { saveSession, listSessions, loadSession, deleteSession, renameSession, setSessionProject } from './session.js';
 import { Runtime } from './runtime.js';
 import { parseInput, BUILTIN_COMMANDS, saveCommand, removeCommand } from './commands.js';
 import { listPlugins, installPlugin, removePlugin, setPluginEnabled, fetchMarketplace } from './plugins.js';
@@ -902,6 +902,11 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 					if ( body.id === sessionId ) {
 						sessionTitle = String( body.title || '' );
 					}
+					return { status: 200, body: { ok: true, sessions: await listSessions() } };
+				}
+				// نسبت‌دادن گفتگو به یک پروژه (پوشه). رشتهٔ خالی یعنی برداشتنِ نسبت.
+				if ( body.action === 'project' ) {
+					await setSessionProject( String( body.id ), String( body.project || '' ) );
 					return { status: 200, body: { ok: true, sessions: await listSessions() } };
 				}
 				return { status: 400, body: { error: 'کنش ناشناخته' } };

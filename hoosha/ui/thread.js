@@ -280,15 +280,18 @@ export function dropThinking() {
 
 export function thinkingBlock() {
 	const body = h( 'div', { class: 'thinking-body' } );
+	// لایهٔ محوکنندهٔ بالای کادر روی همین ظرف می‌نشیند، نه روی متنِ اسکرول‌شونده.
+	const view = h( 'div', { class: 'thinking-view' }, [ body ] );
 	const head = h( 'div', { class: 'thinking-head' }, [
 		h( 'span', { class: 'spin', text: '◜' } ),
 		h( 'b', { text: 'در حال استدلال' } ),
 		h( 'span', { class: 'grow' } ),
 		h( 'span', { class: 'm-ico', text: '▾' } ),
 	] );
-	const box = h( 'div', { class: 'thinking' }, [ head, body ] );
+	const box = h( 'div', { class: 'thinking' }, [ head, view ] );
 	head.addEventListener( 'click', () => {
-		body.hidden = ! body.hidden;
+		view.hidden = ! view.hidden;
+		body.hidden = view.hidden;
 		head.querySelector( '.m-ico' ).textContent = body.hidden ? '▸' : '▾';
 	} );
 	box._body = body;

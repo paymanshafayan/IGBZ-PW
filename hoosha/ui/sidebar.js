@@ -174,11 +174,62 @@ function sessionMenu( item, x, y ) {
 		items: [
 			{ ico: '📌', label: isPinned ? t( 'برداشتن سنجاق' ) : t( 'سنجاق' ), hint: 'P', onPick: () => togglePin( item.id ) },
 			{ ico: '✎', label: t( 'تغییر نام' ), hint: 'R', onPick: () => renameSession( item ) },
+			{ ico: '▤', label: t( 'افزودن به پروژه' ), submenu: () => projectItems( item ) },
 			{ ico: '↗', label: t( 'باز کردن در تب تازه' ), onPick: () => openInNewTab( item.id ) },
 			'-',
 			{ ico: '🗑', label: t( 'حذف' ), hint: 'D', danger: true, onPick: () => removeSession( item ) },
 		],
 	} );
+}
+
+/**
+ * فهرست پروژه‌ها برای زیرمنوی «افزودن به پروژه».
+ *
+ * پروژه در هوشا یک پوشه است، پس فهرست همان پوشه‌های اخیرِ همین مرورگر به‌علاوهٔ پوشهٔ
+ * کاریِ فعلی است. انتخاب هر کدام، نسبتِ گفتگو را روی سرور ذخیره می‌کند — نه فقط در
+ * حافظهٔ مرورگر — تا با باز و بسته‌شدن برنامه هم بماند.
+ *
+ * @param {{id:string, project?:string}} item
+ */
+function projectItems( item ) {
+	const current = getState()?.config?.workspace || '';
+	/** @type {string[]} */
+	let list = [];
+	try {
+		list = JSON.parse( localStorage.getItem( 'hoosha-projects' ) || '[]' );
+	} catch {
+		list = [];
+	}
+	const all = [ ...new Set( [ current, ...list ].filter( Boolean ) ) ];
+
+	const rows = all.map( ( dir ) => ( {
+		ico: item.project === dir ? '✓' : '▫',
+		label: dir.split( /[\\/]/ ).filter( Boolean ).pop() || dir,
+		hint: dir === current ? t( 'پروژهٔ فعلی' ) : '',
+		onPick: () => assignProject( item, dir ),
+	} ) );
+
+	if ( ! rows.length ) {
+		return [ { ico: '▫', label: t( 'هنوز پروژه‌ای نیست' ), onPick: () => onView( 'projects' ) } ];
+	}
+	if ( item.project ) {
+		rows.push( '-', { ico: '×', label: t( 'برداشتن از پروژه' ), onPick: () => assignProject( item, '' ) } );
+	}
+	return rows;
+}
+
+/**
+ * @param {{id:string}} item
+ * @param {string} dir
+ */
+async function assignProject( item, dir ) {
+	const out = await post( '/api/sessions', { action: 'project', id: item.id, project: dir } );
+	if ( out.error ) {
+		toast( out.error, 'error' );
+		return;
+	}
+	toast( dir ? `${ t( 'افزوده شد به' ) } ${ dir.split( /[\\/]/ ).filter( Boolean ).pop() || dir }` : t( 'از پروژه برداشته شد' ) );
+	await refreshSessions();
 }
 
 /** @param {string} id */

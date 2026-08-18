@@ -754,11 +754,27 @@ code .f {
  * متن استدلال: پنجره‌ای پنج‌خطی که خطِ تازه از پایین می‌آید و خطِ بالایی از کادر
  * بیرون می‌رود.
  *
- * `max-height` دقیقاً پنج برابر `line-height` است تا عدد از هوا نیامده باشد، و
- * ماسکِ ۱۰ پیکسلیِ بالا باعث می‌شود خط‌ها موقع رسیدن به سقف محو شوند نه اینکه وسط
- * حرف قیچی شوند. (ماسک را به‌جای یک لایهٔ سفید گذاشتم چون در تم تیره، سفید همان‌جا
- * یک نوار روشنِ زشت می‌شد.)
+ * `max-height` دقیقاً پنج برابر `line-height` است تا عدد از هوا نیامده باشد.
+ *
+ * محوشدن سرِ کادر با یک لایهٔ گرادیانی انجام می‌شود، نه با `mask-image`. ماسک را اول
+ * امتحان کردم و کارفرما درست دید: چون روی **کل جعبه** می‌نشیند و متن زیرش اسکرول
+ * می‌کند، به‌جای یک محوِ نرم، خطِ بالایی را یک‌دست کم‌رنگ می‌کرد. لایهٔ گرادیانی روی
+ * همان ۱۲ پیکسل بالا می‌ماند و رنگش هم از پس‌زمینهٔ تم می‌آید، پس در تم تیره نوار سفید
+ * نمی‌سازد.
  */
+.thinking-view {
+	position: relative;
+}
+.thinking-view::before {
+	content: '';
+	position: absolute;
+	inset-inline: 0;
+	top: 0;
+	height: 12px;
+	background: linear-gradient(to bottom, var(--background) 0%, transparent 100%);
+	pointer-events: none;
+	z-index: 1;
+}
 .thinking-body {
 	margin: 6px 0 0;
 	white-space: pre-wrap;
@@ -768,8 +784,6 @@ code .f {
 	line-height: 1.6;
 	max-height: 8em;
 	overflow: hidden;
-	-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
-	mask-image: linear-gradient(to bottom, transparent 0, #000 10px);
 }
 
 /* ═══════════════════════════════════════════════ کارت‌های ابزار */
@@ -2374,8 +2388,9 @@ body.sidebar-collapsed .account-menu {
  * در صفحهٔ «تغییرات»، ردیف دکمه‌ها مستقیم به پنل زیرش چسبیده بود (تصویر کارفرما): ظرفِ
  * دکمه‌ها `gap` داشت ولی هیچ‌چیز فاصلهٔ *بین بخش‌ها* را نمی‌داد.
  */
-.page-inner > * + * {
-	margin-top: 16px;
+.page-inner > * + *,
+.page-body > * + * {
+	margin-top: 20px;
 }
 .page-inner {
 	max-width: 56rem;
@@ -2442,6 +2457,14 @@ body.sidebar-collapsed .account-menu {
 	display: flex;
 	flex-direction: column;
 	gap: 2px;
+}
+/* نام پروژهٔ گفتگو، زیر عنوانش. */
+.row-sub {
+	font-size: 12px;
+	color: var(--muted-foreground);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .row-title {
 	font-size: 15px;

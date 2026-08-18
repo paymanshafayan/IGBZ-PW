@@ -32,6 +32,8 @@ export async function saveSession( id, data ) {
 				updatedAt: Date.now(),
 				messages: data.messages,
 				transcript: data.transcript,
+				// نسبتِ پروژه را ذخیرهٔ بعدی نباید پاک کند؛ ذخیره هر چند ثانیه یک بار رخ می‌دهد.
+				...( previous?.project ? { project: previous.project } : {} ),
 			},
 			null,
 			2
@@ -53,6 +55,7 @@ export async function listSessions() {
 				title: raw.title,
 				updatedAt: raw.updatedAt,
 				messages: Array.isArray( raw.messages ) ? raw.messages.length : 0,
+				project: raw.project || '',
 			} );
 		} catch {
 			// یک فایل خراب نباید کل فهرست را بخواباند.
@@ -82,6 +85,30 @@ export async function deleteSession( id ) {
 	}
 	await fs.rm( file, { force: true } );
 	return { ok: true };
+}
+
+/**
+ * نسبت‌دادن یک گفتگو به یک پروژه (پوشهٔ کاری).
+ *
+ * پروژه در هوشا یک مسیر است، نه یک شیء در پایگاه داده؛ پس همان مسیر کنار خودِ نشست
+ * ذخیره می‌شود. رشتهٔ خالی یعنی «بدون پروژه».
+ *
+ * @param {string} id
+ * @param {string} project
+ */
+export async function setSessionProject( id, project ) {
+	const saved = await loadSession( id );
+	if ( ! saved ) {
+		throw new Error( 'نشست پیدا نشد.' );
+	}
+	const next = String( project || '' ).trim().slice( 0, 400 );
+	if ( next ) {
+		saved.project = next;
+	} else {
+		delete saved.project;
+	}
+	await fs.writeFile( fileFor( id ), JSON.stringify( saved, null, 2 ), 'utf8' );
+	return { ok: true, project: next };
 }
 
 /**

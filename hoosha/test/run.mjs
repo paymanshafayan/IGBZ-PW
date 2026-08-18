@@ -3898,6 +3898,8 @@ async function bootApp( overrides = {}, domOpts = {} ) {
 						? state
 						: url === '/api/sessions'
 						? { sessions: [ { id: 's1', title: 'سلام', messages: 3, updatedAt: Date.now() } ] }
+						: url.startsWith( '/api/git' )
+						? { git: state.git, stat: [] }
 						: url === '/api/hub'
 						? {
 								active: false,
@@ -4961,9 +4963,23 @@ await test( 'کادر استدلال پنج‌خطی است، بالایش مح�
 	assert.equal( /max-height:\s*300px/.test( body ), false, 'سقف قدیمی ۳۰۰ پیکسل باید رفته باشد' );
 
 	// محوشدن ۱۰ پیکسلی بالای کادر.
-	// تلهٔ آشنا: `-webkit-mask-image` هم با /mask-image:/ جور درمی‌آید، پس مرز لازم است.
-	assert.match( body, /[\s;]mask-image:\s*linear-gradient\(to bottom, transparent 0, #000 10px\)/ );
-	assert.match( body, /-webkit-mask-image:\s*linear-gradient\(to bottom, transparent 0, #000 10px\)/, 'برای وبکیت هم لازم است' );
+	/*
+	 * محوشدن با یک لایهٔ گرادیانی است، نه با ماسک.
+	 *
+	 * ماسک روی کل جعبه می‌نشست و به‌جای محوِ نرمِ خطِ بالایی، همان خط را یک‌دست کم‌رنگ
+	 * می‌کرد — کارفرما درست دید: «کل خط را می‌پوشاند».
+	 */
+	assert.equal( /mask-image/.test( body ), false, 'ماسک روی متن استدلال باید برداشته شده باشد' );
+	const fade = cssBlock( '.thinking-view::before' );
+	assert.match( fade, /position:\s*absolute/ );
+	assert.match( fade, /top:\s*0/ );
+	assert.match( fade, /height:\s*12px/ );
+	assert.match( fade, /background:\s*linear-gradient\(to bottom, var\(--background\) 0%, transparent 100%\)/ );
+	assert.match( fade, /pointer-events:\s*none/, 'لایه نباید جلوی کلیک را بگیرد' );
+	assert.match( cssBlock( '.thinking-view' ), /position:\s*relative/ );
+
+	// و متن واقعاً داخل همان ظرف می‌نشیند، وگرنه لایه روی هوا می‌افتد.
+	assert.match( fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' ), /class: 'thinking-view' \}, \[ body \]/ );
 
 	// و در جاوااسکریپت، هر خط تازه کادر را به آخر می‌برد.
 	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
@@ -5038,9 +5054,36 @@ await test( 'ردیف حساب فقط نام سرویس را نشان می‌د�
 	assert.equal( /chip-provider[\s\S]{0,160}p\.model/.test( sidebar ), false, 'نام مدل نباید در ردیف حساب باشد' );
 } );
 
-await test( 'بخش‌های صفحه به هم نمی‌چسبند (تصویر «تغییرات»)', () => {
-	// در تصویر، ردیف Commit/Push/Pull request مستقیم روی پنل زیرش نشسته بود.
-	assert.match( cssBlock( '.page-inner > * + *' ), /margin-top:\s*16px/ );
+await test( 'بخش‌های صفحه به هم نمی‌چسبند — و قاعده به ظرفِ درست می‌خورد', async () => {
+	/*
+	 * دور اول این را روی `.page-inner` گذاشتم و کارفرما دوباره همان تصویر را فرستاد:
+	 * بین `.page-inner` و بخش‌های صفحه یک div بی‌کلاس بود، پس سلکتورِ فرزندِ مستقیم
+	 * اصلاً به دکمه‌ها نمی‌رسید. حالا تست، هم قاعده را می‌سنجد هم اینکه ظرفِ واقعیِ
+	 * محتوا همان کلاس را دارد.
+	 */
+	assert.match( cssBlock( '.page-inner > * + *,\n.page-body > * + *' ), /margin-top:\s*20px/ );
+
+	const { dom } = await bootApp( {
+		git: { name: 'IGBZ-WP', branch: 'main', protected: false, dirty: false, ahead: 0, added: 0, removed: 0, files: [] },
+	} );
+	try {
+		document.querySelector( '.nav-item[data-view="changes"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 150 ) );
+
+		const commit = [ ...document.querySelectorAll( '#panel-body button' ) ].find( ( b ) => /ثبت تغییرات/.test( b.textContent ) );
+		assert.ok( commit, 'دکمهٔ ثبت تغییرات در صفحه نیست' );
+		const row = commit.parentNode;
+		assert.ok( String( row.className ).includes( 'row' ), 'دکمه‌ها باید در یک ردیف باشند' );
+		assert.ok(
+			String( row.parentNode.className ).includes( 'page-body' ),
+			`ظرفِ بخش‌ها باید page-body باشد، نه «${ row.parentNode.className }»`
+		);
+		// و بخشِ بعدی همان‌جا سیبلینگِ ردیف است، پس قاعدهٔ فاصله رویش می‌افتد.
+		const after = row.parentNode.children[ row.parentNode.children.indexOf( row ) + 1 ];
+		assert.ok( after, 'بعد از ردیف دکمه‌ها باید پنل بعدی باشد' );
+	} finally {
+		dom.restore();
+	}
 } );
 
 await test( 'دکمهٔ «برو به آخر» کانتینر خودش را دارد و در هاور نمی‌پرد', () => {
@@ -5110,6 +5153,65 @@ await test( 'راست‌کلیک روی گفتگوی اخیر، منو باز م
 	} finally {
 		dom.restore();
 	}
+} );
+
+await test( '«افزودن به پروژه» در منوی گفتگو کار می‌کند و روی سرور می‌ماند', async () => {
+	/*
+	 * پروژه در هوشا یک پوشه است، پس زیرمنو همان پوشه‌های اخیر است. مهم این است که
+	 * انتخاب، روی **سرور** ذخیره شود نه فقط در حافظهٔ مرورگر — وگرنه با بستن برنامه
+	 * می‌پرد.
+	 */
+	const { dom } = await bootApp();
+	try {
+		localStorage.setItem( 'hoosha-projects', JSON.stringify( [ '/repo/alpha', '/repo/beta' ] ) );
+		const row = document.querySelector( '.recent-item' );
+		row.oncontextmenu( { preventDefault() {}, clientX: 50, clientY: 60 } );
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+
+		const items = () => document.querySelectorAll( '#ctx-menu .menu-item' );
+		const addTo = [ ...items() ].find( ( b ) => /افزودن به پروژه/.test( b.textContent ) );
+		assert.ok( addTo, `«افزودن به پروژه» در منو نیست: ${ [ ...items() ].map( ( b ) => b.textContent ).join( ' | ' ) }` );
+		assert.match( addTo.textContent, /›/, 'باید نشانهٔ زیرمنو داشته باشد' );
+
+		addTo.click();
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+		assert.ok( document.querySelector( '#ctx-menu' ), 'زیرمنو نباید منو را ببندد' );
+
+		const labels = [ ...items() ].map( ( b ) => b.textContent );
+		assert.ok( labels.some( ( l ) => /بازگشت/.test( l ) ), 'ردیف بازگشت لازم است' );
+		assert.ok( labels.some( ( l ) => /alpha/.test( l ) ), `فهرست پروژه‌ها نیامد: ${ labels.join( ' | ' ) }` );
+
+		const alpha = [ ...items() ].find( ( b ) => /alpha/.test( b.textContent ) );
+		const before = fetchLog.length;
+		alpha.click();
+		await new Promise( ( r ) => setTimeout( r, 80 ) );
+		assert.ok( fetchLog.slice( before ).includes( 'POST /api/sessions' ), 'انتخاب پروژه به سرور نرفت' );
+		assert.equal( document.querySelector( '#ctx-menu' ), null, 'بعد از انتخاب، منو بسته می‌شود' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'سرور نسبتِ گفتگو به پروژه را ذخیره می‌کند و در فهرست برمی‌گرداند', async () => {
+	// همان مسیر، این بار بدون رابط: فایلِ نشست باید واقعاً عوض شود.
+	const home = path.join( tmpRoot, 'home-project' );
+	process.env.HOOSHA_HOME = home;
+	const mod = await import( `../src/session.js?p=${ Math.random() }` );
+
+	await mod.saveSession( 'p1', { title: 'گفتگو', messages: [ { role: 'user', content: 'سلام' } ] } );
+	await mod.setSessionProject( 'p1', '/repo/alpha' );
+	assert.equal( ( await mod.loadSession( 'p1' ) ).project, '/repo/alpha' );
+	assert.equal( ( await mod.listSessions() ).find( ( x ) => x.id === 'p1' ).project, '/repo/alpha' );
+
+	// ذخیرهٔ بعدیِ همان نشست هم نباید نسبت را بشوید.
+	await mod.saveSession( 'p1', { title: 'گفتگو', messages: [ { role: 'user', content: 'باز هم' } ] } );
+	assert.equal( ( await mod.loadSession( 'p1' ) ).project, '/repo/alpha', 'ذخیرهٔ خودکار نباید پروژه را پاک کند' );
+
+	// و رشتهٔ خالی، نسبت را برمی‌دارد — نه اینکه «» را ذخیره کند.
+	await mod.setSessionProject( 'p1', '' );
+	assert.equal( 'project' in ( await mod.loadSession( 'p1' ) ), false );
+
+	await assert.rejects( () => mod.setSessionProject( 'نیست', '/x' ), /پیدا نشد/ );
 } );
 
 await test( '«باز کردن در تب تازه» نشانی نشست را می‌سازد و برنامه آن را می‌فهمد', async () => {
