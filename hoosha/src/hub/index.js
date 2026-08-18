@@ -642,11 +642,23 @@ export class Hub {
 
 	// ---------------------------------------------------------------- گزارش
 
+	/**
+	 * ریست یک اتصال — «ریست و رفع خطا»ی مدیر (طرح §۴ DESIGN-PROVIDER-UI).
+	 * @param {string} id
+	 */
+	resetProvider( id ) {
+		if ( ! this.data.connections?.[ id ] ) {
+			return { ok: false, error: 'اتصال پیدا نشد.' };
+		}
+		return { ok: true, cleared: this.health.resetPrefix( `${ id }::` ) };
+	}
+
 	snapshot() {
 		return {
 			hub: publicHub( this.data ),
 			ready: hubReady( this.data ),
 			health: this.health.snapshot(),
+			traffic: this.health.traffic(),
 			learning: this.learning.table(),
 			budget: this.budget.snapshot(),
 			cache: this.cache.stats(),

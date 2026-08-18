@@ -397,6 +397,19 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 					hub.health.reset( String( body.key || '' ) );
 					await hub.saveState();
 					return { status: 200, body: { ok: true } };
+				case 'reset-provider': {
+					const out = hub.resetProvider( String( body.id || '' ) );
+					if ( out.ok ) {
+						await hub.saveState();
+						broadcast( { type: 'hub' } );
+					}
+					return { status: out.ok ? 200 : 404, body: out };
+				}
+				case 'reset-health':
+					hub.health.resetAll();
+					await hub.saveState();
+					broadcast( { type: 'hub' } );
+					return { status: 200, body: { ok: true } };
 				case 'clear-cache':
 					hub.cache.clear();
 					return { status: 200, body: { ok: true } };

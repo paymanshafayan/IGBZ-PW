@@ -17,6 +17,27 @@ const STORE_KEY = 'hoosha-lang';
 
 /** @type {Record<string, Record<string,string>>} */
 const EN = {
+	// صفحهٔ هاب پرووایدر (۰.۹.۴)
+	'نگاه کلی هاب': 'Hub overview',
+	'نگاه کلی': 'Overview',
+	'اتصال‌ها': 'Connections',
+	'ترکیب‌ها': 'Combos',
+	'سلامت و مصرف': 'Health & spend',
+	'هاب فعال است': 'The hub is active',
+	'هاب فعال': 'Hub active',
+	'هاب': 'Hub',
+	'فرمان با هاب است': 'The hub is in command',
+	'مدار باز': 'Circuit open',
+	'اعتبار/کلید': 'Credits/key',
+	'ریست و رفع خطا': 'Reset & clear errors',
+	'آخرین مسیرها': 'Recent routes',
+	'۲۰ تصمیم مسیریابی آخر، تازه‌ترین اول.': 'The 20 latest routing decisions, newest first.',
+	'موفق': 'ok',
+	'— ضخامت یال = ترافیک ثبت‌شده': '— edge thickness = recorded traffic',
+	'پرووایدرها و هاب…': 'Providers & hub…',
+	'هاب پرووایدر': 'Provider hub',
+	'مسیریابی با هاب انجام می‌شود': 'Routing is done by the hub',
+	'وضعیت زندهٔ اتصال‌ها از نگاه مسیریاب: رنگ هر گره وضعیت واقعی آن است و ضخامت هر یال، ترافیک ثبت‌شده.': "Live connection state from the router's view: each node's color is its real status, each edge's thickness its recorded traffic.",
 	// نوار کناری
 	'گفتگوی تازه': 'New chat',
 	'گفتگوها': 'Chats',
@@ -32,7 +53,6 @@ const EN = {
 	'بستن نوار کناری': 'Collapse sidebar',
 	'حساب و تنظیمات': 'Account and settings',
 	'پروفایل': 'Profile',
-	'هاب پرووایدر': 'Provider hub',
 	'مسیریابی خودکار': 'Automatic routing',
 
 	// منوی حساب
@@ -627,6 +647,9 @@ const PATTERNS = [
 
 	[ /^(\d+) از (\d+) روشن$/, '$1 of $2 on' ],
 	[ /^(\d+) مدل$/, '$1 models' ],
+	[ /^(\d+) اتصال$/, '$1 connections' ],
+	[ /^(\d+) مدل روشن\.?$/, '$1 models on' ],
+	[ /^مسیریابی با هاب انجام می‌شود — (.+)$/, 'Routing is done by the hub — $1' ],
 	[ /^(\d+) روشن$/, '$1 on' ],
 	[ /^(\d+) نوبت$/, '$1 rounds' ],
 	[ /^\((\d+) نوبت\)$/, '($1 rounds)' ],
