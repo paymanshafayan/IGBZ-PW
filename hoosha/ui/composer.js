@@ -200,11 +200,19 @@ export function syncSendButton() {
 	}
 }
 
+/** کف و سقف ارتفاع کادر نوشتن — همان اعدادی که در CSS هم هستند (`--composer-h`). */
+const BOX_MIN = 70;
+const BOX_MAX = 168;
+
 function autoGrow() {
 	syncSendButton();
 	input.style.height = 'auto';
-	// سقف ثابت و کوچک، نه درصدی از ارتفاع پنجره: روی نمایشگر بزرگ، ۴۰٪ یعنی نصف صفحه.
-	input.style.height = Math.min( input.scrollHeight, 168 ) + 'px';
+	/*
+	 * سقف و کف هر دو ثابت‌اند و از ارتفاع پنجره مستقل. قبلاً سقف ۴۰٪ ارتفاع پنجره بود و
+	 * روی نمایشگر بلند یعنی نصف صفحه؛ و کفی هم نبود، پس مقدارِ خالی به چند پیکسل می‌افتاد
+	 * و کادر می‌پرید.
+	 */
+	input.style.height = Math.max( BOX_MIN, Math.min( input.scrollHeight, BOX_MAX ) ) + 'px';
 }
 
 async function submit() {

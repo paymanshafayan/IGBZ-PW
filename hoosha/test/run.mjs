@@ -1729,7 +1729,7 @@ await test( 'ناوبری نوار کناری همان ترتیب Claude را د
 	assert.match( cssBlock( '.btn' ), /background:\s*transparent/ );
 	assert.match( cssBlock( '.btn.row' ), /justify-content:\s*flex-start/ );
 	// و کلاس .new-chat فقط جای دکمه را تعیین می‌کند، نه شکلش.
-	const nc = cssBlock( '.btn.new-chat' );
+	const nc = cssBlock( '.btn.row.new-chat' );
 	assert.equal( /background|border:|border-color/.test( nc ), false, '.new-chat نباید ظاهر دکمه را دوباره تعریف کند' );
 } );
 
@@ -4587,20 +4587,39 @@ await test( 'کادر پیام ارتفاع مهارشده دارد و صفحه 
 	 * `Math.min(scrollHeight, innerHeight * 0.4)` در بزرگ‌شدن خودکار — که روی یک
 	 * نمایشگر بلند یعنی چند صد پیکسل. حالا هر دو عدد ثابت و کوچک‌اند.
 	 */
+	const root = cssBlock( ':root' );
+	assert.match( root, /--composer-h:\s*70px/, 'همان عددی که در طرح آمده' );
+	assert.match( root, /--composer-max:\s*168px/ );
+	assert.match( root, /--composer-box:\s*138px/, 'ارتفاع کارت: ۱۲+۷۰+۸+۳۶+۱۲' );
+
 	const box = cssBlock( '.composer textarea' );
-	assert.match( box, /min-height:\s*70px/, 'همان عددی که در طرح آمده' );
-	assert.match( box, /max-height:\s*168px/ );
-	assert.equal( /max-height:\s*\d+vh/.test( box ), false, 'سقف نباید درصدی از ارتفاع پنجره باشد' );
-	assert.equal( /min-height:\s*50px/.test( box ), false );
+	assert.match( box, /min-height:\s*var\(--composer-h\)/ );
+	assert.match( box, /max-height:\s*var\(--composer-max\)/ );
+	assert.match( box, /flex:\s*none/, 'کادر نباید با ظرفش کش بیاید' );
+	assert.equal( /\d+vh|innerHeight/.test( box ), false, 'سقف نباید درصدی از ارتفاع پنجره باشد' );
+
+	// و خودِ کارت هم ارتفاع صریح دارد، نه هرچه محتوا گفت.
+	const card = cssBlock( '.composer' );
+	assert.match( card, /min-height:\s*var\(--composer-box\)/ );
+	assert.match( card, /max-height:\s*calc\(var\(--composer-max\) \+ 68px\)/ );
+
+	// نوار گیت — که طرح ندارد — بیرون کارت است، وگرنه ۴۵ پیکسل به قدش اضافه می‌کرد.
+	const form = html.slice( html.indexOf( '<form id="composer"' ), html.indexOf( '</form>' ) );
+	assert.equal( /id="git-bar"/.test( form ), false, 'نوار گیت نباید داخل کارت کامپوزر باشد' );
+	assert.match( html.slice( html.indexOf( '</form>' ) ), /id="git-bar"/, 'ولی باید بلافاصله زیرش بماند' );
+	assert.match( cssBlock( '.git-bar' ), /height:\s*34px/, 'نوار گیت هم قد ثابت دارد' );
+
+	// و بزرگ‌شدن خودکار در جاوااسکریپت با همان دو عدد مهار می‌شود.
+	const composerJs = fssync.readFileSync( path.join( uiDir, 'composer.js' ), 'utf8' );
+	assert.match( composerJs, /const BOX_MIN = 70;/ );
+	assert.match( composerJs, /const BOX_MAX = 168;/ );
+	assert.match( composerJs, /Math\.max\( BOX_MIN, Math\.min\( input\.scrollHeight, BOX_MAX \) \)/ );
+	assert.equal( /innerHeight/.test( composerJs ), false, 'هیچ ارتفاعی نباید به اندازهٔ پنجره گره بخورد' );
 
 	// عرض‌ها هم از طرح: کامپوزر ۷۰۰ (+ حاشیه) و ستون گفتگو ۸۰۰.
 	assert.match( cssBlock( '.thread > *' ), /max-width:\s*800px/ );
 	assert.match( cssBlock( '.msg.user .body' ), /max-width:\s*80%/ );
 	assert.match( cssBlock( '.msg.user .body' ), /font-size:\s*15\.5px/ );
-
-	const composer = fssync.readFileSync( path.join( uiDir, 'composer.js' ), 'utf8' );
-	assert.match( composer, /Math\.min\( input\.scrollHeight, 168 \)/ );
-	assert.equal( /innerHeight \* 0\.4/.test( composer ), false );
 
 	// و در حالت خالی، فاصلهٔ زیر کادر هم جمع می‌شود تا گروه وسط بنشیند.
 	assert.match( css, /\.view-chat\.empty \.composer-wrap\s*\{[^}]*padding-bottom:\s*0/ );
@@ -4755,9 +4774,30 @@ await test( 'کلاس .btn همان اعداد طرح پیوست را دارد �
 	}
 } );
 
+await test( 'هر دکمه ۱۰ پیکسل فاصله دارد و هیچ‌جا فاصله دوبرابر نمی‌شود', () => {
+	// شکایت کارفرما: «بعضی جاها می‌چسبه به سایر آیتم‌ها.»
+	assert.match( cssBlock( ':root' ), /--btn-gap:\s*10px/ );
+	assert.match( cssBlock( '.btn' ), /margin:\s*var\(--btn-gap\)/ );
+
+	// ظرف‌هایی که خودشان gap دارند، مارجین را صفر می‌کنند تا ۱۰ پیکسل، ۲۰ نشود.
+	const reset = css.slice( css.indexOf( ':is(' ), css.indexOf( '{', css.indexOf( ':is(' ) ) );
+	for ( const box of [ '.composer-bar', '.top-right', '.msg-actions', '.modal-actions', '.page-actions', '.item', '.row', '.git-bar', '.chips', '.side-nav', '.pop-menu' ] ) {
+		assert.ok( reset.includes( `${ box },` ) || reset.includes( `${ box }\n` ), `${ box } در فهرست خنثی‌سازی نیست` );
+	}
+	// …و در عوض فاصلهٔ خودشان همان ۱۰ است.
+	for ( const box of [ '.composer-bar', '.top-right', '.msg-actions', '.modal-actions', '.page-actions', '.tab-row', '.git-bar', '.chips', '.row', '.item', '.account-row', '.side-top-actions' ] ) {
+		assert.match( cssBlock( box ), /gap:\s*var\(--btn-gap\)/, `فاصلهٔ ${ box } باید ۱۰ باشد` );
+	}
+	// ردیف‌های ناوبری استثنا هستند: روی هم می‌نشینند.
+	assert.match( cssBlock( '.btn.row' ), /margin:\s*0/ );
+	// ولی «گفتگوی تازه» و ردیف‌های ناوبری جای خودشان را نگه می‌دارند.
+	assert.match( cssBlock( '.btn.row.new-chat' ), /margin:\s*8px 12px 16px/ );
+	assert.match( cssBlock( '.btn.row.nav-item' ), /margin-inline:\s*12px/ );
+} );
+
 await test( 'کلاس‌های جایگاه، ظاهر دکمه را دوباره تعریف نمی‌کنند', () => {
 	// قاعده: .btn شکل را می‌دهد؛ کلاس کنارش فقط جا و اندازهٔ ظرف را.
-	for ( const sel of [ '.btn.new-chat', '.btn.nav-item', '.btn.git-chip', '.btn.q-option', '.btn.chat-title', '.btn.account-main', '.btn.set-item', '.btn.menu-item', '.topbar .btn.plan-chip' ] ) {
+	for ( const sel of [ '.btn.row.new-chat', '.btn.row.nav-item', '.btn.git-chip', '.btn.q-option', '.btn.chat-title', '.btn.account-main', '.btn.set-item', '.btn.menu-item', '.topbar .btn.plan-chip' ] ) {
 		const block = cssBlock( sel );
 		assert.equal( /(^|[\s;])cursor:\s*pointer/.test( block ), false, `${ sel } نباید دوباره cursor بگذارد` );
 		assert.equal( /(^|[\s;])border:/.test( block ), false, `${ sel } نباید دوباره border بگذارد` );
@@ -4920,6 +4960,173 @@ await test( 'بلوک استدلال واقعاً وجود دارد — thinking
 	assert.match( thread, /box\._body = body/ );
 	assert.match( css, /\.thinking-head\s*\{/ );
 	assert.match( css, /\.thinking-head \.spin\s*\{/ );
+} );
+
+// ------------------------------------------------------- انگلیسیِ تمام‌وقت
+
+section( 'انگلیسی بدون ته‌ماندهٔ فارسی' );
+
+/** همهٔ متن‌های دیدنیِ صفحه: متن گره‌ها و صفت‌های خواندنی. */
+function visibleText( root ) {
+	const out = [];
+	const walk = ( node ) => {
+		if ( ! node ) {
+			return;
+		}
+		if ( node.nodeType === 3 ) {
+			out.push( node.nodeValue || '' );
+			return;
+		}
+		for ( const name of [ 'title', 'placeholder', 'aria-label', 'alt' ] ) {
+			const v = node.getAttribute?.( name );
+			if ( v ) {
+				out.push( v );
+			}
+		}
+		if ( node.tagName === 'STYLE' || node.tagName === 'SCRIPT' ) {
+			return;
+		}
+		for ( const child of node.childNodes || [] ) {
+			walk( child );
+		}
+	};
+	walk( root );
+	return out;
+}
+
+await test( 'در حالت انگلیسی هیچ متن فارسی روی صفحه نمی‌ماند', async () => {
+	/*
+	 * خواستهٔ کارفرما، کلمه‌به‌کلمه: «وقتی زبان روی انگلیسی هست نباید هیچ متن فارسی
+	 * دیده بشه.» پس معیار پذیرش هم همین است: انگلیسی می‌کنیم، همهٔ صفحه‌ها، همهٔ تب‌های
+	 * تنظیمات و **همهٔ منوهای داخلی** را باز می‌کنیم و دنبال یک حرف فارسی می‌گردیم.
+	 *
+	 * محتوای کاربر (عنوان گفتگو، نام پروژه، متن پیام) با `data-no-t` علامت خورده و
+	 * ترجمه نمی‌شود — ترجمهٔ حرفِ کاربر، خودش یک باگ است.
+	 */
+	const { dom } = await bootApp( {
+		git: { name: 'IGBZ-WP', branch: 'main', protected: false, dirty: true, ahead: 1, added: 4, removed: 2, files: [ { path: 'a.js', state: 'M' } ] },
+		tools: [ { name: 'read_file', description: 'خواندن فایل', risk: 'read' }, { name: 'bash', description: 'اجرای فرمان', risk: 'exec' } ],
+		skills: [ { name: 'wp', description: 'وردپرس', source: 'user', enabled: true } ],
+		agents: [ { name: 'reviewer', description: 'بازبین کد', scope: 'project', source: 'project', tools: [ 'read_file' ] } ],
+		commands: [ { name: 'help', description: 'راهنما', source: 'builtin' } ],
+		mcp: [ { name: 'files', status: 'ok', tools: 3 } ],
+		connectors: [ { id: 'c1', name: 'گیت‌هاب', kind: 'http', enabled: true, config: { url: 'https://api.github.com', headers: {} } } ],
+		plugins: [ { name: 'demo', version: '1.0.0', enabled: true, source: 'local', has: { skills: 1, commands: 2, mcp: true, hooks: false } } ],
+		checkpoints: [ { id: 'k1', label: 'قبل از ویرایش', at: Date.now() } ],
+		shells: [ { id: 'sh1', command: 'npm test', running: true } ],
+		todos: [ { text: 'کار اول', state: 'doing' } ],
+	} );
+	try {
+		const { setLang } = await import( '../ui/lib/i18n.js' );
+		setLang( 'en' );
+		await new Promise( ( r ) => setTimeout( r, 120 ) );
+
+		const leftovers = new Map();
+		const inData = ( node ) => {
+			let n = node;
+			while ( n && n.nodeType === 1 ) {
+				if ( n.getAttribute?.( 'data-no-t' ) !== null && n.getAttribute?.( 'data-no-t' ) !== undefined ) {
+					return true;
+				}
+				n = n.parentNode;
+			}
+			return false;
+		};
+		const collect = ( where ) => {
+			const walk = ( node ) => {
+				if ( ! node || inData( node ) ) {
+					return;
+				}
+				if ( node.nodeType === 3 ) {
+					const text = ( node.nodeValue || '' ).trim();
+					if ( /[\u0600-\u06FF]/.test( text ) ) {
+						leftovers.set( text, where );
+					}
+					return;
+				}
+				for ( const attr of [ 'title', 'placeholder', 'aria-label' ] ) {
+					const v = node.getAttribute?.( attr );
+					if ( v && /[\u0600-\u06FF]/.test( v ) ) {
+						leftovers.set( v.trim(), `${ where } (${ attr })` );
+					}
+				}
+				const kids = node.childNodes || [];
+				if ( ! kids.length && /[\u0600-\u06FF]/.test( node.textContent || '' ) ) {
+					leftovers.set( node.textContent.trim(), where );
+				}
+				for ( const child of kids ) {
+					walk( child );
+				}
+			};
+			walk( document.body );
+		};
+
+		collect( 'خالی' );
+		for ( const view of [ 'chats', 'projects', 'tools', 'changes', 'workspace' ] ) {
+			document.querySelector( `.nav-item[data-view="${ view }"]` ).click();
+			await new Promise( ( r ) => setTimeout( r, 120 ) );
+			collect( view );
+		}
+
+		document.querySelector( '.nav-item[data-view="customize"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 160 ) );
+		const tabs = document.querySelectorAll( '.set-item' );
+		assert.ok( tabs.length >= 19, `فقط ${ tabs.length } تب تنظیمات باز شد` );
+		for ( const item of tabs ) {
+			item.click();
+			await new Promise( ( r ) => setTimeout( r, 90 ) );
+			collect( `تنظیمات/${ item.textContent.trim().slice( 0, 18 ) }` );
+		}
+
+		// و منوهای داخلی — همان‌هایی که کارفرما گفت «حل کن».
+		document.querySelector( '#btn-back' )?.click();
+		await new Promise( ( r ) => setTimeout( r, 100 ) );
+		let menus = 0;
+		for ( const id of [ '#btn-plus', '#pill-model', '#btn-more', '#btn-account', '#git-repo', '#git-branch', '#git-action', '#pill-mode', '#btn-search', '#btn-export', '#btn-recents-more' ] ) {
+			const node = document.querySelector( id );
+			if ( ! node ) {
+				continue;
+			}
+			menus++;
+			node.click();
+			await new Promise( ( r ) => setTimeout( r, 130 ) );
+			collect( `منوی ${ id }` );
+		}
+		assert.ok( menus >= 10, `فقط ${ menus } منو باز شد؛ سناریو ناقص است` );
+
+		const report = [ ...leftovers ].map( ( [ text, where ] ) => `${ where } → ${ text.slice( 0, 60 ) }` ).sort();
+		assert.deepEqual( report, [], `${ report.length } متن فارسی در حالت انگلیسی ماند:\n  ${ report.join( '\n  ' ) }` );
+		assert.equal( document.documentElement.dir, 'ltr' );
+		assert.equal( document.documentElement.dataset.lang, 'en' );
+
+		// و برگشت به فارسی، همه‌چیز را سر جایش برمی‌گرداند.
+		setLang( 'fa' );
+		await new Promise( ( r ) => setTimeout( r, 80 ) );
+		assert.match( document.querySelector( '#btn-new' ).textContent, /گفتگوی تازه/, 'برگشت به فارسی' );
+		assert.equal( document.documentElement.dir, 'rtl' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'جاروی ترجمه، محتوای کاربر را دست نمی‌زند و متن‌های پارامتری را می‌فهمد', async () => {
+	const dom = ( await import( './fake-dom.mjs' ) ).installFakeDom( {} );
+	try {
+		const { setLang, translate } = await import( `../ui/lib/i18n.js?tr=${ Math.random() }` );
+		setLang( 'en' );
+		assert.equal( translate( 'گفتگوی تازه' ), 'New chat' );
+		assert.equal( translate( 'ثبت ۳ تغییر' ), 'Commit 3 changes' );
+		assert.equal( translate( '۵ دقیقه پیش' ), '5 minutes ago' );
+		assert.equal( translate( 'تنظیمات: اسکیل‌ها' ), 'Settings: Skills' );
+		assert.equal( translate( 'مدل‌ها · ابزارها' ), 'Models · Tools' );
+		assert.equal( translate( '۱۲٪' ), '12%' );
+		// رشتهٔ ناشناخته: دست‌نخورده برمی‌گردد، نه کلید خام و نه خالی.
+		assert.match( translate( 'یک رشتهٔ کاملاً تازه' ), /یک رشتهٔ/ );
+		setLang( 'fa' );
+		assert.equal( translate( 'گفتگوی تازه' ), 'گفتگوی تازه' );
+	} finally {
+		dom.restore();
+	}
 } );
 
 // ------------------------------------------------------------------ پایان

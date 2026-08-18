@@ -12,7 +12,7 @@
 import { $, h, toast, promptDialog, fmtTokens, timeAgo } from './lib/dom.js';
 import { post, refreshState, subscribe, getState, api } from './lib/api.js';
 import { paintStaleBar } from './lib/stale.js';
-import { t, lang, setLang, initLang, translateDom, LANGS } from './lib/i18n.js';
+import { t, lang, setLang, initLang, translateDom, sweep, watchDom, LANGS } from './lib/i18n.js';
 import {
 	mountThread,
 	handleEvent,
@@ -30,6 +30,12 @@ import { initGitBar, paintGitBar, renderChanges } from './gitbar.js';
 // زبان اول از همه: جهت صفحه و فونت به آن بسته‌اند و اگر بعد از رندر عوض شود، پرش دارد.
 initLang();
 translateDom();
+/*
+ * و بعد جاروی زنده: هر متنی که در زمان اجرا ساخته می‌شود هم ترجمه می‌شود، وگرنه در حالت
+ * انگلیسی نیمی از پنل‌ها فارسی می‌مانند — همان چیزی که کارفرما دید.
+ */
+sweep( document.body );
+watchDom();
 
 // تم: تا وقتی کاربر خودش انتخاب نکرده، از تنظیم سیستم پیروی می‌کنیم — مثل Claude.
 const savedTheme = localStorage.getItem( 'hoosha-theme' );
@@ -74,6 +80,7 @@ const PAGES = {
 async function switchLang( code ) {
 	setLang( code );
 	translateDom();
+	sweep( document.body );
 	await refreshState();
 	await refreshSessions();
 	if ( view !== 'chat' ) {
@@ -190,7 +197,7 @@ async function renderChatsPage( host ) {
 		box.appendChild(
 			h( 'div', { class: 'row-item', onClick: () => resumeSession( item.id ) }, [
 				h( 'div', { class: 'row-main' }, [
-					h( 'span', { class: 'row-title', text: item.title || t( 'بدون عنوان' ) } ),
+					h( 'span', { class: 'row-title', 'data-no-t': '', text: item.title || t( 'بدون عنوان' ) } ),
 				] ),
 				h( 'div', { class: 'row-meta' }, [
 					s?.sessionId === item.id ? h( 'span', { class: 'tag ok', text: t( 'باز' ) } ) : null,
@@ -272,7 +279,7 @@ async function renderProjectsPage( host ) {
 	for ( const p of list ) {
 		grid.appendChild(
 			h( 'div', { class: 'grid-card', onClick: () => switchProject( p ).then( () => renderProjectsPage( host ) ) }, [
-				h( 'b', { text: p.split( /[\\/]/ ).filter( Boolean ).pop() || p } ),
+				h( 'b', { 'data-no-t': '', text: p.split( /[\\/]/ ).filter( Boolean ).pop() || p } ),
 				h( 'p', { class: 'mono', text: p } ),
 				h( 'span', { class: 'gc-date', text: t( p === current ? 'پروژهٔ فعلی' : 'باز کن' ) } ),
 			] )

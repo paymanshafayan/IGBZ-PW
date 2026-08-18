@@ -49,6 +49,8 @@ class FakeNode {
 	/** @param {string} tag */
 	constructor( tag ) {
 		this.tagName = String( tag || 'div' ).toUpperCase();
+		// گره متنی هم گره است: بدون nodeType، جاروی ترجمه اصلاً چیزی برای ترجمه نمی‌بیند.
+		this.nodeType = this.tagName === 'TEXT' ? 3 : 1;
 		this.children = [];
 		this.parentNode = null;
 		this.className = '';
@@ -66,6 +68,18 @@ class FakeNode {
 
 	get parentElement() {
 		return this.parentNode;
+	}
+	get childNodes() {
+		return this.children;
+	}
+	get nodeValue() {
+		return this.nodeType === 3 ? this.textValue : null;
+	}
+	set nodeValue( value ) {
+		if ( this.nodeType === 3 ) {
+			this.textValue = String( value ?? '' );
+			notify( this, 'characterData' );
+		}
 	}
 	get firstChild() {
 		return this.children[ 0 ] || null;
@@ -104,6 +118,7 @@ class FakeNode {
 		const i = this.children.indexOf( before );
 		node.parentNode = this;
 		this.children.splice( i < 0 ? this.children.length : i, 0, node );
+		notify( this, 'childList', [ node ] );
 		return node;
 	}
 	scrollTo() {}
@@ -116,6 +131,7 @@ class FakeNode {
 	set textContent( value ) {
 		this.textValue = String( value ?? '' );
 		this.children = [];
+		notify( this, 'characterData' );
 	}
 	set innerHTML( value ) {
 		this.textValue = String( value ?? '' );
@@ -128,6 +144,7 @@ class FakeNode {
 	appendChild( child ) {
 		child.parentNode = this;
 		this.children.push( child );
+		notify( this, 'childList', [ child ] );
 		return child;
 	}
 	append( ...nodes ) {
@@ -256,6 +273,66 @@ function matches( node, sel ) {
 	return true;
 }
 
+/*
+ * یک MutationObserver کوچک.
+ *
+ * بدون این، «جاروی ترجمه» در تست اصلاً اجرا نمی‌شود و سبزبودنش هیچ چیز ثابت نمی‌کند —
+ * دقیقاً همان جایی که در مرورگر کار می‌کند و در هارنس نه.
+ */
+const observers = [];
+
+function notify( target, type, added = [] ) {
+	if ( ! observers.length ) {
+		return;
+	}
+	for ( const o of observers ) {
+		if ( ! inside( target, o.target ) ) {
+			continue;
+		}
+		o.queue.push( type === 'childList' ? { type, addedNodes: added, target } : { type, target } );
+		if ( ! o.scheduled ) {
+			o.scheduled = true;
+			queueMicrotask( () => {
+				o.scheduled = false;
+				const records = o.queue.splice( 0 );
+				o.cb( records, o );
+			} );
+		}
+	}
+}
+
+function inside( node, root ) {
+	let n = node;
+	while ( n ) {
+		if ( n === root ) {
+			return true;
+		}
+		n = n.parentNode;
+	}
+	return false;
+}
+
+class FakeMutationObserver {
+	constructor( cb ) {
+		this.cb = cb;
+		this.queue = [];
+		this.scheduled = false;
+	}
+	observe( target ) {
+		this.target = target;
+		observers.push( this );
+	}
+	disconnect() {
+		const i = observers.indexOf( this );
+		if ( i > -1 ) {
+			observers.splice( i, 1 );
+		}
+	}
+	takeRecords() {
+		return this.queue.splice( 0 );
+	}
+}
+
 /** data-view → view */
 function camel( name ) {
 	return String( name ).replace( /^data-/, '' ).replace( /-([a-z])/g, ( _, c ) => c.toUpperCase() );
@@ -267,6 +344,7 @@ function camel( name ) {
  * @param {{fetch?: (url:string, opts?:any)=>Promise<any>}} [opts]
  */
 export function installFakeDom( opts = {} ) {
+	observers.length = 0;
 	const document = {
 		createElement: ( tag ) => new FakeNode( tag ),
 		createTextNode: ( text ) => {
@@ -309,9 +387,11 @@ export function installFakeDom( opts = {} ) {
 		fetch: globalThis.fetch,
 		localStorage: globalThis.localStorage,
 		CustomEvent: globalThis.CustomEvent,
+		MutationObserver: globalThis.MutationObserver,
 	};
 
 	globalThis.document = document;
+	globalThis.MutationObserver = FakeMutationObserver;
 	globalThis.CustomEvent = class {
 		constructor( type, init ) {
 			this.type = type;
@@ -335,6 +415,8 @@ export function installFakeDom( opts = {} ) {
 			globalThis.fetch = previous.fetch;
 			globalThis.localStorage = previous.localStorage;
 			globalThis.CustomEvent = previous.CustomEvent;
+			globalThis.MutationObserver = previous.MutationObserver;
+			observers.length = 0;
 		},
 	};
 }

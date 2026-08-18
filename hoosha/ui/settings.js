@@ -426,7 +426,7 @@ async function renderConnectors( box ) {
 		list.appendChild(
 			h( 'div', { class: 'item' }, [
 				h( 'div', { class: 'item-main' }, [
-					h( 'b', { text: c.name } ),
+					h( 'b', { 'data-no-t': '', text: c.name } ),
 					h( 'p', { class: 'mono', text: c.kind === 'http' ? c.config.url : `${ c.config.command } ${ ( c.config.args || [] ).join( ' ' ) }` } ),
 					st?.error ? h( 'p', { class: 'note error', text: st.error } ) : null,
 					st?.tools?.length ? h( 'p', { class: 'note', text: `ابزارها: ${ st.tools.join( '، ' ) }` } ) : null,
@@ -667,7 +667,7 @@ async function renderSkills( box ) {
 	for ( const sk of s.skills || [] ) {
 		list.appendChild(
 			h( 'div', { class: 'item' }, [
-				h( 'div', { class: 'item-main' }, [ h( 'b', { text: sk.name } ), h( 'p', { text: sk.description || '' } ) ] ),
+				h( 'div', { class: 'item-main', 'data-no-t': '' }, [ h( 'b', { text: sk.name } ), h( 'p', { text: sk.description || '' } ) ] ),
 				h( 'span', { class: 'tag', text: sk.source } ),
 				sk.source === 'user'
 					? h( 'button', {
@@ -734,7 +734,7 @@ async function renderPlugins( box ) {
 					for ( const p of out.marketplace?.plugins || [] ) {
 						marketList.appendChild(
 							h( 'div', { class: 'item' }, [
-								h( 'div', { class: 'item-main' }, [ h( 'b', { text: p.name } ), h( 'p', { text: p.description || '' } ) ] ),
+								h( 'div', { class: 'item-main', 'data-no-t': '' }, [ h( 'b', { text: p.name } ), h( 'p', { text: p.description || '' } ) ] ),
 								h( 'button', {
 									class: 'btn solid',
 									text: 'نصب',
@@ -762,7 +762,7 @@ async function renderPlugins( box ) {
 		list.appendChild(
 			h( 'div', { class: 'item' }, [
 				h( 'div', { class: 'item-main' }, [
-					h( 'b', { text: p.name } ),
+					h( 'b', { 'data-no-t': '', text: p.name } ),
 					h( 'p', { text: `اسکیل: ${ p.has.skills } · دستور: ${ p.has.commands }${ p.has.mcp ? ' · MCP' : '' }${ p.has.hooks ? ' · هوک' : '' }` } ),
 				] ),
 				h( 'span', { class: `tag ${ p.enabled ? 'ok' : '' }`, text: p.enabled ? 'فعال' : 'خاموش' } ),
@@ -807,8 +807,8 @@ async function renderAgents( box ) {
 		list.appendChild(
 			h( 'div', { class: 'item' }, [
 				h( 'div', { class: 'item-main' }, [
-					h( 'b', { text: a.name } ),
-					h( 'p', { text: a.description || '' } ),
+					h( 'b', { 'data-no-t': '', text: a.name } ),
+					h( 'p', { 'data-no-t': '', text: a.description || '' } ),
 					h( 'p', { class: 'note mono', text: `${ a.model || 'مدل پیش‌فرض' } · ${ a.tools?.length ? a.tools.join( '، ' ) : 'همهٔ ابزارها' }` } ),
 				] ),
 				h( 'span', { class: 'tag', text: a.source } ),
@@ -919,7 +919,7 @@ async function renderCommands( box ) {
 	for ( const c of s.commands || [] ) {
 		list.appendChild(
 			h( 'div', { class: 'item' }, [
-				h( 'div', { class: 'item-main' }, [ h( 'b', { class: 'mono', text: `/${ c.name }` } ), h( 'p', { text: c.description || '' } ) ] ),
+				h( 'div', { class: 'item-main', 'data-no-t': '' }, [ h( 'b', { class: 'mono', text: `/${ c.name }` } ), h( 'p', { text: c.description || '' } ) ] ),
 				h( 'span', { class: 'tag', text: c.source } ),
 				c.source !== 'builtin' ? h( 'button', { class: 'btn outline', text: 'ویرایش', onClick: () => form( c ) } ) : null,
 				c.source !== 'builtin'

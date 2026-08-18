@@ -118,6 +118,220 @@ const EN = {
 	'زبان': 'Language',
 	'فارسی': 'Persian',
 	'انگلیسی': 'English',
+
+	"تعریف شده": "defined",
+	"نصب شده": "installed",
+	"نقطه": "points",
+	"کامیت آماده": "commits ready",
+	"در دسترس": "available",
+	"Ctrl+U — یا فقط بچسبان": "Ctrl+U — or just paste",
+	"اتصال مخزن تازه": "Connect a new repository",
+	"اشاره به فایل پروژه": "Point to a project file",
+	"افزودن فایل یا تصویر": "Add a file or image",
+	"این پرووایدر فهرست مدل نمی‌دهد.": "This provider does not list models.",
+	"با gh ساخته می‌شود": "Created with gh",
+	"بازگشت به چک‌پوینت": "Rewind to a checkpoint",
+	"بدون تأیید، جز آنچه ممنوع کرده‌ای": "No confirmation, except what you have denied",
+	"بدون کلون": "Without cloning",
+	"بستن کار": "Close the task",
+	"تغییر نام گفتگو": "Rename the chat",
+	"تغییر پوشهٔ کاری": "Change the workspace folder",
+	"تنظیمات پرووایدر": "Provider settings",
+	"جستجو: گفتگو، دستور، فایل، تنظیمات…": "Search: chats, commands, files, settings…",
+	"جستجوی فازی": "Fuzzy search",
+	"خروجی JSON": "Export JSON",
+	"خروجی ذخیره شد.": "Export saved.",
+	"خروجی مارک‌داون": "Export Markdown",
+	"خودکار": "Automatic",
+	"در حال خواندن شاخه‌ها…": "Reading branches…",
+	"دستور": "Command",
+	"دیدن تغییرات": "See the changes",
+	"دیدن همهٔ تغییرات": "See all changes",
+	"فرستادن به ریموت": "Push to the remote",
+	"فقط بررسی و خواندن — چیزی تغییر نمی‌کند": "Read and review only — nothing changes",
+	"فهرست نیامد": "No list came back",
+	"میان‌برها": "Shortcuts",
+	"نوشتن و اجرا با تأیید تو": "Writes and commands with your confirmation",
+	"پاک‌کردن گفتگو": "Delete the chat",
+	"پلن": "Plan",
+	"کلون از آدرس گیت": "Clone from a git URL",
+	"کلید، آدرس، پروفایل‌ها": "Keys, endpoints, profiles",
+	"گفتگو": "Chat",
+	"حالت": "Mode",
+
+	"نصب‌شده": "installed",
+	"تعریف‌شده": "defined",
+	"کانکتورها (MCP)": "Connectors (MCP)",
+
+	// ── پنل‌ها و منوهای عمیق (جاروی زنده اینها را می‌گیرد) ──────────────
+	'هوشا': 'Hoosha',
+	'برو به آخر': 'Jump to latest',
+	'گزینه‌ها': 'Options',
+	'تغییر نام یا حذف': 'Rename or delete',
+	'مدل': 'Model',
+	'حالت کار': 'Mode',
+	'حالت کار (Shift+Tab)': 'Mode (Shift+Tab)',
+	'خروجی گفتگو': 'Export chat',
+	'مخزن — کلیک برای تعویض یا اتصال': 'Repository — click to switch or connect',
+	'شاخه — کلیک برای تعویض یا ساخت': 'Branch — click to switch or create',
+	'تغییرات — کلیک برای دیدن دیف': 'Changes — click to see the diff',
+	'همین حالا': 'just now',
+	'عادی': 'Normal',
+	'راهنما': 'Help',
+	'اجرا': 'Run',
+	'نصب': 'Install',
+	'روشن': 'On',
+	'خاموش': 'Off',
+	'فعال': 'Enabled',
+	'روشن کن': 'Turn on',
+	'سراسری': 'Global',
+	'پیش‌فرض': 'Default',
+	'وضعیت': 'Status',
+	'مسیرها': 'Routes',
+	'ایمیج': 'Image',
+	'شبکه': 'Network',
+	'تم': 'Theme',
+	'تراکم': 'Density',
+	'راحت': 'Comfortable',
+	'فشرده': 'Compact',
+	'تاریک': 'Dark',
+	'اندازهٔ متن': 'Text size',
+	'خواندن': 'Read',
+	'با ابزار': 'With tool',
+	'همراه تصویر': 'With image',
+	'وصل نشد': 'Not connected',
+	'هاب خاموش است': 'The hub is off',
+	'نمونهٔ آماده': 'Sample',
+	'نمونه: فایل‌سیستم': 'Sample: filesystem',
+	'نمونه: گیت‌هاب': 'Sample: GitHub',
+	'مرور مارکت‌پلیس': 'Browse the marketplace',
+	'نصب اسکیل': 'Install a skill',
+	'نصب پلاگین': 'Install a plugin',
+	'owner/repo یا /path/to/skill': 'owner/repo or /path/to/skill',
+	'owner/repo یا مسیر محلی': 'owner/repo or a local path',
+	'مثلاً: این تابع خطا می‌دهد، دیباگش کن': 'For example: this function throws, debug it',
+	'ترکیب‌ها': 'Combos',
+	'دستهٔ کار': 'Task category',
+	'راهبرد': 'Strategy',
+	'راهبرد پیش‌فرض': 'Default strategy',
+	'حداکثر تلاش': 'Max attempts',
+	'حداقل شکست هم‌امضا': 'Minimum matching failures',
+	'سقف هزینه': 'Cost cap',
+	'سقف روزانهٔ کل ($)': 'Total daily cap ($)',
+	'سقف هر کار ($)': 'Per-task cap ($)',
+	'سقف هر مدیر ($)': 'Per-manager cap ($)',
+	'سقف تماس روزانه': 'Daily call cap',
+	'سقف تماس هر امضا در ساعت': 'Per-signature calls per hour',
+	'سقف CPU': 'CPU limit',
+	'سقف حافظه': 'Memory limit',
+	'کش پاسخ': 'Response cache',
+	'خالی کردن کش': 'Clear the cache',
+	'دفتر راه‌حل‌ها': 'Solution ledger',
+	'چه یاد گرفته': 'What it has learned',
+	'سلامت مسیرها': 'Route health',
+	'عیب‌یاب هاب': 'Hub diagnoser',
+	'عیب‌یاب روشن باشد': 'Diagnoser enabled',
+	'مدل عیب‌یاب': 'Diagnoser model',
+	'اتصال عیب‌یاب': 'Diagnoser connection',
+	'اتصال دوباره به همه': 'Reconnect everything',
+	'این درخواست به کجا می‌رود؟': 'Where does this request go?',
+	'ببین کجا می‌رود': 'See where it goes',
+	'موتور کانتینر': 'Container engine',
+	'خودکار (اول docker، بعد podman)': 'Automatic (docker first, then podman)',
+	'تست سندباکس': 'Test the sandbox',
+	'سندباکس اجرای فرمان': 'Command sandbox',
+	'فرمان‌ها را داخل کانتینر اجرا کن': 'Run commands inside a container',
+	'ریشهٔ کانتینر فقط‌خواندنی باشد (به‌جز /tmp)': 'Container root read-only (except /tmp)',
+	'اگر کانتینر در دسترس نبود، روی سیستم اجرا کن (پیش‌فرض: نه — اجرا نشود)': 'If no container is available, run on the host (default: no — refuse)',
+	'بسته — بدون اینترنت (امن‌ترین)': 'Closed — no internet (safest)',
+	'معمولی — اینترنت دارد': 'Normal — has internet',
+	'شبکهٔ میزبان (ناامن؛ فقط اگر می‌دانی چرا)': 'Host network (unsafe; only if you know why)',
+	'مسیرهای اضافه': 'Extra mounts',
+	'+ مسیر اضافه': '+ Add a mount',
+	'به شکل host:container — مثلاً /home/me/.composer:/root/.composer': 'As host:container — e.g. /home/me/.composer:/root/.composer',
+	'چه چیزی را محافظت می‌کند و چه چیزی را نه': 'What it protects and what it does not',
+	'پوشهٔ کاری': 'Workspace',
+	'تغییر پوشه': 'Change folder',
+	'حافظهٔ پروژه (HOOSHA.md)': 'Project memory (HOOSHA.md)',
+	'تعریف هوک‌ها (JSON)': 'Hook definitions (JSON)',
+	'دستورهای اسلش': 'Slash commands',
+	'کانکتورها (سرورهای MCP)': 'Connectors (MCP servers)',
+	'شل‌های پس‌زمینه': 'Background shells',
+	'چک‌پوینت‌ها': 'Checkpoints',
+	'فهرست کار': 'Task list',
+	'توکن ورودی این نشست': 'Input tokens this session',
+	'توکن خروجی این نشست': 'Output tokens this session',
+	'هزینهٔ این نشست': 'Cost of this session',
+	'همیشه مجاز': 'Always allowed',
+	'همیشه ممنوع': 'Always denied',
+	'همیشه بپرس': 'Always ask',
+	'+ قاعدهٔ مجاز': '+ Allow rule',
+	'+ قاعدهٔ ممنوع': '+ Deny rule',
+	'+ قاعدهٔ پرسشی': '+ Ask rule',
+	'+ پروفایل تازه': '+ New profile',
+	'+ کانکتور تازه': '+ New connector',
+	'+ اتصال تازه': '+ New connection',
+	'+ ترکیب تازه': '+ New combo',
+	'+ دستور تازه': '+ New command',
+	'+ زیرعامل تازه': '+ New subagent',
+	'خودکار — بدون تأیید (جز فهرست ممنوع)': 'Automatic — no confirmation (except the deny list)',
+	'عادی — نوشتن و اجرا با تأیید': 'Normal — writes and commands need confirmation',
+	'پلن — فقط بررسی و خواندن': 'Plan — read and review only',
+	'اگر مدل اول شکست خورد، بی‌صدا برو سراغ بعدی': 'If the first model fails, quietly move to the next',
+	'وصله‌های موفق بدون تأیید من ماندگار شوند': 'Keep successful patches without asking me',
+	'اجازهٔ جستجوی اینترنتی — فقط متن خطای پاک‌سازی‌شده بیرون می‌رود': 'Allow web search — only the scrubbed error text leaves',
+	'— بدون مدل عیب‌یاب (فقط پله‌های یک و دو) —': '— No diagnoser model (steps one and two only) —',
+	'هنوز اتصالی از کاتالوگ نساخته‌ای.': 'You have not created a catalog connection yet.',
+	'هنوز اتصال سازگاری نساخته‌ای.': 'You have not created a compatible connection yet.',
+	'هنوز ترکیبی نساخته‌ای. بدون ترکیب، همهٔ مدل‌های روشن با راهبرد پیش‌فرض نامزد می‌شوند.': 'No combos yet. Without one, every enabled model is a candidate under the default strategy.',
+	'هنوز مدلی کشف نشده. در صفحهٔ پرووایدرها، روی «کشف مدل‌ها» بزن.': 'No models discovered yet. On the providers page, hit “Discover models”.',
+	'هنوز تماسی ثبت نشده.': 'No calls recorded yet.',
+	'هنوز مصرفی ثبت نشده.': 'No usage recorded yet.',
+	'هنوز چیزی یاد نگرفته — چند نوبت کار لازم است.': 'Nothing learned yet — it needs a few rounds of work.',
+	'دفتر خالی است — یعنی هنوز خطایی نبوده که راه‌حلش آزموده شده باشد.': 'The ledger is empty — no error has had a tested fix yet.',
+	'تنظیمات ظاهری در همین مرورگر ذخیره می‌شود.': 'Appearance settings are stored in this browser.',
+	'اگر چیزی کار نمی‌کند، اول اینجا را ببین.': 'If something is broken, look here first.',
+	'این همان کد مخزن است؛ هر git pull بلافاصله اثر می‌گذارد.': 'This is the repository code itself; every git pull takes effect immediately.',
+	'ابزارها حذف نمی‌شوند؛ آنچه کنترل می‌شود دسترسی است — در تب مجوزها.': 'Tools are never removed; what you control is access — on the Permissions tab.',
+	'قاعده می‌تواند نام ابزار باشد (مثل bash) یا پیشوندی (مثل bash:git) یا * برای همه.': 'A rule can be a tool name (like bash), a prefix (like bash:git), or * for everything.',
+	'هرچه اینجا بنویسی، در هر گفتگو به مدل داده می‌شود. جای قواعد پروژه، سبک کد، و کارهای ممنوع.': 'Whatever you write here goes to the model in every conversation: project rules, code style, and what is off limits.',
+	'هر کانکتور، ابزارهای یک سرویس بیرونی را داخل هوشا می‌آورد. دو نوع: اجرای فرمان محلی (stdio) یا آدرس اینترنتی (HTTP).': 'A connector brings an outside service’s tools into Hoosha. Two kinds: a local command (stdio) or a URL (HTTP).',
+	'یک پلاگین می‌تواند اسکیل، دستور، کانکتور MCP و هوک با خودش بیاورد.': 'A plugin can bring skills, commands, MCP connectors and hooks with it.',
+	'اسکیل آماده را از یک مخزن گیت‌هاب یا پوشهٔ محلی نصب کن. فرمت استاندارد SKILL.md پشتیبانی می‌شود.': 'Install a ready-made skill from a GitHub repository or a local folder. The standard SKILL.md format is supported.',
+	'هر زیرعامل یک متخصص است با پرامپت، مدل و ابزارهای خودش. عامل اصلی با ابزار task صدایشان می‌زند.': 'Each subagent is a specialist with its own prompt, model and tools. The main agent calls them with the task tool.',
+	'دستور خودت را بساز: متن دستور همان پرامپتی است که فرستاده می‌شود. $ARGUMENTS و $1 و $2 جایگزین می‌شوند.': 'Build your own command: its body is the prompt that gets sent. $ARGUMENTS, $1 and $2 are substituted.',
+	'فرمان‌هایی که در لحظه‌های مشخص اجرا می‌شوند: PreToolUse، PostToolUse، UserPromptSubmit، SessionStart، SessionEnd، Stop. اگر PreToolUse با کد ۲ خارج شود، جلوی ابزار گرفته می‌شود.': 'Commands that run at defined moments: PreToolUse, PostToolUse, UserPromptSubmit, SessionStart, SessionEnd, Stop. If PreToolUse exits with code 2, the tool is blocked.',
+	'وقتی روشن باشد، ابزار bash و شل‌های پس‌زمینه داخل یک کانتینر اجرا می‌شوند. خواندن و نوشتن فایل روی سیستم خودت می‌ماند (همین حالا هم به پوشهٔ کاری محدود است).': 'When on, the bash tool and background shells run inside a container. File reads and writes stay on your machine (already limited to the workspace).',
+	'محافظت می‌کند: فرمانی که مدل اجرا می‌کند به بقیهٔ دیسک، به شبکه (اگر بسته باشد) و به دسترسی‌های سیستمی نمی‌رسد.': 'It protects you: a command the model runs cannot reach the rest of the disk, the network (when closed), or system capabilities.',
+	'محافظت نمی‌کند: خودِ پوشهٔ کاری داخل کانتینر قابل نوشتن است — چون کار عامل همین است. برای برگرداندنش، چک‌پوینت داری.': 'It does not protect the workspace itself: that stays writable inside the container, because that is the agent’s job. To undo, you have checkpoints.',
+	'برای پروژهٔ PHP/وردپرس: php:8.3-cli · برای جاوااسکریپت: node:22-bookworm-slim · ایمیج باید از قبل pull شده باشد یا شبکه باز باشد.': 'For a PHP/WordPress project: php:8.3-cli · for JavaScript: node:22-bookworm-slim · the image must already be pulled, or the network must be open.',
+	'روی ویندوز به Docker Desktop با WSL2 نیاز داری.': 'On Windows you need Docker Desktop with WSL2.',
+	'با روشن‌کردن هاب، هوشا بین چند اتصال و چند مدل خودش مسیریابی می‌کند.': 'With the hub on, Hoosha routes between several connections and models by itself.',
+	'حالت سادهٔ قدیمی: یک پرووایدر، یک مدل. وقتی هاب روشن و آماده باشد این کنار گذاشته می‌شود و مسیریابی با هاب است.': 'The old simple mode: one provider, one model. Once the hub is on and ready, this is set aside and the hub does the routing.',
+	'از کاتالوگ انتخاب کن، کلید بده، تست کن. می‌توانی از یک سرویس چند حساب داشته باشی — هر حساب یک سهمیهٔ جدا.': 'Pick from the catalog, add a key, test it. You can hold several accounts on one service — each with its own quota.',
+	'هر سرویسی که مسیر سازگار با OpenAI یا Anthropic دارد: آدرس پایه، سبک احراز، هدر دلخواه و مسیر فهرست مدل، همه دست خودت.': 'Any service with an OpenAI- or Anthropic-compatible endpoint: base URL, auth style, custom headers and the models path are all yours to set.',
+	'کشف خودکار یک نقطهٔ شروع است. برچسبی که اینجا می‌زنی بر آن می‌چربد، و آنچه هوشا از نتیجهٔ واقعی یاد می‌گیرد بر هر دو.': 'Auto-discovery is a starting point. A label you set here beats it, and what Hoosha learns from real results beats both.',
+	'ترکیب یعنی یک زنجیرهٔ نام‌دار از مدل‌ها با یک راهبرد. دستهٔ کار می‌گوید کدام ترکیب برای چه جنسی از درخواست.': 'A combo is a named chain of models plus a strategy. The task category says which combo serves which kind of request.',
+	'ترتیب مدل‌ها در هر ترکیب مهم است — راهبردهای اولویتی از بالا شروع می‌کنند.': 'Order matters inside a combo — priority strategies start from the top.',
+	'هوشا جنس درخواست را خودش تشخیص می‌دهد؛ اینجا فقط می‌گویی هر جنس به کدام ترکیب برود.': 'Hoosha classifies the request itself; here you only say which combo each kind goes to.',
+	'یک متن نمونه بنویس و ببین هوشا آن را چه جنسی می‌فهمد و به کدام مدل می‌فرستد — بدون اینکه تماسی گرفته شود.': 'Write a sample message and see how Hoosha classifies it and which model it would pick — without making a call.',
+	'صدک تأخیر، نرخ موفقیت و وضعیت مدارشکن هر مدل. مدار باز یعنی هوشا فعلاً سراغ آن نمی‌رود.': 'Latency percentile, success rate and circuit state per model. An open circuit means Hoosha stays away for now.',
+	'امتیاز هر مدل در هر دسته، از نتیجهٔ واقعی همین نصب — نه از یک جدول ثابت.': 'Each model’s score per category, from this installation’s real results — not from a fixed table.',
+	'هرچه هوشا یاد گرفته، با تاریخ و شمار موفقیت. هر ردیف با یک دکمه پاک می‌شود.': 'Everything Hoosha has learned, with dates and success counts. Any row clears with one button.',
+	'جدا از هاب تنظیم می‌شود — چیزی که قرار است هاب را تعمیر کند نباید از داخل خود هاب مسیر بگیرد.': 'Configured apart from the hub — whatever is meant to repair the hub must not be routed by it.',
+	'یک مدل کوچک و ارزان کافی است؛ کارش خواندن متن خطا و پیشنهاد یک وصلهٔ ساختاریافته است.': 'A small, cheap model is enough; its job is to read the error and propose a structured patch.',
+	'سقف خالی یعنی بی‌سقف. عبور از سقف، درخواست را رد می‌کند — نه اینکه فقط هشدار بدهد.': 'An empty cap means no cap. Going over rejects the request — it does not just warn.',
+	'پاسخی که فراخوانی ابزار دارد کش نمی‌شود — چون اجرای دوبارهٔ ابزار، دنیای بیرون را عوض می‌کند.': 'A reply containing a tool call is never cached — running the tool again changes the outside world.',
+	"خواندن فایل": "Read a file",
+	"اجرای فرمان": "Run a command",
+	"بدون کلید": "no key",
+	"بدون مدل": "no model",
+	"همهٔ ابزارها": "all tools",
+	"مدل پیش‌فرض": "default model",
+	"پروژه": "Project",
+	"اصابت": "hits",
+	"خطا": "errors",
+	'هزینه تخمینی است و از جدول قیمت داخلی می‌آید؛ در config.json با کلید pricing قابل تغییر است.': 'Cost is an estimate from the built-in price table; change it in config.json under the pricing key.',
 };
 
 /** فرهنگ‌ها بر اساس زبان. فارسی کلیدِ خودش است، پس فرهنگ لازم ندارد. */
@@ -164,6 +378,9 @@ export function setLang( code ) {
 	root.lang = current;
 	root.dir = isRtl() ? 'rtl' : 'ltr';
 	root.dataset.lang = current;
+	if ( typeof document !== 'undefined' && document.body ) {
+		sweep( document.body );
+	}
 	return current;
 }
 
@@ -190,6 +407,307 @@ export function translateDom( root = document ) {
 	for ( const el of root.querySelectorAll( '[data-t-ph]' ) ) {
 		el.placeholder = t( el.dataset.tPh );
 	}
+}
+
+/*
+ * ═════════════════════════════════════════ جاروی زندهٔ صفحه
+ *
+ * شکایت کارفرما: «وقتی زبان روی انگلیسی است نباید هیچ متن فارسی دیده بشه.»
+ *
+ * پوشاندن ~۷۰۰ رشتهٔ فارسی با `t()` در ۹ فایل، هم پرخطاست هم هر رشتهٔ تازه‌ای که فردا
+ * اضافه شود دوباره از قلم می‌افتد. پس ترجمه را به **خروجی** می‌بریم نه به صدا‌زدن‌ها:
+ * یک جارو که متنِ خودِ DOM را ترجمه می‌کند و یک MutationObserver که هر چیز تازه‌ای را
+ * هم می‌گیرد. هر رشته‌ای که ترجمه نداشته باشد، در تست فهرست می‌شود — نه اینکه بی‌صدا
+ * فارسی بماند.
+ */
+
+const FA_CHAR = /[\u0600-\u06FF]/;
+const FA_DIGITS = /[\u06F0-\u06F9\u0660-\u0669]/g;
+
+/** الگوهای پارامتری — رشته‌هایی که عدد یا نام داخلشان است. */
+const PATTERNS = [
+	[ /^(\d+) پیام$/, '$1 messages' ],
+	[ /^(\d+) گفتگو$/, '$1 chats' ],
+	[ /^(\d+) فایل$/, '$1 files' ],
+	[ /^(\d+) فایل تغییرکرده$/, '$1 files changed' ],
+	[ /^(\d+) تغییر$/, '$1 changes' ],
+	[ /^ثبت (\d+) تغییر$/, 'Commit $1 changes' ],
+	[ /^فرستادن (\d+) کامیت$/, 'Push $1 commits' ],
+	[ /^(\d+) دقیقه پیش$/, '$1 minutes ago' ],
+	[ /^(\d+) ساعت پیش$/, '$1 hours ago' ],
+	[ /^(\d+) روز پیش$/, '$1 days ago' ],
+	[ /^نسخه: هوشا (.+)$/, 'Version: Hoosha $1' ],
+	[ /^ساخت: (.*)$/, 'Build: $1' ],
+	[ /^کد از: (.+)$/, 'Code from: $1' ],
+	[ /^پوشهٔ کاری: (.+)$/, 'Workspace: $1' ],
+	[ /^ابزارها \((\d+)\)$/, 'Tools ($1)' ],
+	[ /^امروز \((.*)\): (.+)$/, 'Today ($1): $2' ],
+	[ /^اسکیل: (\d+) · دستور: (\d+)$/, 'Skills: $1 · Commands: $2' ],
+	[ /^اسکیل: (\d+) · دستور: (\d+) · MCP$/, 'Skills: $1 · Commands: $2 · MCP' ],
+	[ /^مارکت‌پلیس: (.+)$/, 'Marketplace: $1' ],
+	[ /^مثلاً: (.+)$/, 'For example: $1' ],
+	[ /^(\d+) پاسخ در کش$/, '$1 cached replies' ],
+	[ /^(\d+) اصابت$/, '$1 hits' ],
+	[ /^(\d+) خطا$/, '$1 errors' ],
+	[ /^امروز (\d+) تماس عیب‌یابی$/, 'Today $1 diagnoser calls' ],
+	[ /^ابزارها: (.+)$/, 'Tools: $1' ],
+];
+
+/** ترجمهٔ یک رشتهٔ کامل، با تکیه بر فرهنگ و بعد الگوها. */
+export function translate( text ) {
+	const dict = DICT[ current ];
+	if ( ! dict ) {
+		return text;
+	}
+	const raw = String( text );
+	const trimmed = raw.trim();
+	if ( ! trimmed || ! FA_CHAR.test( trimmed ) ) {
+		return raw.replace( FA_DIGITS, toAsciiDigit );
+	}
+	const lead = raw.slice( 0, raw.length - raw.trimStart().length );
+	const tail = raw.slice( raw.trimEnd().length );
+	return lead + core( trimmed, dict ) + tail;
+}
+
+/** جداکننده‌هایی که یک رشته را به چند جملهٔ مستقل می‌شکنند. */
+const SPLITS = [ ' · ', ' — ', ' | ', ' ، ', '، ', ' / ' ];
+
+/**
+ * هستهٔ ترجمه: اول فرهنگ، بعد الگو، بعد شکستن به تکه‌ها، بعد عدد.
+ * @param {string} text
+ * @param {Record<string,string>} dict
+ */
+function core( text, dict ) {
+	if ( ! FA_CHAR.test( text ) ) {
+		return punct( text );
+	}
+	const hit = dict[ text ];
+	if ( hit ) {
+		return hit;
+	}
+
+	const ascii = text.replace( FA_DIGITS, toAsciiDigit );
+	for ( const [ re, into ] of PATTERNS ) {
+		if ( re.test( ascii ) ) {
+			return ascii.replace( re, into );
+		}
+	}
+
+	// «الف · ب · ج» — هر تکه یک جملهٔ مستقل است.
+	for ( const sep of SPLITS ) {
+		if ( ! text.includes( sep ) ) {
+			continue;
+		}
+		const parts = text.split( sep ).map( ( piece ) => core( piece.trim(), dict ) );
+		if ( ! parts.some( ( piece ) => FA_CHAR.test( piece ) ) ) {
+			return parts.join( sep );
+		}
+	}
+
+	// «برچسب: مقدار» — فقط برچسب ترجمه می‌شود، مقدار دست‌نخورده می‌ماند.
+	const colon = text.match( /^([^:]{1,40}):\s*(.+)$/ );
+	if ( colon ) {
+		const label = dict[ colon[ 1 ].trim() ];
+		if ( label ) {
+			return `${ label }: ${ core( colon[ 2 ].trim(), dict ) }`;
+		}
+	}
+
+	// «۱۲ فایل» یا «فایل ۱۲» — عدد سرِ جایش می‌ماند، متن ترجمه می‌شود.
+	const head = text.match( /^([\d\u06F0-\u06F9.,%$+−-]+)\s+(.+)$/ );
+	if ( head ) {
+		const rest = core( head[ 2 ], dict );
+		if ( ! FA_CHAR.test( rest ) ) {
+			return `${ head[ 1 ].replace( FA_DIGITS, toAsciiDigit ) } ${ rest }`;
+		}
+	}
+	const foot = text.match( /^(.+?)\s+([\d\u06F0-\u06F9.,%$+−-]+)$/ );
+	if ( foot ) {
+		const rest = core( foot[ 1 ], dict );
+		if ( ! FA_CHAR.test( rest ) ) {
+			return `${ rest } ${ foot[ 2 ].replace( FA_DIGITS, toAsciiDigit ) }`;
+		}
+	}
+
+	return punct( text );
+}
+
+/** رقم و نشانه‌گذاری فارسی → لاتین. «۱۲٪» در متن انگلیسی، فارسی به‌نظر می‌رسد. */
+function punct( text ) {
+	return text
+		.replace( FA_DIGITS, toAsciiDigit )
+		.replace( /٪/g, '%' )
+		.replace( /،/g, ',' )
+		.replace( /؛/g, ';' )
+		.replace( /؟/g, '?' )
+		.replace( /٫/g, '.' )
+		.replace( /\u200c/g, ' ' );
+}
+
+/** @param {string} d */
+function toAsciiDigit( d ) {
+	const fa = '۰۱۲۳۴۵۶۷۸۹';
+	const ar = '٠١٢٣٤٥٦٧٨٩';
+	const i = fa.indexOf( d );
+	return String( i === -1 ? ar.indexOf( d ) : i );
+}
+
+/** متن اصلی هر گره، تا برگشت به فارسی چیزی گم نشود. */
+const ORIGINAL = new WeakMap();
+const ATTRS = [ 'title', 'placeholder', 'aria-label', 'alt' ];
+
+/** یک گرهٔ متنی یا صفت را ترجمه می‌کند. */
+function apply( node, get, set ) {
+	const now = get();
+	let seen = ORIGINAL.get( node );
+	/*
+	 * اگر متن فعلی همانی نیست که خودمان نوشتیم، یعنی برنامه محتوا را عوض کرده — پس
+	 * «اصل» تازه می‌شود.
+	 *
+	 * بدون این شرط، جارو محتوای تازه را با متن قدیمیِ حفظ‌شده بازمی‌گرداند: عنوان گفتگو
+	 * بعد از باز کردن یک نشست، دوباره «گفتگوی تازه» می‌شد. یک بار همین اتفاق افتاد و
+	 * تستِ نامربوطی قرمز شد که آن را لو داد.
+	 */
+	if ( ! seen || ( now !== seen.written && now !== seen.source ) ) {
+		if ( ! FA_CHAR.test( now || '' ) ) {
+			return;
+		}
+		seen = { source: now, written: now };
+		ORIGINAL.set( node, seen );
+	}
+	const source = seen.source;
+	const next = current === 'fa' ? source : translate( source );
+	/*
+	 * نوشتنِ بی‌تغییر ممنوع.
+	 *
+	 * ناظرِ DOM با هر نوشتن دوباره صدا زده می‌شود؛ اگر مقدار یکسان را هم بنویسیم، حلقه
+	 * بی‌پایان می‌شود. (اولین بار همین‌جا برنامه در تست قفل شد و هیچ خطایی هم نداد.)
+	 */
+	seen.written = next;
+	if ( next !== now ) {
+		set( next );
+	}
+}
+
+/**
+ * ترجمهٔ کل یک زیردرخت: متن‌ها، صفت‌ها، و مقدار دکمه‌ها.
+ * @param {Node} root
+ */
+export function sweep( root = document.body ) {
+	if ( ! root || noTranslate( root ) ) {
+		return;
+	}
+	const nodes = root.nodeType === 1 ? [ root, ...root.querySelectorAll( '*' ) ] : [];
+	for ( const el of nodes ) {
+		// محتوای کاربر — عنوان گفتگو، نام پروژه، متن پیام — ترجمه نمی‌شود.
+		if ( noTranslate( el ) ) {
+			continue;
+		}
+		for ( const name of ATTRS ) {
+			if ( el.getAttribute?.( name ) ) {
+				apply(
+					attrKey( el, name ),
+					() => el.getAttribute( name ),
+					( v ) => el.setAttribute( name, v )
+				);
+			}
+		}
+		const kids = el.childNodes || [];
+		let sawText = false;
+		for ( const child of kids ) {
+			if ( child.nodeType === 3 ) {
+				sawText = true;
+				apply(
+					child,
+					() => child.nodeValue,
+					( v ) => ( child.nodeValue = v )
+				);
+			}
+		}
+		// برگِ بی‌گرهِ متنی: متنش را مستقیم ترجمه کن (المانی که فقط textContent دارد).
+		if ( ! sawText && ! kids.length && el.textContent ) {
+			apply(
+				el,
+				() => el.textContent,
+				( v ) => ( el.textContent = v )
+			);
+		}
+	}
+}
+
+/** آیا این گره (یا نیایش) محتوای کاربر است؟ */
+function noTranslate( node ) {
+	let n = node;
+	while ( n && n.nodeType === 1 ) {
+		if ( n.hasAttribute ? n.hasAttribute( 'data-no-t' ) : n.getAttribute?.( 'data-no-t' ) !== null && n.getAttribute?.( 'data-no-t' ) !== undefined ) {
+			return true;
+		}
+		n = n.parentNode;
+	}
+	return false;
+}
+
+/** برای هر صفت یک کلید یکتا لازم است، چون WeakMap روی خود المان یکی بیشتر جا ندارد. */
+const ATTR_KEYS = new WeakMap();
+function attrKey( el, name ) {
+	let bag = ATTR_KEYS.get( el );
+	if ( ! bag ) {
+		bag = {};
+		ATTR_KEYS.set( el, bag );
+	}
+	if ( ! bag[ name ] ) {
+		bag[ name ] = { el, name };
+	}
+	return bag[ name ];
+}
+
+let observer = null;
+let observed = null;
+
+/**
+ * جارو را زنده نگه می‌دارد: هر چیزی که بعداً به صفحه اضافه شود هم ترجمه می‌شود.
+ *
+ * اگر `document.body` عوض شده باشد (در تست‌ها هر بار یک DOM تازه)، ناظر قبلی روی جسدِ
+ * صفحهٔ قبلی نشسته است. یک بار همین باعث شد تست سبز به‌نظر برسد در حالی که هیچ ترجمه‌ای
+ * انجام نمی‌شد — پس ناظر با هر بدنهٔ تازه دوباره بسته می‌شود.
+ */
+export function watchDom() {
+	if ( typeof MutationObserver === 'undefined' || ! document?.body ) {
+		return;
+	}
+	if ( observer && observed === document.body ) {
+		return;
+	}
+	observer?.disconnect();
+	observer = new MutationObserver( ( records ) => {
+		for ( const r of records ) {
+			for ( const node of r.addedNodes || [] ) {
+				if ( node.nodeType === 1 ) {
+					sweep( node );
+				} else if ( node.nodeType === 3 ) {
+					apply(
+						node,
+						() => node.nodeValue,
+						( v ) => ( node.nodeValue = v )
+					);
+				}
+			}
+			if ( r.type === 'characterData' && r.target ) {
+				if ( r.target.nodeType === 3 ) {
+					apply(
+						r.target,
+						() => r.target.nodeValue,
+						( v ) => ( r.target.nodeValue = v )
+					);
+				} else {
+					// `el.textContent = '…'` — در مرورگر گرهِ متنی تازه می‌سازد، در هارنس نه.
+					sweep( r.target );
+				}
+			}
+		}
+	} );
+	observed = document.body;
+	observer.observe( document.body, { childList: true, subtree: true, characterData: true } );
 }
 
 /** فهرست زبان‌ها برای منوی انتخاب. */

@@ -70,6 +70,16 @@
 	/* عرض ریل وقتی نوار کناری جمع می‌شود — آیکون‌ها می‌مانند. */
 	--rail-w: 56px;
 	--col: 46rem;
+	/*
+	 * ارتفاع کادر نوشتن، عدد به عدد از طرح تأییدشده:
+	 *   ۱۲ padding + ۷۰ کادر متن + ۸ فاصله + ۳۶ ردیف دکمه‌ها + ۱۲ padding = ۱۳۸
+	 * بزرگ‌شدن خودکار هم سقف دارد؛ هیچ‌جا درصدی از ارتفاع پنجره نیست.
+	 */
+	/* فاصلهٔ استاندارد دور دکمه‌ها — خواستهٔ کارفرما: هیچ دکمه‌ای به بغل‌دستی‌اش نچسبد. */
+	--btn-gap: 10px;
+	--composer-h: 70px;
+	--composer-max: 168px;
+	--composer-box: 138px;
 	--ease: cubic-bezier(0.22, 0.9, 0.32, 1);
 }
 
@@ -343,7 +353,7 @@ textarea {
 .account-row {
 	display: flex;
 	align-items: center;
-	gap: 4px;
+	gap: var(--btn-gap);
 	border-top: 1px solid var(--border-soft);
 	padding-top: 8px;
 }
@@ -390,7 +400,7 @@ textarea {
 .top-right {
 	display: flex;
 	align-items: center;
-	gap: 4px;
+	gap: var(--btn-gap);
 	position: relative;
 }
 .ctx-chip {
@@ -539,7 +549,7 @@ textarea {
 
 .msg-actions {
 	display: flex;
-	gap: 2px;
+	gap: var(--btn-gap);
 	margin-top: 6px;
 	opacity: 0;
 	transition: opacity 0.15s;
@@ -1124,16 +1134,22 @@ code .f {
 
 /* ─────────────────────────────────── نوار گیت زیر کامپوزر */
 
+/*
+ * نوار گیت زیر کادر نوشتن — نه داخلش.
+ *
+ * قبلاً داخل همان کارت بود و ۴۵ پیکسل به ارتفاعش اضافه می‌کرد؛ طرح تأییدشده اصلاً چنین
+ * ردیفی ندارد و همین بود که کادر چت را از اندازهٔ طرح بزرگ‌تر می‌کرد.
+ */
 .git-bar {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	margin-top: 10px;
-	padding-top: 9px;
-	border-top: 1px solid var(--border-soft);
+	gap: var(--btn-gap);
+	height: 34px;
+	margin-top: 8px;
+	padding: 0 4px;
 	font-size: 0.8rem;
 	color: var(--muted-foreground);
-	flex-wrap: wrap;
+	overflow: hidden;
 }
 .git-chip span {
 	white-space: nowrap;
@@ -1353,7 +1369,7 @@ code .f {
 }
 .tab-row {
 	display: flex;
-	gap: 4px;
+	gap: var(--btn-gap);
 	flex-wrap: wrap;
 	border-bottom: 1px solid var(--border-soft);
 	margin: 20px 0 18px;
@@ -1491,7 +1507,7 @@ code .f {
 }
 .row {
 	display: flex;
-	gap: 8px;
+	gap: var(--btn-gap);
 	align-items: center;
 	flex-wrap: wrap;
 }
@@ -1516,7 +1532,7 @@ code .f {
 .chips {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: var(--btn-gap);
 }
 .note {
 	color: var(--muted-foreground);
@@ -1675,7 +1691,7 @@ code .f {
 }
 .modal-actions {
 	display: flex;
-	gap: 8px;
+	gap: var(--btn-gap);
 	align-items: center;
 	margin-top: 16px;
 }
@@ -2078,7 +2094,7 @@ body.sidebar-collapsed .account-menu {
 .side-top-actions {
 	display: flex;
 	align-items: center;
-	gap: 2px;
+	gap: var(--btn-gap);
 }
 
 /*
@@ -2087,7 +2103,7 @@ body.sidebar-collapsed .account-menu {
  * در نسخهٔ قبل این را یک دکمهٔ نارنجیِ توپر کرده بودم و همان اولین چیزی بود که در تصویر
  * توی چشم می‌زد. در Claude همان اندازه و همان وزنِ بقیهٔ ردیف‌های ناوبری است.
  */
-.btn.new-chat {
+.btn.row.new-chat {
 	width: auto;
 	margin: 8px 12px 16px;
 	font-size: 14.5px;
@@ -2105,7 +2121,7 @@ body.sidebar-collapsed .account-menu {
 	color: var(--foreground);
 }
 
-.btn.nav-item {
+.btn.row.nav-item {
 	position: relative;
 	width: auto;
 	min-width: 0;
@@ -2338,7 +2354,7 @@ body.sidebar-collapsed .account-menu {
 .page-actions {
 	display: flex;
 	align-items: center;
-	gap: 8px;
+	gap: var(--btn-gap);
 	flex: none;
 }
 
@@ -2507,8 +2523,49 @@ body.sidebar-collapsed .account-menu {
 	line-height: 1.2;
 	white-space: nowrap;
 	cursor: pointer;
+	margin: var(--btn-gap);
 	transition: background 0.16s var(--ease), border-color 0.16s var(--ease), color 0.16s var(--ease),
 		box-shadow 0.16s var(--ease), transform 0.16s var(--ease);
+}
+/*
+ * فاصلهٔ ۱۰ پیکسلی دور هر دکمه.
+ *
+ * شکایت کارفرما: «بعضی جاها می‌چسبه به سایر آیتم‌ها.» پس فاصله را روی خودِ کلاس
+ * می‌گذاریم تا هر دکمه‌ای هرجا برود آن را با خودش ببرد. ظرف‌هایی که خودشان `gap`
+ * دارند این مارجین را صفر می‌کنند و در عوض `gap`شان همان ۱۰ پیکسل است — نتیجه یکسان
+ * می‌ماند و فاصله‌ها دوبرابر نمی‌شوند.
+ */
+:is(
+		.composer-bar,
+		.top-right,
+		.side-top-actions,
+		.msg-actions,
+		.modal-actions,
+		.page-actions,
+		.tab-row,
+		.chips,
+		.account-row,
+		.git-bar,
+		.item,
+		.row,
+		.code-head,
+		.side-nav,
+		.set-nav,
+		.pop-menu,
+		.recent-item,
+		.row-item,
+		.hits,
+		.ask-actions,
+		.q-options,
+		.set-head-actions,
+		.kv-row,
+		.stat-row,
+		.card-list,
+		.empty-state,
+		.side-bottom,
+		.attachment
+	) > .btn {
+	margin: 0;
 }
 .btn:hover {
 	background: var(--accent);
@@ -2596,7 +2653,9 @@ body.sidebar-collapsed .account-menu {
 .btn.round {
 	border-radius: 50%;
 }
+/* ردیف‌ها روی هم می‌نشینند؛ ۱۰ پیکسل میانشان یعنی فهرست از هم پاشیده. */
 .btn.row {
+	margin: 0;
 	width: 100%;
 	min-height: 34px;
 	justify-content: flex-start;
@@ -2684,6 +2743,12 @@ body.sidebar-collapsed .account-menu {
 
 .composer {
 	padding: 12px;
+	/* ارتفاع کارت در حالت عادی ثابت است، نه تابع محتوا. */
+	min-height: var(--composer-box);
+	max-height: calc(var(--composer-max) + 68px);
+	display: flex;
+	flex-direction: column;
+	gap: 0;
 	transition: border-color 0.16s var(--ease), box-shadow 0.16s var(--ease);
 	background: var(--card);
 	border: 1px solid var(--border);
@@ -2707,9 +2772,10 @@ body.sidebar-collapsed .account-menu {
 	 * قبلاً سقف ۴۰٪ ارتفاع پنجره بود و بزرگ‌شدن خودکار کادر را تا آنجا می‌برد؛ روی یک
 	 * نمایشگر بلند یعنی نصف صفحه. طرح اصلاً سقف درصدی ندارد.
 	 */
-	height: 70px;
-	min-height: 70px;
-	max-height: 168px;
+	flex: none;
+	height: var(--composer-h);
+	min-height: var(--composer-h);
+	max-height: var(--composer-max);
 	font-size: 17px;
 	padding: 4px 4px 0;
 }
@@ -2721,7 +2787,7 @@ body.sidebar-collapsed .account-menu {
 	align-items: center;
 	margin-top: 8px;
 	padding: 0;
-	gap: 4px;
+	gap: var(--btn-gap);
 }
 
 /* میکروفون و موج صدا در Claude قاب ندارند. */
@@ -3007,7 +3073,7 @@ html[dir='ltr'] .switch input:checked + i::after {
 .item {
 	display: flex;
 	align-items: center;
-	gap: 11px;
+	gap: var(--btn-gap);
 	transition: background 0.14s var(--ease);
 	border: 0;
 	border-bottom: 1px solid var(--border);

@@ -101,9 +101,11 @@ function paint() {
 	// در نوار کناری فقط چند تای آخر؛ بقیه در صفحهٔ «گفتگوها».
 	for ( const item of sessions.slice( 0, 14 ) ) {
 		box.appendChild(
-			h( 'div', { class: `recent-item ${ s?.sessionId === item.id ? 'active' : '' }`, title: `${ item.title }\n${ timeAgo( item.updatedAt ) }` }, [
+			h( 'div', { class: `recent-item ${ s?.sessionId === item.id ? 'active' : '' }` }, [
 				h( 'button', {
 					class: 'btn quiet row rt',
+					'data-no-t': '',
+					title: `${ item.title }\n${ timeAgo( item.updatedAt ) }`,
 					text: item.title || t( 'بدون عنوان' ),
 					onClick: () => onResume( item.id ),
 				} ),

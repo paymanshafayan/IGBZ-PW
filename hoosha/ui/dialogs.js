@@ -164,13 +164,13 @@ export function openPalette( deps ) {
 
 		const sessions = ( await api( '/api/sessions' ) ).sessions || [];
 		for ( const x of sessions.slice( 0, 30 ) ) {
-			out.push( { label: x.title || 'بدون عنوان', hint: timeAgo( x.updatedAt ), kind: 'گفتگو', run: () => deps.onSession( x.id ) } );
+			out.push( { label: x.title || 'بدون عنوان', hint: timeAgo( x.updatedAt ), kind: 'گفتگو', data: true, run: () => deps.onSession( x.id ) } );
 		}
 
 		if ( q ) {
 			const files = ( await api( `/api/files?q=${ encodeURIComponent( q ) }` ) ).files || [];
 			for ( const f of files.slice( 0, 10 ) ) {
-				out.push( { label: f, hint: '', kind: 'فایل', run: () => deps.onFile( f ) } );
+				out.push( { label: f, hint: '', kind: 'فایل', data: true, run: () => deps.onFile( f ) } );
 			}
 		}
 
@@ -192,7 +192,7 @@ export function openPalette( deps ) {
 					},
 				}, [
 					h( 'span', { class: 'pal-kind', text: item.kind } ),
-					h( 'b', { text: item.label } ),
+					h( 'b', { 'data-no-t': item.data ? '' : null, text: item.label } ),
 					h( 'span', { class: 'note', text: item.hint } ),
 				] )
 			);
