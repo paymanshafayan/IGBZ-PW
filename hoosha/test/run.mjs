@@ -2044,8 +2044,9 @@ await test( 'خطاهای میکروفن پیام فارسی دارند، نه �
 
 section( 'خواسته‌های چیدمان' );
 
-await test( 'کادر نوشتن ۵۰ پیکسل از پایین فاصله دارد', () => {
-	assert.match( cssBlock( '.composer-wrap' ), /padding:\s*0 26px 50px/ );
+await test( 'فاصلهٔ کادر نوشتن از پایین، همان عدد طرح است', () => {
+	// طرح: pb-6 یعنی ۲۴ پیکسل. عدد قبلی (۵۰) حدس خودم بود.
+	assert.match( cssBlock( '.composer-wrap' ), /padding:\s*0 16px 24px/ );
 } );
 
 await test( 'ته نوار کناری ردیف حساب است و منویش از همان‌جا بالا می‌آید', () => {
@@ -4489,6 +4490,149 @@ await test( 'نسخه با کاری که شده جلو رفته است', async (
 	const pkg = JSON.parse( await fs.readFile( path.resolve( 'package.json' ), 'utf8' ) );
 	const [ major, minor ] = pkg.version.split( '.' ).map( Number );
 	assert.ok( major > 0 || minor >= 8, `نسخه ${ pkg.version } از کاری که انجام شده عقب است` );
+} );
+
+// ---------------------------------------------------------------- دو زبانه
+
+section( 'دو زبانه و فونت' );
+
+await test( 'ترجمه، جهت و فونت با هم عوض می‌شوند', async () => {
+	const dom = ( await import( './fake-dom.mjs' ) ).installFakeDom( {} );
+	try {
+		const { t, setLang, lang, isRtl, initLang } = await import( `../ui/lib/i18n.js?l=${ Math.random() }` );
+
+		assert.equal( initLang(), 'fa', 'پیش‌فرض باید فارسی باشد' );
+		assert.equal( t( 'گفتگوها' ), 'گفتگوها' );
+		assert.equal( isRtl(), true );
+		assert.equal( document.documentElement.dir, 'rtl' );
+
+		setLang( 'en' );
+		assert.equal( lang(), 'en' );
+		assert.equal( t( 'گفتگوها' ), 'Chats' );
+		assert.equal( t( 'تنظیمات' ), 'Settings' );
+		assert.equal( isRtl(), false );
+		assert.equal( document.documentElement.dir, 'ltr' );
+		assert.equal( document.documentElement.lang, 'en' );
+		assert.equal( document.documentElement.dataset.lang, 'en' );
+
+		// رشتهٔ بی‌ترجمه باید فارسی برگردد، نه کلید خام.
+		assert.equal( t( 'یک رشتهٔ ترجمه‌نشده' ), 'یک رشتهٔ ترجمه‌نشده' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'متن‌های ثابت HTML هم ترجمه می‌شوند', async () => {
+	const { installFakeDom, parseHtml } = await import( './fake-dom.mjs' );
+	const dom = installFakeDom( {} );
+	try {
+		parseHtml( fssync.readFileSync( path.join( uiDir, 'index.html' ), 'utf8' ), document.body );
+		const { setLang, translateDom } = await import( `../ui/lib/i18n.js?d=${ Math.random() }` );
+
+		setLang( 'en' );
+		translateDom();
+		const labels = document.querySelectorAll( '.nav-item span' ).map( ( x ) => x.textContent ).filter( Boolean );
+		assert.ok( labels.includes( 'Chats' ), `برچسب‌ها: ${ labels.join( ' | ' ) }` );
+		assert.ok( labels.includes( 'Projects' ) );
+
+		setLang( 'fa' );
+		translateDom();
+		const fa = document.querySelectorAll( '.nav-item span' ).map( ( x ) => x.textContent );
+		assert.ok( fa.includes( 'گفتگوها' ), 'برگشت به فارسی' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'فونت وزیر کنار برنامه است و در CSS تعریف شده', () => {
+	for ( const w of [ 'Regular', 'Medium', 'SemiBold', 'Bold' ] ) {
+		assert.ok(
+			fssync.existsSync( path.join( uiDir, 'assets', 'fonts', `Vazirmatn-${ w }.woff2` ) ),
+			`وزن ${ w } فونت نیست`
+		);
+	}
+	assert.ok( fssync.existsSync( path.join( uiDir, 'assets', 'fonts', 'OFL.txt' ) ), 'پروانهٔ فونت باید همراهش باشد' );
+	assert.ok( ( css.match( /@font-face/g ) || [] ).length >= 4, 'هر چهار وزن باید تعریف شوند' );
+	assert.match( css, /url\('\/assets\/fonts\/Vazirmatn-Regular\.woff2'\)/, 'باید محلی باشد نه از اینترنت' );
+	assert.match( css, /html\[data-lang='en'\]\s*\{[^}]*--sans:/, 'انگلیسی باید فونت خودش را بگیرد' );
+} );
+
+await test( 'کلید زبان در منوی حساب هست و کار می‌کند', async () => {
+	const { dom, q, all } = await bootApp();
+	try {
+		q( '#btn-account' ).click();
+		await new Promise( ( r ) => setTimeout( r, 40 ) );
+		const row = all( '.menu-item' ).find( ( x ) => x.textContent.includes( 'زبان' ) );
+		assert.ok( row, 'ردیف زبان در منو نیست' );
+		assert.ok( row.textContent.includes( 'English' ), 'باید نام زبان دیگر را نشان دهد' );
+
+		row.click();
+		await new Promise( ( r ) => setTimeout( r, 120 ) );
+		assert.equal( document.documentElement.lang, 'en' );
+		assert.equal( document.documentElement.dir, 'ltr' );
+	} finally {
+		document.documentElement.lang = 'fa';
+		dom.restore();
+	}
+} );
+
+await test( 'کادر پیام ارتفاع مهارشده دارد و صفحه را نمی‌گیرد', () => {
+	/*
+	 * از تصویر کارفرما: کادر خالی نزدیک نصف صفحه را گرفته بود.
+	 *
+	 * علتش دو چیز بود که با هم جمع می‌شدند: `min-height: 50px` روی خود کادر، و
+	 * `Math.min(scrollHeight, innerHeight * 0.4)` در بزرگ‌شدن خودکار — که روی یک
+	 * نمایشگر بلند یعنی چند صد پیکسل. حالا هر دو عدد ثابت و کوچک‌اند.
+	 */
+	const box = cssBlock( '.composer textarea' );
+	assert.match( box, /min-height:\s*70px/, 'همان عددی که در طرح آمده' );
+	assert.match( box, /max-height:\s*168px/ );
+	assert.equal( /max-height:\s*\d+vh/.test( box ), false, 'سقف نباید درصدی از ارتفاع پنجره باشد' );
+	assert.equal( /min-height:\s*50px/.test( box ), false );
+
+	// عرض‌ها هم از طرح: کامپوزر ۷۰۰ (+ حاشیه) و ستون گفتگو ۸۰۰.
+	assert.match( cssBlock( '.thread > *' ), /max-width:\s*800px/ );
+	assert.match( cssBlock( '.msg.user .body' ), /max-width:\s*80%/ );
+	assert.match( cssBlock( '.msg.user .body' ), /font-size:\s*15\.5px/ );
+
+	const composer = fssync.readFileSync( path.join( uiDir, 'composer.js' ), 'utf8' );
+	assert.match( composer, /Math\.min\( input\.scrollHeight, 168 \)/ );
+	assert.equal( /innerHeight \* 0\.4/.test( composer ), false );
+
+	// و در حالت خالی، فاصلهٔ زیر کادر هم جمع می‌شود تا گروه وسط بنشیند.
+	assert.match( css, /\.view-chat\.empty \.composer-wrap\s*\{[^}]*padding-bottom:\s*0/ );
+} );
+
+await test( 'کارت‌های صفحهٔ تغییرات، متن بلند را از پنل بیرون نمی‌ریزند', () => {
+	const card = cssBlock( '.stat' );
+	assert.match( card, /min-width:\s*0/, 'بدون این، کارت در گرید کوچک نمی‌شود' );
+	assert.match( card, /overflow:\s*hidden/ );
+
+	const value = cssBlock( '.stat-value' );
+	assert.match( value, /overflow-wrap:\s*anywhere/, 'نام مخزن و شاخه جای شکستن ندارند' );
+	assert.match( value, /font-size:\s*0\.95rem/ );
+	assert.equal( /font-size:\s*1\.2rem/.test( value ), false, 'فونت قبلی برای این کارت‌ها بزرگ بود' );
+
+	// و شناسه‌ها با فونت تک‌فاصله و کوچک‌تر، با تیتر کامل روی هاور.
+	const bar = fssync.readFileSync( path.join( uiDir, 'gitbar.js' ), 'utf8' );
+	assert.match( bar, /stat\( 'مخزن', git\.name, true \)/ );
+	assert.match( bar, /stat\( 'شاخه', git\.branch[\s\S]{0,60}?, true \)/ );
+	assert.match( bar, /title: `\$\{ label \}: \$\{ value \}`/ );
+} );
+
+await test( 'فرم پرووایدر استاندارد آدرس پایه نمی‌پرسد، سازگار می‌پرسد', () => {
+	// شکایت کارفرما: این دو صفحه شبیه هم بودند.
+	const hub = fssync.readFileSync( path.join( uiDir, 'hub.js' ), 'utf8' );
+	assert.match( hub, /compat \? field\( 'آدرس پایه', baseUrl/, 'سازگار: کادر ورودی' );
+	assert.match( hub, /! compat \? field\( 'آدرس پایه', baseShown/, 'استاندارد: فقط نمایش' );
+	assert.match( hub, /baseUrl: compat \? baseUrl\.value\.trim\(\) : info\?\.baseUrl/, 'استاندارد باید آدرس را از کاتالوگ بردارد' );
+
+	// و فیلدهای مخصوص سازگار در فرم استاندارد اصلاً ساخته نمی‌شوند.
+	for ( const only of [ "'سبک احراز', authStyle", "'مسیر فهرست مدل', modelsPath", "'هدرهای سفارشی', headers" ] ) {
+		assert.ok( hub.includes( `compat ? field( ${ only }` ), `${ only } باید فقط در حالت سازگار باشد` );
+	}
+	// سرویسی که کلید نمی‌خواهد، کادر کلید را هم نشان ندهد.
+	assert.match( hub, /keyField\.hidden = info\?\.needsKey === false/ );
 } );
 
 // ------------------------------------------------------------------ پایان

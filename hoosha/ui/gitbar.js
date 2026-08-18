@@ -304,8 +304,8 @@ export async function renderChanges( host ) {
 
 	host.appendChild(
 		h( 'div', { class: 'stat-row' }, [
-			stat( 'مخزن', git.name ),
-			stat( 'شاخه', git.branch + ( git.protected ? ' ⛨' : '' ) ),
+			stat( 'مخزن', git.name, true ),
+			stat( 'شاخه', git.branch + ( git.protected ? ' ⛨' : '' ), true ),
 			stat( 'تغییر', `+${ git.added } −${ git.removed }` ),
 			stat( 'جلوتر از ریموت', String( git.ahead ) ),
 		] )
@@ -371,9 +371,16 @@ export async function renderChanges( host ) {
 	}
 }
 
-function stat( label, value ) {
-	return h( 'div', { class: 'stat' }, [
+/**
+ * یک کارت آمار.
+ *
+ * `mono` برای مقدارهایی است که شناسه‌اند (نام مخزن، نام شاخه): با فونت تک‌فاصله و
+ * کوچک‌تر خوانا‌ترند و از کارت بیرون نمی‌زنند. `title` هم می‌گذاریم چون وقتی مقدار
+ * بلند بشکند، دیدن کاملش با نگه‌داشتن ماوس ساده‌تر از بزرگ‌کردن کارت است.
+ */
+function stat( label, value, mono = false ) {
+	return h( 'div', { class: 'stat', title: `${ label }: ${ value }` }, [
 		h( 'span', { class: 'stat-label', text: label } ),
-		h( 'b', { class: 'stat-value', text: value } ),
+		h( 'b', { class: `stat-value ${ mono ? 'mono' : '' }`, text: value } ),
 	] );
 }

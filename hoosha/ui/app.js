@@ -12,6 +12,7 @@
 import { $, h, toast, promptDialog, fmtTokens, timeAgo } from './lib/dom.js';
 import { post, refreshState, subscribe, getState, api } from './lib/api.js';
 import { paintStaleBar } from './lib/stale.js';
+import { t, lang, setLang, initLang, translateDom, LANGS } from './lib/i18n.js';
 import {
 	mountThread,
 	handleEvent,
@@ -25,6 +26,10 @@ import { openSettingsModal, renderSection, initSettings, SETTINGS_TABS } from '.
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 import { logoSvg } from './lib/logo.js';
 import { initGitBar, paintGitBar, renderChanges } from './gitbar.js';
+
+// زبان اول از همه: جهت صفحه و فونت به آن بسته‌اند و اگر بعد از رندر عوض شود، پرش دارد.
+initLang();
+translateDom();
 
 // تم: تا وقتی کاربر خودش انتخاب نکرده، از تنظیم سیستم پیروی می‌کنیم — مثل Claude.
 const savedTheme = localStorage.getItem( 'hoosha-theme' );
@@ -64,6 +69,21 @@ const PAGES = {
 	changes: { title: 'تغییرات', render: ( host ) => renderChanges( host ) },
 	workspace: { title: 'فضای کار', render: renderWorkspacePage },
 };
+
+/** میان‌بر: زبان را عوض کن و صفحه را با همان نما دوباره بکش. */
+async function switchLang( code ) {
+	setLang( code );
+	translateDom();
+	await refreshState();
+	await refreshSessions();
+	if ( view !== 'chat' ) {
+		await showView( view );
+	}
+	const g = $( '#greet-text' );
+	if ( g ) {
+		g.textContent = t( greeting() );
+	}
+}
 
 let view = 'chat';
 
@@ -109,7 +129,7 @@ async function showView( next ) {
 
 	box.replaceChildren(
 		h( 'div', { class: 'page-head' }, [
-			h( 'h1', { class: 'page-title', text: meta.title } ),
+			h( 'h1', { class: 'page-title', text: t( meta.title ) } ),
 			h( 'div', { class: 'page-actions' }, meta.actions ? meta.actions( host ) : [] ),
 		] ),
 		host
@@ -130,7 +150,7 @@ let chatFilter = '';
 function chatsActions( host ) {
 	const search = h( 'input', {
 		class: 'field',
-		placeholder: 'جستجو در گفتگوها…',
+		placeholder: t( 'جستجو در گفتگوها…' ),
 		value: chatFilter,
 		style: 'width:220px;margin:0;',
 		onInput: ( e ) => {
@@ -142,7 +162,7 @@ function chatsActions( host ) {
 		search,
 		h( 'button', {
 			class: 'pill primary',
-			text: 'گفتگوی تازه',
+			text: t( 'گفتگوی تازه' ),
 			onClick: () => $( '#btn-new' ).click(),
 		} ),
 	];
@@ -156,7 +176,7 @@ async function renderChatsPage( host ) {
 
 	host.replaceChildren();
 	if ( ! rows.length ) {
-		host.appendChild( emptyState( 'هنوز گفتگویی نیست', 'از «گفتگوی تازه» شروع کن؛ هر گفتگو خودش ذخیره می‌شود.' ) );
+		host.appendChild( emptyState( t( 'هنوز گفتگویی نیست' ), t( 'از «گفتگوی تازه» شروع کن؛ هر گفتگو خودش ذخیره می‌شود.' ) ) );
 		return;
 	}
 
@@ -165,17 +185,17 @@ async function renderChatsPage( host ) {
 	for ( const item of rows ) {
 		const g = groupOf( item.updatedAt );
 		if ( g !== group ) {
-			box.appendChild( h( 'div', { class: 'side-label', text: g } ) );
+			box.appendChild( h( 'div', { class: 'side-label', text: t( g ) } ) );
 			group = g;
 		}
 		box.appendChild(
 			h( 'div', { class: 'row-item', onClick: () => resumeSession( item.id ) }, [
 				h( 'div', { class: 'row-main' }, [
-					h( 'span', { class: 'row-title', text: item.title || 'بدون عنوان' } ),
+					h( 'span', { class: 'row-title', text: item.title || t( 'بدون عنوان' ) } ),
 				] ),
 				h( 'div', { class: 'row-meta' }, [
-					s?.sessionId === item.id ? h( 'span', { class: 'tag ok', text: 'باز' } ) : null,
-					h( 'span', { text: `${ item.messages } پیام` } ),
+					s?.sessionId === item.id ? h( 'span', { class: 'tag ok', text: t( 'باز' ) } ) : null,
+					h( 'span', { text: `${ item.messages } ${ t( 'پیام' ) }` } ),
 					h( 'span', { text: timeAgo( item.updatedAt ) } ),
 				] ),
 				h( 'button', {
@@ -231,7 +251,7 @@ function projectsActions( host ) {
 	return [
 		h( 'button', {
 			class: 'pill primary',
-			text: 'پروژهٔ تازه',
+			text: t( 'پروژهٔ تازه' ),
 			onClick: async () => {
 				const next = await promptDialog( 'مسیر پروژه:', getState()?.config?.workspace || '' );
 				if ( next ) {
@@ -255,7 +275,7 @@ async function renderProjectsPage( host ) {
 			h( 'div', { class: 'grid-card', onClick: () => switchProject( p ).then( () => renderProjectsPage( host ) ) }, [
 				h( 'b', { text: p.split( /[\\/]/ ).filter( Boolean ).pop() || p } ),
 				h( 'p', { class: 'mono', text: p } ),
-				h( 'span', { class: 'gc-date', text: p === current ? 'پروژهٔ فعلی' : 'باز کن' } ),
+				h( 'span', { class: 'gc-date', text: t( p === current ? 'پروژهٔ فعلی' : 'باز کن' ) } ),
 			] )
 		);
 	}
@@ -379,6 +399,8 @@ initSidebar( {
 			openSettings( 'status' );
 		} else if ( name === 'reload' ) {
 			location.reload();
+		} else if ( name === 'lang' ) {
+			switchLang( lang() === 'fa' ? 'en' : 'fa' );
 		}
 	},
 } );
@@ -412,7 +434,7 @@ subscribe( ( s ) => {
 	 */
 	const ws = String( s.config.workspace || '' );
 	const inChat = ( s.transcript || [] ).length > 0 || ! $( '#welcome' );
-	$( '#plan-text' ).textContent = ws.split( /[\\/]/ ).filter( Boolean ).pop() || 'بدون پروژه';
+	$( '#plan-text' ).textContent = ws.split( /[\\/]/ ).filter( Boolean ).pop() || t( 'بدون پروژه' );
 	$( '#plan-chip' ).title = ws;
 	$( '#plan-chip' ).hidden = inChat && view === 'chat';
 	$( '#session-title' ).hidden = ! ( inChat && view === 'chat' );
@@ -614,7 +636,7 @@ function showWelcome() {
 		h( 'div', { class: 'welcome', id: 'welcome' }, [
 			h( 'div', { class: 'greet' }, [
 				h( 'span', { class: 'greet-mark', html: logoSvg( 34 ) } ),
-				h( 'span', { text: greeting() } ),
+				h( 'span', { text: t( greeting() ) } ),
 			] ),
 		] )
 	);
@@ -762,7 +784,7 @@ async function boot() {
 		showWelcome();
 		const g = $( '#greet-text' );
 		if ( g ) {
-			g.textContent = greeting();
+			g.textContent = t( greeting() );
 		}
 		const gm = $( '#greet-mark' );
 		if ( gm && ! gm.innerHTML.trim() ) {

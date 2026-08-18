@@ -18,12 +18,51 @@
  * همین فیروزه است. یعنی رنگِ «الان این فعال است» در کل برنامه یکی است.
  */
 
+/*
+ * فونت وزیرمتن — کنار خودِ برنامه، نه از اینترنت.
+ *
+ * تا امروز `--sans` نام 'Vazirmatn' را داشت ولی فایلش هیچ‌جا نبود، پس عملاً همیشه به
+ * Segoe UI یا Tahoma می‌افتاد. حالا چهار وزن (۲۱۲ کیلوبایت) داخل مخزن است و آفلاین هم
+ * کار می‌کند — که برای ابزاری که قرار است روی سرور بی‌اینترنت بنشیند، شرط است.
+ * پروانه: OFL، فایلش کنار فونت‌هاست.
+ */
+@font-face {
+	font-family: 'Vazirmatn';
+	src: url('/assets/fonts/Vazirmatn-Regular.woff2') format('woff2');
+	font-weight: 400;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'Vazirmatn';
+	src: url('/assets/fonts/Vazirmatn-Medium.woff2') format('woff2');
+	font-weight: 500;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'Vazirmatn';
+	src: url('/assets/fonts/Vazirmatn-SemiBold.woff2') format('woff2');
+	font-weight: 600;
+	font-display: swap;
+}
+@font-face {
+	font-family: 'Vazirmatn';
+	src: url('/assets/fonts/Vazirmatn-Bold.woff2') format('woff2');
+	font-weight: 700;
+	font-display: swap;
+}
+
 :root {
 	--radius: 0.75rem;
 	--radius-sm: 0.5rem;
 	--radius-lg: 1rem;
 	--radius-xl: 1.75rem;
 	--fs: 15px;
+	/*
+	 * فارسی با وزیرمتن، انگلیسی با فونت سیستم.
+	 *
+	 * گذاشتن وزیر برای انگلیسی هم ممکن بود، ولی متن لاتین در فونت فارسی همیشه کمی
+	 * غریب می‌نشیند؛ و برعکسش بدتر است. پس با `data-lang` عوض می‌شود.
+	 */
 	--sans: 'Vazirmatn', 'Segoe UI', Tahoma, -apple-system, BlinkMacSystemFont, sans-serif;
 	--serif: 'Lora', 'Noto Naskh Arabic', 'Times New Roman', Georgia, 'Vazirmatn', serif;
 	--mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, Menlo, monospace;
@@ -182,6 +221,11 @@ html[data-theme='dark'] {
 
 [hidden] {
 	display: none !important;
+}
+
+html[data-lang='en'] {
+	--sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+	--serif: 'Lora', Georgia, 'Times New Roman', serif;
 }
 
 * {
@@ -612,7 +656,7 @@ textarea {
 	overscroll-behavior: contain;
 }
 .thread > * {
-	max-width: 50rem;
+	max-width: 800px;
 	margin-inline: auto;
 	padding-inline: 16px;
 }
@@ -643,6 +687,9 @@ textarea {
 }
 .view-chat.empty .disclaimer {
 	opacity: 0;
+}
+.view-chat.empty .composer-wrap {
+	padding-bottom: 0;
 }
 @keyframes rise {
 	from {
@@ -1338,10 +1385,14 @@ code .f {
 
 /* ══════════════════════════════════════════════════════ کامپوزر */
 
+/*
+ * عرض‌ها از طرح: کامپوزر ۷۰۰، ستون گفتگو ۸۰۰. قبلاً هر دو را یک عدد گرفته بودم و
+ * کامپوزر از چیزی که باید پهن‌تر می‌نشست.
+ */
 .composer-wrap {
 	flex: none;
-	padding: 0 26px 50px;
-	max-width: calc(var(--col) + 3rem);
+	padding: 0 16px 24px;
+	max-width: 732px;
 	width: 100%;
 	margin-inline: auto;
 	position: relative;
@@ -2061,15 +2112,24 @@ code .f {
 }
 .stat-row {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
 	gap: 9px;
 	margin-bottom: 16px;
 }
+/*
+ * کارت‌های آمار در صفحهٔ تغییرات.
+ *
+ * مقدارها اینجا شناسه‌اند — «paymanshafayan/IGBZ-WP» و «arena/01a00c31-igbz-wp» — که
+ * بلندند و جای شکستن ندارند. با فونت بزرگ از کارت می‌زدند بیرون. حالا کوچک‌ترند،
+ * هرجا لازم باشد می‌شکنند، و کارت `min-width: 0` دارد وگرنه در گرید اصلاً کوچک نمی‌شود.
+ */
 .stat {
 	border: 1px solid var(--border);
 	border-radius: var(--radius);
-	padding: 12px 14px;
-	background: linear-gradient(135deg, var(--card), var(--muted));
+	padding: 11px 13px;
+	background: var(--muted);
+	min-width: 0;
+	overflow: hidden;
 }
 .stat-label {
 	display: block;
@@ -2077,8 +2137,18 @@ code .f {
 	font-size: 0.77rem;
 }
 .stat-value {
-	font-size: 1.2rem;
+	display: block;
+	font-size: 0.95rem;
+	font-weight: 600;
+	line-height: 1.5;
 	color: var(--foreground);
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+.stat-value.mono {
+	font-family: var(--mono);
+	font-size: 0.85rem;
+	font-weight: 500;
 }
 .table {
 	width: 100%;
@@ -3105,10 +3175,17 @@ body.sidebar-collapsed .account-menu {
 	outline: none;
 	resize: none;
 	line-height: 1.7;
-	max-height: 40vh;
+	/*
+	 * ارتفاع از خودِ طرح: ۷۰ پیکسل، با سقف ثابت.
+	 *
+	 * قبلاً سقف ۴۰٪ ارتفاع پنجره بود و بزرگ‌شدن خودکار کادر را تا آنجا می‌برد؛ روی یک
+	 * نمایشگر بلند یعنی نصف صفحه. طرح اصلاً سقف درصدی ندارد.
+	 */
+	height: 70px;
+	min-height: 70px;
+	max-height: 168px;
 	font-size: 17px;
 	padding: 4px 4px 0;
-	min-height: 50px;
 }
 .composer textarea::placeholder {
 	color: var(--muted-foreground);

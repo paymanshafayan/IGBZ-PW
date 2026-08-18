@@ -203,7 +203,8 @@ export function syncSendButton() {
 function autoGrow() {
 	syncSendButton();
 	input.style.height = 'auto';
-	input.style.height = Math.min( input.scrollHeight, window.innerHeight * 0.4 ) + 'px';
+	// سقف ثابت و کوچک، نه درصدی از ارتفاع پنجره: روی نمایشگر بزرگ، ۴۰٪ یعنی نصف صفحه.
+	input.style.height = Math.min( input.scrollHeight, 168 ) + 'px';
 }
 
 async function submit() {

@@ -12,6 +12,7 @@
 import { $, h, timeAgo, toast, confirmDialog, promptDialog } from './lib/dom.js';
 import { api, post, getState } from './lib/api.js';
 import { logoSvg } from './lib/logo.js';
+import { t, lang, LANGS } from './lib/i18n.js';
 
 let onResume = () => {};
 let onView = () => {};
@@ -93,7 +94,7 @@ function paint() {
 
 	const s = getState();
 	if ( ! sessions.length ) {
-		box.appendChild( h( 'div', { class: 'empty small', text: 'هنوز گفتگویی نداری.' } ) );
+		box.appendChild( h( 'div', { class: 'empty small', text: t( 'هنوز گفتگویی نیست' ) } ) );
 		return;
 	}
 
@@ -103,7 +104,7 @@ function paint() {
 			h( 'div', { class: `recent-item ${ s?.sessionId === item.id ? 'active' : '' }`, title: `${ item.title }\n${ timeAgo( item.updatedAt ) }` }, [
 				h( 'button', {
 					class: 'rt',
-					text: item.title || 'بدون عنوان',
+					text: item.title || t( 'بدون عنوان' ),
 					onClick: () => onResume( item.id ),
 					style: 'background:none;border:0;color:inherit;font:inherit;text-align:start;cursor:pointer;padding:0;',
 				} ),
@@ -163,16 +164,20 @@ function toggleAccountMenu() {
 			end ? h( 'span', { class: 'mi-end', text: end } ) : null,
 		] );
 
+	// نام زبانِ **دیگر** را نشان می‌دهیم، چون این ردیف یک کلید تعویض است نه یک برچسب.
+	const other = LANGS.find( ( l ) => l.code !== lang() );
+
 	menu.replaceChildren(
 		h( 'div', { class: 'menu-mail', text: String( s.config?.workspace || '' ) } ),
-		item( '⚙', 'تنظیمات', 'Ctrl+,', () => onCommand( 'settings' ) ),
-		item( '◐', 'ظاهر', '', () => onCommand( 'theme' ) ),
-		item( '?', 'راهنما و میان‌برها', '?', () => onCommand( 'shortcuts' ) ),
+		item( '⚙', t( 'تنظیمات' ), 'Ctrl+,', () => onCommand( 'settings' ) ),
+		item( '◐', t( 'ظاهر' ), '', () => onCommand( 'theme' ) ),
+		item( '⟐', t( 'زبان' ), other.label, () => onCommand( 'lang' ) ),
+		item( '?', t( 'راهنما و میان‌برها' ), '?', () => onCommand( 'shortcuts' ) ),
 		h( 'div', { class: 'menu-sep' } ),
-		item( '⌁', 'مصرف و هزینه', '', () => onCommand( 'usage' ) ),
-		item( '✚', 'وضعیت و تشخیص', '', () => onCommand( 'status' ) ),
+		item( '⌁', t( 'مصرف و هزینه' ), '', () => onCommand( 'usage' ) ),
+		item( '✚', t( 'وضعیت و تشخیص' ), '', () => onCommand( 'status' ) ),
 		h( 'div', { class: 'menu-sep' } ),
-		item( '↺', 'بارگذاری دوباره', '', () => onCommand( 'reload' ) )
+		item( '↺', t( 'بارگذاری دوباره' ), '', () => onCommand( 'reload' ) )
 	);
 	menu.hidden = false;
 }
@@ -181,9 +186,9 @@ function toggleAccountMenu() {
 export function paintSidebarState( s ) {
 	const p = s.config.profiles?.[ s.config.activeProfile ] || {};
 	const hub = s.hub?.active;
-	$( '#account-name' ).textContent = hub ? 'هاب پرووایدر' : p.label || s.config.activeProfile || 'پروفایل';
+	$( '#account-name' ).textContent = hub ? t( 'هاب پرووایدر' ) : p.label || s.config.activeProfile || t( 'پروفایل' );
 	$( '#chip-provider' ).textContent = hub
-		? 'مسیریابی خودکار'
+		? t( 'مسیریابی خودکار' )
 		: `${ p.provider || '—' }${ p.model ? ` · ${ p.model }` : '' }`;
 	// آواتار، نشان خودِ هوشاست — همان‌جایی که در Claude دایرهٔ حساب می‌نشیند.
 	const dot = $( '#account-initial' );

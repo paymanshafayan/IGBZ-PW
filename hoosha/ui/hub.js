@@ -240,6 +240,10 @@ function renderConnections( box, page, compat ) {
 		const enabled = h( 'input', { type: 'checkbox', checked: current.enabled !== false } );
 
 		const note = h( 'p', { class: 'note' } );
+		// آدرس پایهٔ پرووایدر استاندارد فقط **نمایش** داده می‌شود، نه ویرایش.
+		const baseShown = h( 'p', { class: 'note mono' } );
+		const keyField = h( 'div', {} );
+
 		const sync = () => {
 			const info = options.find( ( p ) => p.id === provider.value );
 			note.textContent = info?.note || '';
@@ -247,6 +251,17 @@ function renderConnections( box, page, compat ) {
 				baseUrl.value = info.baseUrl;
 			}
 			authHeader.disabled = ! [ 'header', 'query' ].includes( authStyle.value );
+
+			if ( ! compat ) {
+				// در حالت استاندارد، آدرس از کاتالوگ می‌آید و کاربر لازم نیست بداند.
+				baseShown.textContent = info?.baseUrl || '—';
+				keyField.hidden = info?.needsKey === false;
+				apiKey.placeholder = info?.needsKey === false
+					? 'این سرویس کلید نمی‌خواهد'
+					: current.hasKey
+					? '••••••• (خالی بگذار تا بماند)'
+					: 'کلید را از پنل سرویس‌دهنده کپی کن';
+			}
 		};
 		provider.onchange = sync;
 		authStyle.onchange = sync;
@@ -261,7 +276,7 @@ function renderConnections( box, page, compat ) {
 					label: label.value.trim() || info?.label || 'اتصال',
 					provider: provider.value,
 					kind: info?.kind || 'openai',
-					baseUrl: baseUrl.value.trim(),
+					baseUrl: compat ? baseUrl.value.trim() : info?.baseUrl || baseUrl.value.trim(),
 					apiKey: apiKey.value.trim(),
 					authStyle: authStyle.value,
 					authHeader: authHeader.value.trim(),
@@ -286,7 +301,18 @@ function renderConnections( box, page, compat ) {
 				field( 'نام', label, 'هرچه که در فهرست‌ها می‌خواهی ببینی — مثلاً «OpenRouter حساب اصلی».' ),
 				field( 'سرویس', provider ),
 				note,
-				field( 'آدرس پایه', baseUrl ),
+
+				/*
+				 * دو فرم متفاوت، نه یک فرم با چند فیلد خاموش.
+				 *
+				 * کارفرما درست گفت که این دو صفحه شبیه هم شده بودند. پرووایدر استاندارد
+				 * آدرس پایه‌اش را از کاتالوگ دارد و پرسیدنش از کاربر، هم اضافی است و هم
+				 * جای اشتباه‌کردن باز می‌کند. سبک احراز و مسیر فهرست مدل هم همین‌طور.
+				 */
+				compat ? field( 'آدرس پایه', baseUrl, 'اجباری — همان چیزی که سرویس‌دهنده می‌دهد.' ) : null,
+				! compat ? field( 'آدرس پایه', baseShown, 'از کاتالوگ می‌آید؛ لازم نیست چیزی وارد کنی.' ) : null,
+
+				h( 'div', {}, [ keyField ] ),
 				field( 'کلید API', apiKey, 'در فایل تنظیمات محلی و با دسترسی ۶۰۰ ذخیره می‌شود و هیچ‌وقت به رابط برنمی‌گردد.' ),
 				compat ? field( 'سبک احراز', authStyle ) : null,
 				compat ? field( 'نام هدر یا پارامتر احراز', authHeader, 'فقط برای سبک «هدر دلخواه» و «پارامتر آدرس».' ) : null,
