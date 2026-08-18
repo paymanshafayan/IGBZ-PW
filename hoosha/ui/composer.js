@@ -250,7 +250,7 @@ function paintQueue() {
 				h( 'span', { text: '⏱' } ),
 				h( 'span', { class: 'q-text', text: q.text || `${ q.images.length } تصویر` } ),
 				h( 'button', {
-					class: 'ghost-icon',
+					class: 'btn icon sm quiet',
 					text: '×',
 					onClick: () => {
 						queue.splice( i, 1 );
@@ -306,7 +306,7 @@ function paintAttachments() {
 			h( 'div', { class: 'attachment', title: a.name }, [
 				h( 'img', { src: a.url, alt: a.name } ),
 				h( 'button', {
-					class: 'ghost-icon',
+					class: 'btn icon sm quiet',
 					type: 'button',
 					text: '×',
 					onClick: () => {
@@ -322,7 +322,7 @@ function paintAttachments() {
 // ─────────────────────────────────────────────────────── منوی «+»
 
 function menuItem( ico, label, desc, onClick, checked ) {
-	return h( 'div', { class: 'menu-item', onClick }, [
+	return h( 'div', { class: 'btn quiet row menu-item', onClick }, [
 		h( 'span', { class: 'm-ico', text: ico } ),
 		h( 'b', { text: label } ),
 		desc ? h( 'span', { class: 'm-desc', text: desc } ) : null,
@@ -400,7 +400,7 @@ async function toggleModelMenu() {
 	}
 	$( '#plus-menu' ).hidden = true;
 
-	box.replaceChildren( h( 'div', { class: 'menu-item', text: 'در حال گرفتن فهرست مدل‌ها…' } ) );
+	box.replaceChildren( h( 'div', { class: 'btn quiet row menu-item', text: 'در حال گرفتن فهرست مدل‌ها…' } ) );
 	box.hidden = false;
 
 	const out = await api( '/api/models' );
@@ -410,7 +410,7 @@ async function toggleModelMenu() {
 
 	if ( out.error || ! ( out.models || [] ).length ) {
 		box.appendChild(
-			h( 'div', { class: 'menu-item' }, [
+			h( 'div', { class: 'btn quiet row menu-item' }, [
 				h( 'b', { text: 'فهرست نیامد' } ),
 				h( 'span', { class: 'm-desc', text: out.error || 'این پرووایدر فهرست مدل نمی‌دهد.' } ),
 			] )

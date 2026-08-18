@@ -301,6 +301,7 @@ textarea {
 	overflow: hidden;
 	transition: grid-template-columns 0.22s var(--ease);
 }
+
 /*
  * نوار جمع‌شده کنار می‌رود و یک دکمهٔ شناور جایش را می‌گیرد.
  *
@@ -328,224 +329,23 @@ textarea {
 	padding: 1px 6px;
 	align-self: center;
 }
-
-.ghost-icon {
-	background: transparent;
-	border: 0;
-	color: var(--muted-foreground);
-	width: 32px;
-	height: 32px;
-	border-radius: var(--radius-sm);
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	cursor: pointer;
-	transition: 0.15s var(--ease);
-	flex: none;
-}
-.ghost-icon:hover {
-	background: var(--accent);
-	color: var(--foreground);
-}
-
-.new-chat:active {
-	transform: translateY(0);
-}
-
 .side-nav {
 	display: flex;
 	flex-direction: column;
 	gap: 1px;
 	margin-top: 8px;
 }
-
-.nav-item span {
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.nav-item:hover svg {
-	transform: scale(1.08);
-	color: var(--primary);
-}
-.nav-item.active::before {
-	content: '';
-	position: absolute;
-	inset-inline-start: 0;
-	top: 50%;
-	transform: translateY(-50%);
-	width: 3px;
-	height: 18px;
-	border-radius: 3px;
-	background: var(--primary);
-}
-
-.side-recents {
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
-	margin-top: 14px;
-}
 .session-list {
 	display: flex;
 	flex-direction: column;
 	gap: 1px;
 }
-.nav-item.pinned .pin-count {
-	margin-inline-start: auto;
-	font-size: 0.72rem;
-	color: var(--primary);
-	background: var(--primary-soft);
-	border-radius: 20px;
-	padding: 0 6px;
-	font-weight: 600;
-}
-
 .account-row {
 	display: flex;
 	align-items: center;
 	gap: 4px;
 	border-top: 1px solid var(--border-soft);
 	padding-top: 8px;
-}
-
-/* ══════════════════════════════════════════════ ستون فهرست نشست‌ها */
-
-.list-col {
-	display: flex;
-	flex-direction: column;
-	min-width: 0;
-	min-height: 0;
-	overflow: hidden;
-	padding: 10px 6px;
-	background: var(--sidebar);
-}
-.list-head {
-	display: flex;
-	align-items: center;
-	gap: 4px;
-	padding: 4px 6px 10px;
-	flex: none;
-	position: relative;
-}
-.project-chip {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	background: transparent;
-	border: 1px solid transparent;
-	color: var(--muted-foreground);
-	padding: 6px 9px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	font-size: 0.86rem;
-	min-width: 0;
-	max-width: 15ch;
-	transition: 0.15s var(--ease);
-}
-.project-chip:hover {
-	background: var(--accent);
-	border-color: var(--border);
-	color: var(--foreground);
-}
-.project-chip span {
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.list-scroll {
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
-	padding-inline: 2px;
-}
-.list-group {
-	color: var(--muted-foreground);
-	font-size: 0.72rem;
-	font-weight: 600;
-	letter-spacing: 0.05em;
-	padding: 14px 10px 6px;
-	text-transform: uppercase;
-}
-.list-item {
-	display: flex;
-	align-items: center;
-	border-radius: var(--radius-sm);
-	transition: 0.15s var(--ease);
-}
-.list-item:hover {
-	background: var(--accent);
-}
-.list-item.active {
-	background: var(--accent);
-	box-shadow: inset 2px 0 0 var(--primary);
-}
-.list-main {
-	flex: 1;
-	min-width: 0;
-	background: transparent;
-	border: 0;
-	text-align: start;
-	cursor: pointer;
-	padding: 8px 10px;
-	display: flex;
-	flex-direction: column;
-	gap: 1px;
-}
-.list-title {
-	color: var(--muted-foreground);
-	font-size: 0.95rem;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	transition: 0.15s var(--ease);
-}
-.list-item.active .list-title,
-.list-item:hover .list-title {
-	color: var(--foreground);
-}
-.list-sub {
-	color: var(--muted-foreground);
-	font-size: 0.76rem;
-	opacity: 0.75;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.list-actions {
-	display: none;
-	padding-inline-end: 4px;
-}
-.list-item:hover .list-actions {
-	display: flex;
-}
-
-.round-ghost {
-	width: 34px;
-	height: 34px;
-	border-radius: 50%;
-	border: 0;
-	background: transparent;
-	color: var(--muted-foreground);
-	cursor: pointer;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex: none;
-	transition: 0.15s var(--ease);
-}
-.round-ghost:hover {
-	background: var(--accent);
-	color: var(--foreground);
-	transform: translateY(-1px);
-}
-.round-ghost.raised {
-	background: var(--card);
-	border: 1px solid var(--border-soft);
-	box-shadow: var(--shadow-1);
-}
-.round-ghost.raised:hover {
-	box-shadow: var(--shadow-2);
 }
 
 /* ══════════════════════════════════════════════════════ ناحیهٔ اصلی */
@@ -586,34 +386,6 @@ textarea {
 	padding: 0 16px;
 	border-bottom: 1px solid transparent;
 	transition: border-color 0.2s;
-}
-.main-card.scrolled .topbar {
-	border-bottom-color: var(--border);
-}
-.chat-title {
-	flex: 1;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: 6px;
-	background: transparent;
-	border: 0;
-	color: var(--foreground);
-	padding: 6px 12px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	font-size: 1rem;
-	font-weight: 600;
-	min-width: 0;
-	transition: 0.15s var(--ease);
-}
-.chat-title span {
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.chat-title:hover {
-	background: var(--accent);
 }
 .top-right {
 	display: flex;
@@ -719,40 +491,6 @@ textarea {
 		transform: scale(1.06) rotate(11deg);
 	}
 }
-.starter {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 10px;
-	width: 100%;
-	max-width: 40rem;
-}
-.starter-card {
-	background: var(--card);
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	padding: 13px 15px;
-	cursor: pointer;
-	display: flex;
-	flex-direction: column;
-	gap: 3px;
-	text-align: start;
-	transition: 0.18s var(--ease);
-}
-.starter-card:hover {
-	border-color: var(--primary-line);
-	background: var(--primary-soft);
-	transform: translateY(-2px);
-	box-shadow: var(--shadow-2);
-}
-.starter-card b {
-	color: var(--foreground);
-	font-weight: 500;
-}
-.starter-card span {
-	font-size: 0.84rem;
-	color: var(--muted-foreground);
-}
-
 .msg {
 	margin-bottom: 22px;
 	animation: fade 0.3s var(--ease);
@@ -766,6 +504,7 @@ textarea {
 .msg .body {
 	overflow-wrap: anywhere;
 }
+
 /*
  * پیام کاربر یک حباب است که **به اندازهٔ محتوایش** است و به ابتدای سطر می‌چسبد؛
  * پاسخ دستیار متن ساده و تمام‌عرض است، بدون حباب و بدون قاب. این را از تصویر یک
@@ -808,25 +547,6 @@ textarea {
 .msg:hover .msg-actions {
 	opacity: 1;
 }
-.act-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	width: 28px;
-	height: 28px;
-	padding: 0;
-	background: transparent;
-	border: 0;
-	color: var(--muted-foreground);
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	transition: 0.15s var(--ease);
-}
-.act-btn:hover {
-	background: var(--accent);
-	color: var(--primary);
-}
-
 .body p {
 	margin: 0 0 0.9em;
 }
@@ -924,17 +644,6 @@ textarea {
 	font-size: 0.73rem;
 	color: var(--muted-foreground);
 }
-.code-copy {
-	background: transparent;
-	border: 0;
-	color: var(--muted-foreground);
-	cursor: pointer;
-	font-size: 0.95em;
-	transition: 0.15s;
-}
-.code-copy:hover {
-	color: var(--primary);
-}
 .codeblock pre {
 	margin: 0;
 	padding: 13px 15px;
@@ -1021,6 +730,19 @@ code .f {
 }
 .thinking-head b {
 	font-weight: 500;
+}
+.thinking-head .spin {
+	display: inline-block;
+	color: var(--primary);
+	animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+.thinking.done .thinking-head {
+	color: var(--muted-foreground);
 }
 .thinking-body {
 	margin: 6px 0 0;
@@ -1188,18 +910,13 @@ code .f {
 	display: flex;
 	gap: 8px;
 }
-.file-link {
-	background: transparent;
-	border: 0;
-	color: var(--primary);
-	cursor: pointer;
-	padding: 0;
+.btn.file-link {
 	font-family: var(--mono);
 	font-size: 1em;
+	max-width: 100%;
+	overflow: hidden;
+	text-overflow: ellipsis;
 	white-space: nowrap;
-}
-.file-link:hover {
-	text-decoration: underline;
 }
 .hit-text {
 	color: var(--muted-foreground);
@@ -1342,20 +1059,13 @@ code .f {
 	gap: 6px;
 	margin-bottom: 8px;
 }
-.q-option {
-	text-align: start;
-	background: var(--background);
-	border: 1px solid var(--border);
-	border-radius: var(--radius-sm);
-	padding: 10px 13px;
-	cursor: pointer;
-	display: flex;
+.btn.q-option {
 	flex-direction: column;
-	transition: 0.15s var(--ease);
-}
-.q-option:hover {
-	border-color: var(--primary);
-	transform: translateX(-2px);
+	align-items: flex-start;
+	gap: 2px;
+	min-height: 0;
+	padding: 10px 13px;
+	white-space: normal;
 }
 .q-option span {
 	color: var(--muted-foreground);
@@ -1403,36 +1113,11 @@ code .f {
 	background: var(--primary-soft);
 }
 
-
-/*
- * میکروفن در حال ضبط.
- *
- * در Claude این دکمه قرمزِ توپر می‌شود. رنگِ «الان فعال است» در هوشا فیروزه است، پس
- * همان شکل با همان وزن، ولی فیروزه — خواستهٔ صریح کارفرما.
- */
-.round-btn.recording {
-	color: var(--primary-foreground);
-	background: var(--primary);
-	border-color: var(--primary);
-	animation: pulse-mic 1.2s ease-in-out infinite;
-}
-@keyframes pulse-mic {
-	50% {
-		box-shadow: 0 0 0 6px var(--destructive-soft);
-	}
-}
-
-.model-chip,
-.model-chip:hover,
-.model-chip #model-name {
-	overflow: hidden;
-	text-overflow: ellipsis;
-}
-.mode-chip[data-mode='plan'] {
+#pill-mode[data-mode='plan'] {
 	color: var(--second);
 	background: var(--second-soft);
 }
-.mode-chip[data-mode='auto'] {
+#pill-mode[data-mode='auto'] {
 	color: var(--warn);
 	background: var(--warn-soft);
 }
@@ -1450,88 +1135,27 @@ code .f {
 	color: var(--muted-foreground);
 	flex-wrap: wrap;
 }
-.git-chip {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	background: transparent;
-	border: 1px solid transparent;
-	color: var(--muted-foreground);
-	padding: 3px 8px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	font-size: 0.8rem;
-	max-width: 22ch;
-	transition: 0.15s var(--ease);
-}
-.git-chip:hover {
-	background: var(--accent);
-	border-color: var(--border);
-	color: var(--foreground);
-}
 .git-chip span {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
+.btn.git-chip {
+	max-width: 22ch;
+}
 .git-chip svg {
 	flex: none;
 	opacity: 0.8;
 }
-.git-chip.branch.protected {
+.btn.git-chip.protected {
 	color: var(--warn);
 }
-.git-stat {
-	font-family: var(--mono);
-	font-size: 0.76rem;
-	display: inline-flex;
-	gap: 6px;
-	padding: 3px 8px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	transition: 0.15s var(--ease);
-}
-.git-stat:hover {
-	background: var(--accent);
-}
-.git-stat .plus {
+#git-stat .plus {
 	color: var(--ok);
 }
-.git-stat .minus {
+#git-stat .minus {
 	color: var(--destructive);
 }
-.git-action {
-	margin-inline-start: auto;
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	background: var(--primary);
-	color: var(--primary-foreground);
-	border: 0;
-	border-radius: 20px;
-	padding: 5px 14px;
-	font-size: 0.8rem;
-	font-weight: 500;
-	cursor: pointer;
-	transition: 0.15s var(--ease);
-	box-shadow: 0 2px 8px var(--primary-soft);
-}
-.git-action:hover {
-	background: var(--primary-hover);
-	transform: translateY(-1px);
-}
-.git-action.quiet {
-	background: transparent;
-	color: var(--muted-foreground);
-	border: 1px solid var(--border);
-	box-shadow: none;
-}
-.git-action.quiet:hover {
-	color: var(--foreground);
-	border-color: var(--muted-foreground);
-}
-
-
 .attachments {
 	display: flex;
 	gap: 8px;
@@ -1553,7 +1177,7 @@ code .f {
 	object-fit: cover;
 	display: block;
 }
-.attachment .ghost-icon {
+.attachment .btn {
 	position: absolute;
 	top: 1px;
 	inset-inline-end: 1px;
@@ -1590,26 +1214,16 @@ code .f {
 	text-overflow: ellipsis;
 }
 
-.jump-down {
+.btn.jump-down {
 	position: absolute;
 	inset-inline-start: 50%;
-	transform: translateX(50%);
 	bottom: 160px;
-	width: 34px;
-	height: 34px;
-	border-radius: 50%;
-	border: 1px solid var(--border);
-	background: var(--popover);
-	color: var(--muted-foreground);
-	cursor: pointer;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	box-shadow: var(--shadow-2);
+	transform: translateX(50%);
 	z-index: 15;
-	transition: 0.15s var(--ease);
+	background: var(--popover);
+	box-shadow: var(--shadow-2);
 }
-.jump-down:hover {
+.btn.jump-down:hover {
 	color: var(--primary);
 	transform: translateX(50%) translateY(-2px);
 }
@@ -1642,14 +1256,8 @@ code .f {
 		transform: translateY(6px) scale(0.98);
 	}
 }
-.pop-menu.model-menu,
-.pop-menu.cmd {
+.pop-menu.model-menu {
 	inset-inline: 26px;
-}
-.menu-item:hover,
-.menu-item.active {
-	background: var(--accent);
-	color: var(--foreground);
 }
 .menu-item b {
 	font-weight: 500;
@@ -1730,12 +1338,6 @@ code .f {
 	inset-inline-start: 26px;
 	min-width: 300px;
 }
-.project-menu {
-	top: 44px;
-	bottom: auto;
-	inset-inline-start: 6px;
-	min-width: 270px;
-}
 
 /* ═══════════════════════════════════ نمای صفحه‌های تمام‌قد */
 
@@ -1749,64 +1351,6 @@ code .f {
 		transform: translateY(10px);
 	}
 }
-.panel-scroll {
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
-	padding: 4px 32px 48px;
-	max-width: 62rem;
-	width: 100%;
-	margin-inline: auto;
-}
-.panel-hero {
-	display: flex;
-	align-items: flex-start;
-	gap: 14px;
-	padding: 18px 0 6px;
-}
-.panel-hero .hero-ico {
-	width: 44px;
-	height: 44px;
-	border-radius: var(--radius);
-	background: linear-gradient(135deg, var(--primary-soft), var(--second-soft));
-	border: 1px solid var(--primary-line);
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	color: var(--primary);
-	font-size: 1.2rem;
-	flex: none;
-}
-.panel-title {
-	font-family: var(--serif);
-	font-size: 1.85rem;
-	margin: 0 0 3px;
-	line-height: 1.3;
-}
-.panel-sub {
-	color: var(--muted-foreground);
-	margin: 0;
-	font-size: 0.93rem;
-	max-width: 60ch;
-}
-
-.sub-shell {
-	display: grid;
-	grid-template-columns: 216px minmax(0, 1fr);
-	gap: 26px;
-	align-items: start;
-	margin-top: 22px;
-}
-.sub-nav {
-	display: flex;
-	flex-direction: column;
-	gap: 1px;
-	position: sticky;
-	top: 0;
-}
-.sub-body {
-	min-width: 0;
-}
 .tab-row {
 	display: flex;
 	gap: 4px;
@@ -1814,53 +1358,6 @@ code .f {
 	border-bottom: 1px solid var(--border-soft);
 	margin: 20px 0 18px;
 }
-.tab-btn {
-	background: transparent;
-	border: 0;
-	border-bottom: 2px solid transparent;
-	color: var(--muted-foreground);
-	padding: 9px 13px;
-	cursor: pointer;
-	font-size: 0.9rem;
-	transition: 0.15s var(--ease);
-}
-.tab-btn:hover {
-	color: var(--foreground);
-}
-.tab-btn.active {
-	color: var(--primary);
-	border-bottom-color: var(--primary);
-}
-.snav-item {
-	display: flex;
-	align-items: center;
-	gap: 9px;
-	width: 100%;
-	background: transparent;
-	border: 0;
-	color: var(--muted-foreground);
-	padding: 8px 11px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	text-align: start;
-	font-size: 0.89rem;
-	transition: 0.15s var(--ease);
-}
-.snav-item:hover {
-	background: var(--accent);
-	color: var(--foreground);
-}
-.snav-item.active {
-	background: var(--primary-soft);
-	color: var(--primary);
-	font-weight: 500;
-}
-.snav-ico {
-	width: 16px;
-	text-align: center;
-}
-
-/* ══════════════════════════════════════════════════════ ریل کناری */
 
 .small {
 	font-size: 0.85em;
@@ -1909,30 +1406,6 @@ code .f {
 }
 
 /* ══════════════════════════════════════════════ اجزای مشترک فرم */
-
-.pill:hover {
-	border-color: var(--muted-foreground);
-	color: var(--foreground);
-	transform: translateY(-1px);
-}
-.pill.danger,
-.pill.ghost.danger {
-	color: var(--destructive);
-	border-color: var(--destructive);
-}
-.pill.danger:hover {
-	background: var(--destructive-soft);
-}
-.pill.tiny {
-	font-size: 0.75rem;
-	padding: 3px 10px;
-}
-.pill:disabled {
-	opacity: 0.5;
-	cursor: default;
-	transform: none;
-}
-
 .item-main {
 	flex: 1;
 	min-width: 0;
@@ -2045,25 +1518,6 @@ code .f {
 	flex-wrap: wrap;
 	gap: 6px;
 }
-.chip {
-	background: var(--background);
-	border: 1px solid var(--border);
-	color: var(--muted-foreground);
-	border-radius: 20px;
-	padding: 3px 11px;
-	font-size: 0.78rem;
-	cursor: pointer;
-	font-family: var(--mono);
-	transition: 0.15s;
-}
-.chip:hover {
-	border-color: var(--muted-foreground);
-}
-.chip.on {
-	background: var(--primary-soft);
-	border-color: var(--primary-line);
-	color: var(--primary);
-}
 .note {
 	color: var(--muted-foreground);
 	font-size: 0.85rem;
@@ -2116,6 +1570,7 @@ code .f {
 	gap: 9px;
 	margin-bottom: 16px;
 }
+
 /*
  * کارت‌های آمار در صفحهٔ تغییرات.
  *
@@ -2367,13 +1822,7 @@ kbd {
 .toast.error {
 	border-inline-start-color: var(--destructive);
 	color: var(--destructive);
-}
-
-.only-narrow {
-	display: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
+}@media (prefers-reduced-motion: reduce) {
 	*,
 	*::before,
 	*::after {
@@ -2455,35 +1904,23 @@ body.sidebar-collapsed .account-menu {
 		transition: transform 0.22s var(--ease);
 		box-shadow: var(--shadow-3);
 	}
-	body.sidebar-open .sidebar {
+	/* در انگلیسی نوار سمت چپ است، پس بیرونِ صفحه یعنی سمت دیگر. */
+	html[dir='ltr'] .sidebar {
+		transform: translateX(-100%);
+	}
+	/*
+	 * و وقتی جمع نیست، دیده شود. قبلاً این قاعده روی کلاس `sidebar-open` بود که هیچ‌جای
+	 * برنامه ست نمی‌شد: در پهنای کم، نوار کناری هیچ‌وقت باز نمی‌شد.
+	 */
+	body:not(.sidebar-collapsed) .sidebar,
+	html[dir='ltr'] body:not(.sidebar-collapsed) .sidebar {
 		transform: none;
-	}
-	.only-narrow {
-		display: inline-flex;
-	}
-	.sub-shell {
-		grid-template-columns: 1fr;
-		gap: 12px;
-	}
-	.sub-nav {
-		flex-direction: row;
-		overflow-x: auto;
-		position: static;
-	}
-	.snav-item {
-		white-space: nowrap;
 	}
 	.shortcuts {
 		grid-template-columns: 1fr;
 	}
 	.greet {
 		font-size: 1.5rem;
-	}
-	.starter {
-		grid-template-columns: 1fr;
-	}
-	.panel-scroll {
-		padding-inline: 18px;
 	}
 }
 
@@ -2650,28 +2087,11 @@ body.sidebar-collapsed .account-menu {
  * در نسخهٔ قبل این را یک دکمهٔ نارنجیِ توپر کرده بودم و همان اولین چیزی بود که در تصویر
  * توی چشم می‌زد. در Claude همان اندازه و همان وزنِ بقیهٔ ردیف‌های ناوبری است.
  */
-.new-chat {
-	display: flex;
-	align-items: center;
-	background: transparent;
-	border: 0;
-	color: var(--foreground);
-	padding: 6px 8px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	font-weight: 500;
-	font-size: 14.5px;
-	gap: 8px;
-	text-align: start;
-	box-shadow: none;
-	transition: background 0.15s var(--ease);
-	margin: 8px 12px 16px;
+.btn.new-chat {
 	width: auto;
-}
-.new-chat:hover {
-	background: var(--accent);
-	transform: none;
-	box-shadow: none;
+	margin: 8px 12px 16px;
+	font-size: 14.5px;
+	font-weight: 500;
 }
 .nc-plus {
 	display: inline-flex;
@@ -2685,31 +2105,12 @@ body.sidebar-collapsed .account-menu {
 	color: var(--foreground);
 }
 
-.nav-item {
-	display: flex;
-	align-items: center;
-	gap: 10px;
+.btn.nav-item {
+	position: relative;
 	width: auto;
 	min-width: 0;
-	position: relative;
-	background: transparent;
-	border: 0;
-	border-radius: 8px;
-	cursor: pointer;
-	text-align: start;
-	transition: background 0.15s var(--ease);
-	color: var(--foreground);
-	font-size: 14px;
-	padding: 6px 8px;
-	font-weight: 400;
+	gap: 10px;
 	margin-inline: 12px;
-}
-.nav-item:hover {
-	background: var(--accent);
-}
-.nav-item.active {
-	background: var(--accent);
-	font-weight: 500;
 }
 .nav-item svg {
 	color: var(--muted-foreground);
@@ -2775,19 +2176,18 @@ body.sidebar-collapsed .account-menu {
 	background: var(--accent);
 	font-weight: 500;
 }
-.recent-item .rt {
+.recent-item .btn.rt {
 	flex: 1;
 	min-width: 0;
+	min-height: 0;
+	padding: 0;
+	color: inherit;
+	font-size: inherit;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	white-space: nowrap;
 }
-.recent-item .row-menu {
-	opacity: 0;
-}
-.recent-item:hover .row-menu,
-.recent-item:focus-within .row-menu {
-	opacity: 1;
+.recent-item .btn.rt:hover {
+	background: transparent;
 }
 
 /* ردیف حساب، ته نوار کناری */
@@ -2796,24 +2196,6 @@ body.sidebar-collapsed .account-menu {
 	padding-top: 6px;
 	border-top: 0;
 	padding: 4px 12px 12px;
-}
-.account-main {
-	flex: 1;
-	min-width: 0;
-	display: flex;
-	align-items: center;
-	gap: 10px;
-	background: transparent;
-	border: 0;
-	border-radius: 12px;
-	cursor: pointer;
-	text-align: start;
-	transition: background 0.15s var(--ease);
-	color: var(--foreground);
-	padding: 8px;
-}
-.account-main:hover {
-	background: var(--accent);
 }
 .avatar-dot {
 	box-shadow: var(--shadow-1);
@@ -2873,31 +2255,15 @@ body.sidebar-collapsed .account-menu {
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.menu-item {
-	display: flex;
-	align-items: center;
-	transition: background 0.14s var(--ease);
-	gap: 10px;
-	width: 100%;
-	background: transparent;
-	border: 0;
-	color: var(--foreground);
+.btn.menu-item {
 	padding: 6px 14px;
 	border-radius: 0;
-	cursor: pointer;
-	text-align: start;
-	font-size: 14px;
+	gap: 10px;
 }
-.menu-item:hover {
+.btn.menu-item:hover {
 	background: var(--menu-hover);
 }
-.menu-item .mi-ico {
-	width: 17px;
-	text-align: center;
-	color: var(--muted-foreground);
-	flex: none;
-}
-.menu-item .mi-end {
+.menu-item .m-end {
 	margin-inline-start: auto;
 	color: var(--muted-foreground);
 	font-size: 0.75rem;
@@ -2908,25 +2274,34 @@ body.sidebar-collapsed .account-menu {
 	margin: 5px 4px;
 }
 
+/* ردیف حساب: همان .btn.row است، فقط عرض و فاصله‌اش فرق دارد. */
+.btn.account-main {
+	flex: 1;
+	width: auto;
+	min-width: 0;
+	gap: 10px;
+	padding: 8px;
+	border-radius: 12px;
+}
+
 /* ───────────────────────────────────────────────── نوار بالای محتوا */
 
-.topbar .plan-chip {
-	margin-inline: auto;
-	font-size: 0.8rem;
-	color: var(--muted-foreground);
-	display: inline-flex;
-	align-items: center;
-	gap: 7px;
-	background: transparent;
-	border: 0;
-	cursor: default;
-	max-width: 60%;
+.btn.chat-title {
+	max-width: 45%;
+	gap: 6px;
+	font-weight: 500;
+}
+.btn.chat-title span {
 	overflow: hidden;
-	white-space: nowrap;
 	text-overflow: ellipsis;
 }
-.topbar .plan-chip .sep {
-	opacity: 0.5;
+.topbar .btn.plan-chip {
+	margin-inline: auto;
+	max-width: 60%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	cursor: default;
+	gap: 7px;
 }
 
 /* ───────────────────────────────────────────────── سربرگ صفحه‌ها */
@@ -2955,6 +2330,10 @@ body.sidebar-collapsed .account-menu {
 	margin: 0;
 	flex: 1;
 	min-width: 0;
+}
+.field.inline {
+	width: 220px;
+	margin: 0;
 }
 .page-actions {
 	display: flex;
@@ -3005,10 +2384,6 @@ body.sidebar-collapsed .account-menu {
 	white-space: nowrap;
 	font-weight: 500;
 }
-.row-sub {
-	font-size: 0.79rem;
-	color: var(--muted-foreground);
-}
 .row-meta {
 	display: flex;
 	align-items: center;
@@ -3016,25 +2391,6 @@ body.sidebar-collapsed .account-menu {
 	font-size: 13px;
 	color: var(--muted-foreground);
 	flex: none;
-}
-.row-menu {
-	width: 30px;
-	height: 30px;
-	border-radius: 50%;
-	border: 0;
-	background: transparent;
-	color: var(--muted-foreground);
-	cursor: pointer;
-	opacity: 0;
-	transition: 0.14s var(--ease);
-	flex: none;
-}
-.row-item:hover .row-menu {
-	opacity: 1;
-}
-.row-menu:hover {
-	background: var(--accent);
-	color: var(--foreground);
 }
 
 /* ───────────────────────────────────────────────── شبکهٔ کارت (پروژه‌ها) */
@@ -3108,50 +2464,220 @@ body.sidebar-collapsed .account-menu {
 	line-height: 1.75;
 }
 
-/* ───────────────────────────────────────────────── دکمه‌ها */
+/* ═════════════════════════════════════════ دکمه‌ها — یک کلاس، یک شکل
+ *
+ * شکایت کارفرما: «دکمه‌ها حالت یکسانی ندارند؛ در برخی صفحه‌ها به یک شکل‌اند و در
+ * برخی دیگر شکل دیگری — انگار از یک کلاس واحد پیروی نمی‌کنند.» درست بود: یازده
+ * پیاده‌سازی موازی داشتیم (pill، round-btn، round-ghost، icon-btn، act-btn،
+ * tab-btn، git-action، git-stat، chip، model-chip، mode-chip) و هرکدام قد و
+ * شعاع و فونت خودش را داشت.
+ *
+ * حالا هر دکمهٔ برنامه همین `.btn` است. ترکیب:
+ *
+ *     .btn                پایه — قد ۳۶، شعاع ۱۰، فونت ۱۴/۵۰۰ (طرح تأییدشده)
+ *     لحن   solid         مشکیِ توپر، دکمهٔ اصلی هر صفحه («پروژهٔ تازه»)
+ *           brand         فیروزه — فقط ارسال و حالت ضبط
+ *           outline       قاب نازک، دکمهٔ دوم («انصراف»، «مرتب‌سازی»)
+ *           quiet         بی‌قاب، برای آیکون‌ها و ردیف‌ها
+ *           danger        قرمز، فقط برای کار برگشت‌ناپذیر
+ *     شکل   icon          مربع هم‌اندازهٔ قد · round دایره · row ردیف تمام‌عرض
+ *           tab           سربرگ زیرخط‌دار · link متنِ کلیک‌شدنی داخل جمله
+ *     اندازه sm / lg
+ *     حالت  active (انتخاب‌شده) · on (کلید روشن) · reveal (با هاورِ ردیف پیدا می‌شود)
+ *
+ * کلاس‌های دیگری که کنار `.btn` می‌آیند (`.new-chat`، `.git-chip`، `.jump-down`، …)
+ * فقط جای دکمه را تعیین می‌کنند — حق ندارند رنگ و قد و فونتش را عوض کنند.
+ */
 
-/* دکمهٔ اصلی در Claude مشکیِ توپر است، بدون سایهٔ رنگی. */
-.pill.primary {
-	box-shadow: none;
+.btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	flex: none;
+	min-height: 36px;
+	padding: 0 14px;
+	border: 1px solid transparent;
+	border-radius: 10px;
+	background: transparent;
+	color: var(--foreground);
+	font-family: inherit;
+	font-size: 14px;
 	font-weight: 500;
+	line-height: 1.2;
+	white-space: nowrap;
+	cursor: pointer;
+	transition: background 0.16s var(--ease), border-color 0.16s var(--ease), color 0.16s var(--ease),
+		box-shadow 0.16s var(--ease), transform 0.16s var(--ease);
+}
+.btn:hover {
+	background: var(--accent);
+}
+.btn:active {
+	transform: translateY(1px);
+}
+.btn:disabled {
+	opacity: 0.5;
+	cursor: default;
+	transform: none;
+}
+
+/* لحن‌ها */
+
+.btn.solid {
 	background: var(--solid);
 	border-color: var(--solid);
 	color: var(--solid-foreground);
 }
-.pill.primary:hover {
+.btn.solid:hover {
 	background: var(--solid-hover);
 	border-color: var(--solid-hover);
 }
-.pill {
-	background: transparent;
-	border: 1px solid var(--border);
-	border-radius: 20px;
-	cursor: pointer;
-	white-space: nowrap;
-	transition: 0.16s var(--ease);
-	color: var(--foreground);
-	padding: 7px 15px;
-	font-size: 0.86rem;
+.btn.brand {
+	background: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-foreground);
+	box-shadow: var(--shadow-1);
 }
-.pill.ghost {
-	border-color: transparent;
+.btn.brand:hover {
+	background: var(--primary-hover);
+	border-color: var(--primary-hover);
 }
-.icon-btn {
-	width: 34px;
-	height: 34px;
-	border-radius: 50%;
-	border: 1px solid var(--border);
-	background: transparent;
-	color: var(--foreground);
-	cursor: pointer;
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex: none;
-	transition: 0.15s var(--ease);
+.btn.outline {
+	background: var(--card);
+	border-color: var(--border);
 }
-.icon-btn:hover {
+.btn.outline:hover {
 	background: var(--accent);
+	border-color: var(--muted-foreground);
+	transform: translateY(-1px);
+}
+.btn.quiet {
+	color: var(--muted-foreground);
+}
+.btn.quiet:hover {
+	color: var(--foreground);
+}
+.btn.danger {
+	color: var(--destructive);
+}
+.btn.danger.outline {
+	border-color: var(--destructive);
+}
+.btn.danger:hover {
+	background: var(--destructive-soft);
+	color: var(--destructive);
+}
+
+/* اندازه و شکل */
+
+.btn.sm {
+	min-height: 30px;
+	padding: 0 10px;
+	gap: 6px;
+	border-radius: 8px;
+	font-size: 13px;
+}
+.btn.lg {
+	min-height: 42px;
+	padding: 0 18px;
+	font-size: 15px;
+}
+.btn.icon {
+	width: 36px;
+	padding: 0;
+}
+.btn.sm.icon {
+	width: 30px;
+}
+.btn.lg.icon {
+	width: 42px;
+}
+.btn.round {
+	border-radius: 50%;
+}
+.btn.row {
+	width: 100%;
+	min-height: 34px;
+	justify-content: flex-start;
+	padding: 0 8px;
+	border-radius: 8px;
+	color: var(--foreground);
+	font-weight: 400;
+	text-align: start;
+}
+.btn.mono {
+	font-family: var(--mono);
+	font-size: 12px;
+}
+.btn.link {
+	min-height: 0;
+	padding: 0;
+	border: 0;
+	color: var(--primary);
+	font-weight: 400;
+}
+.btn.link:hover {
+	background: transparent;
+	text-decoration: underline;
+}
+.btn.tab {
+	min-height: 38px;
+	border-radius: 0;
+	border-bottom: 2px solid transparent;
+	color: var(--muted-foreground);
+	font-weight: 400;
+}
+.btn.tab:hover {
+	background: transparent;
+	color: var(--foreground);
+}
+.btn.tab.active {
+	background: transparent;
+	border-bottom-color: var(--primary);
+	color: var(--primary);
+}
+
+/* حالت‌ها */
+
+.btn.active {
+	background: var(--accent);
+	color: var(--foreground);
+	font-weight: 500;
+}
+.btn.on {
+	background: var(--primary-soft);
+	border-color: var(--primary-line);
+	color: var(--primary);
+}
+/*
+ * میکروفن در حال ضبط.
+ *
+ * در Claude این دکمه قرمزِ توپر می‌شود. رنگِ «الان فعال است» در هوشا فیروزه است، پس
+ * همان شکل با همان وزن، ولی فیروزه — خواستهٔ صریح کارفرما.
+ */
+.btn.recording {
+	background: var(--primary);
+	border-color: var(--primary);
+	color: var(--primary-foreground);
+	animation: pulse-mic 1.2s ease-in-out infinite;
+}
+@keyframes pulse-mic {
+	50% {
+		box-shadow: 0 0 0 6px var(--primary-soft);
+	}
+}
+.btn.reveal {
+	opacity: 0;
+}
+.btn.reveal:focus-visible,
+.row-item:hover .btn.reveal,
+.recent-item:hover .btn.reveal,
+.recent-item:focus-within .btn.reveal {
+	opacity: 1;
+}
+.btn.push-end {
+	margin-inline-start: auto;
 }
 
 /* ───────────────────────────────────────────────── کامپوزر */
@@ -3197,82 +2723,10 @@ body.sidebar-collapsed .account-menu {
 	padding: 0;
 	gap: 4px;
 }
-.round-btn {
-	display: inline-flex;
-	align-items: center;
-	justify-content: center;
-	flex: none;
-	cursor: pointer;
-	font-size: 1rem;
-	transition: 0.15s var(--ease);
-	width: 36px;
-	height: 36px;
-	border-radius: 12px;
-	border: 1px solid var(--border);
-	background: transparent;
-	color: #4b5563;
-	border-color: transparent;
-}
-.round-btn:hover {
-	background: var(--muted);
-	border-color: #e5e7eb;
-}
-.round-btn.send {
-	background: var(--primary);
-	border-color: var(--primary);
-	color: var(--primary-foreground);
-	width: 32px;
-	height: 32px;
-	border-radius: 8px;
-	box-shadow: var(--shadow-1);
-}
-.round-btn.send:hover {
-	background: var(--primary-hover);
-}
-.round-btn.stop {
-	background: var(--solid);
-	border-color: var(--solid);
-	color: var(--solid-foreground);
-	border-radius: 8px;
-}
+
 /* میکروفون و موج صدا در Claude قاب ندارند. */
-#btn-mic,
-#btn-voice {
-	border-color: transparent;
-	color: var(--muted-foreground);
-}
-#btn-mic:hover,
-#btn-voice:hover {
-	color: var(--foreground);
-}
 
 /* نام مدل: متنِ ساده، نه چیپِ قاب‌دار. */
-.model-chip {
-	background: transparent;
-	border: 1px solid transparent;
-	color: #4b5563;
-	font-size: 14px;
-	font-weight: 500;
-	padding: 6px 12px;
-	border-radius: 12px;
-}
-.model-chip:hover {
-	background: var(--muted);
-	border-color: #e5e7eb;
-}
-.mode-chip {
-	background: transparent;
-	border: 0;
-	color: var(--muted-foreground);
-	font-size: 0.84rem;
-	font-weight: 400;
-	padding: 6px 8px;
-	border-radius: var(--radius-sm);
-}
-.mode-chip:hover {
-	background: var(--accent);
-}
-
 .disclaimer {
 	opacity: 0.9;
 	transition: opacity 0.2s var(--ease);
@@ -3340,27 +2794,11 @@ body.sidebar-collapsed .account-menu {
 	text-transform: uppercase;
 	letter-spacing: 0.06em;
 }
-.set-item {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	width: 100%;
-	background: transparent;
-	border: 0;
-	color: var(--foreground);
-	padding: 6px 12px;
+.btn.set-item {
+	padding: 0 12px;
+	min-height: 36px;
 	border-radius: 12px;
-	cursor: pointer;
-	text-align: start;
-	font-size: 14px;
-	transition: background 0.14s var(--ease);
-}
-.set-item:hover {
-	background: var(--accent);
-}
-.set-item.active {
-	background: var(--accent);
-	font-weight: 500;
+	gap: 12px;
 }
 .set-item .si-ico {
 	width: 16px;
@@ -3445,14 +2883,6 @@ body.sidebar-collapsed .account-menu {
 .set-row.stack .set-row-control .field {
 	width: 100%;
 }
-.set-section {
-	font-size: 1.02rem;
-	font-weight: 600;
-	margin: 22px 0 2px;
-}
-.set-section:first-child {
-	margin-top: 4px;
-}
 
 /* کلید سوییچ — Claude برای بولین‌ها چک‌باکس نشان نمی‌دهد. */
 .switch {
@@ -3504,23 +2934,6 @@ html[dir='ltr'] .switch input:checked + i::after {
 }
 
 /* جدول ساده — «Skill | Last updated | Author» */
-.set-table {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: 0.87rem;
-}
-.set-table th {
-	text-align: start;
-	font-weight: 400;
-	color: var(--muted-foreground);
-	font-size: 0.8rem;
-	padding: 8px 10px;
-	border-bottom: 1px solid var(--border);
-}
-.set-table td {
-	padding: 12px 10px;
-	border-bottom: 1px solid var(--border-soft);
-}
 
 /* نشان هوشا داخل دایرهٔ حساب. */
 .avatar-dot svg {
@@ -3669,30 +3082,6 @@ html[dir='ltr'] .switch input:checked + i::after {
 }
 
 /* نوار بالای گفتگو: نام گفتگو با فلش در ابتدا، «اشتراک» در انتها — از تصویر گفتگو. */
-.topbar .chat-title {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	background: transparent;
-	border: 0;
-	color: var(--foreground);
-	font-size: 0.92rem;
-	font-weight: 500;
-	padding: 6px 10px;
-	border-radius: var(--radius-sm);
-	cursor: pointer;
-	max-width: 40%;
-	min-width: 0;
-	transition: background 0.15s var(--ease);
-}
-.topbar .chat-title:hover {
-	background: var(--accent);
-}
-.topbar .chat-title span {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
-}
 .topbar .top-right {
 	margin-inline-start: auto;
 	display: flex;
@@ -3713,38 +3102,10 @@ html[dir='ltr'] .switch input:checked + i::after {
  * در تصویر «Capabilities»، تنظیم «Allow network egress» داخل یک کادر با پس‌زمینهٔ کمی
  * متفاوت نشسته — چون زیرمجموعهٔ تنظیم بالای خودش است و ریسک دارد.
  */
-.set-box {
-	background: var(--sidebar);
-	border: 1px solid var(--border);
-	border-radius: var(--radius);
-	padding: 4px 16px;
-	margin: 14px 0 4px;
-}
-.set-box .set-row {
-	border-bottom: 0;
-}
-
 
 /* ══════════════════════════════════════════════════════════════════════
    اندازه‌ها و ساختار از طرح تأییدشده (_bin/claude-ui.zip)
    ══════════════════════════════════════════════════════════════════════ */
-
-
-.page-actions .pill {
-	border-radius: 12px;
-	padding: 8px 16px;
-	font-size: 14px;
-	font-weight: 500;
-	box-shadow: var(--shadow-1);
-}
-
-.page-actions .icon-btn {
-	border-radius: 12px;
-	width: 36px;
-	height: 36px;
-	box-shadow: var(--shadow-1);
-}
-
 .msg.assistant {
 	display: flex;
 	gap: 16px;
@@ -3777,6 +3138,5 @@ html[dir='ltr'] .switch input:checked + i::after {
 	display: flex;
 	flex-direction: column;
 }
-
 
 /* دکمهٔ شناور، فقط وقتی نوار کناری جمع است. */

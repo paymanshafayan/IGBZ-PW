@@ -110,7 +110,7 @@ function paintSettingsNav() {
 		for ( const t of items ) {
 			nav.appendChild(
 				h( 'button', {
-					class: `set-item ${ t.id === currentTab ? 'active' : '' }`,
+					class: `btn quiet row set-item ${ t.id === currentTab ? 'active' : '' }`,
 					dataset: { tab: t.id },
 					onClick: async () => {
 						currentTab = t.id;
@@ -142,7 +142,7 @@ function paintHeadActions() {
 	box.replaceChildren(
 		...( HEAD_ACTIONS[ currentTab ] || [] ).map( ( [ label, action ] ) =>
 			h( 'button', {
-				class: 'pill',
+				class: 'btn outline',
 				text: label,
 				onClick: () => document.dispatchEvent( new CustomEvent( 'hoosha:set-action', { detail: action } ) ),
 			} )
@@ -228,7 +228,7 @@ async function renderProvider( box ) {
 		box.appendChild(
 			h( 'div', { class: 'empty' }, [
 				h( 'p', { text: 'الان هاب فرمان را در دست دارد؛ این پروفایل استفاده نمی‌شود.' } ),
-				h( 'button', { class: 'pill', text: 'رفتن به هاب', onClick: () => openSettings( 'hub' ) } ),
+				h( 'button', { class: 'btn outline', text: 'رفتن به هاب', onClick: () => openSettings( 'hub' ) } ),
 			] )
 		);
 	}
@@ -245,7 +245,7 @@ async function renderProvider( box ) {
 			active ? h( 'span', { class: 'tag ok', text: 'فعال' } ) : null,
 			! active
 				? h( 'button', {
-						class: 'pill',
+						class: 'btn outline',
 						text: 'فعال کن',
 						onClick: async () => {
 							await post( '/api/profiles', { action: 'activate', id } );
@@ -254,10 +254,10 @@ async function renderProvider( box ) {
 						},
 				  } )
 				: null,
-			h( 'button', { class: 'pill', text: 'ویرایش', onClick: () => editProfile( id, p ) } ),
+			h( 'button', { class: 'btn outline', text: 'ویرایش', onClick: () => editProfile( id, p ) } ),
 			profiles.length > 1
 				? h( 'button', {
-						class: 'pill ghost danger',
+						class: 'btn quiet danger',
 						text: 'حذف',
 						onClick: async () => {
 							if ( ! ( await confirmDialog( `پروفایل «${ p.label || id }» حذف شود؟`, { danger: true } ) ) ) {
@@ -275,7 +275,7 @@ async function renderProvider( box ) {
 
 	box.appendChild(
 		row(
-			h( 'button', { class: 'pill primary', text: '+ پروفایل تازه', onClick: () => editProfile( `p${ Date.now().toString( 36 ) }`, null ) } )
+			h( 'button', { class: 'btn solid', text: '+ پروفایل تازه', onClick: () => editProfile( `p${ Date.now().toString( 36 ) }`, null ) } )
 		)
 	);
 
@@ -343,7 +343,7 @@ async function renderProvider( box ) {
 				field( 'آدرس پایه', baseUrl, 'برای سرویس‌های سازگار با OpenAI/Anthropic (مثل OpenRouter، Ollama، LM Studio) اینجا را پر کن.' ),
 				field( 'کلید API', apiKey, 'کلید در فایل تنظیمات محلی ذخیره می‌شود؛ به جایی فرستاده نمی‌شود.' ),
 				field( 'مدل', row( model, h( 'button', {
-					class: 'pill',
+					class: 'btn outline',
 					text: 'گرفتن فهرست مدل‌ها',
 					onClick: async () => {
 						if ( ! ( await save() ) ) {
@@ -364,7 +364,7 @@ async function renderProvider( box ) {
 				datalist,
 				h( 'div', { class: 'modal-actions' }, [
 					h( 'button', {
-						class: 'pill',
+						class: 'btn outline',
 						text: 'تست اتصال',
 						onClick: async () => {
 							testNote.className = 'note';
@@ -378,9 +378,9 @@ async function renderProvider( box ) {
 						},
 					} ),
 					h( 'span', { class: 'grow' } ),
-					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
+					h( 'button', { class: 'btn outline', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
 					h( 'button', {
-						class: 'pill primary',
+						class: 'btn solid',
 						text: 'ذخیره',
 						onClick: async () => {
 							if ( await save() ) {
@@ -434,16 +434,16 @@ async function renderConnectors( box ) {
 				h( 'span', { class: 'tag', text: c.scope === 'project' ? 'پروژه' : 'سراسری' } ),
 				badge,
 				h( 'button', {
-					class: 'pill',
+					class: 'btn outline',
 					text: c.disabled ? 'روشن' : 'خاموش',
 					onClick: async () => {
 						await post( '/api/connectors', { action: 'toggle', name: c.name, scope: c.scope, enabled: c.disabled } );
 						await openSettings( 'connectors' );
 					},
 				} ),
-				h( 'button', { class: 'pill', text: 'ویرایش', onClick: () => form( c ) } ),
+				h( 'button', { class: 'btn outline', text: 'ویرایش', onClick: () => form( c ) } ),
 				h( 'button', {
-					class: 'pill ghost danger',
+					class: 'btn quiet danger',
 					text: 'حذف',
 					onClick: async () => {
 						if ( ! ( await confirmDialog( `کانکتور «${ c.name }» حذف شود؟`, { danger: true } ) ) ) {
@@ -463,11 +463,11 @@ async function renderConnectors( box ) {
 
 	box.appendChild(
 		row(
-			h( 'button', { class: 'pill primary', text: '+ کانکتور تازه', onClick: () => form( null ) } ),
-			h( 'button', { class: 'pill', text: 'نمونه: فایل‌سیستم', onClick: () => form( sample( 'files' ) ) } ),
-			h( 'button', { class: 'pill', text: 'نمونه: گیت‌هاب', onClick: () => form( sample( 'github' ) ) } ),
+			h( 'button', { class: 'btn solid', text: '+ کانکتور تازه', onClick: () => form( null ) } ),
+			h( 'button', { class: 'btn outline', text: 'نمونه: فایل‌سیستم', onClick: () => form( sample( 'files' ) ) } ),
+			h( 'button', { class: 'btn outline', text: 'نمونه: گیت‌هاب', onClick: () => form( sample( 'github' ) ) } ),
 			h( 'button', {
-				class: 'pill',
+				class: 'btn outline',
 				text: 'اتصال دوباره به همه',
 				onClick: async () => {
 					await post( '/api/reload', {} );
@@ -556,7 +556,7 @@ async function renderConnectors( box ) {
 				httpRow,
 				h( 'div', { class: 'modal-actions' }, [
 					h( 'button', {
-						class: 'pill',
+						class: 'btn outline',
 						text: 'تست اتصال',
 						onClick: async () => {
 							note.className = 'note';
@@ -567,9 +567,9 @@ async function renderConnectors( box ) {
 						},
 					} ),
 					h( 'span', { class: 'grow' } ),
-					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
+					h( 'button', { class: 'btn outline', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
 					h( 'button', {
-						class: 'pill primary',
+						class: 'btn solid',
 						text: 'ذخیره',
 						onClick: async () => {
 							const out = await post( '/api/connectors', { action: 'save', ...payload() } );
@@ -597,13 +597,13 @@ function kvEditor( initial, label ) {
 	const addRow = ( k = '', v = '' ) => {
 		const key = h( 'input', { class: 'field small', dir: 'ltr', value: k, placeholder: 'کلید' } );
 		const val = h( 'input', { class: 'field small', dir: 'ltr', value: v, placeholder: 'مقدار' } );
-		const del = h( 'button', { class: 'pill ghost', text: '×', onClick: () => line.remove() } );
+		const del = h( 'button', { class: 'btn quiet', text: '×', onClick: () => line.remove() } );
 		const line = h( 'div', { class: 'kv-row' }, [ key, val, del ] );
 		host.insertBefore( line, adder );
 		return line;
 	};
 
-	const adder = h( 'button', { class: 'pill', text: `+ ${ label }`, onClick: () => addRow() } );
+	const adder = h( 'button', { class: 'btn outline', text: `+ ${ label }`, onClick: () => addRow() } );
 	host.appendChild( adder );
 	for ( const [ k, v ] of Object.entries( initial || {} ) ) {
 		addRow( k, String( v ) );
@@ -638,7 +638,7 @@ async function renderSkills( box ) {
 	box.appendChild(
 		h( 'div', { class: 'form-card' }, [
 			field( 'نصب اسکیل', row( source, h( 'button', {
-				class: 'pill primary',
+				class: 'btn solid',
 				text: 'نصب',
 				onClick: async () => {
 					if ( ! source.value.trim() ) {
@@ -671,7 +671,7 @@ async function renderSkills( box ) {
 				h( 'span', { class: 'tag', text: sk.source } ),
 				sk.source === 'user'
 					? h( 'button', {
-							class: 'pill ghost danger',
+							class: 'btn quiet danger',
 							text: 'حذف',
 							onClick: async () => {
 								if ( ! ( await confirmDialog( `اسکیل «${ sk.name }» حذف شود؟`, { danger: true } ) ) ) {
@@ -705,7 +705,7 @@ async function renderPlugins( box ) {
 	box.appendChild(
 		h( 'div', { class: 'form-card' }, [
 			field( 'نصب پلاگین', row( source, h( 'button', {
-				class: 'pill primary',
+				class: 'btn solid',
 				text: 'نصب',
 				onClick: async () => {
 					note.className = 'note';
@@ -721,7 +721,7 @@ async function renderPlugins( box ) {
 				},
 			} ) ) ),
 			field( 'مرور مارکت‌پلیس', row( market, h( 'button', {
-				class: 'pill',
+				class: 'btn outline',
 				text: 'باز کن',
 				onClick: async () => {
 					marketList.replaceChildren( el( 'div', 'loading', 'در حال گرفتن فهرست…' ) );
@@ -736,7 +736,7 @@ async function renderPlugins( box ) {
 							h( 'div', { class: 'item' }, [
 								h( 'div', { class: 'item-main' }, [ h( 'b', { text: p.name } ), h( 'p', { text: p.description || '' } ) ] ),
 								h( 'button', {
-									class: 'pill primary',
+									class: 'btn solid',
 									text: 'نصب',
 									onClick: async () => {
 										const r = await post( '/api/plugins', { action: 'install', source: p.source, name: p.name } );
@@ -767,7 +767,7 @@ async function renderPlugins( box ) {
 				] ),
 				h( 'span', { class: `tag ${ p.enabled ? 'ok' : '' }`, text: p.enabled ? 'فعال' : 'خاموش' } ),
 				h( 'button', {
-					class: 'pill',
+					class: 'btn outline',
 					text: p.enabled ? 'خاموش' : 'روشن',
 					onClick: async () => {
 						await post( '/api/plugins', { action: 'toggle', name: p.name, enabled: ! p.enabled } );
@@ -775,7 +775,7 @@ async function renderPlugins( box ) {
 					},
 				} ),
 				h( 'button', {
-					class: 'pill ghost danger',
+					class: 'btn quiet danger',
 					text: 'حذف',
 					onClick: async () => {
 						if ( ! ( await confirmDialog( `پلاگین «${ p.name }» حذف شود؟`, { danger: true } ) ) ) {
@@ -812,9 +812,9 @@ async function renderAgents( box ) {
 					h( 'p', { class: 'note mono', text: `${ a.model || 'مدل پیش‌فرض' } · ${ a.tools?.length ? a.tools.join( '، ' ) : 'همهٔ ابزارها' }` } ),
 				] ),
 				h( 'span', { class: 'tag', text: a.source } ),
-				h( 'button', { class: 'pill', text: 'ویرایش', onClick: () => form( a ) } ),
+				h( 'button', { class: 'btn outline', text: 'ویرایش', onClick: () => form( a ) } ),
 				h( 'button', {
-					class: 'pill ghost danger',
+					class: 'btn quiet danger',
 					text: 'حذف',
 					onClick: async () => {
 						if ( ! ( await confirmDialog( `زیرعامل «${ a.name }» حذف شود؟`, { danger: true } ) ) ) {
@@ -831,7 +831,7 @@ async function renderAgents( box ) {
 		);
 	}
 	box.appendChild( list );
-	box.appendChild( row( h( 'button', { class: 'pill primary', text: '+ زیرعامل تازه', onClick: () => form( null ) } ) ) );
+	box.appendChild( row( h( 'button', { class: 'btn solid', text: '+ زیرعامل تازه', onClick: () => form( null ) } ) ) );
 
 	const formHost = el( 'div', 'form-host' );
 	box.appendChild( formHost );
@@ -852,7 +852,7 @@ async function renderAgents( box ) {
 		const chosen = new Set( a?.tools || [] );
 		for ( const t of s.tools || [] ) {
 			const chip = h( 'button', {
-				class: `chip ${ chosen.has( t.name ) ? 'on' : '' }`,
+				class: `btn outline sm mono ${ chosen.has( t.name ) ? 'on' : '' }`,
 				text: t.name,
 				onClick: () => {
 					if ( chosen.has( t.name ) ) {
@@ -878,9 +878,9 @@ async function renderAgents( box ) {
 				field( 'پرامپت سیستمی', prompt ),
 				h( 'div', { class: 'modal-actions' }, [
 					h( 'span', { class: 'grow' } ),
-					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
+					h( 'button', { class: 'btn outline', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
 					h( 'button', {
-						class: 'pill primary',
+						class: 'btn solid',
 						text: 'ذخیره',
 						onClick: async () => {
 							const out = await post( '/api/agents', {
@@ -921,10 +921,10 @@ async function renderCommands( box ) {
 			h( 'div', { class: 'item' }, [
 				h( 'div', { class: 'item-main' }, [ h( 'b', { class: 'mono', text: `/${ c.name }` } ), h( 'p', { text: c.description || '' } ) ] ),
 				h( 'span', { class: 'tag', text: c.source } ),
-				c.source !== 'builtin' ? h( 'button', { class: 'pill', text: 'ویرایش', onClick: () => form( c ) } ) : null,
+				c.source !== 'builtin' ? h( 'button', { class: 'btn outline', text: 'ویرایش', onClick: () => form( c ) } ) : null,
 				c.source !== 'builtin'
 					? h( 'button', {
-							class: 'pill ghost danger',
+							class: 'btn quiet danger',
 							text: 'حذف',
 							onClick: async () => {
 								if ( ! ( await confirmDialog( `دستور /${ c.name } حذف شود؟`, { danger: true } ) ) ) {
@@ -942,7 +942,7 @@ async function renderCommands( box ) {
 		);
 	}
 	box.appendChild( list );
-	box.appendChild( row( h( 'button', { class: 'pill primary', text: '+ دستور تازه', onClick: () => form( null ) } ) ) );
+	box.appendChild( row( h( 'button', { class: 'btn solid', text: '+ دستور تازه', onClick: () => form( null ) } ) ) );
 
 	const formHost = el( 'div', 'form-host' );
 	box.appendChild( formHost );
@@ -967,9 +967,9 @@ async function renderCommands( box ) {
 				field( 'متن دستور (پرامپت)', body ),
 				h( 'div', { class: 'modal-actions' }, [
 					h( 'span', { class: 'grow' } ),
-					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
+					h( 'button', { class: 'btn outline', text: 'انصراف', onClick: () => formHost.replaceChildren() } ),
 					h( 'button', {
-						class: 'pill primary',
+						class: 'btn solid',
 						text: 'ذخیره',
 						onClick: async () => {
 							const out = await post( '/api/commands', {
@@ -1014,7 +1014,7 @@ async function renderHooks( box ) {
 			h( 'div', { class: 'modal-actions' }, [
 				h( 'span', { class: 'grow' } ),
 				h( 'button', {
-					class: 'pill primary',
+					class: 'btn solid',
 					text: 'ذخیره',
 					onClick: async () => {
 						let parsed;
@@ -1066,7 +1066,7 @@ async function renderPermissions( box ) {
 			h( 'div', { class: 'modal-actions' }, [
 				h( 'span', { class: 'grow' } ),
 				h( 'button', {
-					class: 'pill primary',
+					class: 'btn solid',
 					text: 'ذخیره',
 					onClick: async () => {
 						const res = await post( '/api/permissions', {
@@ -1088,11 +1088,11 @@ function listEditor( initial, label ) {
 	const host = el( 'div', 'kv' );
 	const addRow = ( v = '' ) => {
 		const input = h( 'input', { class: 'field small', dir: 'ltr', value: v, placeholder: 'bash:git' } );
-		const del = h( 'button', { class: 'pill ghost', text: '×', onClick: () => line.remove() } );
+		const del = h( 'button', { class: 'btn quiet', text: '×', onClick: () => line.remove() } );
 		const line = h( 'div', { class: 'kv-row' }, [ input, del ] );
 		host.insertBefore( line, adder );
 	};
-	const adder = h( 'button', { class: 'pill', text: `+ ${ label }`, onClick: () => addRow() } );
+	const adder = h( 'button', { class: 'btn outline', text: `+ ${ label }`, onClick: () => addRow() } );
 	host.appendChild( adder );
 	for ( const v of initial ) {
 		addRow( v );
@@ -1173,7 +1173,7 @@ async function renderSandbox( box ) {
 			field( 'مسیرهای اضافه', mounts.node, 'به شکل host:container — مثلاً /home/me/.composer:/root/.composer' ),
 			h( 'div', { class: 'modal-actions' }, [
 				h( 'button', {
-					class: 'pill',
+					class: 'btn outline',
 					text: 'تست سندباکس',
 					onClick: async () => {
 						note.className = 'note';
@@ -1185,7 +1185,7 @@ async function renderSandbox( box ) {
 				} ),
 				h( 'span', { class: 'grow' } ),
 				h( 'button', {
-					class: 'pill primary',
+					class: 'btn solid',
 					text: 'ذخیره',
 					onClick: async () => {
 						const out = await post( '/api/sandbox', { action: 'save', sandbox: payload() } );
@@ -1225,7 +1225,7 @@ async function renderMemory( box ) {
 			note,
 			h( 'div', { class: 'modal-actions' }, [
 				h( 'button', {
-					class: 'pill',
+					class: 'btn outline',
 					text: 'نمونهٔ آماده',
 					onClick: () => {
 						editor.value = [
@@ -1245,7 +1245,7 @@ async function renderMemory( box ) {
 				} ),
 				h( 'span', { class: 'grow' } ),
 				h( 'button', {
-					class: 'pill primary',
+					class: 'btn solid',
 					text: 'ذخیره',
 					onClick: async () => {
 						const res = await post( '/api/memory', { text: editor.value } );

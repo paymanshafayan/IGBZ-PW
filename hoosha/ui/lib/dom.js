@@ -123,9 +123,9 @@ export function confirmDialog( message, opts = {} ) {
 				h( 'p', { class: 'confirm-text', text: message } ),
 				h( 'div', { class: 'modal-actions' }, [
 					h( 'span', { class: 'grow' } ),
-					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => done( false ) } ),
+					h( 'button', { class: 'btn outline', text: 'انصراف', onClick: () => done( false ) } ),
 					h( 'button', {
-						class: `pill ${ opts.danger ? 'danger' : 'primary' }`,
+						class: `btn ${ opts.danger ? 'outline danger' : 'solid' }`,
 						text: opts.confirmText || 'تأیید',
 						onClick: () => done( true ),
 					} ),
@@ -162,8 +162,8 @@ export function promptDialog( label, value = '' ) {
 				h( 'label', { class: 'field-label' }, [ label, input ] ),
 				h( 'div', { class: 'modal-actions' }, [
 					h( 'span', { class: 'grow' } ),
-					h( 'button', { class: 'pill', text: 'انصراف', onClick: () => done( null ) } ),
-					h( 'button', { class: 'pill primary', text: 'ذخیره', onClick: () => done( input.value ) } ),
+					h( 'button', { class: 'btn outline', text: 'انصراف', onClick: () => done( null ) } ),
+					h( 'button', { class: 'btn solid', text: 'ذخیره', onClick: () => done( input.value ) } ),
 				] ),
 			] ),
 		] );

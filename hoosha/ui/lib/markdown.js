@@ -48,7 +48,7 @@ export function markdown( src ) {
 			const nl = block.indexOf( '\n' );
 			const lang = nl === -1 ? block.trim() : block.slice( 0, nl ).trim();
 			const body = nl === -1 ? '' : block.slice( nl + 1 );
-			out += `<div class="codeblock"><div class="code-head"><span>${ esc( lang || 'متن' ) }</span><button class="code-copy" type="button">کپی</button></div><pre>${ highlight(
+			out += `<div class="codeblock"><div class="code-head"><span>${ esc( lang || 'متن' ) }</span><button class="btn quiet sm" type="button" data-copy>کپی</button></div><pre>${ highlight(
 				body.replace( /\n$/, '' ),
 				lang
 			) }</pre></div>`;
@@ -138,7 +138,7 @@ export function inline( s ) {
 
 /** دکمهٔ «کپی» بلوک‌های کد را زنده می‌کند. */
 export function wireCodeCopy( root ) {
-	for ( const btn of root.querySelectorAll( '.code-copy' ) ) {
+	for ( const btn of root.querySelectorAll( '[data-copy]' ) ) {
 		if ( btn.dataset.wired ) {
 			continue;
 		}

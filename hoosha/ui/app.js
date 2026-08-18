@@ -149,10 +149,9 @@ let chatFilter = '';
 
 function chatsActions( host ) {
 	const search = h( 'input', {
-		class: 'field',
+		class: 'field inline',
 		placeholder: t( 'جستجو در گفتگوها…' ),
 		value: chatFilter,
-		style: 'width:220px;margin:0;',
 		onInput: ( e ) => {
 			chatFilter = e.target.value;
 			renderChatsPage( host );
@@ -161,7 +160,7 @@ function chatsActions( host ) {
 	return [
 		search,
 		h( 'button', {
-			class: 'pill primary',
+			class: 'btn solid',
 			text: t( 'گفتگوی تازه' ),
 			onClick: () => $( '#btn-new' ).click(),
 		} ),
@@ -199,7 +198,7 @@ async function renderChatsPage( host ) {
 					h( 'span', { text: timeAgo( item.updatedAt ) } ),
 				] ),
 				h( 'button', {
-					class: 'row-menu',
+					class: 'btn icon round quiet reveal row-menu',
 					text: '⋯',
 					title: 'تغییر نام یا حذف',
 					onClick: async ( e ) => {
@@ -250,7 +249,7 @@ async function switchProject( dir ) {
 function projectsActions( host ) {
 	return [
 		h( 'button', {
-			class: 'pill primary',
+			class: 'btn solid',
 			text: t( 'پروژهٔ تازه' ),
 			onClick: async () => {
 				const next = await promptDialog( 'مسیر پروژه:', getState()?.config?.workspace || '' );
@@ -307,7 +306,7 @@ async function renderWorkspacePage( host ) {
 			] ),
 			h( 'div', { class: 'set-row-control' }, [
 				h( 'button', {
-					class: 'pill',
+					class: 'btn outline',
 					text: 'تغییر پوشه',
 					onClick: async () => {
 						const next = await promptDialog( 'مسیر پوشهٔ کاری:', s.config.workspace );
@@ -341,7 +340,7 @@ async function renderWorkspacePage( host ) {
 
 	for ( const t of WORKSPACE_TABS ) {
 		tabs.appendChild(
-			h( 'button', { class: 'tab-btn', dataset: { tab: t.id }, text: t.label, onClick: () => paint( t.id ) } )
+			h( 'button', { class: 'btn tab', dataset: { tab: t.id }, text: t.label, onClick: () => paint( t.id ) } )
 		);
 	}
 	await paint( workspaceTab );
@@ -480,7 +479,7 @@ function showSetupBanner( s ) {
 	const banner = h( 'div', { class: 'banner danger', id: 'setup-banner' }, [
 		h( 'b', { text: 'هنوز آمادهٔ کار نیست' } ),
 		h( 'span', { text: `کم است: ${ ( s.ready?.missing || [] ).join( '، ' ) }` } ),
-		h( 'button', { class: 'pill primary', text: 'تنظیم پرووایدر', onClick: () => openSettings( 'hub' ) } ),
+		h( 'button', { class: 'btn solid lg', text: 'تنظیم پرووایدر', onClick: () => openSettings( 'hub' ) } ),
 	] );
 	$( '.main-card' ).insertBefore( banner, $( '#view-chat' ) );
 }
@@ -683,7 +682,7 @@ $( '#btn-more' ).onclick = ( e ) => {
 		return;
 	}
 	const item = ( ico, label, onClick ) =>
-		h( 'div', { class: 'menu-item', onClick: () => {
+		h( 'div', { class: 'btn quiet row menu-item', onClick: () => {
 			box.hidden = true;
 			onClick();
 		} }, [ h( 'span', { class: 'm-ico', text: ico } ), h( 'b', { text: label } ) ] );

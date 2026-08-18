@@ -24,7 +24,7 @@ export async function openFile( relPath ) {
 			body,
 			h( 'div', { class: 'modal-actions' }, [
 				h( 'span', { class: 'grow' } ),
-				h( 'button', { class: 'pill', text: 'بستن', onClick: () => close() } ),
+				h( 'button', { class: 'btn outline', text: 'بستن', onClick: () => close() } ),
 			] ),
 		] ),
 	] );
@@ -94,9 +94,9 @@ export async function openRewind( run, preselect ) {
 			] ),
 			h( 'div', { class: 'modal-actions' }, [
 				h( 'span', { class: 'grow' } ),
-				h( 'button', { class: 'pill', text: 'انصراف', onClick: () => close() } ),
+				h( 'button', { class: 'btn outline', text: 'انصراف', onClick: () => close() } ),
 				h( 'button', {
-					class: 'pill primary',
+					class: 'btn solid',
 					text: 'برگرد',
 					onClick: async () => {
 						close();
@@ -258,7 +258,7 @@ export function openShortcuts() {
 			),
 			h( 'div', { class: 'modal-actions' }, [
 				h( 'span', { class: 'grow' } ),
-				h( 'button', { class: 'pill', text: 'بستن', onClick: () => {
+				h( 'button', { class: 'btn outline', text: 'بستن', onClick: () => {
 					dlg.close();
 					dlg.remove();
 				} } ),

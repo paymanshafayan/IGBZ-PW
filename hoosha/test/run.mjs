@@ -1573,12 +1573,12 @@ await test( 'پالت دقیقاً از طرح تأییدشدهٔ کارفرما
 
 	// و دکمهٔ عمل صفحه‌ها در طرح مشکیِ توپر است، نه رنگ برند.
 	assert.match( light, /--solid:\s*#000000/ );
-	assert.match( cssBlock( '.pill.primary' ), /background:\s*var\(--solid\)/ );
+	assert.match( cssBlock( '.btn.solid' ), /background:\s*var\(--solid\)/ );
 } );
 
 await test( 'رابط زنده است: ترنزیشن، سایه و حرکت دارد', () => {
 	// شکایت کارفرما: «یک رابط با ظاهر بی‌روح و مرده کاربر را خسته می‌کند.»
-	assert.ok( ( css.match( /transition:/g ) || [] ).length > 25, 'ترنزیشن کم است' );
+	assert.ok( ( css.match( /transition:/g ) || [] ).length > 18, 'ترنزیشن کم است' );
 	assert.ok( ( css.match( /@keyframes/g ) || [] ).length >= 6, 'انیمیشن کم است' );
 	assert.ok( css.includes( '--shadow-1' ) && css.includes( '--shadow-3' ), 'سطح‌بندی سایه لازم است' );
 	assert.match( css, /translateY\(-1px\)|translateY\(-2px\)/, 'بلندشدن هنگام هاور' );
@@ -1725,9 +1725,12 @@ await test( 'ناوبری نوار کناری همان ترتیب Claude را د
 		assert.match( html, new RegExp( `data-view="${ view }"` ), `آیتم ناوبری ${ view } نیست` );
 	}
 	// «گفتگوی تازه» یک ردیف ساده است، نه دکمهٔ پررنگ نارنجی.
-	const nc = cssBlock( '.new-chat' );
-	assert.match( nc, /background:\s*transparent/ );
-	assert.match( nc, /border:\s*0/ );
+	assert.match( html, /class="btn quiet row new-chat" id="btn-new"/, '«گفتگوی تازه» باید همان دکمهٔ بی‌قابِ ردیفی باشد' );
+	assert.match( cssBlock( '.btn' ), /background:\s*transparent/ );
+	assert.match( cssBlock( '.btn.row' ), /justify-content:\s*flex-start/ );
+	// و کلاس .new-chat فقط جای دکمه را تعیین می‌کند، نه شکلش.
+	const nc = cssBlock( '.btn.new-chat' );
+	assert.equal( /background|border:|border-color/.test( nc ), false, '.new-chat نباید ظاهر دکمه را دوباره تعریف کند' );
 } );
 
 await test( 'تنظیمات یک مودال بزرگ است با ناوبری دوگروهی و جستجو', () => {
@@ -1755,7 +1758,7 @@ await test( 'زیربخش‌های فضای کار همان‌جا باز می�
 		assert.ok( app.includes( `id: '${ id }'` ), `زیربخش ${ id } در فضای کار نیست` );
 	}
 	assert.match( app, /renderSection\( id, body \)/ );
-	assert.match( css, /\.tab-btn\s*\{/ );
+	assert.match( css, /\.btn\.tab\s*\{/ );
 } );
 
 await test( 'همهٔ بخش‌های تنظیمات رندرکنندهٔ واقعی دارند', async () => {
@@ -1785,7 +1788,7 @@ await test( 'دکمهٔ «برو به آخر» وجود دارد و به اسک�
 	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
 	assert.match( thread, /jump-down/ );
 	assert.match( thread, /addEventListener\( 'scroll'/ );
-	assert.match( cssBlock( '.jump-down' ), /position:\s*absolute/ );
+	assert.match( cssBlock( '.btn.jump-down' ), /position:\s*absolute/ );
 } );
 
 await test( 'تم، تا وقتی کاربر انتخاب نکرده از سیستم پیروی می‌کند', () => {
@@ -4633,6 +4636,290 @@ await test( 'فرم پرووایدر استاندارد آدرس پایه نمی
 	}
 	// سرویسی که کلید نمی‌خواهد، کادر کلید را هم نشان ندهد.
 	assert.match( hub, /keyField\.hidden = info\?\.needsKey === false/ );
+} );
+
+// ------------------------------------------------- یک کلاس واحد برای دکمه‌ها
+
+section( 'دکمه‌ها — یک کلاس واحد' );
+
+/** همهٔ فایل‌های رابط، یک‌جا. */
+const uiSources = ( () => {
+	const out = [];
+	for ( const dir of [ uiDir, path.join( uiDir, 'lib' ) ] ) {
+		for ( const f of fssync.readdirSync( dir ) ) {
+			if ( /\.(js|html)$/.test( f ) ) {
+				out.push( { file: path.relative( uiDir, path.join( dir, f ) ), text: fssync.readFileSync( path.join( dir, f ), 'utf8' ) } );
+			}
+		}
+	}
+	return out;
+} )();
+
+/** هر مقدار class که در منبع نوشته شده — از HTML، از h() و از el(). */
+function classValues( text ) {
+	const out = [];
+	for ( const m of text.matchAll( /class="([^"${}]*)"/g ) ) out.push( m[ 1 ] );
+	for ( const m of text.matchAll( /class:\s*'([^'${}]*)'/g ) ) out.push( m[ 1 ] );
+	for ( const m of text.matchAll( /class:\s*`([^`${}]*)\$\{/g ) ) out.push( m[ 1 ] );
+	for ( const m of text.matchAll( /class="([^"${}]*)\$\{/g ) ) out.push( m[ 1 ] );
+	for ( const m of text.matchAll( /el\(\s*'\w+',\s*'([^'${}]*)'/g ) ) out.push( m[ 1 ] );
+	// کلاسی که در زمان اجرا ست می‌شود هم کلاس است — همان جایی که نوار گیت از قلم افتاد.
+	for ( const m of text.matchAll( /className\s*=\s*[`']([^`'${}]*)/g ) ) out.push( m[ 1 ] );
+	for ( const m of text.matchAll( /classList\.(?:add|toggle|remove)\(\s*'([^']*)'/g ) ) out.push( m[ 1 ] );
+	return out;
+}
+
+await test( 'هیچ اثری از یازده کلاس دکمهٔ قدیمی نمانده', () => {
+	/*
+	 * شکایت کارفرما: «دکمه‌ها حالت یکسانی ندارند… انگار از یک کلاس واحد پیروی نمی‌کنند.»
+	 * درست بود؛ یازده پیادهٔ موازی داشتیم. اینها دیگر نه در CSS باشند، نه در منبع.
+	 */
+	const gone = [ 'pill', 'round-btn', 'round-ghost', 'ghost-icon', 'icon-btn', 'act-btn', 'tab-btn', 'git-action', 'git-stat', 'chip', 'model-chip', 'mode-chip', 'code-copy' ];
+	const bare = css.replace( /\/\*[\s\S]*?\*\//g, '' );
+	for ( const cls of gone ) {
+		assert.equal(
+			new RegExp( `\\.${ cls }[\\s.,:{[]` ).test( bare ),
+			false,
+			`کلاس دکمهٔ قدیمی .${ cls } هنوز در style.css قاعده دارد`
+		);
+		for ( const { file, text } of uiSources ) {
+			for ( const value of classValues( text ) ) {
+				assert.equal(
+					value.split( /\s+/ ).includes( cls ),
+					false,
+					`${ file } هنوز کلاس «${ cls }» را می‌نویسد: «${ value }»`
+				);
+			}
+		}
+	}
+} );
+
+await test( 'هر دکمه‌ای که ساخته می‌شود، کلاس btn دارد', () => {
+	/** دکمه‌ها را از منبع بیرون می‌کشد: <button class="…"> و h( 'button', { class: … } ). */
+	const offenders = [];
+	for ( const { file, text } of uiSources ) {
+		for ( const m of text.matchAll( /<button\b[^>]*?class="([^"]*)"/g ) ) {
+			if ( ! m[ 1 ].split( /\s+/ ).includes( 'btn' ) ) offenders.push( `${ file }: <button class="${ m[ 1 ] }">` );
+		}
+		for ( const m of text.matchAll( /h\(\s*'button',\s*\{([\s\S]{0,220}?)\}/g ) ) {
+			const cls = m[ 1 ].match( /class:\s*[`']([^`']*)/ );
+			if ( ! cls || ! cls[ 1 ].split( /\s+/ ).includes( 'btn' ) ) offenders.push( `${ file }: h('button', { class: ${ cls ? cls[ 1 ] : '—' } })` );
+		}
+		for ( const m of text.matchAll( /el\(\s*'button',\s*'([^']*)'/g ) ) {
+			if ( ! m[ 1 ].split( /\s+/ ).includes( 'btn' ) ) offenders.push( `${ file }: el('button', '${ m[ 1 ] }')` );
+		}
+	}
+	assert.deepEqual( offenders, [], `این دکمه‌ها از کلاس واحد پیروی نمی‌کنند:\n  ${ offenders.join( '\n  ' ) }` );
+
+	// و دست‌کم به تعداد واقعی دکمه‌ها پیدایشان کرده باشیم، وگرنه تست خالی سبز می‌شود.
+	const total = uiSources.reduce( ( n, { text } ) => n + ( text.match( /<button\b|h\(\s*'button'|el\(\s*'button'/g ) || [] ).length, 0 );
+	assert.ok( total > 60, `فقط ${ total } دکمه پیدا شد؛ الگوی جستجو خراب است` );
+} );
+
+await test( 'کلاس .btn همان اعداد طرح پیوست را دارد و همهٔ لحن‌هایش تعریف شده‌اند', () => {
+	const base = cssBlock( '.btn' );
+	assert.match( base, /min-height:\s*36px/, 'قد دکمه در طرح ۳۶ است' );
+	assert.match( base, /border-radius:\s*10px/ );
+	assert.match( base, /font-size:\s*14px/ );
+	assert.match( base, /font-weight:\s*500/ );
+	assert.match( base, /gap:\s*8px/ );
+	assert.match( base, /cursor:\s*pointer/ );
+
+	// دکمهٔ اصلی مشکیِ توپر است (New project در تصویر)، نه رنگ برند.
+	assert.match( cssBlock( '.btn.solid' ), /background:\s*var\(--solid\)/ );
+	assert.match( cssBlock( '.btn.solid' ), /color:\s*var\(--solid-foreground\)/ );
+	// فیروزه فقط برای ارسال و ضبط.
+	assert.match( cssBlock( '.btn.brand' ), /background:\s*var\(--primary\)/ );
+	assert.match( cssBlock( '.btn.outline' ), /border-color:\s*var\(--border\)/ );
+	assert.match( cssBlock( '.btn.quiet' ), /color:\s*var\(--muted-foreground\)/ );
+	assert.match( cssBlock( '.btn.danger' ), /color:\s*var\(--destructive\)/ );
+	assert.match( cssBlock( '.btn.icon' ), /width:\s*36px/ );
+	assert.match( cssBlock( '.btn.round' ), /border-radius:\s*50%/ );
+	assert.match( cssBlock( '.btn.row' ), /width:\s*100%/ );
+	assert.match( cssBlock( '.btn.tab.active' ), /border-bottom-color:\s*var\(--primary\)/ );
+	assert.match( cssBlock( '.btn:disabled' ), /opacity:\s*0\.5/ );
+	for ( const v of [ '.btn.sm', '.btn.lg', '.btn.link', '.btn.mono', '.btn.active', '.btn.on', '.btn.reveal', '.btn.push-end' ] ) {
+		cssBlock( v ); // نبودنش خطا می‌دهد
+	}
+
+	// و هر لحنی که تعریف شده، دست‌کم یک‌بار در رابط استفاده شود.
+	const used = new Set();
+	for ( const { text } of uiSources ) {
+		for ( const value of classValues( text ) ) {
+			const parts = value.split( /\s+/ );
+			if ( parts.includes( 'btn' ) ) parts.forEach( ( p ) => used.add( p ) );
+		}
+	}
+	for ( const v of [ 'solid', 'brand', 'outline', 'quiet', 'danger', 'icon', 'round', 'row', 'sm', 'lg', 'tab', 'link', 'mono', 'reveal', 'push-end' ] ) {
+		assert.ok( used.has( v ), `تغییردهندهٔ .btn.${ v } تعریف شده ولی هیچ دکمه‌ای از آن استفاده نمی‌کند` );
+	}
+} );
+
+await test( 'کلاس‌های جایگاه، ظاهر دکمه را دوباره تعریف نمی‌کنند', () => {
+	// قاعده: .btn شکل را می‌دهد؛ کلاس کنارش فقط جا و اندازهٔ ظرف را.
+	for ( const sel of [ '.btn.new-chat', '.btn.nav-item', '.btn.git-chip', '.btn.q-option', '.btn.chat-title', '.btn.account-main', '.btn.set-item', '.btn.menu-item', '.topbar .btn.plan-chip' ] ) {
+		const block = cssBlock( sel );
+		assert.equal( /(^|[\s;])cursor:\s*pointer/.test( block ), false, `${ sel } نباید دوباره cursor بگذارد` );
+		assert.equal( /(^|[\s;])border:/.test( block ), false, `${ sel } نباید دوباره border بگذارد` );
+		assert.equal( /(^|[\s;])display:\s*(inline-)?flex/.test( block ), false, `${ sel } نباید دوباره display بگذارد` );
+	}
+} );
+
+await test( 'قاعده‌های جایگاه با .btn نوشته شده‌اند، وگرنه لحن دکمه رویشان می‌افتد', () => {
+	/*
+	 * تلهٔ ویژگی (specificity): `.btn.quiet` دو کلاس است و `.new-chat` یک کلاس. اگر
+	 * قاعدهٔ جایگاه را تک‌کلاسه بنویسیم، هرچه در آن باشد زیر لحنِ دکمه دفن می‌شود —
+	 * بی‌آنکه خطایی جایی دیده شود. پس هر قاعده‌ای که به دکمه‌ای می‌خورد، `.btn` را
+	 * در سلکتورش دارد.
+	 */
+	const bare = css.replace( /\/\*[\s\S]*?\*\//g, '' );
+	const modifiers = new Set( [ 'btn', 'solid', 'brand', 'outline', 'quiet', 'danger', 'icon', 'round', 'row', 'sm', 'lg', 'tab', 'link', 'mono', 'active', 'on', 'reveal', 'push-end', 'recording' ] );
+	const placement = new Set();
+	for ( const { text } of uiSources ) {
+		for ( const value of classValues( text ) ) {
+			const parts = value.split( /\s+/ ).filter( Boolean );
+			if ( parts.includes( 'btn' ) ) parts.forEach( ( p ) => ! modifiers.has( p ) && placement.add( p ) );
+		}
+	}
+	assert.ok( placement.size >= 8, `فقط ${ placement.size } کلاس جایگاه پیدا شد` );
+
+	const weak = [];
+	for ( const cls of placement ) {
+		for ( const m of bare.matchAll( new RegExp( `(?:^|\\n)([^{}\\n]*\\.${ cls }(?![\\w-])[^{}\\n]*)\\{`, 'g' ) ) ) {
+			const sel = m[ 1 ].trim();
+			// قاعده‌هایی که فرزندِ دکمه را هدف می‌گیرند اشکالی ندارند.
+			const targetsButton = new RegExp( `\\.${ cls }(?![\\w-])[\\s]*$` ).test( sel ) || new RegExp( `\\.${ cls }[.:][^\\s]*$` ).test( sel );
+			if ( targetsButton && ! sel.includes( '.btn' ) && ! sel.startsWith( 'body' ) ) weak.push( sel );
+		}
+	}
+	assert.deepEqual( weak, [], `این قاعده‌ها زیر لحن .btn دفن می‌شوند: ${ weak.join( ' · ' ) }` );
+
+	// و حالت ضبط باید بعد از لحن‌ها بیاید، وگرنه فیروزه‌اش را quiet می‌خورد.
+	assert.ok( bare.indexOf( '.btn.recording' ) > bare.indexOf( '.btn.quiet' ), 'ترتیب حالت ضبط اشتباه است' );
+} );
+
+await test( 'در style.css هیچ سلکتور تکراری و هیچ ویژگی تکراری در یک بلوک نیست', () => {
+	/*
+	 * خواستهٔ دوم کارفرما: «برای تمام آیتم‌ها چک کن کلاس تکراری وجود نداشته باشد.»
+	 * `.menu-item` دو بار تعریف شده بود (یکی برای منوی «+» و یکی برای منوی حساب) با
+	 * padding و رنگ هاور متفاوت — و همین بود که دو منو را دو شکل می‌کرد.
+	 */
+	const rules = [];
+	const walk = ( text, prefix ) => {
+		let sel = '', body = '', depth = 0, mode = 'sel';
+		for ( let i = 0; i < text.length; i++ ) {
+			const c = text[ i ];
+			if ( mode === 'sel' ) {
+				if ( c === '{' ) { mode = 'body'; depth = 1; body = ''; } else { sel += c; }
+				continue;
+			}
+			if ( c === '{' ) depth++;
+			if ( c === '}' ) {
+				depth--;
+				if ( ! depth ) {
+					const s = sel.trim().replace( /\s+/g, ' ' );
+					if ( s.startsWith( '@' ) ) walk( body, `${ prefix }${ s } > ` );
+					else rules.push( { sel: prefix + s, body } );
+					sel = ''; mode = 'sel';
+					continue;
+				}
+			}
+			body += c;
+		}
+	};
+	walk( css.replace( /\/\*[\s\S]*?\*\//g, '' ), '' );
+	assert.ok( rules.length > 300, `فقط ${ rules.length } قاعده تجزیه شد؛ تجزیه‌گر خراب است` );
+
+	const seen = new Map();
+	for ( const r of rules ) seen.set( r.sel, ( seen.get( r.sel ) || 0 ) + 1 );
+	const dup = [ ...seen ].filter( ( [ , n ] ) => n > 1 ).map( ( [ s ] ) => s );
+	assert.deepEqual( dup, [], `سلکتور تکراری: ${ dup.join( ' · ' ) }` );
+
+	for ( const r of rules ) {
+		const props = [ ...r.body.matchAll( /(?:^|;|\n)\s*([a-z-]+)\s*:/g ) ].map( ( m ) => m[ 1 ] );
+		const count = new Map();
+		for ( const p of props ) count.set( p, ( count.get( p ) || 0 ) + 1 );
+		const twice = [ ...count ].filter( ( [ , n ] ) => n > 1 ).map( ( [ p ] ) => p );
+		assert.deepEqual( twice, [], `${ r.sel } ویژگی تکراری دارد: ${ twice.join( '، ' ) }` );
+	}
+} );
+
+await test( 'هیچ کلاس بی‌استفاده‌ای در style.css نمانده', () => {
+	// CSS مرده همان چیزی است که آدم را گمراه می‌کند: قاعده‌ای که هیچ‌وقت روی چیزی نمی‌نشیند.
+	const defined = new Set();
+	for ( const m of css.replace( /\/\*[\s\S]*?\*\//g, '' ).matchAll( /\.([a-zA-Z][\w-]*)/g ) ) defined.add( m[ 1 ] );
+	const tokens = new Set();
+	for ( const { text } of uiSources ) {
+		for ( const m of text.matchAll( /[\w-]+/g ) ) tokens.add( m[ 0 ] );
+	}
+	// کلاس‌هایی که نامشان در زمان اجرا ساخته می‌شود: `s-${state}` و `risk-${risk}`.
+	const dynamic = /^(s-[A-Z]|risk-|woff2$)/;
+	const dead = [ ...defined ].filter( ( c ) => ! tokens.has( c ) && ! dynamic.test( c ) ).sort();
+	assert.deepEqual( dead, [], `کلاس بی‌استفاده در CSS: ${ dead.join( ' ' ) }` );
+} );
+
+await test( 'در برنامهٔ زنده هم هر دکمه‌ای که رندر می‌شود کلاس واحد را دارد', async () => {
+	/*
+	 * تست ایستا فقط چیزی را می‌بیند که در منبع نوشته شده. این یکی برنامه را واقعاً بالا
+	 * می‌آورد، هر پنج صفحه و مودال تنظیمات را باز می‌کند و بعد به تک‌تکِ <button>های
+	 * ساخته‌شده نگاه می‌کند.
+	 */
+	const { dom, q } = await bootApp( {
+		git: { name: 'IGBZ-WP', branch: 'arena/x', protected: false, dirty: true, ahead: 0, added: 12, removed: 3, files: [ { path: 'a.js', state: 'M' } ] },
+	} );
+	try {
+		const bad = new Set();
+		const sweep = ( where ) => {
+			for ( const b of document.querySelectorAll( 'button' ) ) {
+				const cls = String( b.className || '' ).split( /\s+/ ).filter( Boolean );
+				if ( ! cls.includes( 'btn' ) ) {
+					bad.add( `${ where }: <button class="${ cls.join( ' ' ) }">${ ( b.textContent || '' ).slice( 0, 20 ) }` );
+				}
+			}
+		};
+
+		let count = 0;
+		sweep( 'صفحهٔ خالی' );
+		count += document.querySelectorAll( 'button' ).length;
+
+		for ( const view of [ 'chats', 'projects', 'tools', 'changes', 'workspace' ] ) {
+			document.querySelector( `.nav-item[data-view="${ view }"]` ).click();
+			await new Promise( ( r ) => setTimeout( r, 110 ) );
+			sweep( `صفحهٔ ${ view }` );
+			count += document.querySelectorAll( '#panel-body button' ).length;
+		}
+
+		document.querySelector( '.nav-item[data-view="customize"]' ).click();
+		await new Promise( ( r ) => setTimeout( r, 160 ) );
+		sweep( 'تنظیمات' );
+		count += document.querySelectorAll( '#settings button' ).length;
+
+		assert.deepEqual( [ ...bad ], [], `دکمهٔ بی‌کلاس در اجرا:\n  ${ [ ...bad ].join( '\n  ' ) }` );
+		assert.ok( count > 40, `فقط ${ count } دکمه رندر شد؛ یعنی صفحه‌ها بالا نیامده‌اند` );
+		assert.ok( q( '#btn-new' ).className.includes( 'btn' ) );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'در پهنای کم، نوار کناری واقعاً می‌تواند باز شود', () => {
+	// قاعده‌ای که پیدا شد: در media، نوار کناری با translateX بیرون صفحه بود و قاعدهٔ
+	// بازشدنش روی کلاس `sidebar-open` نوشته شده بود — کلاسی که هیچ‌جای برنامه ست نمی‌شود.
+	const media = css.slice( css.indexOf( '@media (max-width: 860px)' ) );
+	assert.match( media, /body:not\(\.sidebar-collapsed\) \.sidebar[\s\S]{0,120}transform:\s*none/ );
+	assert.match( media, /html\[dir='ltr'\] \.sidebar\s*\{\s*transform:\s*translateX\(-100%\)/ );
+	assert.equal( /sidebar-open/.test( css.replace( /\/\*[\s\S]*?\*\//g, '' ) ), false, 'کلاس مردهٔ sidebar-open نباید برگردد' );
+} );
+
+await test( 'بلوک استدلال واقعاً وجود دارد — thinkingBlock دیگر تعریف‌نشده نیست', () => {
+	// باگ واقعی: thread.js این را صدا می‌زد و هیچ‌جا تعریف نشده بود؛ هر رویداد thinking
+	// یک ReferenceError می‌داد و ادامهٔ رندرِ همان پاسخ می‌ایستاد.
+	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
+	assert.match( thread, /function thinkingBlock\(\)/ );
+	assert.match( thread, /class:\s*'thinking-body'/ );
+	assert.match( thread, /box\._body = body/ );
+	assert.match( css, /\.thinking-head\s*\{/ );
+	assert.match( css, /\.thinking-head \.spin\s*\{/ );
 } );
 
 // ------------------------------------------------------------------ پایان

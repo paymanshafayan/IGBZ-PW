@@ -29,7 +29,7 @@ export function mountThread( opts ) {
 	onOpenFile = opts.onOpenFile;
 
 	const jump = h( 'button', {
-		class: 'jump-down',
+		class: 'btn icon round outline jump-down',
 		id: 'jump-down',
 		title: 'برو به آخر',
 		hidden: true,
@@ -59,7 +59,7 @@ export function clearThread() {
  * @param {()=>void} onClick
  */
 function iconBtn( title, d, onClick ) {
-	const b = el( 'button', 'act-btn' );
+	const b = el( 'button', 'btn icon sm quiet' );
 	b.title = title;
 	b.innerHTML = `<svg viewBox="0 0 20 20" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="${ d }"/></svg>`;
 	b.onclick = onClick;
@@ -250,6 +250,33 @@ export function addNotice( text ) {
 	append( h( 'div', { class: 'notice' }, [ h( 'span', { class: 'notice-ico', text: '•' } ), h( 'span', { text } ) ] ) );
 }
 
+/**
+ * بلوک «استدلال» — متن فکرکردن مدل، جمع‌شونده.
+ *
+ * این تابع صدا زده می‌شد ولی هیچ‌جا تعریف نشده بود: هر رویداد `thinking` از پرووایدرهای
+ * استدلالی، ReferenceError می‌داد و بقیهٔ رندرِ همان پاسخ می‌ایستاد. CSSش (`.thinking`)
+ * از اول در فایل بود؛ فقط خودِ بلوک گم شده بود.
+ *
+ * @returns {HTMLElement & { _body: HTMLElement }}
+ */
+export function thinkingBlock() {
+	const body = h( 'div', { class: 'thinking-body' } );
+	const head = h( 'div', { class: 'thinking-head' }, [
+		h( 'span', { class: 'spin', text: '◜' } ),
+		h( 'b', { text: 'در حال استدلال' } ),
+		h( 'span', { class: 'grow' } ),
+		h( 'span', { class: 'm-ico', text: '▾' } ),
+	] );
+	const box = h( 'div', { class: 'thinking' }, [ head, body ] );
+	head.addEventListener( 'click', () => {
+		body.hidden = ! body.hidden;
+		head.querySelector( '.m-ico' ).textContent = body.hidden ? '▸' : '▾';
+	} );
+	box._body = body;
+	append( box );
+	return box;
+}
+
 export function addError( message, hint ) {
 	const card = el( 'div', 'err-card' );
 	card.appendChild( el( 'b', null, message ) );
@@ -399,12 +426,12 @@ function hitList( output ) {
 		const m = /^([^:]+):(\d+):\s?(.*)$/.exec( line );
 		const row = el( 'div', 'hit' );
 		if ( m ) {
-			const link = el( 'button', 'file-link', `${ m[ 1 ] }:${ m[ 2 ] }` );
+			const link = el( 'button', 'btn link file-link', `${ m[ 1 ] }:${ m[ 2 ] }` );
 			link.onclick = () => onOpenFile( m[ 1 ] );
 			row.appendChild( link );
 			row.appendChild( el( 'span', 'hit-text', m[ 3 ] ) );
 		} else {
-			const link = el( 'button', 'file-link', line );
+			const link = el( 'button', 'btn link file-link', line );
 			link.onclick = () => onOpenFile( line.trim() );
 			row.appendChild( link );
 		}
@@ -529,10 +556,10 @@ function askCard( ev ) {
 	}
 
 	const actions = el( 'div', 'ask-actions' );
-	const allow = el( 'button', 'pill primary', 'اجازه بده' );
-	const always = el( 'button', 'pill', alwaysLabel( ev ) );
-	const deny = el( 'button', 'pill ghost', 'رد کن' );
-	const never = el( 'button', 'pill ghost danger', 'هرگز' );
+	const allow = el( 'button', 'btn solid', 'اجازه بده' );
+	const always = el( 'button', 'btn outline', alwaysLabel( ev ) );
+	const deny = el( 'button', 'btn quiet', 'رد کن' );
+	const never = el( 'button', 'btn quiet danger', 'هرگز' );
 
 	const answer = async ( decision, remember ) => {
 		for ( const b of [ allow, always, deny, never ] ) {
@@ -601,9 +628,9 @@ function planCard( ev ) {
 	card.appendChild( body );
 
 	const actions = el( 'div', 'ask-actions' );
-	const run = el( 'button', 'pill primary', 'تأیید و اجرا (با تأیید هر مرحله)' );
-	const auto = el( 'button', 'pill', 'تأیید و اجرای خودکار' );
-	const keep = el( 'button', 'pill ghost', 'نه، اصلاحش کن' );
+	const run = el( 'button', 'btn solid', 'تأیید و اجرا (با تأیید هر مرحله)' );
+	const auto = el( 'button', 'btn outline', 'تأیید و اجرای خودکار' );
+	const keep = el( 'button', 'btn quiet', 'نه، اصلاحش کن' );
 
 	const answer = async ( value, mode ) => {
 		for ( const b of [ run, auto, keep ] ) {
@@ -638,7 +665,7 @@ function questionCard( ev ) {
 	};
 
 	for ( const opt of ev.options || [] ) {
-		const btn = h( 'button', { class: 'q-option', onClick: () => send( opt.label ) }, [
+		const btn = h( 'button', { class: 'btn outline row q-option', onClick: () => send( opt.label ) }, [
 			h( 'b', { text: opt.label } ),
 			opt.description ? h( 'span', { text: opt.description } ) : null,
 		] );

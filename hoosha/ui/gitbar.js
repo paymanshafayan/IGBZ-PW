@@ -57,7 +57,7 @@ export function paintGitBar( s ) {
 		$( '#git-branch' ).hidden = true;
 		$( '#git-stat' ).hidden = true;
 		$( '#git-action' ).textContent = 'اتصال مخزن';
-		$( '#git-action' ).className = 'git-action quiet';
+		$( '#git-action' ).className = 'btn outline sm push-end';
 		return;
 	}
 
@@ -81,13 +81,13 @@ export function paintGitBar( s ) {
 	const action = $( '#git-action' );
 	if ( git.dirty ) {
 		action.textContent = `ثبت ${ git.files.length } تغییر`;
-		action.className = 'git-action';
+		action.className = 'btn solid sm push-end';
 	} else if ( git.ahead > 0 ) {
 		action.textContent = `فرستادن ${ git.ahead } کامیت`;
-		action.className = 'git-action';
+		action.className = 'btn solid sm push-end';
 	} else {
 		action.textContent = 'درخواست ادغام';
-		action.className = 'git-action quiet';
+		action.className = 'btn outline sm push-end';
 	}
 }
 
@@ -105,7 +105,7 @@ function close() {
 }
 
 function row( ico, label, desc, onClick, checked ) {
-	return h( 'div', { class: `menu-item ${ checked ? 'active' : '' }`, onClick }, [
+	return h( 'div', { class: `btn quiet row menu-item ${ checked ? 'active' : '' }`, onClick }, [
 		h( 'span', { class: 'm-ico', text: ico } ),
 		h( 'b', { text: label } ),
 		desc ? h( 'span', { class: 'm-desc', text: desc } ) : null,
@@ -119,7 +119,7 @@ function repoMenu() {
 
 	menu( [
 		h( 'div', { class: 'menu-label', text: 'مخزن' } ),
-		git ? h( 'div', { class: 'menu-item' }, [ h( 'span', { class: 'm-ico', text: '⌗' } ), h( 'b', { text: git.name } ), h( 'span', { class: 'm-desc', text: git.remote } ) ] ) : null,
+		git ? h( 'div', { class: 'btn quiet row menu-item' }, [ h( 'span', { class: 'm-ico', text: '⌗' } ), h( 'b', { text: git.name } ), h( 'span', { class: 'm-desc', text: git.remote } ) ] ) : null,
 		h( 'div', { class: 'menu-sep' } ),
 		row( '+', 'اتصال مخزن تازه', 'کلون از آدرس گیت', async () => {
 			close();
@@ -160,7 +160,7 @@ async function connectRepo() {
 }
 
 async function branchMenu() {
-	menu( [ h( 'div', { class: 'menu-item', text: 'در حال خواندن شاخه‌ها…' } ) ] );
+	menu( [ h( 'div', { class: 'btn quiet row menu-item', text: 'در حال خواندن شاخه‌ها…' } ) ] );
 
 	const out = await api( '/api/git' );
 	const git = out.git;
@@ -294,7 +294,7 @@ export async function renderChanges( host ) {
 		host.appendChild(
 			h( 'div', { class: 'empty' }, [
 				h( 'p', { text: 'این پوشه مخزن گیت نیست.' } ),
-				h( 'button', { class: 'pill primary', text: 'اتصال مخزن', onClick: () => connectRepo() } ),
+				h( 'button', { class: 'btn solid', text: 'اتصال مخزن', onClick: () => connectRepo() } ),
 			] )
 		);
 		return;
@@ -313,9 +313,9 @@ export async function renderChanges( host ) {
 
 	host.appendChild(
 		h( 'div', { class: 'row' }, [
-			h( 'button', { class: 'pill primary', text: 'ثبت تغییرات', onClick: doCommit } ),
-			h( 'button', { class: 'pill', text: 'فرستادن', onClick: doPush } ),
-			h( 'button', { class: 'pill', text: 'درخواست ادغام', onClick: doPr } ),
+			h( 'button', { class: 'btn solid', text: 'ثبت تغییرات', onClick: doCommit } ),
+			h( 'button', { class: 'btn outline', text: 'فرستادن', onClick: doPush } ),
+			h( 'button', { class: 'btn outline', text: 'درخواست ادغام', onClick: doPr } ),
 		] )
 	);
 

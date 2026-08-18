@@ -103,13 +103,12 @@ function paint() {
 		box.appendChild(
 			h( 'div', { class: `recent-item ${ s?.sessionId === item.id ? 'active' : '' }`, title: `${ item.title }\n${ timeAgo( item.updatedAt ) }` }, [
 				h( 'button', {
-					class: 'rt',
+					class: 'btn quiet row rt',
 					text: item.title || t( 'بدون عنوان' ),
 					onClick: () => onResume( item.id ),
-					style: 'background:none;border:0;color:inherit;font:inherit;text-align:start;cursor:pointer;padding:0;',
 				} ),
 				h( 'button', {
-					class: 'row-menu',
+					class: 'btn icon round quiet reveal row-menu',
 					title: 'گزینه‌ها',
 					text: '⋯',
 					onClick: async ( e ) => {
@@ -155,13 +154,13 @@ function toggleAccountMenu() {
 
 	const s = getState() || {};
 	const item = ( ico, label, end, onClick ) =>
-		h( 'button', { class: 'menu-item', onClick: () => {
+		h( 'button', { class: 'btn quiet row menu-item', onClick: () => {
 			menu.hidden = true;
 			onClick();
 		} }, [
-			h( 'span', { class: 'mi-ico', text: ico } ),
+			h( 'span', { class: 'm-ico', text: ico } ),
 			h( 'span', { text: label } ),
-			end ? h( 'span', { class: 'mi-end', text: end } ) : null,
+			end ? h( 'span', { class: 'm-end', text: end } ) : null,
 		] );
 
 	// نام زبانِ **دیگر** را نشان می‌دهیم، چون این ردیف یک کلید تعویض است نه یک برچسب.
