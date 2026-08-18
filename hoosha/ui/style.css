@@ -2931,12 +2931,12 @@ body.sidebar-collapsed .account-menu {
 }
 .composer:focus-within {
 	/*
-	 * قاب در فوکوس هم می‌ماند؛ ناپدیدشدنش (شفاف + رینگ) شبیه کادر قدیمی بود و
-	 * کارفرما آن را باگ دید (۱۴۰۵/۰۵/۲۷). رینگ ۳px کرم فقط اضافه می‌شود.
+	 * فوکوس ظاهر کادر را عوض نمی‌کند — نه شفاف‌شدن قاب (شبیه کادر قدیمی بود)،
+	 * نه رینگ اضافه (ضخیم‌شدن بوردر دیده می‌شد). کارفرما ۱۴۰۵/۰۵/۲۷: کادر
+	 * همیشه باید مثل تصویر باشد.
 	 */
 	border-color: var(--border);
-	box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, #000 3.5%, transparent),
-		0 0 0 3px var(--ring);
+	box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, #000 3.5%, transparent);
 }
 .composer textarea {
 	width: 100%;

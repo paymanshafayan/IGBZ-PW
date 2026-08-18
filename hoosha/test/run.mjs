@@ -5632,10 +5632,11 @@ await test( 'کادر چت همان اعداد و ترنزیشنی را دارد
 	assert.match( card, /transition:\s*background-color 0\.2s/ );
 	assert.equal( /transition:[^;]*\ball\b/.test( card ), false, 'ترنزیشن روی همه‌چیز نه' );
 
-	// قاب در حالت فوکوس هم می‌ماند — ناپدیدشدن قاب هنگام فوکوس، «کادر قدیمی» به نظر می‌رسید.
+	// فوکوس هیچ تغییری در ظاهر کادر نمی‌دهد — قاب می‌ماند و چیزی اضافه نمی‌شود.
+	// (رینگِ فوکوس روی قاب، «ضخیم‌شدن بوردر» دیده می‌شد؛ کارفرما ۱۴۰۵/۰۵/۲۷.)
 	const focus = cssBlock( '.composer:focus-within' );
-	assert.match( focus, /border-color:\s*var\(--border\)/, "قاب ۱px باید در فوکوس هم بماند" );
-	assert.match( focus, /box-shadow:[^;]*var\(--ring\)/, "رینگ ملایمِ فوکوس" );
+	assert.match( focus, /border-color:\s*var\(--border\)/, 'قاب ۱px در فوکوس هم می‌ماند' );
+	assert.equal( /var\(--ring\)/.test( focus ), false, 'فوکوس نباید چیزی اضافه کند — ظاهر همیشه مثل تصویر است' );
 
 	// و کادر، پنجاه پیکسل پایین‌تر از خوش‌آمد.
 	assert.match( cssBlock( '.view-chat.empty .composer-wrap' ), /margin-top:\s*50px/ );
