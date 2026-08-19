@@ -101,7 +101,7 @@ export class Hub {
 		const callModel =
 			cfg.enabled && conn && cfg.model
 				? async ( prompt ) => {
-						const provider = createConnectionProvider( conn, { modelId: cfg.model } );
+						const provider = createConnectionProvider( conn, { modelId: cfg.model, proxy: this.data.proxy?.url } );
 						let out = '';
 						for await ( const ev of provider.stream( {
 							model: cfg.model,
@@ -242,14 +242,14 @@ export class Hub {
 			return { ok: false, error: 'اتصال پیدا نشد.' };
 		}
 		try {
-			const provider = createConnectionProvider( conn );
+			const provider = createConnectionProvider( conn, { proxy: this.data.proxy?.url } );
 			const ids = await provider.listModels();
 			const merged = mergeDiscovered( this.data, id, ids );
 			this.data.models = merged.models;
 			await this.save();
 			return { ok: true, added: merged.added, kept: merged.kept, missing: merged.missing, total: ids.length };
 		} catch ( e ) {
-			const info = explain( e, { baseUrl: conn.baseUrl, provider: conn.provider } );
+			const info = explain( e, { baseUrl: conn.baseUrl, provider: conn.provider, proxy: conn.proxy || this.data.proxy?.url || '' } );
 			return { ok: false, error: info.message, hint: info.hint };
 		}
 	}
@@ -269,7 +269,7 @@ export class Hub {
 		}
 		const started = this.now();
 		try {
-			const provider = createConnectionProvider( conn, { modelId: target } );
+			const provider = createConnectionProvider( conn, { modelId: target, proxy: this.data.proxy?.url } );
 			let text = '';
 			for await ( const ev of provider.stream( {
 				model: target,
@@ -287,7 +287,7 @@ export class Hub {
 			this.health.record( modelKey( id, target ), { ok: true, ms } );
 			return { ok: true, ms, model: target, message: `پاسخ گرفتم (${ ms } میلی‌ثانیه): «${ text.trim().slice( 0, 60 ) || '(خالی)' }»` };
 		} catch ( e ) {
-			const info = explain( e, { baseUrl: conn.baseUrl, model: target } );
+			const info = explain( e, { baseUrl: conn.baseUrl, model: target, proxy: conn.proxy || this.data.proxy?.url || '' } );
 			this.health.record( modelKey( id, target ), { ok: false, kind: info.kind, message: info.message } );
 			return { ok: false, error: info.message, hint: info.hint, kind: info.kind };
 		}
@@ -488,6 +488,7 @@ export class Hub {
 				const wired = createConnectionProvider( patched, {
 					modelId: candidate.modelId,
 					overrides: patched.overrides,
+					proxy: this.data.proxy?.url,
 				} );
 
 				for await ( const ev of wired.stream( { ...req, model: candidate.modelId } ) ) {
@@ -533,7 +534,7 @@ export class Hub {
 				return { ok: true, emitted: emitted || collected.length > 0 };
 			}
 
-			const info = explain( failure, { baseUrl: conn.baseUrl, model: candidate.modelId } );
+			const info = explain( failure, { baseUrl: conn.baseUrl, model: candidate.modelId, proxy: conn.proxy || this.data.proxy?.url || '' } );
 			const signature = signatureOf( {
 				kind: info.kind,
 				status: statusOf( failure?.message ),

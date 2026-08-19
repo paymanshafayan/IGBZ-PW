@@ -37,6 +37,14 @@ const EN = {
 	'پرووایدرها و هاب…': 'Providers & hub…',
 	'هاب پرووایدر': 'Provider hub',
 	'مسیریابی با هاب انجام می‌شود': 'Routing is done by the hub',
+	'پراکسی هوشا': 'Hoosha proxy',
+	'تست پراکسی': 'Test proxy',
+	'ذخیره پراکسی': 'Save proxy',
+	'پراکسی ذخیره شد.': 'Proxy saved.',
+	'در حال آزمودن…': 'Testing…',
+	'پراکسی این اتصال (اختیاری)': 'Proxy for this connection (optional)',
+	'خالی = پراکسی سراسری هاب. مثال: http://127.0.0.1:7890': 'Empty = the hub-wide proxy. Example: http://127.0.0.1:7890',
+	'تماس‌های پرووایدر از این مسیر می‌گذرند (Hiddify: http://127.0.0.1:7890). مقصدهای محلی همیشه مستقیم‌اند. هر اتصال می‌تواند پراکسی خودش را هم در ویزارد بگیرد.': 'Provider traffic goes through this route (Hiddify: http://127.0.0.1:7890). Local targets always stay direct. Each connection can also set its own proxy in the wizard.',
 	'وضعیت زندهٔ اتصال‌ها از نگاه مسیریاب: رنگ هر گره وضعیت واقعی آن است و ضخامت هر یال، ترافیک ثبت‌شده.': "Live connection state from the router's view: each node's color is its real status, each edge's thickness its recorded traffic.",
 	// نوار کناری
 	'گفتگوی تازه': 'New chat',
@@ -612,6 +620,13 @@ const FA_DIGITS = /[\u06F0-\u06F9\u0660-\u0669]/g;
 
 /** الگوهای پارامتری — رشته‌هایی که عدد یا نام داخلشان است. */
 const PATTERNS = [
+	// — خاص صفحهٔ پراکسی (۰.۹.۵): باید قبل از الگوهای عمومیِ «از/در» بیایند —
+	[ /^از پراکسی: (.+)$/, 'Via proxy: $1' ],
+	[ /^مستقیم: (.+)$/, 'Direct: $1' ],
+	[ /^IP (.+)$/, 'IP $1' ],
+	[ /^در (\d+)ms$/, 'in $1ms' ],
+	[ /^پراکسی مخصوص: (.+)$/, 'Dedicated proxy: $1' ],
+	[ /^خطا: (.+)$/, 'Error: $1' ],
 	[ /^(\d+) پیام$/, '$1 messages' ],
 	[ /^(\d+) گفتگو$/, '$1 chats' ],
 	[ /^(\d+) فایل$/, '$1 files' ],
@@ -650,6 +665,7 @@ const PATTERNS = [
 	[ /^(\d+) اتصال$/, '$1 connections' ],
 	[ /^(\d+) مدل روشن\.?$/, '$1 models on' ],
 	[ /^مسیریابی با هاب انجام می‌شود — (.+)$/, 'Routing is done by the hub — $1' ],
+	[ /^ناموفق$/, 'failed' ],
 	[ /^(\d+) روشن$/, '$1 on' ],
 	[ /^(\d+) نوبت$/, '$1 rounds' ],
 	[ /^\((\d+) نوبت\)$/, '($1 rounds)' ],

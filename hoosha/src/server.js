@@ -17,6 +17,7 @@ import { loadConfig, saveConfig, publicConfig, activeProfile, HOME } from './con
 import { PROVIDERS, createProvider, validateProfile, providerInfo } from './providers/index.js';
 import { CATEGORIES, STRATEGIES, AUTH_STYLES, hubId } from './hub/schema.js';
 import { handleChatCompletions, modelsResponse } from './hub/openai-api.js';
+import { proxyFetch, normalizeProxy } from './net.js';
 import { hubReady as hubReadyOf } from './hub/registry.js';
 import { VERSION, installInfo } from './version.js';
 import { MODES } from './permissions.js';
@@ -397,6 +398,24 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 					hub.health.reset( String( body.key || '' ) );
 					await hub.saveState();
 					return { status: 200, body: { ok: true } };
+				case 'proxy-test': {
+					// مقایسهٔ خروجی با/بدون پراکسی: IP و تأخیر، با مهلت هشت‌ثانیه‌ای.
+					const url = normalizeProxy( String( body.proxy ?? hub.data?.proxy?.url ?? '' ) );
+					const probe = async ( via ) => {
+						const t0 = Date.now();
+						try {
+							const res = await proxyFetch( 'https://api.ipify.org?format=json', {
+								signal: AbortSignal.timeout( 8000 ),
+								headers: { 'user-agent': 'hoosha-proxy-test' },
+							}, via );
+							const out = await res.json().catch( () => ( {} ) );
+							return { ok: res.ok, status: res.status, ip: out.ip || '', ms: Date.now() - t0 };
+						} catch ( e ) {
+							return { ok: false, error: String( e?.message || e ).slice( 0, 200 ), ms: Date.now() - t0 };
+						}
+					};
+					return { status: 200, body: { ok: true, proxy: url, proxied: await probe( url ), direct: await probe( '' ) } };
+				}
 				case 'reset-provider': {
 					const out = hub.resetProvider( String( body.id || '' ) );
 					if ( out.ok ) {

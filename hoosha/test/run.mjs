@@ -3568,6 +3568,90 @@ await test( 'ریست اتصال و ریست کل در سرور و سلامت ث
 	assert.deepEqual( h.traffic(), {} );
 } );
 
+await test( 'پراکسی: نرمال‌سازی، تقدم و دورزدن مقصدهای محلی', async () => {
+	const net = await import( '../src/net.js' );
+	assert.equal( net.normalizeProxy( '127.0.0.1:7890' ), 'http://127.0.0.1:7890', 'بدون اسکیم → http' );
+	assert.equal( net.normalizeProxy( '  ' ), '' );
+	assert.equal( net.normalizeProxy( 'socks5://x:1080' ), 'socks5://x:1080' );
+	assert.equal( net.effectiveProxy( '', 'http://g:1' ), 'http://g:1', 'سراسری وقتی اتصال ندارد' );
+	assert.equal( net.effectiveProxy( 'http://c:1', 'http://g:1' ), 'http://c:1', 'اتصال مقدم است' );
+	assert.ok( net.isLocalTarget( 'http://127.0.0.1:11434/v1' ) );
+	assert.ok( net.isLocalTarget( 'http://localhost:1234' ) );
+	assert.equal( net.isLocalTarget( 'https://api.anthropic.com' ), false );
+	// مقصد محلی هرگز داسپچر نمی‌گیرد — Ollama نباید از پراکسی بگذرد.
+	assert.equal( net.dispatcherFor( 'http://127.0.0.1:11434', 'http://p:1' ), null );
+	const d1 = net.dispatcherFor( 'https://api.example.com', 'http://p:1' );
+	assert.ok( d1, 'داسپچر http ساخته نشد' );
+	assert.equal( net.dispatcherFor( 'https://other.example.com', 'http://p:1' ), d1, 'داسپچر کش نمی‌شود' );
+	assert.ok( net.dispatcherFor( 'https://api.example.com', 'socks5://127.0.0.1:1080' ), 'داسپچر socks ساخته نشد' );
+} );
+
+await test( 'پراکسی: درخواست واقعاً از پراکسی می‌گذرد', async () => {
+	// یک پراکسی HTTP محلی می‌سازیم؛ اگر proxyFetch واقعاً از آن بگذرد، درخواست با مسیر
+	// مطلق به آن می‌رسد و ما پاسخ ساختگی برمی‌گردانیم.
+	const http = await import( 'node:http' );
+	const seen = [];
+	const srv = http.createServer( ( req, res ) => {
+		seen.push( req.url || '' );
+		res.writeHead( 200, { 'content-type': 'application/json' } );
+		res.end( JSON.stringify( { via: 'proxy', url: req.url } ) );
+	} );
+	await new Promise( ( r ) => srv.listen( 0, '127.0.0.1', r ) );
+	const port = srv.address().port;
+	try {
+		const { proxyFetch } = await import( '../src/net.js' );
+		const res = await proxyFetch( 'http://example.test/x', {}, `http://127.0.0.1:${ port }` );
+		const body = await res.json();
+		assert.equal( body.via, 'proxy', 'پاسخ از پراکسی نیامد' );
+		assert.equal( seen[ 0 ], 'http://example.test/x', 'درخواست مطلق به پراکسی نرسید' );
+	} finally {
+		await new Promise( ( r ) => srv.close( r ) );
+	}
+} );
+
+await test( 'پراکسی: خطای ۴۲۹/۴۰۳ بدون پراکسی، راهنمای درست می‌دهد', async () => {
+	const { explain } = await import( '../src/errors.js' );
+	const rate = explain( new Error( 'too many requests' ), { proxy: '' } );
+	assert.equal( rate.kind, 'rate' );
+	assert.match( rate.hint, /پراکسی/ );
+	const rate2 = explain( new Error( 'too many requests' ), { proxy: 'http://127.0.0.1:7890' } );
+	assert.equal( /پراکسی سیستم/.test( rate2.hint ), false, 'با پراکسیِ تنظیم‌شده دیگر سرزنش پراکسی نکن' );
+	const geo = explain( new Error( 'پاسخ 451 از پرووایدر' ), { proxy: '' } );
+	assert.equal( geo.kind, 'geo' );
+	assert.match( geo.hint, /پراکسی/ );
+	const auth403 = explain( new Error( 'پاسخ 403 از پرووایدر' ), { proxy: '' } );
+	assert.equal( auth403.kind, 'auth' );
+	assert.match( auth403.hint, /پراکسی/, '۴۰۳ بدون پراکسی هم باید سرنخ تحریم بدهد' );
+} );
+
+await test( 'پراکسی: سرور اکشن تست و اتصال فیلد پراکسی دارد', () => {
+	const server = fssync.readFileSync( path.resolve( 'src/server.js' ), 'utf8' );
+	assert.match( server, /case 'proxy-test'/ );
+	assert.match( server, /api\.ipify\.org/ );
+	const schema = fssync.readFileSync( path.resolve( 'src/hub/schema.js' ), 'utf8' );
+	assert.match( schema, /proxy: String\( raw\?\.proxy/, 'اتصال باید فیلد پراکسی داشته باشد' );
+	const page = fssync.readFileSync( path.join( uiDir, 'hubpage.js' ), 'utf8' );
+	assert.match( page, /تست پراکسی/ );
+	assert.match( page, /action: 'proxy-test'/ );
+	assert.match( page, /ذخیره پراکسی/ );
+	assert.match( page, /پراکسی این اتصال/ );
+} );
+
+await test( 'پراکسی: کارت پراکسی در نمای اتصال‌ها ساخته می‌شود', async () => {
+	const dom = ( await import( './fake-dom.mjs' ) ).installFakeDom( { fetch: async () => ( { ok: true, json: async () => hubSnapshotFixture() } ) } );
+	try {
+		const { mountHubPage } = await import( `../ui/hubpage.js?proxy=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await mountHubPage( box, { view: 'connections' } );
+		assert.ok( box.querySelector( '.proxy-card' ), 'کارت پراکسی نیست' );
+		const btns = box.querySelectorAll( 'button' );
+		assert.ok( [ ...btns ].some( ( b ) => b.textContent === 'تست پراکسی' ) );
+		assert.ok( [ ...btns ].some( ( b ) => b.textContent === 'ذخیره پراکسی' ) );
+	} finally {
+		dom.restore();
+	}
+} );
+
 await test( 'toast همیشه در بالاترین لایه است — داخل دیالوگِ باز، نه زیرش', async () => {
 	const dom = ( await import( './fake-dom.mjs' ) ).installFakeDom( { fetch: async () => ( { ok: true, json: async () => ( {} ) } ) } );
 	try {

@@ -1,0 +1,86 @@
+/**
+ * لایهٔ شبکهٔ هوشا — تماس‌های پرووایدر از این‌جا می‌گذرند (۰.۹.۵).
+ *
+ * چرا لازم شد: Node.js برخلاف مرورگر پراکسی سیستم (Hiddify، v2rayN، Clash…) را
+ * خودکار استفاده نمی‌کند؛ درخواست‌ها مستقیم می‌روند و از IP ایران پاسخ کلاسیک
+ * ۴۲۹/«درخواست‌ها زیاد است» می‌آید. با این لایه، هر تماس می‌تواند از پراکسی بگذرد:
+ *
+ *   پراکسی مؤثر = اتصالِ خودش ← پراکسی سراسری هاب ← متغیر محیط (HTTPS_PROXY/ALL_PROXY)
+ *
+ * مقصدهای محلی (Ollama، LM Studio، vLLM روی 127.0.0.1) **هرگز** از پراکسی نمی‌گذرند.
+ * دو شکل آدرس پشتیبانی می‌شود: `http://127.0.0.1:7890` و `socks5://127.0.0.1:1080`
+ * (Hiddify پورت مخصوص ۷۸۹۰ هر دو را می‌دهد).
+ */
+
+/*
+ * نکتهٔ پیاده‌سازی: داسپچرِ بستهٔ npm (undici 7) با fetch داخلی Node (undici همراه
+ * خود Node) ناسازگار است («invalid onRequestStart method»). پس درخواستِ پراکسی‌دار
+ * از fetchِ خودِ همان بسته می‌رود؛ درخواست مستقیم همان fetch سراسری می‌مانَد.
+ */
+import { fetch as undiciFetch, ProxyAgent } from 'undici';
+import { socksDispatcher } from 'fetch-socks';
+
+/** @type {Map<string, any>} آدرس → داسپچر؛ ساخت داسپچر ارزان است ولی کش که کنیم، اتصال‌های پراکسی هم دوباره استفاده می‌شوند. */
+const cache = new Map();
+
+/** شکل درست آدرس پراکسی — «127.0.0.1:7890» هم بدون اسکیم قبول است. */
+export function normalizeProxy( raw ) {
+	const s = String( raw || '' ).trim();
+	if ( ! s ) {
+		return '';
+	}
+	if ( ! /^[a-z][a-z0-9+.-]*:\/\//i.test( s ) ) {
+		return `http://${ s }`;
+	}
+	return s;
+}
+
+/** پراکسی از متغیرهای محیط — همان قراردادی که ابزارهای خط فرمان می‌شناسند. */
+export function envProxy() {
+	return normalizeProxy(
+		process.env.HTTPS_PROXY || process.env.https_proxy ||
+		process.env.ALL_PROXY || process.env.all_proxy || ''
+	);
+}
+
+/** پراکسی مؤثر برای یک تماس: خود اتصال، بعد سراسری هاب، بعد محیط. */
+export function effectiveProxy( connProxy, globalProxy ) {
+	return normalizeProxy( connProxy ) || normalizeProxy( globalProxy ) || envProxy();
+}
+
+/** آیا مقصد محلی است؟ محلی از پراکسی نمی‌گذرد — پراکسیِ روشنِ خاموشش هم ممکن است. */
+export function isLocalTarget( url ) {
+	return /^(https?:)?\/\/(localhost|127\.|0\.0\.0\.0|\[::1\])/i.test( String( url ) );
+}
+
+/** داسپچرِ پراکسی برای یک مقصد — null یعنی مستقیم. */
+export function dispatcherFor( url, proxy ) {
+	const p = isLocalTarget( url ) ? '' : normalizeProxy( proxy );
+	if ( ! p ) {
+		return null;
+	}
+	if ( ! cache.has( p ) ) {
+		if ( /^socks[45]?:\/\//i.test( p ) ) {
+			cache.set( p, socksDispatcher( { url: new URL( p ) } ) );
+		} else {
+			cache.set( p, new ProxyAgent( p ) );
+		}
+	}
+	return cache.get( p );
+}
+
+/**
+ * fetch با پراکسی — همان fetch معمولی، به‌جز اینکه در صورت پراکسیِ مؤثر داسپچر
+ * روی درخواست سوار می‌شود.
+ * @param {string} url
+ * @param {any} [opts]
+ * @param {string} [proxy]
+ */
+export async function proxyFetch( url, opts = {}, proxy = '' ) {
+	const d = opts.dispatcher || dispatcherFor( url, proxy );
+	if ( ! d ) {
+		return fetch( url, opts );
+	}
+	// signal باید جدا منتقل شود؛ undici-fetch ورودی‌های استاندارد fetch را می‌گیرد.
+	return undiciFetch( url, { ...opts, dispatcher: d } );
+}

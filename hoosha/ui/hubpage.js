@@ -289,6 +289,43 @@ function renderOverview( box, page ) {
 function renderCatalog( box, page ) {
 	box.appendChild( section( 'اتصال‌ها', 'از کاتالوگ انتخاب کن، کلید بده، تست کن. از یک سرویس می‌توانی چند حساب جدا داشته باشی.' ) );
 
+	/*
+	 * پراکسی هوشا (۰.۹.۵) — Node.js برخلاف مرورگر پراکسی سیستم (Hiddify و مانندش) را
+	 * نمی‌بیند؛ تماس‌های پرووایدر این‌جا از مسیر مشخص‌شده می‌گذرند. مقصدهای محلی
+	 * (Ollama و…) همیشه مستقیم‌اند. درخواست کارفرما: «پراکسی مطمئن برای هوشا».
+	 */
+	const proxyUrl = h( 'input', { class: 'field', dir: 'ltr', value: snap?.hub?.proxy?.url || '', placeholder: 'http://127.0.0.1:7890' } );
+	const proxyResult = el( 'p', 'note' );
+	const proxyCard = h( 'div', { class: 'form-card proxy-card' }, [
+		h( 'div', { class: 'item-main' }, [
+			h( 'b', { text: 'پراکسی هوشا' } ),
+			h( 'p', { class: 'note', text: 'تماس‌های پرووایدر از این مسیر می‌گذرند (Hiddify: http://127.0.0.1:7890). مقصدهای محلی همیشه مستقیم‌اند. هر اتصال می‌تواند پراکسی خودش را هم در ویزارد بگیرد.' } ),
+		] ),
+		proxyUrl,
+		h( 'div', { class: 'modal-actions' }, [
+			h( 'button', {
+				class: 'btn outline', text: 'تست پراکسی',
+				onClick: async () => {
+					proxyResult.textContent = 'در حال آزمودن…';
+					const out = await action( { action: 'proxy-test', proxy: proxyUrl.value.trim() } );
+					const fmt = ( r ) => r?.ok ? `IP ${ r.ip || '؟' } · ${ r.ms }ms` : ( r?.error ? `خطا: ${ String( r.error ).slice( 0, 60 ) }` : '✗' );
+					proxyResult.textContent = `از پراکسی: ${ fmt( out.proxied ) } · مستقیم: ${ fmt( out.direct ) }`;
+				},
+			} ),
+			h( 'span', { class: 'grow' } ),
+			h( 'button', {
+				class: 'btn solid', text: 'ذخیره پراکسی',
+				onClick: async () => {
+					await action( { action: 'update', patch: { proxy: { url: proxyUrl.value.trim() } } } );
+					toast( 'پراکسی ذخیره شد.' );
+					await refresh();
+				},
+			} ),
+		] ),
+		proxyResult,
+	] );
+	box.appendChild( proxyCard );
+
 	const hub = snap?.hub || {};
 	const catalog = ( snap?.catalog || [] ).filter( ( p ) => p.id !== 'mock' );
 	const conns = Object.values( hub.connections || {} );
@@ -429,6 +466,7 @@ function renderDetail( box, page, providerId ) {
 					h( 'p', { class: 'mono', text: `${ c.provider } · ${ c.baseUrl || '—' }` } ),
 					h( 'p', { class: 'note', text: `${ models.length } مدل · ${ models.filter( ( m ) => m.enabled ).length } روشن · اولویت ${ c.priority } · هم‌زمانی ${ c.maxConcurrent }${ c.dailyCap ? ` · سقف روزانه ${ c.dailyCap }` : '' }` } ),
 					hrows.some( ( [ , v ] ) => v.exhausted ) ? h( 'p', { class: 'note error', text: 'اعتبار این اتصال تمام علامت خورده — با شارژ، ریستش کن.' } ) : null,
+				c.proxy ? h( 'p', { class: 'note', text: `پراکسی مخصوص: ${ c.proxy }` } ) : null,
 				] ),
 				h( 'span', { class: `tag ${ c.hasKey || CUSTOM.has( c.provider ) ? 'ok' : '' }`, text: c.hasKey ? 'کلید ✓' : CUSTOM.has( c.provider ) ? 'سازگار' : 'بدون کلید' } ),
 				h( 'button', {
@@ -653,6 +691,7 @@ function connWizard( conn, preset, page ) {
 		maxConcurrent: conn?.maxConcurrent ?? 4,
 		dailyCap: conn?.dailyCap ?? '',
 		enabled: conn ? conn.enabled !== false : true,
+		proxy: conn?.proxy || '',
 	};
 	let savedId = conn?.id || null;
 
@@ -698,6 +737,7 @@ function connWizard( conn, preset, page ) {
 			const maxConcurrent = h( 'input', { class: 'field', type: 'number', min: 1, value: data.maxConcurrent } );
 			const dailyCap = h( 'input', { class: 'field', type: 'number', min: 0, value: data.dailyCap } );
 			const enabled = h( 'input', { type: 'checkbox', checked: data.enabled } );
+			const wizardProxy = h( 'input', { class: 'field', dir: 'ltr', value: data.proxy || '', placeholder: 'http://127.0.0.1:7890' } );
 			const note = h( 'p', { class: 'note' } );
 			const sync = () => {
 				const i2 = info();
@@ -724,6 +764,7 @@ function connWizard( conn, preset, page ) {
 				isCompat() ? field( 'مسیر فهرست مدل', modelsPath, 'اگر سرویس مسیر غیراستانداردی دارد.' ) : null,
 				isCompat() ? field( 'هدرهای سفارشی', headers, 'هر خط یک هدر: نام: مقدار' ) : null,
 				row( field( 'اولویت', priority ), field( 'سقف هم‌زمانی', maxConcurrent ), field( 'سقف روزانه (تعداد تماس)', dailyCap ) ),
+				field( 'پراکسی این اتصال (اختیاری)', wizardProxy, 'خالی = پراکسی سراسری هاب. مثال: http://127.0.0.1:7890' ),
 				h( 'label', { class: 'check' }, [ enabled, h( 'span', { text: 'این اتصال روشن باشد' } ) ] ),
 			] ) );
 			shell.next2 = async () => {
@@ -738,6 +779,7 @@ function connWizard( conn, preset, page ) {
 				data.maxConcurrent = Number( maxConcurrent.value ) || 4;
 				data.dailyCap = dailyCap.value === '' ? null : Number( dailyCap.value );
 				data.enabled = enabled.checked;
+				data.proxy = wizardProxy.value.trim();
 				const out = await action( { action: 'save-connection', connection: {
 					id: savedId,
 					label: data.label || info().label || 'اتصال',
@@ -753,6 +795,7 @@ function connWizard( conn, preset, page ) {
 					maxConcurrent: data.maxConcurrent,
 					dailyCap: data.dailyCap,
 					enabled: data.enabled,
+					proxy: data.proxy,
 				} } );
 				if ( out.error ) {
 					toast( out.error, 'error' );
