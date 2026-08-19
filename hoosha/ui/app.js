@@ -23,6 +23,7 @@ import {
 import { initComposer, setBusy, setMode, fillComposer, composerIsEmpty, focusComposer, toggleDictation } from './composer.js';
 import { initSidebar, refreshSessions, paintSidebarState, markActiveView, allSessions, groupOf, assignProject } from './sidebar.js';
 import { openSettingsModal, renderSection, initSettings, SETTINGS_TABS } from './settings.js';
+import { mountHubPage } from './hubpage.js';
 import { openFile, openRewind, openPalette, openShortcuts } from './dialogs.js';
 import { logoSvg } from './lib/logo.js';
 import { initGitBar, paintGitBar, setGitLock, renderChanges } from './gitbar.js';
@@ -76,6 +77,7 @@ if ( localStorage.getItem( 'hoosha-ui-version' ) !== UI_STATE_VERSION ) {
  * @type {Record<string, {title:string, actions?:(host:HTMLElement)=>Node[], render:(host:HTMLElement)=>any}>}
  */
 const PAGES = {
+	hub: { title: 'هاب پرووایدر', render: ( host ) => mountHubPage( host, {} ) },
 	chats: { title: 'گفتگوها', render: renderChatsPage, actions: chatsActions },
 	projects: { title: 'پروژه‌ها', render: renderProjectsPage, actions: projectsActions },
 	tools: { title: 'ابزارها', render: ( host ) => renderSection( 'tools', host ) },

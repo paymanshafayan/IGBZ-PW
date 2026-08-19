@@ -7,6 +7,7 @@
 
 import { sseLines } from './sse.js';
 import { buildHeaders, authedUrl, finalizePayload, backoff, reshapeMessages } from './wire.js';
+import { proxyFetch } from '../net.js';
 
 /** @param {import('./types.js').ProviderConfig} cfg */
 export function createOpenAiProvider( cfg ) {
@@ -25,7 +26,7 @@ export function createOpenAiProvider( cfg ) {
 
 		async listModels() {
 			const path = cfg.modelsPath || '/models';
-			const res = await fetch( authedUrl( `${ base }${ path.startsWith( '/' ) ? path : `/${ path }` }`, cfg ), { headers } );
+			const res = await proxyFetch( authedUrl( `${ base }${ path.startsWith( '/' ) ? path : `/${ path }` }`, cfg ), { headers }, cfg.proxy );
 			if ( ! res.ok ) {
 				throw new Error( `فهرست مدل‌ها گرفته نشد (${ res.status })` );
 			}
@@ -94,12 +95,12 @@ export function createOpenAiProvider( cfg ) {
 					: {} ),
 			}, overrides );
 
-			const res = await fetch( authedUrl( `${ base }/chat/completions`, cfg ), {
+			const res = await proxyFetch( authedUrl( `${ base }/chat/completions`, cfg ), {
 				method: 'POST',
 				headers,
 				body: JSON.stringify( payload ),
 				signal: req.signal,
-			} );
+			}, cfg.proxy );
 
 			if ( ! res.ok || ! res.body ) {
 				const text = await res.text().catch( () => '' );

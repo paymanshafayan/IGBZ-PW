@@ -151,6 +151,11 @@ export function normalizeConnection( raw, previous = null ) {
 		maxConcurrent: clampInt( raw?.maxConcurrent ?? previous?.maxConcurrent, 1, 128, 4 ),
 		dailyCap: numberOrNull( raw?.dailyCap ?? previous?.dailyCap ),
 		notes: String( raw?.notes ?? previous?.notes ?? '' ).slice( 0, 500 ),
+		/*
+		 * پراکسیِ مخصوص این اتصال (۰.۹.۵) — خالی یعنی از پراکسی سراسری هاب. مقصدهای
+		 * محلی در net.js همیشه مستقیم می‌روند، صرف‌نظر از این مقدار.
+		 */
+		proxy: String( raw?.proxy ?? previous?.proxy ?? '' ).trim().slice( 0, 200 ),
 		// وصله‌های **دائمی** این اتصال: تأییدشدهٔ مدیر، و پیش از اولین تلاش اعمال می‌شوند.
 		// وصلهٔ موقت اینجا نمی‌آید؛ آن در دفتر می‌ماند و فقط بعد از خطا استفاده می‌شود.
 		patches: Array.isArray( raw?.patches ) ? raw.patches : previous?.patches || [],

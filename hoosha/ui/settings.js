@@ -8,8 +8,9 @@
 
 import { $, el, h, toast, timeAgo, confirmDialog } from './lib/dom.js';
 import { api, post, refreshState, getState } from './lib/api.js';
-import { mountHub } from './hub.js';
 import { iconSvg } from './lib/icons.js';
+import { renderProxySettings } from './proxy.js';
+import { renderLogsSettings } from './logs.js';
 
 /**
  * دو گروه، دقیقاً مثل ناوبری داخل مودال تنظیمات Claude: «Settings» و «Customize».
@@ -17,15 +18,11 @@ import { iconSvg } from './lib/icons.js';
  */
 const GROUPS = [
 	{
-		// طرحِ تأییدشده این گروه را ندارد، چون Claude پرووایدر ندارد. کارفرما خواست
-		// اضافه شود، و اول می‌آید چون اولین کاری است که مدیر روی نصب تازه می‌کند.
+		// از ۰.۹.۴ شش تبِ هاب به یک صفحهٔ تمام‌قد رفت (DESIGN-PROVIDER-UI). اینجا فقط
+		// لینک می‌مانَد + پروفایل تک‌نفره که تنظیمات سادهٔ همان حالت قدیمی است.
 		label: 'پرووایدر و مدل',
 		items: [
-			{ id: 'hub', label: 'پرووایدرهای استاندارد', ico: 'provider' },
-			{ id: 'hub-compat', label: 'پرووایدرهای سازگار', ico: 'plug-alt' },
-			{ id: 'hub-models', label: 'مدل‌ها', ico: 'model' },
-			{ id: 'hub-routing', label: 'هاب و مسیریابی', ico: 'hub' },
-			{ id: 'hub-health', label: 'سلامت و عیب‌یاب', ico: 'health' },
+			{ id: 'hub-open', label: 'پرووایدرها و هاب…', ico: 'hub' },
 			{ id: 'provider', label: 'پروفایل تک‌نفره', ico: 'profile' },
 		],
 	},
@@ -36,6 +33,8 @@ const GROUPS = [
 			{ id: 'sandbox', label: 'سندباکس', ico: 'sandbox' },
 			{ id: 'usage', label: 'مصرف و هزینه', ico: 'usage' },
 			{ id: 'status', label: 'وضعیت و تشخیص', ico: 'health' },
+			{ id: 'proxy', label: 'پراکسی', ico: 'plug-alt' },
+			{ id: 'logs', label: 'لاگ‌ها', ico: 'list' },
 			{ id: 'appearance', label: 'ظاهر', ico: 'appearance' },
 		],
 	},
@@ -109,6 +108,15 @@ function paintSettingsNav() {
 		}
 		nav.appendChild( h( 'div', { class: 'set-group', text: group.label } ) );
 		for ( const t of items ) {
+			if ( t.id === 'hub-open' ) {
+				nav.appendChild(
+					h( 'button', {
+						class: 'btn quiet row set-item',
+						onClick: () => openHubPage(),
+					}, [ h( 'span', { class: 'si-ico', html: iconSvg( t.ico, 16 ) } ), h( 'span', { text: t.label } ) ] )
+				);
+				continue;
+			}
 			nav.appendChild(
 				h( 'button', {
 					class: `btn quiet row set-item ${ t.id === currentTab ? 'active' : '' }`,
@@ -162,9 +170,25 @@ async function paintSettingsBody() {
 	body.scrollTop = 0;
 }
 
-/** میان‌بر: از هرجای برنامه، تنظیمات را روی یک تب باز کن. */
+/**
+ * میان‌بر: از هرجای برنامه، تنظیمات را روی یک تب باز کن.
+ * شناسه‌های hub* مال شش‌تبِ قدیمی بودند؛ حالا همه به صفحهٔ تمام‌قد می‌روند.
+ */
 export function openSettings( tab ) {
+	if ( String( tab || '' ).startsWith( 'hub' ) ) {
+		openHubPage();
+		return;
+	}
 	document.dispatchEvent( new CustomEvent( 'hoosha:settings', { detail: tab } ) );
+}
+
+/** صفحهٔ تمام‌قد «پرووایدرها و هاب» — مودال را می‌بندد و نما را عوض می‌کند. */
+export function openHubPage() {
+	const dlg = document.querySelector( '#settings' );
+	if ( dlg?.open ) {
+		dlg.close();
+	}
+	document.dispatchEvent( new CustomEvent( 'hoosha:view', { detail: 'hub' } ) );
 }
 
 export function initSettings() {
@@ -1526,11 +1550,6 @@ async function renderCheckpoints( box ) {
 }
 
 const RENDER = {
-	hub: ( box ) => mountHub( box, 'hub' ),
-	'hub-compat': ( box ) => mountHub( box, 'hub-compat' ),
-	'hub-models': ( box ) => mountHub( box, 'hub-models' ),
-	'hub-routing': ( box ) => mountHub( box, 'hub-routing' ),
-	'hub-health': ( box ) => mountHub( box, 'hub-health' ),
 	provider: renderProvider,
 	connectors: renderConnectors,
 	skills: renderSkills,
@@ -1543,6 +1562,8 @@ const RENDER = {
 	memory: renderMemory,
 	tools: renderTools,
 	usage: renderUsage,
+	proxy: renderProxySettings,
+	logs: renderLogsSettings,
 	status: renderStatus,
 	appearance: renderAppearance,
 	todos: renderTodos,

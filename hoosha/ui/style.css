@@ -87,7 +87,7 @@
 	--btn-gap: 10px;
 	--composer-h: 70px;
 	--composer-max: 168px;
-	--composer-box: 138px;
+	--composer-box: 114px;
 	--ease: cubic-bezier(0.22, 0.9, 0.32, 1);
 }
 
@@ -455,10 +455,12 @@ textarea {
 /*
  * ظرف خوش‌آمد، بیرون از ناحیهٔ اسکرول‌شوندهٔ گفتگو.
  *
- * دو بار تلاش کردم داخل `.thread` نگهش دارم و هر بار روی نمایشگر کوتاه از **بالای**
- * صفحه می‌زد بیرون: آن ناحیه هم‌زمان باید اسکرول گفتگو را داشته باشد و هم وسط‌چینِ
- * خوش‌آمد باشد، و این دو با هم جمع نمی‌شوند. حالا ظرف جداست: خودش کوچک می‌شود، خودش
- * اسکرول می‌گیرد، و مرکزیتش به رشتهٔ گفتگو ربطی ندارد.
+ * تاریخچهٔ چهار باری که خوش‌آمد از بالای صفحه بیرون می‌زد: دو بار داخل `.thread` بود
+ * (اسکرول و وسط‌چینی در یک عنصر جمع نمی‌شوند)، بار سوم ظرف جدا افتاد ولی مرکز‌چینی با
+ * `justify-content: center` انجام می‌شد — ستونی که از ظرفش بلندتر است، نیمی از سرریز را
+ * «بالای مبدأ» می‌فرستد و اسکرول به دست نمی‌رسد. بار چهارم مرکز‌چینی با **مارجین auto**
+ * شد (جا که نبود مارجین صفر می‌شود و گروه از بالا می‌چسبد) و مرجع اسکرول، خودِ نمای خالی
+ * است. شرح کامل و اعداد اندازه‌گیری: DESIGN-UI-PARITY.md §۱۷.
  */
 .welcome-slot {
 	flex: 0 1 auto;
@@ -474,13 +476,14 @@ textarea {
 /*
  * خوش‌آمد گفتگوی تازه: نشان بزرگ، یک تیتر و یک زیرنویس — و تا اولین پیام کاربر
  * سر جایش می‌ماند.
+ *
+ * `justify-content: center` اینجا ممنوع است: وقتی محتوا از ظرف بلندتر شود،
+ * نیمهٔ بالای محتوا به بالای مبدأ می‌ریزد — همان جایی که اسکرول نمی‌رسد.
  */
 .welcome {
 	display: flex;
 	flex-direction: column;
 	align-items: center;
-	justify-content: center;
-	min-height: 0;
 	gap: 14px;
 	padding: 24px 16px 8px;
 	animation: rise 0.5s var(--ease);
@@ -488,24 +491,30 @@ textarea {
 
 /*
  * وقتی گفتگو خالی است، تیتر خوش‌آمد و کامپوزر **با هم** در مرکز عمودی می‌نشینند و
- * کامپوزر به کف نمی‌چسبد. این دقیقاً کاری است که Claude در صفحهٔ گفتگوی تازه می‌کند و
- * یکی از واضح‌ترین تفاوت‌هایی بود که کارفرما دید.
+ * کامپوزر به کف نمی‌چسبد. این دقیقاً کاری است که Claude در صفحهٔ گفتگوی تازه می‌کند.
+ *
+ * مرکز‌چینی با مارجینِ auto انجام می‌شود، نه با `justify-content: center`:
+ * مارجین auto در فضای خالی نصف‌نصف تقسیم می‌شود (گروه وسط می‌نشیند) و وقتی جا نباشد
+ * صفر می‌شود (گروه از بالا می‌چسبد و اسکرولِ همین نما از همان پیکسل اول به دست می‌رسد).
+ * `justify-content: center` در سرریز، نیمی از محتوا را بالای مبدأ می‌برد — بیرون‌زدگی.
  */
 .view-chat.empty {
-	justify-content: center;
+	overflow-y: auto;
+}
+.view-chat.empty .welcome-slot {
+	flex: 0 0 auto;
+	margin-block-start: auto;
+	overflow: visible;
 }
 /*
- * در حالت خالی، گروهِ «خوش‌آمد + کادر نوشتن» وسط عمودی می‌نشیند.
- *
- * `flex: 0 1 auto` مهم است: با `0 0 auto` ناحیهٔ خوش‌آمد کوچک نمی‌شد و روی نمایشگر
- * کوتاه از **بالای** صفحه می‌زد بیرون — جایی که اسکرول هم نداشت. حالا اگر جا کم بیاید
- * همان ناحیه اسکرول می‌خورد و مرکزیت به‌هم نمی‌ریزد.
+ * رشتهٔ گفتگو در حالت خالی صفر فضا می‌گیرد (پیامی نیست) و چیزی از آن بیرون نمی‌ریزد؛
+ * با اولین رویداد، `.empty` برداشته می‌شود و `flex: 1` برمی‌گردد.
  */
 .view-chat.empty .thread {
-	flex: 0 1 auto;
+	flex: 0 0 0;
 	min-height: 0;
-	overflow-y: auto;
-	padding-bottom: 0;
+	padding: 0;
+	overflow: hidden;
 }
 .view-chat.empty .disclaimer {
 	opacity: 0;
@@ -514,6 +523,7 @@ textarea {
 	padding-bottom: 0;
 	/* خواستهٔ کارفرما: کادر چت حدود ۵۰ پیکسل پایین‌تر از پیام خوش‌آمد بنشیند. */
 	margin-top: 50px;
+	margin-block-end: auto;
 }
 @keyframes rise {
 	from {
@@ -1179,6 +1189,15 @@ code .f {
  */
 .composer-wrap {
 	flex: none;
+	/*
+	 * ستونِ flex صریح — سپرِ باگ چیدمان. با چیدمان بلاکِ ضمنی، پس از جهش‌های DOMِ
+	 * رانتایم (state/SSE، پنهان‌کردن‌وبازکردن صف و منوها) بین فرزندان این ظرف حفرهٔ
+	 * نامرئی تا ~۵۰۰px باز می‌شد (اندازه‌گیری‌شده با مرورگر واقعی؛ ارتفاع 748px به‌جای
+	 * 234px) و کل ستون خالی را متورم می‌کرد — همان چیزی که خوش‌آمد را از بالا بیرون
+	 * می‌راند. با ستون flex صریح، فرزندان فقط پشت‌سرهم می‌نشینند. DESIGN-UI-PARITY §۱۷.
+	 */
+	display: flex;
+	flex-direction: column;
 	padding: 0 16px 24px;
 	max-width: 732px;
 	width: 100%;
@@ -2049,15 +2068,7 @@ body.sidebar-collapsed .account-menu {
    پنج صفحهٔ هاب از همان اجزای تنظیمات ساخته شده‌اند؛ چیزی که اینجا اضافه می‌شود فقط
    حالت‌هایی است که قبلاً وجود نداشت: کارت روشن/خاموش، ردیف برچسب، و نتیجهٔ آزمون مسیر. */
 
-.hub-master {
-	border-inline-start: 3px solid var(--border);
-	transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
-}
 
-.hub-master.on {
-	border-inline-start-color: var(--primary);
-	background: linear-gradient( to left, var(--primary-soft), transparent 55% );
-}
 
 /* خاموشی باید دیده شود ولی داد نزند — کم‌رنگ، نه قرمز. */
 .item.off {
@@ -2285,7 +2296,7 @@ body.sidebar-collapsed .account-menu {
 	border-radius: 8px;
 	cursor: pointer;
 	text-align: start;
-	font-size: 13.5px;
+	font-size: 13px;
 	transition: background 0.14s var(--ease);
 	position: relative;
 	margin-inline: 12px;
@@ -2326,8 +2337,8 @@ body.sidebar-collapsed .account-menu {
 	flex-direction: column;
 	align-items: flex-start;
 	gap: 0;
-	line-height: 1.35;
-	padding-block: 4px;
+	line-height: 1.7;
+	padding-block: 5px;
 }
 .recent-item .btn.rt:hover {
 	background: transparent;
@@ -2904,16 +2915,20 @@ body.sidebar-collapsed .account-menu {
 	cursor: text;
 	z-index: 1;
 	background: var(--card);
-	border: 1px solid transparent;
+	border: 1px solid var(--border);
 	border-radius: 20px;
-	box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, #000 3.5%, transparent),
-		0 0 0 1px color-mix(in srgb, var(--foreground) 15%, transparent);
+	box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, #000 3.5%, transparent);
 	transition: background-color 0.2s var(--ease), border-color 0.2s var(--ease), box-shadow 0.2s var(--ease),
 		opacity 0.2s var(--ease);
 }
 .composer:focus-within {
-	border-color: transparent;
-	box-shadow: 0 0 0 3px var(--ring);
+	/*
+	 * فوکوس ظاهر کادر را عوض نمی‌کند — نه شفاف‌شدن قاب (شبیه کادر قدیمی بود)،
+	 * نه رینگ اضافه (ضخیم‌شدن بوردر دیده می‌شد). کارفرما ۱۴۰۵/۰۵/۲۷: کادر
+	 * همیشه باید مثل تصویر باشد.
+	 */
+	border-color: var(--border);
+	box-shadow: 0 0.25rem 1.25rem color-mix(in srgb, #000 3.5%, transparent);
 }
 .composer textarea {
 	width: 100%;
@@ -3366,3 +3381,278 @@ body.sidebar-collapsed .account-menu {
 }
 
 /* دکمهٔ شناور، فقط وقتی نوار کناری جمع است. */
+
+/* ════════════════════════════ صفحهٔ هاب پرووایدر (۰.۹.۴ — DESIGN-PROVIDER-UI) ════════════════════════════ */
+
+.hub-view {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.hub-status {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+.hub-status.ok {
+	border-inline-start: 3px solid var(--ok);
+}
+.hub-status.warn {
+	border-inline-start: 3px solid var(--destructive);
+}
+.hub-catalog {
+	display: grid;
+	grid-template-columns: repeat( auto-fill, minmax( 216px, 1fr ) );
+	gap: 12px;
+}
+.hub-catalog.mini {
+	grid-template-columns: repeat( auto-fill, minmax( 184px, 1fr ) );
+}
+.hub-card {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 14px;
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	background: var(--card);
+	text-align: start;
+	cursor: pointer;
+	transition: border-color 0.15s var(--ease);
+}
+.hub-card:hover {
+	border-color: var(--primary);
+}
+.hub-card.linked {
+	border-color: var(--primary-line);
+}
+.hub-card.bad {
+	border-color: var(--destructive);
+}
+.hub-card.sel {
+	border-color: var(--primary);
+	box-shadow: var(--glow);
+}
+.hub-card-top {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+}
+.hub-card-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: auto;
+}
+.pav {
+	width: 34px;
+	height: 34px;
+	border-radius: 10px;
+	background: var(--muted);
+	color: var(--foreground);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
+	flex: none;
+}
+.stat-cards {
+	display: grid;
+	grid-template-columns: repeat( auto-fit, minmax( 150px, 1fr ) );
+	gap: 12px;
+}
+.hub-stat {
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: var(--radius-lg);
+	padding: 14px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.hub-stat b {
+	font-size: 1.3rem;
+}
+.hub-stat.ok {
+	border-color: var(--ok);
+}
+.hub-stat.bad {
+	border-color: var(--destructive);
+}
+.steps {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin: 8px 0 14px;
+}
+.step {
+	font-size: 0.8rem;
+	color: var(--muted-foreground);
+	border: 1px solid var(--border);
+	border-radius: 999px;
+	padding: 3px 10px;
+}
+.step.now {
+	color: var(--primary-foreground);
+	background: var(--primary);
+	border-color: var(--primary);
+}
+.step.done {
+	color: var(--ok);
+	border-color: var(--ok);
+}
+.topo {
+	position: relative;
+	margin-inline: auto;
+}
+.topo-center {
+	position: absolute;
+	left: 50%;
+	top: 50%;
+	transform: translate( -50%, -50% );
+	background: var(--popover);
+	border: 2px solid var(--border);
+	border-radius: 16px;
+	padding: 10px 16px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	z-index: 2;
+}
+.topo-center.on {
+	border-color: var(--primary);
+	color: var(--primary);
+}
+.topo-node {
+	position: absolute;
+	transform: translate( -50%, -50% );
+	background: var(--card);
+	border: 1px solid var(--border);
+	border-radius: 12px;
+	padding: 8px 10px;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 2px;
+	cursor: pointer;
+	z-index: 2;
+	min-width: 96px;
+	text-align: center;
+}
+.topo-node.ok {
+	border-color: var(--ok);
+}
+.topo-node.bad {
+	border-color: var(--destructive);
+}
+.topo-node.warn {
+	border-color: #d9a441;
+}
+.topo-node.off {
+	opacity: 0.55;
+}
+.topo-node .btn {
+	margin-top: 4px;
+}
+.topo-dot {
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
+	background: var(--ok);
+	display: inline-block;
+}
+.topo-dot.ok {
+	background: var(--ok);
+}
+.topo-dot.bad {
+	background: var(--destructive);
+}
+.topo-dot.warn {
+	background: #d9a441;
+}
+.topo-dot.off {
+	background: var(--muted-foreground);
+}
+.topo-edge {
+	position: absolute;
+	background: var(--border);
+	z-index: 1;
+	border-radius: 2px;
+}
+.topo-legend {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+.topo-empty {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	align-items: flex-start;
+}
+.btn.btn.btn.hub-back {
+	align-self: flex-start;
+}
+.hub-search {
+	max-width: 240px;
+}
+.simple-mode {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	opacity: 0.85;
+}
+.hub-wizard {
+	max-width: 720px;
+}
+
+/* ════════════ ۰.۹.۶ — OmniRoute-style hub + پراکسی + لاگ ════════════ */
+
+.hub-layout {
+	display: flex;
+	gap: 18px;
+	align-items: flex-start;
+}
+.hub-side {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	width: 168px;
+	flex: none;
+	position: sticky;
+	top: 0;
+}
+.btn.hub-side-item {
+	justify-content: flex-start;
+	font-weight: 500;
+}
+.btn.hub-side-item.active {
+	background: var(--accent);
+	color: var(--primary);
+	border-inline-start: 2px solid var(--primary);
+}
+.pav.brand {
+	color: #fff;
+	font-size: 0.95rem;
+	text-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.steps .step.now::before {
+	content: '';
+}
+.log-row .tag.err + .item-main p {
+	color: var(--destructive);
+}
+.log-detail {
+	grid-column: 1 / -1;
+	background: var(--muted);
+	border-radius: 8px;
+	padding: 10px;
+	font-size: 0.78rem;
+	max-height: 240px;
+	overflow: auto;
+	margin: 0;
+}
+.item.log-row {
+	flex-wrap: wrap;
+}

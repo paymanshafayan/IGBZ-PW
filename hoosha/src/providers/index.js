@@ -87,6 +87,8 @@ export function createConnectionProvider( conn, opts = {} ) {
 		headers: conn.headers || {},
 		modelsPath: conn.modelsPath || '',
 		overrides: opts.overrides || {},
+		// پراکسی: اول خودِ اتصال، بعد سراسری هاب که فراخواننده در opts می‌دهد.
+		proxy: conn.proxy || opts.proxy || '',
 	};
 
 	if ( cfg.kind === 'mock' ) {

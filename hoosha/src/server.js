@@ -17,6 +17,11 @@ import { loadConfig, saveConfig, publicConfig, activeProfile, HOME } from './con
 import { PROVIDERS, createProvider, validateProfile, providerInfo } from './providers/index.js';
 import { CATEGORIES, STRATEGIES, AUTH_STYLES, hubId } from './hub/schema.js';
 import { handleChatCompletions, modelsResponse } from './hub/openai-api.js';
+import { proxyFetch, normalizeProxy } from './net.js';
+import { setProxyPolicy } from './net.js';
+import * as logs from './logs.js';
+import * as tunnel from './tunnel/engine.js';
+import { downloadCore, corePresent, coreVersion } from './tunnel/core.js';
 import { hubReady as hubReadyOf } from './hub/registry.js';
 import { VERSION, installInfo } from './version.js';
 import { MODES } from './permissions.js';
@@ -235,6 +240,24 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 	// ------------------------------------------------------------------ مسیرها
 
 	/** @type {Record<string, (c:any)=>any>} */
+	/*
+	 * همگام‌سازی پراکسی (۰.۹.۶): صفحهٔ تنظیماتِ ویندوز-سبک مالک حالت است (config.proxy)
+	 * و آدرسِ مؤثر را روی hub.data.proxy.url می‌نویسد تا همهٔ تماس‌های پرووایدر و
+	 * «تست پراکسی» بدون تغییر از همان بگذرند. حالت engine = درگاه محلی موتور تونل.
+	 */
+	async function syncProxyToHub() {
+		const p = runtime.config?.proxy || {};
+		const url = p.mode === 'manual' ? `http://${ p.address || '127.0.0.1' }:${ p.port || 7890 }` : p.mode === 'engine' ? `http://127.0.0.1:${ tunnel.HTTP_PORT }` : '';
+		setProxyPolicy( p );
+		if ( ( runtime.hub?.data?.proxy?.url || '' ) !== url ) {
+			await runtime.hub.update( { proxy: url ? { url } : { url: '' } } );
+			await runtime.hub.saveState?.();
+		}
+		return url;
+	}
+	// بار اول هم سیاست استثناها فعال باشد.
+	setProxyPolicy( runtime.config?.proxy || {} );
+
 	const routes = {
 		'GET /api/state': async () => ( { status: 200, body: await buildState() } ),
 
@@ -397,12 +420,125 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 					hub.health.reset( String( body.key || '' ) );
 					await hub.saveState();
 					return { status: 200, body: { ok: true } };
+				case 'proxy-test': {
+					// مقایسهٔ خروجی با/بدون پراکسی: IP و تأخیر، با مهلت هشت‌ثانیه‌ای.
+					const url = normalizeProxy( String( body.proxy ?? hub.data?.proxy?.url ?? '' ) );
+					const probe = async ( via ) => {
+						const t0 = Date.now();
+						try {
+							const res = await proxyFetch( 'https://api.ipify.org?format=json', {
+								signal: AbortSignal.timeout( 8000 ),
+								headers: { 'user-agent': 'hoosha-proxy-test' },
+							}, via );
+							const out = await res.json().catch( () => ( {} ) );
+							return { ok: res.ok, status: res.status, ip: out.ip || '', ms: Date.now() - t0 };
+						} catch ( e ) {
+							return { ok: false, error: String( e?.message || e ).slice( 0, 200 ), ms: Date.now() - t0 };
+						}
+					};
+					return { status: 200, body: { ok: true, proxy: url, proxied: await probe( url ), direct: await probe( '' ) } };
+				}
+				case 'reset-provider': {
+					const out = hub.resetProvider( String( body.id || '' ) );
+					if ( out.ok ) {
+						await hub.saveState();
+						broadcast( { type: 'hub' } );
+					}
+					return { status: out.ok ? 200 : 404, body: out };
+				}
+				case 'reset-health':
+					hub.health.resetAll();
+					await hub.saveState();
+					broadcast( { type: 'hub' } );
+					return { status: 200, body: { ok: true } };
 				case 'clear-cache':
 					hub.cache.clear();
 					return { status: 200, body: { ok: true } };
 				default:
 					return { status: 400, body: { error: 'کنش ناشناخته برای هاب.' } };
 			}
+		},
+
+		// ------------------------------------------------------- تونل، پراکسی، لاگ (۰.۹.۶)
+		'GET /api/tunnel': async () => ( {
+			status: 200,
+			body: { ok: true, ...tunnel.status(), core: { present: corePresent(), version: await coreVersion() } },
+		} ),
+
+		'POST /api/tunnel': async ( { body } ) => {
+			switch ( body?.action ) {
+				case 'download-core': {
+					const out = await downloadCore( ( m ) => broadcast( { type: 'tunnel', message: m } ) );
+					return { status: out.ok ? 200 : 500, body: out };
+				}
+				case 'harvest':
+					return { status: 200, body: await tunnel.harvest() };
+				case 'test-all': {
+					const out = await tunnel.testAll( ( p ) => broadcast( { type: 'tunnel', progress: p } ) );
+					return { status: 200, body: out };
+				}
+				case 'start': {
+					const out = await tunnel.start();
+					if ( out.ok && runtime.config?.proxy?.mode !== 'engine' ) {
+						runtime.config.proxy = { ...( runtime.config?.proxy || {} ), mode: 'engine' };
+						await saveConfig( runtime.config );
+					}
+					await syncProxyToHub();
+					broadcast( { type: 'tunnel' } );
+					return { status: 200, body: out };
+				}
+				case 'stop': {
+					const out = await tunnel.stop();
+					if ( runtime.config?.proxy?.mode === 'engine' ) {
+						runtime.config.proxy = { ...runtime.config.proxy, mode: 'off' };
+						await saveConfig( runtime.config );
+					}
+					await syncProxyToHub();
+					broadcast( { type: 'tunnel' } );
+					return { status: 200, body: out };
+				}
+				case 'rotate':
+					return { status: 200, body: await tunnel.rotate() };
+				case 'set-sources':
+					return { status: 200, body: tunnel.setSources( body.urls ) };
+				case 'toggle-config': {
+					const out = tunnel.toggleConfig( String( body.id || '' ), { enabled: Boolean( body.enabled ), pinned: Boolean( body.pinned ) } );
+					return { status: out.ok ? 200 : 404, body: out };
+				}
+				default:
+					return { status: 400, body: { error: 'کنش ناشناخته برای تونل.' } };
+			}
+		},
+
+		'GET /api/proxy': async () => ( {
+			status: 200,
+			body: { ok: true, proxy: runtime.config?.proxy || {}, effective: await syncProxyToHub() },
+		} ),
+
+		'POST /api/proxy': async ( { body } ) => {
+			runtime.config.proxy = {
+				mode: [ 'off', 'manual', 'engine' ].includes( body.mode ) ? body.mode : 'off',
+				address: String( body.address || '127.0.0.1' ).slice( 0, 100 ),
+				port: Number( body.port ) || 7890,
+				exceptions: String( body.exceptions || '' ).slice( 0, 1000 ),
+				bypassLocal: Boolean( body.bypassLocal ),
+			};
+			await saveConfig( runtime.config );
+			const url = await syncProxyToHub();
+			broadcast( { type: 'tunnel' } );
+			return { status: 200, body: { ok: true, effective: url } };
+		},
+
+		'GET /api/logs': async ( { query } ) => ( {
+			status: 200,
+			body: { ok: true, entries: logs.recent( query || {} ), channels: logs.channels() },
+		} ),
+
+		'POST /api/logs': async ( { body } ) => {
+			if ( body?.action === 'clear' ) {
+					return { status: 200, body: { ok: true, cleared: logs.clear() } };
+				}
+			return { status: 400, body: { error: 'کنش ناشناخته.' } };
 		},
 
 		// خروجی سازگار با OpenAI (تصمیم ۸) — فهرست مدل‌ها. تکمیل چت چون استریم دارد،

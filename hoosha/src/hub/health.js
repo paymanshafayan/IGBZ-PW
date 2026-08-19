@@ -25,6 +25,8 @@ export class Health {
 		this.now = opts.now || ( () => Date.now() );
 		/** @type {Map<string, any>} */
 		this.entries = new Map();
+		/** ترافیک به تفکیک اتصال — برای ضخامت یال‌های نمای توپولوژی. */
+		this.routes = {};
 		if ( opts.state ) {
 			this.fromJSON( opts.state );
 		}
@@ -61,6 +63,8 @@ export class Health {
 	 */
 	record( key, result ) {
 		const e = this.entry( key );
+		const connId = String( key ).split( '::' )[ 0 ];
+		this.routes[ connId ] = ( this.routes[ connId ] || 0 ) + 1;
 		const day = new Date( this.now() ).toISOString().slice( 0, 10 );
 		if ( e.day !== day ) {
 			e.day = day;
@@ -161,6 +165,33 @@ export class Health {
 		return e;
 	}
 
+	/**
+	 * ریست در سطح اتصال — «ریست و رفع خطا»ی مدیر: مدارشکن‌ها، خطاها، آمار و
+	 * پرچم «اعتبار تمام» همهٔ مدل‌های آن اتصال پاک می‌شود.
+	 * @param {string} prefix
+	 */
+	resetPrefix( prefix ) {
+		let n = 0;
+		for ( const key of [ ...this.entries.keys() ] ) {
+			if ( key.startsWith( prefix ) ) {
+				this.entries.delete( key );
+				n += 1;
+			}
+		}
+		return n;
+	}
+
+	/** ریست کل سلامت — همهٔ مدارشکن‌ها، خطاها، آمار و شمارندهٔ ترافیک. */
+	resetAll() {
+		this.entries.clear();
+		this.routes = {};
+	}
+
+	/** ترافیک به تفکیک اتصال (شمار تلاش‌های ثبت‌شده). */
+	traffic() {
+		return { ...this.routes };
+	}
+
 	/** @param {string} key */
 	successRate( key ) {
 		const e = this.entries.get( key );
@@ -221,12 +252,20 @@ export class Health {
 	}
 
 	toJSON() {
-		return Object.fromEntries( [ ...this.entries ].map( ( [ k, v ] ) => [ k, { ...v, inFlight: 0 } ] ) );
+		const out = Object.fromEntries( [ ...this.entries ].map( ( [ k, v ] ) => [ k, { ...v, inFlight: 0 } ] ) );
+		// شمارندهٔ ترافیک کنار ورودی‌ها با کلید رزروشده ذخیره می‌شود؛ کلیدهای واقعی همیشه «::» دارند.
+		out.__routes = { ...this.routes };
+		return out;
 	}
 
 	/** @param {any} data */
 	fromJSON( data ) {
-		for ( const [ k, v ] of Object.entries( data || {} ) ) {
+		const saved = { ...( data || {} ) };
+		if ( saved.__routes ) {
+			this.routes = saved.__routes;
+			delete saved.__routes;
+		}
+		for ( const [ k, v ] of Object.entries( saved ) ) {
 			this.entries.set( k, { ...this.entry( k ), ...v, inFlight: 0 } );
 		}
 		return this;

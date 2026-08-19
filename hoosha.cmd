@@ -35,10 +35,14 @@ if not exist "%~dp0hoosha\src\cli.js" (
 
 cd /d "%~dp0hoosha"
 
-if not exist "node_modules" (
-	echo   وابستگی‌ها نصب نیستند. یک بار npm ci اجرا می‌شود...
+rem اگر package.json عوض شده باشد (git pull با وابستگی تازه) خودمان npm ci می‌زنیم —
+rem نه خطی مثل "Cannot find package 'undici'" سرِ راه کاربر بیاید.
+node -e "const fs=require('fs');const v=fs.existsSync('package.json')&&JSON.parse(fs.readFileSync('package.json','utf8')).version||'';const m=fs.existsSync('.deps-marker')&&fs.readFileSync('.deps-marker','utf8').trim()||'';process.exit(v===m&&fs.existsSync('node_modules')?0:1)"
+if errorlevel 1 (
+	echo   وابستگی‌ها تازه یا کهنه‌اند — یک بار npm ci اجرا می‌شود...
 	call npm ci
 	if errorlevel 1 exit /b 1
+	node -e "require('fs').writeFileSync('.deps-marker',require('fs').readFileSync('package.json','utf8').match(/\"version\"[^,]+/)[0])"
 )
 
 node src\cli.js %*

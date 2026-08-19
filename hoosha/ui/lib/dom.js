@@ -96,12 +96,20 @@ export function fmtTokens( n ) {
 
 /** یک toast کوچک، چون alert مرورگر وسط کار زشت است. */
 export function toast( text, kind = '' ) {
+	/*
+	 * میزبان پیام باید همیشه در بالاترین لایهٔ دیدنی باشد: دیالوگِ بازشده با showModal
+	 * در «top layer» مرورگر می‌نشیند و هیچ عنصری از body — با هر z-index — از آن
+	 * بالاتر نمی‌رود. پس اگر دیالوگی باز است، میزبان پیام را داخل همان دیالوگ
+	 * می‌بریم؛ وگرنه body. (باگ ثبت‌شدهٔ ۱۴۰۵/۰۵/۲۸: پیام‌های «تست اتصال» زیر مودال
+	 * تنظیمات گم می‌شدند — DESIGN-PROVIDER-UI §۶.)
+	 */
+	const openDialog = [ ...document.querySelectorAll( 'dialog' ) ].filter( ( d ) => d.getAttribute( 'open' ) !== null ).pop();
 	let host = $( '#toasts' );
 	if ( ! host ) {
 		host = el( 'div' );
 		host.id = 'toasts';
-		document.body.appendChild( host );
 	}
+	( openDialog || document.body ).appendChild( host );
 	const t = el( 'div', `toast ${ kind }`, text );
 	host.appendChild( t );
 	setTimeout( () => t.classList.add( 'in' ), 10 );

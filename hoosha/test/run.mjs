@@ -1793,8 +1793,11 @@ await test( 'همهٔ بخش‌های تنظیمات رندرکنندهٔ واق
 	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
 	const tabs = [ ...settings.matchAll( /\{ id: '([\w-]+)', label:/g ) ].map( ( m ) => m[ 1 ] );
 	// نوزده تب: چهارده تای قبلی + پنج صفحهٔ هاب.
-	assert.equal( tabs.length, 19, `انتظار ۱۹ تب، ${ tabs.length } پیدا شد` );
+	assert.equal( tabs.length, 17, `انتظار ۱۷ تب، ${ tabs.length } پیدا شد` );
 	for ( const t of tabs ) {
+		if ( t === 'hub-open' ) {
+			continue; // لینک به صفحهٔ تمام‌قد است، رندرکنندهٔ تب ندارد.
+		}
 		const key = /-/.test( t ) ? `'${ t }'` : t;
 		assert.ok(
 			new RegExp( `\\n\\t${ key.replace( /[-']/g, ( c ) => '\\' + c ) }: ` ).test( settings ),
@@ -3528,41 +3531,198 @@ await test( 'خروجی سازگار با OpenAI، همان مدل‌های ها
 
 section( 'هاب — رابط کاربری' );
 
-await test( 'پنج صفحهٔ هاب در تنظیمات هست', () => {
+await test( 'صفحهٔ تمام‌قد هاب جای شش تبِ قدیمی را گرفت', () => {
+	const html = fssync.readFileSync( path.join( uiDir, 'index.html' ), 'utf8' );
+	const app = fssync.readFileSync( path.join( uiDir, 'app.js' ), 'utf8' );
 	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
-	for ( const id of [ "id: 'hub'", "id: 'hub-compat'", "id: 'hub-models'", "id: 'hub-routing'", "id: 'hub-health'" ] ) {
-		assert.ok( settings.includes( id ), `صفحهٔ ${ id } نیست` );
-	}
-	assert.match( settings, /mountHub/ );
+	assert.ok( html.includes( 'data-view="hub"' ), 'آیتم ناوبری «هاب پرووایدر» نیست' );
+	assert.match( app, /hub: \{ title: 'هاب پرووایدر'/, 'صفحه در PAGES ثبت نشده' );
+	assert.match( app, /import \{ mountHubPage \} from '\.\/hubpage\.js'/ );
+	assert.ok( settings.includes( "id: 'hub-open'" ), 'لینک تنظیمات به صفحه نیست' );
+	assert.equal( settings.includes( 'mountHub' ), false, 'کد رندر قدیمی هاب باید رفته باشد' );
+	assert.equal( fssync.existsSync( path.join( uiDir, 'hub.js' ) ), false, 'ui/hub.js باید حذف شده باشد' );
 } );
 
-await test( 'صفحهٔ هاب کلید اصلی روشن/خاموش دارد', () => {
-	const hubUi = fssync.readFileSync( path.join( uiDir, 'hub.js' ), 'utf8' );
-	assert.match( hubUi, /action: 'toggle'/ );
-	assert.match( hubUi, /hub-master/ );
-} );
-
-await test( 'صفحهٔ مسیریابی، آزمون «این درخواست به کجا می‌رود» دارد', () => {
-	const hubUi = fssync.readFileSync( path.join( uiDir, 'hub.js' ), 'utf8' );
-	assert.match( hubUi, /action: 'explain'/ );
-	assert.match( hubUi, /ببین کجا می‌رود/ );
-} );
-
-await test( 'دفتر راه‌حل‌ها در رابط دیدنی و برگشت‌پذیر است', () => {
-	const hubUi = fssync.readFileSync( path.join( uiDir, 'hub.js' ), 'utf8' );
-	assert.match( hubUi, /forget-patch/ );
-	assert.match( hubUi, /promote-patch/ );
-} );
-
-await test( 'کلاس‌های تازهٔ هاب در استایل تعریف شده‌اند', () => {
-	for ( const cls of [ '.hub-master', '.tag-row', '.route-result', '.route-list' ] ) {
+await test( 'کلاس‌های تازهٔ صفحهٔ هاب در استایل تعریف شده‌اند', () => {
+	for ( const cls of [ '.hub-catalog', '.hub-card', '.topo-node', '.topo-edge', '.stat-cards', '.hub-stat', '.steps', '.pav', '.hub-status', '.btn.hub-back' ] ) {
 		assert.ok( css.includes( cls ), `کلاس ${ cls } در style.css نیست` );
+	}
+} );
+
+await test( 'ریست اتصال و ریست کل در سرور و سلامت ثبت شده‌اند', async () => {
+	const server = fssync.readFileSync( path.resolve( 'src/server.js' ), 'utf8' );
+	assert.match( server, /case 'reset-provider'/ );
+	assert.match( server, /case 'reset-health'/ );
+	const { Health } = await import( '../src/hub/health.js' );
+	const h = new Health();
+	h.record( 'c1::m1', { ok: false, kind: 'http', message: 'x' } );
+	h.record( 'c1::m1', { ok: false, kind: 'http', message: 'x' } );
+	h.record( 'c1::m1', { ok: false, kind: 'http', message: 'x' } );
+	h.record( 'c1::m2', { ok: true, ms: 4 } );
+	h.record( 'c9::m1', { ok: true, ms: 4 } );
+	assert.equal( h.circuit( 'c1::m1' ), 'open' );
+	assert.equal( h.resetPrefix( 'c1::' ), 2 );
+	assert.equal( h.circuit( 'c1::m1' ), 'closed' );
+	assert.deepEqual( h.traffic(), { c1: 4, c9: 1 } );
+	h.resetAll();
+	assert.deepEqual( h.traffic(), {} );
+} );
+
+await test( 'پراکسی: نرمال‌سازی، تقدم و دورزدن مقصدهای محلی', async () => {
+	const net = await import( '../src/net.js' );
+	assert.equal( net.normalizeProxy( '127.0.0.1:7890' ), 'http://127.0.0.1:7890', 'بدون اسکیم → http' );
+	assert.equal( net.normalizeProxy( '  ' ), '' );
+	assert.equal( net.normalizeProxy( 'socks5://x:1080' ), 'socks5://x:1080' );
+	assert.equal( net.effectiveProxy( '', 'http://g:1' ), 'http://g:1', 'سراسری وقتی اتصال ندارد' );
+	assert.equal( net.effectiveProxy( 'http://c:1', 'http://g:1' ), 'http://c:1', 'اتصال مقدم است' );
+	assert.ok( net.isLocalTarget( 'http://127.0.0.1:11434/v1' ) );
+	assert.ok( net.isLocalTarget( 'http://localhost:1234' ) );
+	assert.equal( net.isLocalTarget( 'https://api.anthropic.com' ), false );
+	// مقصد محلی هرگز داسپچر نمی‌گیرد — Ollama نباید از پراکسی بگذرد.
+	assert.equal( net.dispatcherFor( 'http://127.0.0.1:11434', 'http://p:1' ), null );
+	const d1 = net.dispatcherFor( 'https://api.example.com', 'http://p:1' );
+	assert.ok( d1, 'داسپچر http ساخته نشد' );
+	assert.equal( net.dispatcherFor( 'https://other.example.com', 'http://p:1' ), d1, 'داسپچر کش نمی‌شود' );
+	assert.ok( net.dispatcherFor( 'https://api.example.com', 'socks5://127.0.0.1:1080' ), 'داسپچر socks ساخته نشد' );
+} );
+
+await test( 'پراکسی: درخواست واقعاً از پراکسی می‌گذرد', async () => {
+	// یک پراکسی HTTP محلی می‌سازیم؛ اگر proxyFetch واقعاً از آن بگذرد، درخواست با مسیر
+	// مطلق به آن می‌رسد و ما پاسخ ساختگی برمی‌گردانیم.
+	const http = await import( 'node:http' );
+	const seen = [];
+	const srv = http.createServer( ( req, res ) => {
+		seen.push( req.url || '' );
+		res.writeHead( 200, { 'content-type': 'application/json' } );
+		res.end( JSON.stringify( { via: 'proxy', url: req.url } ) );
+	} );
+	await new Promise( ( r ) => srv.listen( 0, '127.0.0.1', r ) );
+	const port = srv.address().port;
+	try {
+		const { proxyFetch } = await import( '../src/net.js' );
+		const res = await proxyFetch( 'http://example.test/x', {}, `http://127.0.0.1:${ port }` );
+		const body = await res.json();
+		assert.equal( body.via, 'proxy', 'پاسخ از پراکسی نیامد' );
+		assert.equal( seen[ 0 ], 'http://example.test/x', 'درخواست مطلق به پراکسی نرسید' );
+	} finally {
+		await new Promise( ( r ) => srv.close( r ) );
+	}
+} );
+
+await test( 'پراکسی: خطای ۴۲۹/۴۰۳ بدون پراکسی، راهنمای درست می‌دهد', async () => {
+	const { explain } = await import( '../src/errors.js' );
+	const rate = explain( new Error( 'too many requests' ), { proxy: '' } );
+	assert.equal( rate.kind, 'rate' );
+	assert.match( rate.hint, /پراکسی/ );
+	const rate2 = explain( new Error( 'too many requests' ), { proxy: 'http://127.0.0.1:7890' } );
+	assert.equal( /پراکسی سیستم/.test( rate2.hint ), false, 'با پراکسیِ تنظیم‌شده دیگر سرزنش پراکسی نکن' );
+	const geo = explain( new Error( 'پاسخ 451 از پرووایدر' ), { proxy: '' } );
+	assert.equal( geo.kind, 'geo' );
+	assert.match( geo.hint, /پراکسی/ );
+	const auth403 = explain( new Error( 'پاسخ 403 از پرووایدر' ), { proxy: '' } );
+	assert.equal( auth403.kind, 'auth' );
+	assert.match( auth403.hint, /پراکسی/, '۴۰۳ بدون پراکسی هم باید سرنخ تحریم بدهد' );
+} );
+
+await test( 'پراکسی: سرور اکشن تست و اتصال فیلد پراکسی دارد', () => {
+	const server = fssync.readFileSync( path.resolve( 'src/server.js' ), 'utf8' );
+	assert.match( server, /case 'proxy-test'/ );
+	assert.match( server, /api\.ipify\.org/ );
+	const schema = fssync.readFileSync( path.resolve( 'src/hub/schema.js' ), 'utf8' );
+	assert.match( schema, /proxy: String\( raw\?\.proxy/, 'اتصال باید فیلد پراکسی داشته باشد' );
+	// از ۰.۹.۶ صفحهٔ تنظیمات پراکسی مالکِ کارت است؛ ویزارد هاب فقط فیلد مخصوص اتصال را دارد.
+	const proxyPage = fssync.readFileSync( path.join( uiDir, 'proxy.js' ), 'utf8' );
+	assert.match( proxyPage, /تست اتصال/ );
+	assert.match( proxyPage, /بypassLocal|bypassLocal/ );
+	const page = fssync.readFileSync( path.join( uiDir, 'hubpage.js' ), 'utf8' );
+	assert.match( page, /پراکسی این اتصال/ );
+} );
+
+await test( 'تونل: پارس چهار پروتکل و اشتراک base64', async () => {
+	const { parseLink, parseAll } = await import( '../src/tunnel/parse.js' );
+	const vmess = 'vmess://' + Buffer.from( JSON.stringify( { v: '2', ps: 'ت', add: '1.2.3.4', port: '443', id: 'ab', aid: '0', net: 'ws', host: 'h', path: '/', tls: 'tls' } ) ).toString( 'base64' );
+	assert.equal( parseLink( vmess )?.proto, 'vmess' );
+	assert.equal( parseLink( 'vless://u@5.6.7.8:8443?encryption=none&security=reality&type=tcp#r' )?.proto, 'vless' );
+	assert.equal( parseLink( 'trojan://p@9.9.9.9:443?security=tls#t' )?.proto, 'trojan' );
+	assert.equal( parseLink( 'ss://' + Buffer.from( 'aes-256-gcm:pw' ).toString( 'base64' ) + '@3.3.3.3:8388#s' )?.proto, 'ss' );
+	assert.equal( parseLink( 'https://not-a-config' ), null );
+	const sub = Buffer.from( [ vmess, 'vless://u@1.1.1.1:443?encryption=none&type=tcp#z' ].join( '\n' ) ).toString( 'base64' );
+	assert.equal( parseAll( sub ).length, 2, 'اشتراک base64 باز نشد' );
+} );
+
+await test( 'لاگر: سطح/کانال/فیلتر و پاک‌کردن', async () => {
+	const logs = await import( '../src/logs.js' );
+	logs.clear();
+	logs.logInfo( 'app', 'پیام عادی' );
+	logs.logError( 'tunnel', 'خطای آزمون', { code: 1 } );
+	assert.equal( logs.recent( { level: 'error' } ).length, 1 );
+	assert.equal( logs.recent( { channel: 'tunnel' } ).length, 1 );
+	assert.ok( logs.recent( { q: 'آزمون' } ).length >= 1 );
+	assert.equal( logs.recent( { level: 'error' } )[ 0 ].data.code, 1 );
+	const clearedN = logs.clear();
+	assert.ok( clearedN >= 1 );
+	// بعد از پاک‌کردن، فقط ردیفِ خودِ «پاک شد» می‌مانَد.
+	assert.ok( logs.recent().every( ( e ) => e.message.includes( 'پاک شد' ) ) );
+} );
+
+await test( 'استثناهای پراکسی: الگوی ویندوزی مطابق می‌شود', async () => {
+	const net = await import( '../src/net.js' );
+	net.setProxyPolicy( { exceptions: 'localhost;10.*;172.16.*;192.168.*;api.internal', bypassLocal: true } );
+	assert.ok( net.matchesException( 'http://localhost:8080/x' ) );
+	assert.ok( net.matchesException( 'http://10.1.2.3/y' ) );
+	assert.ok( net.matchesException( 'https://192.168.1.1/z' ) );
+	assert.ok( net.matchesException( 'https://api.internal/v1' ) );
+	assert.equal( net.matchesException( 'https://api.anthropic.com/v1/messages' ), false, 'نشانی بیرونی نباید استثنا شود' );
+	net.setProxyPolicy( {} );
+} );
+
+await test( 'پراکسی: صفحهٔ تنظیمات (Snap15) ساخته می‌شود — حالت، استثناها، موتور', async () => {
+	const dom = ( await import( './fake-dom.mjs' ) ).installFakeDom( {
+		fetch: async ( url ) => ( { ok: true, json: async () => url.includes( '/api/tunnel' )
+			? { ok: true, corePresent: false, running: false, ports: { socks: 7809, http: 7810 }, current: null, pool: [], sources: [], working: 0, poolSize: 0 }
+			: url.includes( '/api/proxy' )
+			? { ok: true, proxy: { mode: 'manual', address: '127.0.0.1', port: 7890, exceptions: 'localhost', bypassLocal: true }, effective: 'http://127.0.0.1:7890' }
+			: { ok: true } } ),
+	} );
+	try {
+		const { renderProxySettings } = await import( `../ui/proxy.js?set=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await renderProxySettings( box );
+		const text = box.textContent;
+		assert.match( text, /پراکسی هوشا/, 'سربرگ نیست' );
+		assert.match( text, /موتور تونل داخلی/, 'بخش موتور نیست' );
+		assert.match( text, /استثناها/, 'استثناها (Snap15) نیست' );
+		assert.match( text, /شبکهٔ داخلی/, 'تیک bypass-local نیست' );
+		assert.ok( box.querySelectorAll( 'select' ).length >= 1, 'انتخاب حالت نیست' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'toast همیشه در بالاترین لایه است — داخل دیالوگِ باز، نه زیرش', async () => {
+	const dom = ( await import( './fake-dom.mjs' ) ).installFakeDom( { fetch: async () => ( { ok: true, json: async () => ( {} ) } ) } );
+	try {
+		const { toast } = await import( `../ui/lib/dom.js?toast=${ Date.now() }` );
+		toast( 'بیرون' );
+		let host = document.querySelector( '#toasts' );
+		assert.ok( host, 'میزبان toast ساخته نشد' );
+		assert.equal( host.parentElement, document.body, 'بدون دیالوگ باید در body باشد' );
+		const dlg = document.createElement( 'dialog' );
+		dlg.setAttribute( 'open', '' );
+		document.body.appendChild( dlg );
+		toast( 'داخل' );
+		host = document.querySelector( '#toasts' );
+		assert.equal( host.parentElement, dlg, 'با دیالوگِ باز، toast باید داخل همان دیالوگ (top layer) باشد' );
+		// (بازگشت به body پس از بستن دیالوگ با close() خودکار می‌آید؛ fake-dom
+		// removeChild ندارد و همین دو ادعا رفتار اصلی را می‌سنجند.)
+	} finally {
+		dom.restore();
 	}
 } );
 
 // ---------------------------------------------------------------- هاب: اجرای واقعی رابط
 
-section( 'هاب — صفحه‌ها واقعاً رندر می‌شوند' );
+section( 'هاب — صفحهٔ جدید واقعاً رندر می‌شود' );
 
 const { installFakeDom } = await import( './fake-dom.mjs' );
 
@@ -3610,6 +3770,7 @@ function hubSnapshotFixture() {
 			diagnoser: { enabled: true, connectionId: 'c1', model: 'm2', minFailures: 2, perSignaturePerHour: 1, dailyBudget: null, internet: false, autoPromote: false },
 		},
 		health: { 'c1::m1': { ok: 10, fail: 2, successRate: 0.83, p50: 400, p95: 1200, circuit: 'open', exhausted: false, lastError: 'یک خطا', usedToday: 12 } },
+		traffic: { c1: 9, c2: 3 },
 		learning: { coding: [ { modelKey: 'c1::m1', score: 0.71, n: 12 } ] },
 		budget: { day: '2026-08-17', total: 1.25, admins: {}, tasks: {}, limits: { daily: 5 }, usedRatio: 0.25 },
 		cache: { size: 3, hits: 1, misses: 2, enabled: true },
@@ -3619,24 +3780,16 @@ function hubSnapshotFixture() {
 	};
 }
 
-await test( 'هر پنج صفحهٔ هاب بدون خطا ساخته می‌شوند و محتوا دارند', async () => {
-	/** @type {any[]} */
-	const calls = [];
-	const dom = installFakeDom( {
-		fetch: async ( url, options ) => {
-			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
-			const data = url === '/api/hub' ? hubSnapshotFixture() : { ok: true };
-			return { ok: true, json: async () => data };
-		},
-	} );
+await test( 'هر چهار نما بدون خطا ساخته می‌شوند و محتوا دارند', async () => {
+	const dom = installFakeDom( { fetch: async () => ( { ok: true, json: async () => hubSnapshotFixture() } ) } );
 	try {
-		const { mountHub } = await import( `../ui/hub.js?dom=${ Date.now() }` );
-		for ( const page of [ 'hub', 'hub-compat', 'hub-models', 'hub-routing', 'hub-health' ] ) {
+		const { mountHubPage } = await import( `../ui/hubpage.js?four=${ Date.now() }` );
+		for ( const view of [ 'overview', 'connections', 'combos', 'health' ] ) {
 			const box = document.createElement( 'div' );
-			await mountHub( box, page );
+			await mountHubPage( box, { view } );
 			const text = box.textContent;
-			assert.ok( box.children.length > 1, `صفحهٔ ${ page } خالی است` );
-			assert.equal( /undefined|NaN|\[object Object\]/.test( text ), false, `صفحهٔ ${ page } مقدار خام نشان می‌دهد: ${ text.slice( 0, 120 ) }` );
+			assert.ok( box.children.length > 1, `نمای ${ view } خالی است` );
+			assert.equal( /undefined|NaN|\[object Object\]/.test( text ), false, `نمای ${ view } مقدار خام نشان می‌دهد: ${ text.slice( 0, 120 ) }` );
 		}
 	} finally {
 		dom.restore();
@@ -3644,20 +3797,19 @@ await test( 'هر پنج صفحهٔ هاب بدون خطا ساخته می‌ش�
 } );
 
 await test( 'کلید اصلی هاب واقعاً درخواست خاموش‌کردن می‌فرستد', async () => {
-	/** @type {any[]} */
 	const calls = [];
 	const dom = installFakeDom( {
 		fetch: async ( url, options ) => {
 			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
-			return { ok: true, json: async () => ( url === '/api/hub' && ! options ? hubSnapshotFixture() : options?.method === 'POST' ? { ok: true, active: false } : hubSnapshotFixture() ) };
+			return { ok: true, json: async () => ( options?.method === 'POST' ? { ok: true, active: false } : hubSnapshotFixture() ) };
 		},
 	} );
 	try {
-		const { mountHub } = await import( `../ui/hub.js?toggle=${ Date.now() }` );
+		const { mountHubPage } = await import( `../ui/hubpage.js?toggle=${ Date.now() }` );
 		const box = document.createElement( 'div' );
-		await mountHub( box, 'hub' );
+		await mountHubPage( box, { view: 'overview' } );
 		const button = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'خاموش کن' );
-		assert.ok( button, 'دکمهٔ خاموش‌کردن پیدا نشد' );
+		assert.ok( button, 'دکمهٔ خاموش‌کردن در نوار وضعیت نیست' );
 		await button.click();
 		await new Promise( ( r ) => setTimeout( r, 20 ) );
 		const toggle = calls.find( ( c ) => c.body?.action === 'toggle' );
@@ -3668,31 +3820,112 @@ await test( 'کلید اصلی هاب واقعاً درخواست خاموش‌�
 	}
 } );
 
-await test( 'دکمهٔ «کشف مدل‌ها» روی کارت اتصال کار می‌کند', async () => {
-	/** @type {any[]} */
-	const calls = [];
-	const dom = installFakeDom( {
-		fetch: async ( url, options ) => {
-			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
-			return { ok: true, json: async () => ( options?.method === 'POST' ? { ok: true, added: 2, kept: 0, missing: 0 } : hubSnapshotFixture() ) };
-		},
-	} );
+await test( 'توپولوژی گره‌ها را با وضعیت واقعی می‌کشد و روی خطا دکمهٔ ریست دارد', async () => {
+	const dom = installFakeDom( { fetch: async () => ( { ok: true, json: async () => hubSnapshotFixture() } ) } );
 	try {
-		const { mountHub } = await import( `../ui/hub.js?disc=${ Date.now() }` );
+		const { mountHubPage } = await import( `../ui/hubpage.js?topo=${ Date.now() }` );
 		const box = document.createElement( 'div' );
-		await mountHub( box, 'hub' );
-		const button = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'کشف مدل‌ها' );
-		assert.ok( button, 'دکمهٔ کشف پیدا نشد' );
-		await button.click();
-		await new Promise( ( r ) => setTimeout( r, 20 ) );
-		assert.ok( calls.some( ( c ) => c.body?.action === 'discover' && c.body.id === 'c1' ) );
+		await mountHubPage( box, { view: 'overview' } );
+		assert.ok( box.querySelector( '.topo' ), 'نقشه نیست' );
+		assert.equal( box.querySelectorAll( '.topo-node' ).length, 2, 'هر اتصال یک گره' );
+		assert.equal( box.querySelectorAll( '.topo-edge' ).length, 2, 'هر اتصال یک یال' );
+		const bad = box.querySelector( '.topo-node.bad' );
+		assert.ok( bad, 'اتصال دارای مدار باز، گرهٔ خطادار ندارد' );
+		const reset = [ ...bad.querySelectorAll( 'button' ) ].find( ( b ) => b.textContent === 'ریست و رفع خطا' );
+		assert.ok( reset, 'دکمهٔ ریست روی گرهٔ خطادار نیست' );
 	} finally {
 		dom.restore();
 	}
 } );
 
-await test( 'صفحهٔ سلامت، مدار باز را نشان می‌دهد و دکمهٔ بازکردن دارد', async () => {
-	/** @type {any[]} */
+await test( 'کاتالوگ کارتی همیشه دیده می‌شود — حتی با صفر اتصال', async () => {
+	const noConn = hubSnapshotFixture();
+	noConn.hub.connections = {};
+	noConn.hub.enabled = false;
+	noConn.active = false;
+	noConn.ready = { ok: false, reason: 'هیچ اتصال روشنی تعریف نشده است.' };
+	noConn.health = {};
+	noConn.traffic = {};
+	const dom = installFakeDom( { fetch: async () => ( { ok: true, json: async () => noConn } ) } );
+	try {
+		const { mountHubPage } = await import( `../ui/hubpage.js?cat=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await mountHubPage( box, { view: 'connections' } );
+		const cards = box.querySelectorAll( '.hub-card' );
+		assert.ok( cards.length >= 2, `کاتالوگ کارت ندارد (${ cards.length })` );
+		assert.match( box.textContent, /متصل نیست/ );
+		assert.ok( box.querySelectorAll( 'button' ).some( ( b ) => b.textContent === '+ اتصال تازه' ) );
+		// و نوار وضعیت برای بی‌اتصال، «روشن کن» نمی‌گوید — گام بعدی درست را می‌گوید.
+		assert.ok( box.querySelectorAll( 'button' ).some( ( b ) => b.textContent === 'اولین اتصال را بساز' ), 'CTA درست حالت خالی' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'ریست اتصال از صفحهٔ جزئیات، درخواست reset-provider می‌فرستد', async () => {
+	const calls = [];
+	const dom = installFakeDom( {
+		fetch: async ( url, options ) => {
+			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
+			return { ok: true, json: async () => ( options?.method === 'POST' ? { ok: true, cleared: 1 } : hubSnapshotFixture() ) };
+		},
+	} );
+	try {
+		const { mountHubPage } = await import( `../ui/hubpage.js?reset=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await mountHubPage( box, { view: 'connections' } );
+		const open = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'باز کردن' );
+		assert.ok( open, 'دکمهٔ باز کردن کارت نیست' );
+		await open.click();
+		await new Promise( ( r ) => setTimeout( r, 30 ) );
+		const resetBtn = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'ریست و رفع خطا' );
+		assert.ok( resetBtn, 'دکمهٔ ریست در جزئیات نیست' );
+		await resetBtn.click();
+		await new Promise( ( r ) => setTimeout( r, 20 ) );
+		const confirmBtn = document.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'تأیید' );
+		assert.ok( confirmBtn, 'دیالوگ تأیید باز نشد' );
+		await confirmBtn.click();
+		await new Promise( ( r ) => setTimeout( r, 30 ) );
+		assert.ok( calls.some( ( c ) => c.body?.action === 'reset-provider' && c.body.id === 'c1' ), 'درخواست reset-provider فرستاده نشد' );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'مدل‌ها در جزئیات سرویس‌اند: کشف، آزمون تک‌مدل و آزمون همه', async () => {
+	const calls = [];
+	const dom = installFakeDom( {
+		fetch: async ( url, options ) => {
+			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
+			return { ok: true, json: async () => ( options?.method === 'POST' ? { ok: true, added: 2, kept: 0, missing: 0, message: 'سالم' } : hubSnapshotFixture() ) };
+		},
+	} );
+	try {
+		const { mountHubPage } = await import( `../ui/hubpage.js?models=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await mountHubPage( box, { view: 'connections' } );
+		( await Promise.resolve() );
+		const open = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'باز کردن' );
+		await open.click();
+		await new Promise( ( r ) => setTimeout( r, 30 ) );
+		assert.match( box.textContent, /مدل‌های این سرویس/ );
+		const discover = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'کشف مدل‌ها' );
+		assert.ok( discover );
+		await discover.click();
+		await new Promise( ( r ) => setTimeout( r, 20 ) );
+		assert.ok( calls.some( ( c ) => c.body?.action === 'discover' && c.body.id === 'c1' ) );
+		const testOne = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'تست' && ( b.getAttribute( 'title' ) || '' ).includes( 'آزمایشی' ) );
+		assert.ok( testOne, 'دکمهٔ تست تک‌مدل نیست' );
+		await testOne.click();
+		await new Promise( ( r ) => setTimeout( r, 20 ) );
+		assert.ok( calls.some( ( c ) => c.body?.action === 'test-connection' && c.body.model === 'm1' ) );
+		assert.ok( box.querySelectorAll( 'button' ).some( ( b ) => b.textContent === 'آزمون همهٔ مدل‌ها' ) );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'سلامت: مدار باز، بازکردن دوباره، دفتر راه‌حل‌ها و ریست کل', async () => {
 	const calls = [];
 	const dom = installFakeDom( {
 		fetch: async ( url, options ) => {
@@ -3701,42 +3934,26 @@ await test( 'صفحهٔ سلامت، مدار باز را نشان می‌دهد
 		},
 	} );
 	try {
-		const { mountHub } = await import( `../ui/hub.js?health=${ Date.now() }` );
+		const { mountHubPage } = await import( `../ui/hubpage.js?health=${ Date.now() }` );
 		const box = document.createElement( 'div' );
-		await mountHub( box, 'hub-health' );
-		// روی خودِ نشان بررسی می‌کنیم، نه روی متن کل صفحه — چون توضیح بالای صفحه هم
-		// عبارت «مدار باز» را دارد و یک assert سرانگشتی با آن سبز می‌ماند.
+		await mountHubPage( box, { view: 'health' } );
 		const badge = box.querySelectorAll( '.tag' ).find( ( t ) => t.textContent === 'مدار باز' );
-		assert.ok( badge, 'نشان مدار باز روی ردیف مدل نیست' );
-		assert.ok( box.querySelector( '.bad' ), 'ردیف مدل خراب باید علامت بخورد' );
+		assert.ok( badge, 'نشان مدار باز نیست' );
+		assert.ok( box.querySelectorAll( '.hub-stat' ).length >= 3, 'کارت‌های آماری نیستند' );
 		const button = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'بازکردن دوباره' );
 		assert.ok( button, 'دکمهٔ بازکردن مدار نیست' );
 		await button.click();
 		await new Promise( ( r ) => setTimeout( r, 20 ) );
 		assert.ok( calls.some( ( c ) => c.body?.action === 'reset-breaker' && c.body.key === 'c1::m1' ) );
+		assert.match( box.textContent, /آدرس \/v1 نداشت/ );
+		assert.ok( box.querySelectorAll( 'button' ).some( ( b ) => b.textContent === 'ماندگار کن' ), 'دفتر راه‌حل‌ها ماندگارکردن ندارد' );
+		assert.ok( box.querySelectorAll( 'button' ).some( ( b ) => b.textContent === 'ریست کل سلامت هاب' ), 'ریست کل نیست' );
 	} finally {
 		dom.restore();
 	}
 } );
 
-await test( 'صفحهٔ سلامت، دفتر راه‌حل‌ها و وصلهٔ دائمی را نشان می‌دهد', async () => {
-	const dom = installFakeDom( { fetch: async () => ( { ok: true, json: async () => hubSnapshotFixture() } ) } );
-	try {
-		const { mountHub } = await import( `../ui/hub.js?ledger=${ Date.now() }` );
-		const health = document.createElement( 'div' );
-		await mountHub( health, 'hub-health' );
-		assert.match( health.textContent, /آدرس \/v1 نداشت/ );
-		assert.match( health.textContent, /موقت/ );
-
-		const conns = document.createElement( 'div' );
-		await mountHub( conns, 'hub' );
-		assert.match( conns.textContent, /وصلهٔ دائمی/ );
-	} finally {
-		dom.restore();
-	}
-} );
-
-await test( 'آزمون مسیر در صفحهٔ مسیریابی، نتیجه را روی همان صفحه می‌نشاند', async () => {
+await test( 'آزمون مسیر در نمای ترکیب‌ها، نتیجه را روی همان صفحه می‌نشاند', async () => {
 	const answer = {
 		classification: { category: 'coding', confidence: 0.82, reasons: [ 'واژهٔ «تابع»' ] },
 		strategy: 'auto',
@@ -3751,9 +3968,9 @@ await test( 'آزمون مسیر در صفحهٔ مسیریابی، نتیجه �
 		} ),
 	} );
 	try {
-		const { mountHub } = await import( `../ui/hub.js?probe=${ Date.now() }` );
+		const { mountHubPage } = await import( `../ui/hubpage.js?probe=${ Date.now() }` );
 		const box = document.createElement( 'div' );
-		await mountHub( box, 'hub-routing' );
+		await mountHubPage( box, { view: 'combos' } );
 		const button = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'ببین کجا می‌رود' );
 		assert.ok( button, 'دکمهٔ آزمون مسیر نیست' );
 		await button.click();
@@ -3763,6 +3980,44 @@ await test( 'آزمون مسیر در صفحهٔ مسیریابی، نتیجه �
 		assert.match( result.textContent, /کدنویسی/ );
 		assert.match( result.textContent, /مدل یک/ );
 		assert.match( result.textContent, /مدل خاموش است/ );
+	} finally {
+		dom.restore();
+	}
+} );
+
+await test( 'ویزارد اتصال چهارگامی باز می‌شود و ذخیره می‌فرستد', async () => {
+	const calls = [];
+	const dom = installFakeDom( {
+		fetch: async ( url, options ) => {
+			calls.push( { url, body: options?.body ? JSON.parse( options.body ) : null } );
+			return { ok: true, json: async () => ( options?.method === 'POST' ? { ok: true, connection: { id: 'c9' } } : hubSnapshotFixture() ) };
+		},
+	} );
+	try {
+		const { mountHubPage } = await import( `../ui/hubpage.js?wiz=${ Date.now() }` );
+		const box = document.createElement( 'div' );
+		await mountHubPage( box, { view: 'connections' } );
+		const add = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === '+ اتصال تازه' );
+		await add.click();
+		await new Promise( ( r ) => setTimeout( r, 20 ) );
+		const wiz = document.querySelector( '.hub-wizard' );
+		assert.ok( wiz, 'دیالوگ ویزارد باز نشد' );
+		assert.match( wiz.textContent, /۱\. سرویس/, 'گام‌نما نیست' );
+		// گام ۱: انتخاب اولین کارت و «بعدی»
+		const next = [ ...wiz.querySelectorAll( 'button' ) ].find( ( b ) => b.textContent === 'بعدی ←' );
+		await next.click();
+		await new Promise( ( r ) => setTimeout( r, 20 ) );
+		assert.match( wiz.textContent, /۲\. شناسنامه/, 'به گام شناسانه نرفت' );
+		// پر کردن نام و کلید و «بعدی» → ذخیره باید فرستاده شود
+		const inputs = [ ...wiz.querySelectorAll( 'input' ) ];
+		const nameI = inputs.find( ( i ) => i.type === 'text' );
+		const keyI = inputs.find( ( i ) => i.type === 'password' );
+		if ( nameI ) { nameI.value = 'ویزارد تست'; }
+		if ( keyI ) { keyI.value = 'sk-x'; }
+		const next2 = [ ...wiz.querySelectorAll( 'button' ) ].find( ( b ) => b.textContent === 'بعدی ←' );
+		await next2.click();
+		await new Promise( ( r ) => setTimeout( r, 30 ) );
+		assert.ok( calls.some( ( c ) => c.body?.action === 'save-connection' ), 'ذخیرهٔ اتصال فرستاده نشد' );
 	} finally {
 		dom.restore();
 	}
@@ -4023,9 +4278,9 @@ await test( '«سفارشی‌سازی» مودال تنظیمات را باز �
 		assert.equal( q( '#view-chat' ).hidden, false );
 		// سه گروه: «پرووایدر و مدل» به خواستهٔ کارفرما اضافه شد — طرح اصلی نداشتش.
 		assert.deepEqual( all( '.set-group' ).map( ( x ) => x.textContent ), [ 'پرووایدر و مدل', 'تنظیمات', 'سفارشی‌سازی' ] );
-		assert.equal( all( '.set-item' ).length, 19 );
+		assert.equal( all( '.set-item' ).length, 17 );
 		const labels = all( '.set-item' ).map( ( x ) => x.textContent );
-		assert.ok( labels.some( ( l ) => l.includes( 'پرووایدرهای استاندارد' ) ), 'صفحهٔ پرووایدر باید در منو باشد' );
+		assert.ok( labels.some( ( l ) => l.includes( 'پرووایدرها و هاب' ) ), 'لینک صفحهٔ هاب باید در منو باشد' );
 		assert.ok( labels.some( ( l ) => l.includes( 'پروفایل تک‌نفره' ) ) );
 		assert.ok( q( '.set-search' ), 'کادر جستجوی ناوبری نیست' );
 		assert.ok( q( '#set-body' ).children.length > 0, 'بدنهٔ تنظیمات خالی است' );
@@ -4041,18 +4296,19 @@ await test( 'جستجوی ناوبری تنظیمات، فهرست را کم م�
 		await new Promise( ( r ) => setTimeout( r, 150 ) );
 
 		const search = q( '.set-search' );
-		search.value = 'مدل';
+		search.value = 'پرووایدر';
 		for ( const fn of search.listeners.input || [] ) {
 			fn( { target: search } );
 		}
 		const labels = all( '.set-item' ).map( ( x ) => x.textContent );
-		assert.ok( labels.length < 19 && labels.length > 0, `فیلتر کار نکرد: ${ labels.length }` );
-		assert.ok( labels.some( ( l ) => l.includes( 'مدل' ) ) );
+		assert.ok( labels.length < 15 && labels.length > 0, `فیلتر کار نکرد: ${ labels.length }` );
+		assert.ok( labels.some( ( l ) => l.includes( 'پرووایدر' ) ) );
 
 		// و بستن و بازکردن دوباره، فیلتر را پاک می‌کند — وگرنه دفعهٔ بعد نیمی از فهرست غیب است.
+		// (از ۰.۹.۴ شش تبِ هاب رفت و دو آیتم آمد: ۱۵ آیتم.)
 		document.querySelector( '.nav-item[data-view="customize"]' ).click();
 		await new Promise( ( r ) => setTimeout( r, 150 ) );
-		assert.equal( all( '.set-item' ).length, 19, 'جستجوی دفعهٔ قبل نباید بماند' );
+		assert.equal( all( '.set-item' ).length, 17, 'جستجوی دفعهٔ قبل نباید بماند' );
 	} finally {
 		dom.restore();
 	}
@@ -4624,7 +4880,7 @@ await test( 'کادر پیام ارتفاع مهارشده دارد و صفحه 
 	const root = cssBlock( ':root' );
 	assert.match( root, /--composer-h:\s*70px/, 'همان عددی که در طرح آمده' );
 	assert.match( root, /--composer-max:\s*168px/ );
-	assert.match( root, /--composer-box:\s*138px/, 'ارتفاع کارت: ۱۲+۷۰+۸+۳۶+۱۲' );
+	assert.match( root, /--composer-box:\s*114px/, 'ارتفاع محتوا: ۷۰+۸+۳۶ — کادرِ اجباریِ بلندتر برداشته شد (طبق طرح claude-ui: کل باکس ~۱۴۰px)' );
 
 	const box = cssBlock( '.composer textarea' );
 	assert.match( box, /min-height:\s*var\(--composer-h\)/ );
@@ -4676,19 +4932,17 @@ await test( 'کارت‌های صفحهٔ تغییرات، متن بلند را 
 	assert.match( bar, /title: `\$\{ label \}: \$\{ value \}`/ );
 } );
 
-await test( 'فرم پرووایدر استاندارد آدرس پایه نمی‌پرسد، سازگار می‌پرسد', () => {
-	// شکایت کارفرما: این دو صفحه شبیه هم بودند.
-	const hub = fssync.readFileSync( path.join( uiDir, 'hub.js' ), 'utf8' );
-	assert.match( hub, /compat \? field\( 'آدرس پایه', baseUrl/, 'سازگار: کادر ورودی' );
-	assert.match( hub, /! compat \? field\( 'آدرس پایه', baseShown/, 'استاندارد: فقط نمایش' );
-	assert.match( hub, /baseUrl: compat \? baseUrl\.value\.trim\(\) : info\?\.baseUrl/, 'استاندارد باید آدرس را از کاتالوگ بردارد' );
+await test( 'فرم اتصال استاندارد آدرس پایه نمی‌پرسد، سازگار می‌پرسد', () => {
+	// شکایت کارفرما: این دو حالت شبیه هم بودند. (از ۰.۹.۴ هر دو در ویزارد صفحهٔ هاب‌اند.)
+	const page = fssync.readFileSync( path.join( uiDir, 'hubpage.js' ), 'utf8' );
+	assert.match( page, /isCompat\(\) \? field\( 'آدرس پایه', baseUrl/, 'سازگار: کادر ورودی' );
+	assert.match( page, /: field\( 'آدرس پایه', h\( 'p', \{ class: 'note mono', text: info\(\)\.baseUrl/, 'استاندارد: فقط نمایش' );
+	assert.match( page, /data\.baseUrl = isCompat\(\) \? baseUrl\.value\.trim\(\) : \( info\(\)\.baseUrl/, 'استاندارد باید آدرس را از کاتالوگ بردارد' );
 
-	// و فیلدهای مخصوص سازگار در فرم استاندارد اصلاً ساخته نمی‌شوند.
+	// و فیلدهای مخصوص سازگار در حالت استاندارد اصلاً ساخته نمی‌شوند.
 	for ( const only of [ "'سبک احراز', authStyle", "'مسیر فهرست مدل', modelsPath", "'هدرهای سفارشی', headers" ] ) {
-		assert.ok( hub.includes( `compat ? field( ${ only }` ), `${ only } باید فقط در حالت سازگار باشد` );
+		assert.ok( page.includes( `isCompat() ? field( ${ only }` ), `${ only } باید فقط در حالت سازگار باشد` );
 	}
-	// سرویسی که کلید نمی‌خواهد، کادر کلید را هم نشان ندهد.
-	assert.match( hub, /keyField\.hidden = info\?\.needsKey === false/ );
 } );
 
 // ------------------------------------------------- یک کلاس واحد برای دکمه‌ها
@@ -5319,7 +5573,7 @@ await test( 'در برنامهٔ زنده، آیکون‌ها واقعاً رس�
 		document.querySelector( '.nav-item[data-view="customize"]' ).click();
 		await new Promise( ( r ) => setTimeout( r, 160 ) );
 		const withIcon = [ ...document.querySelectorAll( '.si-ico' ) ].filter( ( n ) => /<svg/.test( n.innerHTML ) );
-		assert.ok( withIcon.length >= 19, `فقط ${ withIcon.length } تب آیکون دارد` );
+		assert.ok( withIcon.length >= 15, `فقط ${ withIcon.length } تب آیکون دارد` );
 	} finally {
 		dom.restore();
 	}
@@ -5440,12 +5694,35 @@ await test( 'دستگیرهٔ کلید در حالت روشن ناپدید نم�
 } );
 
 await test( 'خوش‌آمد وسط می‌ماند و از بالای صفحه بیرون نمی‌زند', () => {
-	// روی نمایشگر کوتاه، `flex: 0 0 auto` باعث می‌شد بالای پیام بیرون بزند و اسکرول هم نبود.
+	// ریشهٔ بیرون‌زدگی (بار چهارم) دو چیز بود:
+	//   ۱) `justify-content: center` روی ستونی که از ظرفش بلندتر است، نیمی از سرریز را
+	//      «بالای مبدأ» می‌فرستد — جایی که اسکرول به دست نمی‌رسد. مرکز‌چینیِ امن با
+	//      مارجینِ auto است: جا که نبود، مارجین‌ها صفر می‌شوند و گروه از بالا می‌چسبد.
+	//   ۲) فرزندان `.composer-wrap` با چیدمان بلاکِ ضمنی، پس از جهش‌های DOMِ رانتایم
+	//      حفرهٔ نامرئی (~۵۰۰px) می‌گرفتند و کل ستون را متورم می‌کردند؛ ستونِ flex صریح
+	//      این مسیر را کلاً می‌بندد (با بازسازی گره‌ها هم آزموده شد).
+	const empty = cssBlock( '.view-chat.empty' );
+	assert.equal( /justify-content:\s*center/.test( empty ), false, 'center روی ستون سرریزشده، تلهٔ قدیمی است' );
+	assert.match( empty, /overflow-y:\s*auto/, 'خودِ نمای خالی باید مرجع اسکرول نهایی باشد' );
+
+	const slot = cssBlock( '.view-chat.empty .welcome-slot' );
+	assert.match( slot, /margin-block-start:\s*auto/, 'نیمهٔ بالایی مرکز‌چینیِ امن' );
+	assert.match( slot, /flex:\s*0 0 auto/, 'در حالت خالی ظرف خوش‌آمد جمع نمی‌شود؛ کل گروه اسکرول می‌گیرد' );
+
+	const wrapEmpty = cssBlock( '.view-chat.empty .composer-wrap' );
+	assert.match( wrapEmpty, /margin-block-end:\s*auto/, 'نیمهٔ پایینی مرکز‌چینیِ امن' );
+	assert.match( wrapEmpty, /margin-top:\s*50px/, 'خواستهٔ کارفرما: ~۵۰px پایین‌تر از خوش‌آمد' );
+
+	const welcome = cssBlock( '.welcome' );
+	assert.equal( /justify-content:\s*center/.test( welcome ), false, 'مرکزِ محتوای بلندتر از ظرف، بالای مبدأ می‌ریخت' );
+
+	const wrap = cssBlock( '.composer-wrap' );
+	assert.match( wrap, /display:\s*flex/, 'سپر باگ چیدمان: ستونِ flex صریح' );
+	assert.match( wrap, /flex-direction:\s*column/ );
+
 	const thread = cssBlock( '.view-chat.empty .thread' );
-	assert.match( thread, /flex:\s*0 1 auto/ );
-	assert.match( thread, /overflow-y:\s*auto/ );
-	assert.match( thread, /min-height:\s*0/ );
-	assert.match( cssBlock( '.view-chat.empty' ), /justify-content:\s*center/ );
+	assert.match( thread, /flex:\s*0 0 0/, 'رشتهٔ خالی صفر فضا می‌گیرد' );
+	assert.match( thread, /overflow:\s*hidden/, 'و چیزی از آن بیرون نمی‌ریزد' );
 } );
 
 await test( 'سندباکس پیش‌فرض روشن است و بدون اجازه روی پروژه نمی‌افتد', async () => {
@@ -5599,17 +5876,34 @@ await test( 'خوش‌آمد ظرف خودش را دارد، بیرون از ن�
 await test( 'کادر چت همان اعداد و ترنزیشنی را دارد که کارفرما فرستاد', () => {
 	const card = cssBlock( '.composer' );
 	assert.match( card, /border-radius:\s*20px/ );
-	assert.match( card, /border:\s*1px solid transparent/ );
+	assert.match( card, /border:\s*1px solid var\(--border\)/, 'قاب واقعیِ یک‌پیکسلی به رنگ طرح (#e5e5e5)، نه شفاف' );
 	assert.match( card, /margin-inline:\s*8px/ );
 	assert.match( card, /z-index:\s*1/ );
 	assert.match( card, /cursor:\s*text/ );
 	assert.match( card, /box-sizing:\s*content-box/ );
 	assert.match( card, /box-shadow:\s*0 0\.25rem 1\.25rem color-mix/ );
+	assert.equal( /box-shadow:[^;]*0 0 0 1px/.test( card ), false, 'حلقهٔ قابِ سایه‌ای رفت؛ قاب واقعی جایش را گرفت' );
 	assert.match( card, /transition:\s*background-color 0\.2s/ );
 	assert.equal( /transition:[^;]*\ball\b/.test( card ), false, 'ترنزیشن روی همه‌چیز نه' );
 
+	// فوکوس هیچ تغییری در ظاهر کادر نمی‌دهد — قاب می‌ماند و چیزی اضافه نمی‌شود.
+	// (رینگِ فوکوس روی قاب، «ضخیم‌شدن بوردر» دیده می‌شد؛ کارفرما ۱۴۰۵/۰۵/۲۷.)
+	const focus = cssBlock( '.composer:focus-within' );
+	assert.match( focus, /border-color:\s*var\(--border\)/, 'قاب ۱px در فوکوس هم می‌ماند' );
+	assert.equal( /var\(--ring\)/.test( focus ), false, 'فوکوس نباید چیزی اضافه کند — ظاهر همیشه مثل تصویر است' );
+
 	// و کادر، پنجاه پیکسل پایین‌تر از خوش‌آمد.
 	assert.match( cssBlock( '.view-chat.empty .composer-wrap' ), /margin-top:\s*50px/ );
+} );
+
+await test( 'ردیف «اخیر»: فونت کوچک‌تر و حروف دیگر نصفه دیده نمی‌شوند', () => {
+	// فونت وزیرمتن دنبالهٔ عمودی بلندی دارد (چ/پ/ج/ی پایین‌تر از خط می‌روند)؛
+	// line-height تنگ + overflow:hidden حروف را از پایین قیچی می‌کرد.
+	const item = cssBlock( '.recent-item' );
+	assert.match( item, /font-size:\s*13px/, 'یک درجه کوچک‌تر از ۱۳٫۵ — خواستهٔ کارفرما' );
+	const rt = cssBlock( '.recent-item .btn.rt' );
+	assert.match( rt, /line-height:\s*1\.7/, 'ارتفاع خط برای دنبالهٔ حروف فارسی' );
+	assert.match( rt, /padding-block:\s*5px/ );
 } );
 
 // ------------------------------------------------------- انگلیسیِ تمام‌وقت
@@ -5744,7 +6038,7 @@ await test( 'در حالت انگلیسی هیچ متن فارسی روی صفح
 		};
 
 		collect( 'خالی' );
-		for ( const view of [ 'chats', 'projects', 'tools', 'changes', 'workspace' ] ) {
+		for ( const view of [ 'chats', 'projects', 'tools', 'changes', 'workspace', 'hub' ] ) {
 			document.querySelector( `.nav-item[data-view="${ view }"]` ).click();
 			await new Promise( ( r ) => setTimeout( r, 120 ) );
 			collect( view );
@@ -5759,8 +6053,11 @@ await test( 'در حالت انگلیسی هیچ متن فارسی روی صفح
 		document.querySelector( '.nav-item[data-view="customize"]' ).click();
 		await new Promise( ( r ) => setTimeout( r, 160 ) );
 		const tabs = document.querySelectorAll( '.set-item' );
-		assert.ok( tabs.length >= 19, `فقط ${ tabs.length } تب تنظیمات باز شد` );
+		assert.ok( tabs.length >= 15, `فقط ${ tabs.length } تب تنظیمات باز شد` );
 		for ( const item of tabs ) {
+			if ( ! item.dataset.tab ) {
+				continue; // «پرووایدرها و هاب…» لینک است نه تب — صفحه‌اش در حلقهٔ نماها جارو شد.
+			}
 			item.click();
 			await new Promise( ( r ) => setTimeout( r, 110 ) );
 			collect( `تنظیمات/${ item.textContent.trim().slice( 0, 18 ) }` );
