@@ -77,9 +77,22 @@ export function matchesException( url ) {
 	return false;
 }
 
-/** داسپچرِ پراکسی برای یک مقصد — null یعنی مستقیم. */
-export function dispatcherFor( url, proxy ) {
-	const p = ( isLocalTarget( url ) || matchesException( url ) ) ? '' : normalizeProxy( proxy );
+/**
+ * داسپچرِ پراکسی برای یک مقصد — null یعنی مستقیم.
+ *
+ * ⚠️ اینجا **`effectiveProxy` صدا زده می‌شود، نه `normalizeProxy`**. تا ۰.۹.۶ فقط
+ * آرگومان `proxy` خوانده می‌شد و زنجیرهٔ «اتصال ← هاب ← محیط» عملاً مرده بود: تابع
+ * `effectiveProxy` نوشته شده بود ولی هیچ‌جا استفاده نمی‌شد، پس `HTTPS_PROXY` هرگز
+ * دیده نمی‌شد. نتیجه‌اش این بود که حالت هاب — که پیش از هر پاسخ چند تماس می‌زند —
+ * پشت تحریم می‌ماند و «همهٔ مسیرها شکست خوردند» می‌داد، در حالی که حالت تک‌واحد با
+ * یک تماس شانس رد شدن داشت. (گزارش کارفرما ۱۴۰۵/۰۵/۳۰، سند DESIGN-HUB-UI-FIX §۲.۶)
+ *
+ * @param {string} url
+ * @param {string} [proxy] پراکسی مخصوص همین اتصال
+ * @param {string} [globalProxy] پراکسی سراسری هاب
+ */
+export function dispatcherFor( url, proxy, globalProxy = '' ) {
+	const p = ( isLocalTarget( url ) || matchesException( url ) ) ? '' : effectiveProxy( proxy, globalProxy );
 	if ( ! p ) {
 		return null;
 	}
@@ -100,8 +113,8 @@ export function dispatcherFor( url, proxy ) {
  * @param {any} [opts]
  * @param {string} [proxy]
  */
-export async function proxyFetch( url, opts = {}, proxy = '' ) {
-	const d = opts.dispatcher || dispatcherFor( url, proxy );
+export async function proxyFetch( url, opts = {}, proxy = '', globalProxy = '' ) {
+	const d = opts.dispatcher || dispatcherFor( url, proxy, globalProxy );
 	if ( ! d ) {
 		return fetch( url, opts );
 	}

@@ -474,9 +474,26 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 				case 'harvest':
 					return { status: 200, body: await tunnel.harvest() };
 				case 'test-all': {
-					const out = await tunnel.testAll( ( p ) => broadcast( { type: 'tunnel', progress: p } ) );
+					/*
+					 * سرویس معیار برای مرحلهٔ ۲ (خواستهٔ کارفرما ۱۴۰۵/۰۵/۳۰): کانفیگ وقتی
+					 * «سالم» است که **پرووایدر واقعی** از راهش جواب بدهد، نه صرفاً اینترنت.
+					 * فقط `GET {baseUrl}/models` زده می‌شود — بی‌هزینه و بدون مصرف توکن.
+					 * اگر هیچ اتصالی نبود، مرحلهٔ ۲ رد می‌شود تا کاربر بن‌بست نخورد.
+					 */
+					const conns = Object.values( runtime.hub?.data?.connections || {} );
+					const bench = conns.find( ( c ) => c.enabled !== false && ( c.apiKey || c.keyRef ) && c.baseUrl )
+						|| conns.find( ( c ) => c.enabled !== false && c.baseUrl );
+					const serviceUrl = bench ? `${ String( bench.baseUrl ).replace( /\/+$/, '' ) }/models` : '';
+
+					const out = await tunnel.testAll(
+						( p ) => broadcast( { type: 'tunnel', progress: p } ),
+						{ serviceUrl, serviceLabel: bench?.label || '' }
+					);
+					broadcast( { type: 'tunnel' } );
 					return { status: 200, body: out };
 				}
+				case 'cancel-test':
+					return { status: 200, body: tunnel.cancelTest() };
 				case 'start': {
 					const out = await tunnel.start();
 					if ( out.ok && runtime.config?.proxy?.mode !== 'engine' ) {

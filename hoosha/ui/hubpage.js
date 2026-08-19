@@ -97,17 +97,33 @@ function draw( box ) {
 		[ 'health', 'سلامت و مصرف', 'health' ],
 	];
 	box.appendChild( statusBar( box ) );
-	/* چیدمان OmniRoute: ستون ناوبری + محتوا */
+
+	/*
+	 * ناوبری: یک نوار تب افقی، نه ستون کناری.
+	 *
+	 * ستون قبلی یک «سایدبار داخل سایدبار» می‌ساخت — کاربر دو لایه ناوبری موازی
+	 * می‌دید — و ۱۶۸px از عرض محتوا را هم می‌گرفت. مرجع (Snap5) برای همین کار نوار
+	 * تب افقی دارد. شمارنده‌ها هم مثل مرجع کنار عنوان می‌آیند.
+	 */
+	const hub = snap?.hub || {};
+	const counts = {
+		connections: Object.keys( hub.connections || {} ).length,
+		combos: Object.keys( hub.combos || {} ).length,
+	};
 	const host = el( 'div', 'hub-view' );
-	const side = h( 'div', { class: 'hub-side' },
+	const tabs = h( 'div', { class: 'hub-tabs' },
 		views.map( ( [ id, label, ico ] ) =>
 			h( 'button', {
-				class: `btn quiet row nav-item hub-side-item ${ state.view === id ? 'active' : '' }`,
+				class: `btn quiet hub-tab ${ state.view === id ? 'active' : '' }`,
 				onClick: () => { state.view = id; state.provider = null; again( box ); },
-			}, [ h( 'span', { class: 'si-ico', html: iconSvg( ico, 15 ) } ), h( 'span', { text: label } ) ] ) )
+			}, [
+				h( 'span', { class: 'si-ico', html: iconSvg( ico, 15 ) } ),
+				h( 'span', { text: label } ),
+				counts[ id ] ? h( 'span', { class: 'tab-count', text: String( counts[ id ] ) } ) : null,
+			] ) )
 	);
-	const layout = h( 'div', { class: 'hub-layout' }, [ side, host ] );
-	box.appendChild( layout );
+	box.appendChild( tabs );
+	box.appendChild( host );
 	if ( state.view === 'overview' ) {
 		renderOverview( host, box );
 	} else if ( state.view === 'connections' && state.provider ) {
@@ -221,27 +237,80 @@ function renderOverview( box, page ) {
 	}
 
 	const maxTraffic = Math.max( 1, ...conns.map( ( c ) => traffic[ c.id ] || 0 ) );
-	const W = 640, H = 360, cx = W / 2, cy = H / 2, R = Math.min( W, H ) / 2 - 70;
-	const map = h( 'div', { class: 'topo' } );
-	map.style.width = W + 'px';
-	map.style.height = H + 'px';
 
-	// یال‌ها اول (زیر گره‌ها)
+	/*
+	 * چیدمان: تا هشت گره یک حلقه، بیشتر از آن دو حلقهٔ هم‌مرکز.
+	 *
+	 * با یک حلقه و گره‌های درشتِ قبلی، ده پرووایدر روی هم می‌افتادند. حالا گره‌ها
+	 * مستطیل کوچک‌اند (مثل Snap10) و اگر باز هم زیاد شوند، حلقهٔ دوم باز می‌شود.
+	 */
+	const W = 900, H = 420, cx = W / 2, cy = H / 2;
+	const RING = 8;
+	const rOuter = Math.min( W, H ) / 2 - 46;
+	const rInner = conns.length > RING ? rOuter - 96 : rOuter;
+
+	const posOf = ( i ) => {
+		const inner = conns.length > RING && i < RING;
+		const count = conns.length > RING ? ( inner ? RING : conns.length - RING ) : conns.length;
+		const idx = inner ? i : i - ( conns.length > RING ? RING : 0 );
+		const r = inner ? rInner : rOuter;
+		const angle = ( idx / Math.max( 1, count ) ) * Math.PI * 2 - Math.PI / 2;
+		return { x: cx + r * Math.cos( angle ), y: cy + r * Math.sin( angle ) };
+	};
+
+	/**
+	 * حالت یال — سه‌گانهٔ راهنمای Snap10.
+	 *
+	 * active: همین حالا/تازه کار کرده → نقطه‌چین سبزِ متحرک به سمت پرووایدر.
+	 * recent: در پنجرهٔ اخیر کار کرده → خط ممتد کهربایی.
+	 * error:  آخرین نتیجه خطا بود، یا مدار باز/اعتبار تمام → خط ممتد قرمز.
+	 */
+	const ACTIVE_MS = 60_000;
+	const RECENT_MS = 15 * 60_000;
+	const now = Date.now();
+	const edgeState = ( c ) => {
+		const rows = Object.entries( health ).filter( ( [ k ] ) => k.startsWith( `${ c.id }::` ) );
+		if ( rows.some( ( [ , v ] ) => v.circuit === 'open' || v.exhausted ) ) {
+			return 'error';
+		}
+		const last = Math.max( 0, ...rows.map( ( [ , v ] ) => Number( v.lastUsedAt ) || 0 ) );
+		if ( ! last ) {
+			return 'idle';
+		}
+		if ( rows.some( ( [ , v ] ) => v.lastOk === false ) && now - last < RECENT_MS ) {
+			return 'error';
+		}
+		const age = now - last;
+		if ( age <= ACTIVE_MS ) { return 'active'; }
+		if ( age <= RECENT_MS ) { return 'recent'; }
+		return 'idle';
+	};
+
+	const map = h( 'div', { class: 'topo' } );
+
+	// یال‌ها در یک لایهٔ SVG — نقطه‌چینِ متحرک با div چرخانده ممکن نبود.
+	const NS = 'http://www.w3.org/2000/svg';
+	const svg = document.createElementNS( NS, 'svg' );
+	svg.setAttribute( 'class', 'topo-edges' );
+	svg.setAttribute( 'viewBox', `0 0 ${ W } ${ H }` );
+	svg.setAttribute( 'preserveAspectRatio', 'xMidYMid meet' );
 	conns.forEach( ( c, i ) => {
-		const angle = ( i / conns.length ) * Math.PI * 2 - Math.PI / 2;
-		const x = cx + R * Math.cos( angle );
-		const y = cy + R * Math.sin( angle );
-		const len = Math.hypot( x - cx, y - cy );
+		const { x, y } = posOf( i );
+		const st = edgeState( c );
+		const line = document.createElementNS( NS, 'line' );
+		// همیشه از مرکز به پرووایدر: جهتِ حرکتِ نقطه‌ها از همین ترتیب می‌آید.
+		line.setAttribute( 'x1', String( cx ) );
+		line.setAttribute( 'y1', String( cy ) );
+		line.setAttribute( 'x2', String( x ) );
+		line.setAttribute( 'y2', String( y ) );
+		line.setAttribute( 'class', `topo-edge ${ st }` );
 		const t = ( traffic[ c.id ] || 0 ) / maxTraffic;
-		const edge = el( 'div', 'topo-edge' );
-		edge.style.width = len + 'px';
-		edge.style.left = Math.min( cx, x ) + 'px';
-		edge.style.top = cy + 'px';
-		edge.style.height = ( 2 + Math.round( t * 8 ) ) + 'px';
-		edge.style.transform = `rotate( ${ x >= cx ? Math.atan2( y - cy, x - cx ) : Math.atan2( cy - y, cx - x ) }rad )`;
-		edge.style.transformOrigin = x >= cx ? 'left center' : 'right center';
-		map.appendChild( edge );
+		if ( st !== 'active' ) {
+			line.style.strokeWidth = String( 1.5 + t * 3 );
+		}
+		svg.appendChild( line );
 	} );
+	map.appendChild( svg );
 
 	// مرکز: هاب
 	map.appendChild( h( 'div', { class: `topo-center ${ snap?.active ? 'on' : '' }`, title: snap?.active ? 'فرمان با هاب است' : 'هاب فرمان را ندارد' }, [
@@ -249,44 +318,38 @@ function renderOverview( box, page ) {
 		h( 'b', { text: snap?.active ? 'هاب فعال' : 'هاب' } ),
 	] ) );
 
-	// گره‌ها
+	/*
+	 * گره‌ها: مستطیل کوچکِ تک‌خطه (خواستهٔ کارفرما، الگوی Snap10).
+	 *
+	 * قبلاً کارت عمودی سه‌طبقه با ارتفاع ~۷۰px بود — سه برابر مرجع — و با ده پرووایدر
+	 * روی هم می‌افتاد. شمار مدل به tooltip رفت و دکمهٔ «ریست» از داخل گره برداشته شد
+	 * (کلیک روی گره → صفحهٔ جزئیات، دکمه آنجاست).
+	 */
 	conns.forEach( ( c, i ) => {
-		const angle = ( i / conns.length ) * Math.PI * 2 - Math.PI / 2;
-		const x = cx + R * Math.cos( angle );
-		const y = cy + R * Math.sin( angle );
+		const { x, y } = posOf( i );
 		const st = stateOf( c );
 		const models = Object.values( hub.models || {} ).filter( ( m ) => m.connectionId === c.id );
-		const node = h( 'div', { class: `topo-node ${ st.cls }`, title: `${ c.label } — ${ st.label }` }, [
-			h( 'span', { class: 'topo-dot' } ),
-			h( 'b', { text: c.label } ),
-			h( 'span', { class: 'note', text: `${ models.length } مدل · ${ st.label }` } ),
-			( st.cls === 'bad' || st.cls === 'warn' ) ? h( 'button', {
-				class: 'btn outline sm',
-				text: 'ریست و رفع خطا',
-				onClick: async ( e ) => {
-					e?.stopPropagation?.();
-					if ( ! ( await confirmDialog( `وضعیت خطای «${ c.label }» ریست شود؟ مدارشکن‌ها و خطاهای مدل‌هایش پاک می‌شود.` ) ) ) {
-						return;
-					}
-					const out = await action( { action: 'reset-provider', id: c.id } );
-					toast( out.ok ? `ریست شد — ${ out.cleared } مدل پاک شد.` : out.error, out.ok ? 'ok' : 'error' );
-					await again( page );
-				},
-			} ) : null,
+		const node = h( 'div', {
+			class: `topo-node ${ st.cls }`,
+			title: `${ c.label } — ${ st.label } · ${ models.length } مدل`,
+		}, [
+			h( 'span', { class: `topo-dot ${ st.cls }` } ),
+			h( 'span', { class: 'pav brand xs', style: `background:${ brandColor( c.provider, c.label ) }`, text: ( c.label || '?' ).trim().slice( 0, 1 ).toUpperCase() } ),
+			h( 'span', { class: 'topo-name', text: c.label } ),
 		] );
-		node.style.left = x + 'px';
-		node.style.top = y + 'px';
+		node.style.insetInlineStart = `${ ( x / W ) * 100 }%`;
+		node.style.top = `${ ( y / H ) * 100 }%`;
 		node.onclick = () => { state.view = 'connections'; state.provider = c.provider; again( page ); };
 		map.appendChild( node );
 	} );
 
 	box.appendChild( h( 'div', { class: 'form-card topo-card' }, [ map ] ) );
+	// راهنما: همان سه‌گانهٔ بالا-راست Snap10، با همان ترتیب.
 	box.appendChild( h( 'div', { class: 'topo-legend note' }, [
-		h( 'span', { class: 'topo-dot ok' } ), ' فعال ',
-		h( 'span', { class: 'topo-dot bad' } ), ' مدار باز ',
-		h( 'span', { class: 'topo-dot warn' } ), ' اعتبار/کلید ',
-		h( 'span', { class: 'topo-dot off' } ), ' خاموش ',
-		' — ضخامت یال = ترافیک ثبت‌شده',
+		h( 'span', { class: 'lg-edge active' } ), h( 'span', { text: 'فعال' } ),
+		h( 'span', { class: 'lg-edge recent' } ), h( 'span', { text: 'اخیر (یال)' } ),
+		h( 'span', { class: 'lg-edge error' } ), h( 'span', { text: 'خطا (یال)' } ),
+		h( 'span', { class: 'note', text: '— ضخامت یال = ترافیک ثبت‌شده. برای جزئیات، روی هر سرویس کلیک کن.' } ),
 	] ) );
 
 	// آخرین مسیرها

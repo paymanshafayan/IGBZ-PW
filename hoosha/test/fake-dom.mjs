@@ -176,6 +176,14 @@ class FakeNode {
 		if ( name === 'id' ) {
 			this.id = String( value );
 		}
+		/*
+		 * `setAttribute('class', …)` باید همان چیزی را عوض کند که `className` می‌بیند،
+		 * وگرنه سلکتورِ `.foo` عنصر را پیدا نمی‌کند. عناصر SVG (یال‌های توپولوژی از
+		 * ۰.۹.۷) کلاسشان را از همین مسیر می‌گیرند، نه از `className`.
+		 */
+		if ( name === 'class' ) {
+			this.className = String( value );
+		}
 	}
 	getAttribute( name ) {
 		return this.attributes[ name ] ?? null;
@@ -387,6 +395,8 @@ export function installFakeDom( opts = {} ) {
 	observers.length = 0;
 	const document = {
 		createElement: ( tag ) => new FakeNode( tag ),
+		// یال‌های توپولوژی از ۰.۹.۷ در SVG کشیده می‌شوند (نقطه‌چین متحرک با div ممکن نبود).
+		createElementNS: ( _ns, tag ) => new FakeNode( tag ),
 		createTextNode: ( text ) => {
 			const n = new FakeNode( 'text' );
 			n.textContent = text;

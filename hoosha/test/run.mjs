@@ -3820,7 +3820,13 @@ await test( 'کلید اصلی هاب واقعاً درخواست خاموش‌�
 	}
 } );
 
-await test( 'توپولوژی گره‌ها را با وضعیت واقعی می‌کشد و روی خطا دکمهٔ ریست دارد', async () => {
+await test( 'توپولوژی: گره‌های کوچک، یال‌های سه‌حالته، بدون دکمه داخل گره', async () => {
+	/*
+	 * از ۰.۹.۷ گره‌ها **مستطیل کوچک** یک‌خطه‌اند (خواستهٔ کارفرما، الگوی Snap10) و دکمهٔ
+	 * «ریست و رفع خطا» از داخلشان برداشته شده: هم گره را سه‌برابر بلند می‌کرد و با ده
+	 * پرووایدر گره‌ها روی هم می‌افتادند، هم جای درستش صفحهٔ جزئیات است. کلیک روی گره
+	 * به همان‌جا می‌برد.
+	 */
 	const dom = installFakeDom( { fetch: async () => ( { ok: true, json: async () => hubSnapshotFixture() } ) } );
 	try {
 		const { mountHubPage } = await import( `../ui/hubpage.js?topo=${ Date.now() }` );
@@ -3829,10 +3835,20 @@ await test( 'توپولوژی گره‌ها را با وضعیت واقعی می
 		assert.ok( box.querySelector( '.topo' ), 'نقشه نیست' );
 		assert.equal( box.querySelectorAll( '.topo-node' ).length, 2, 'هر اتصال یک گره' );
 		assert.equal( box.querySelectorAll( '.topo-edge' ).length, 2, 'هر اتصال یک یال' );
+
 		const bad = box.querySelector( '.topo-node.bad' );
 		assert.ok( bad, 'اتصال دارای مدار باز، گرهٔ خطادار ندارد' );
-		const reset = [ ...bad.querySelectorAll( 'button' ) ].find( ( b ) => b.textContent === 'ریست و رفع خطا' );
-		assert.ok( reset, 'دکمهٔ ریست روی گرهٔ خطادار نیست' );
+		assert.equal( bad.querySelectorAll( 'button' ).length, 0, 'گره باید تمیز بماند — دکمه داخلش نه' );
+		assert.ok( typeof bad.onclick === 'function', 'کلیک روی گره باید به جزئیات ببرد' );
+
+		// یالِ اتصالِ خطادار باید حالت error بگیرد، نه شکل پیش‌فرض.
+		const edges = [ ...box.querySelectorAll( '.topo-edge' ) ];
+		assert.ok(
+			edges.some( ( e ) => ( e.getAttribute( 'class' ) || '' ).includes( 'error' ) ),
+			'یال اتصالِ مدارباز باید error باشد'
+		);
+		// و راهنمای سه‌گانه سر جایش است.
+		assert.equal( box.querySelectorAll( '.lg-edge' ).length, 3, 'راهنما باید سه حالت داشته باشد' );
 	} finally {
 		dom.restore();
 	}
@@ -5266,9 +5282,17 @@ await test( 'کادر استدلال پنج‌خطی است، بالایش مح�
 	// و متن واقعاً داخل همان ظرف می‌نشیند، وگرنه لایه روی هوا می‌افتد.
 	assert.match( fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' ), /class: 'thinking-view' \}, \[ body \]/ );
 
-	// و در جاوااسکریپت، هر خط تازه کادر را به آخر می‌برد.
+	/*
+	 * و در جاوااسکریپت، پنجره فقط ۵ خط آخر را نگه می‌دارد.
+	 *
+	 * تا ۰.۹.۶ اینجا `scrollTop = scrollHeight` بود، ولی روی المانی که
+	 * `overflow: hidden` دارد قابل اتکا نیست: متن از بالا ثابت می‌ماند و کاربر ۵ خط
+	 * **اول** را می‌دید نه آخر — دقیقاً برعکس خواستهٔ کارفرما. حالا رندرِ صریحِ
+	 * `slice(-5)` جای آن را گرفته که به رفتار اسکرول مرورگر وابسته نیست.
+	 */
 	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
-	assert.match( thread, /_body\.scrollTop = thinkEl\._body\.scrollHeight/ );
+	assert.match( thread, /slice\(\s*-THINK_LINES\s*\)/, 'باید فقط چند خط آخر رندر شود' );
+	assert.match( thread, /const THINK_LINES = 5/, 'اندازهٔ پنجره باید ۵ خط باشد' );
 } );
 
 await test( 'کادر استدلال با آمدن جواب پاک می‌شود، نه اینکه تا رفرش بماند', async () => {
@@ -5286,7 +5310,14 @@ await test( 'کادر استدلال با آمدن جواب پاک می‌شود
 		const box = document.querySelector( '.thinking' );
 		assert.ok( box, 'کادر استدلال ساخته نشد' );
 		assert.match( document.querySelector( '.thinking-body' ).textContent, /خط دوم/ );
-		assert.ok( document.querySelector( '.thinking-body' ).scrollTop > 0, 'کادر باید به آخرین خط اسکرول شود' );
+
+		// پنجرهٔ ۵ خطی: خط‌های قدیمی‌تر از پنجره بیرون می‌روند، نه اینکه بمانند و اول
+		// فهرست دیده شوند.
+		thread.handleEvent( { type: 'thinking', text: 'س\nچ\nپ\nش\nه\n' } );
+		await new Promise( ( r ) => setTimeout( r, 30 ) );
+		const shown = document.querySelector( '.thinking-body' ).textContent;
+		assert.equal( /خط اول/.test( shown ), false, 'خط قدیمی باید از پنجره بیرون رفته باشد' );
+		assert.match( shown, /ه/, 'تازه‌ترین خط باید دیده شود' );
 
 		thread.handleEvent( { type: 'text', text: 'جواب مدل' } );
 		await new Promise( ( r ) => setTimeout( r, 40 ) );

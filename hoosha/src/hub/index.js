@@ -384,8 +384,45 @@ export class Hub {
 		} );
 
 		if ( ! routed.candidates.length ) {
-			const why = routed.blocked.map( ( b ) => `${ b.key }: ${ b.reason }` ).slice( 0, 4 ).join( ' · ' );
-			yield { type: 'error', error: `هیچ مدلی برای این درخواست در دسترس نیست.${ why ? ` (${ why })` : '' }` };
+			/*
+			 * پیام باید بگوید «چه کار کنم»، نه فقط «نشد».
+			 *
+			 * حالت پرتکرار و گیج‌کننده: کاربر تصویر می‌فرستد و **هیچ‌کدام** از مدل‌های
+			 * روشن بینا نیستند. `caps.vision` فقط از روی نام مدل حدس زده می‌شود
+			 * (registry.js)، پس هر مدلی که الگو نشناسدش «بدون بینایی» می‌ماند و کاربر
+			 * پیام مبهم «هیچ مدلی در دسترس نیست» می‌گیرد در حالی که همه‌چیز سالم است.
+			 * (DESIGN-HUB-UI-FIX §۲.۵)
+			 */
+			const reasons = routed.blocked.map( ( b ) => b.reason );
+			const allVision = reasons.length > 0 && reasons.every( ( r ) => r === 'بینایی ندارد' );
+
+			if ( allVision ) {
+				yield {
+					type: 'error',
+					error: 'هیچ‌کدام از مدل‌های روشن، بینایی (تصویر) ندارند.',
+					hint: 'یک مدل بینا روشن کن، یا در «هاب پرووایدر ← اتصال‌ها ← مدل‌ها» تیک «بینایی» همین مدل را دستی بزن. قابلیت‌ها از روی نام مدل حدس زده می‌شوند و نام‌های تازه شناخته نمی‌شوند.',
+					kind: 'capability',
+				};
+				return;
+			}
+
+			// شمردنِ دلایل، خواناتر از فهرست‌کردن چهار کلید تصادفی است.
+			const tally = new Map();
+			for ( const r of reasons ) {
+				tally.set( r, ( tally.get( r ) || 0 ) + 1 );
+			}
+			const why = [ ...tally.entries() ]
+				.sort( ( a, b ) => b[ 1 ] - a[ 1 ] )
+				.slice( 0, 3 )
+				.map( ( [ r, n ] ) => `${ r } (${ n } مدل)` )
+				.join( ' · ' );
+
+			yield {
+				type: 'error',
+				error: `هیچ مدلی برای این درخواست در دسترس نیست.${ why ? ` — ${ why }` : '' }`,
+				hint: 'در «هاب پرووایدر ← سلامت و مصرف» ببین کدام اتصال مدارشکنش باز است، یا از «ریست و رفع خطا» استفاده کن.',
+				kind: 'routing',
+			};
 			return;
 		}
 
@@ -404,6 +441,9 @@ export class Hub {
 
 		/** @type {any} */
 		let lastError = null;
+		/** گزارش هر تلاش، برای پیام پایانی — «چه چیزی آزموده شد و هرکدام چه داد». */
+		/** @type {{label:string, reason:string}[]} */
+		const tried = [];
 
 		for ( let i = 0; i < limit; i++ ) {
 			const candidate = routed.candidates[ i ];
@@ -424,6 +464,10 @@ export class Hub {
 				return;
 			}
 			lastError = outcome.error;
+			tried.push( {
+				label: this.data.models?.[ candidate.key ]?.label || candidate.modelId || candidate.key,
+				reason: outcome.error?.message || 'بدون توضیح',
+			} );
 			if ( outcome.emitted ) {
 				// حرفی از این مدل به کاربر رفته؛ نمی‌شود وسط جمله مدل عوض کرد.
 				yield { type: 'error', error: outcome.error?.message || 'ارتباط با مدل قطع شد.' };
@@ -432,10 +476,24 @@ export class Hub {
 			this.emit( { type: 'hub-failover', from: candidate.key, reason: outcome.error?.message || '' } );
 		}
 
+		/*
+		 * پیام پایانی باید سه چیز را بگوید: چند مسیر آزموده شد، هرکدام چه داد، و گام
+		 * بعدی چیست. تا ۰.۹.۶ فقط «آخرین خطا» می‌آمد و `hint` عملاً دیده نمی‌شد، پس سه
+		 * علتِ کاملاً متفاوت (کلید غلط، تحریم، پراکسی خاموش) یک جملهٔ مبهم می‌دادند.
+		 */
+		const detail = tried.length
+			? tried.map( ( t ) => `«${ t.label }»: ${ t.reason }` ).join( ' · ' )
+			: '';
+		const networkish = /network|fetch|ENOTFOUND|ECONNREFUSED|timeout|وصل نشدم/i.test( String( lastError?.message || '' ) );
+
 		yield {
 			type: 'error',
-			error: lastError?.message ? `همهٔ مسیرها شکست خوردند. آخرین خطا: ${ lastError.message }` : 'همهٔ مسیرهای هاب شکست خوردند.',
-			hint: lastError?.hint,
+			error: tried.length > 1
+				? `هر ${ tried.length } مسیر شکست خورد. ${ detail }`
+				: `مسیر شکست خورد. ${ detail || lastError?.message || '' }`.trim(),
+			hint: lastError?.hint || ( networkish
+				? 'اگر Hiddify یا مشابهش روشن است، آدرسش را در تنظیمات ← پراکسی وارد کن؛ Node پراکسی سیستم را خودش برنمی‌دارد. بعد «تست پراکسی» را بزن. جزئیات کامل در تنظیمات ← لاگ‌ها.'
+				: 'جزئیات کامل هر تلاش در تنظیمات ← لاگ‌ها ثبت شده است.' ),
 			kind: lastError?.kind,
 		};
 	}
