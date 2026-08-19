@@ -183,6 +183,13 @@ Toman/Rial factor (`payments.currency_multiplier`, default 10).
 3. **dbDelta needs two spaces** in `PRIMARY KEY  (`.
 4. Secrets are encrypted at rest. `Settings::set_many()` skips values equal to `Crypto::MASK` or
    `''`, so a masked field round-trips without wiping the stored secret.
+5. **Never list-destructure an associative return value.** `AbstractIpgGateway::post_json()` and
+   `post_raw()` return `['ok'=>…, 'body'=>…, 'raw'=>…, 'error'=>…]`. Writing
+   `[ $ok, $body ] = $this->post_json(…)` asks for keys `0` and `1`, which do not exist: both
+   variables become `null`, every successful bank response reads as a failure, and PHP emits
+   "Undefined array key". Four gateways (Sadad, Asan Pardakht, Mellat, Parsian) shipped with
+   exactly this bug and it was fixed on ۱۴۰۵/۰۵/۳۰. Read by key, and give any method returning an
+   associative array a `@return array{…}` shape in its PHPDoc.
 
 ---
 

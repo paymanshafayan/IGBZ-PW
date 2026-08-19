@@ -66,7 +66,9 @@ final class MellatGateway extends AbstractIpgGateway {
 			]
 		);
 
-		[ $ok, , $raw ] = $this->post_raw( self::WSDL, $body );
+		$response = $this->post_raw( self::WSDL, $body );
+		$ok       = (bool) $response['ok'];
+		$raw      = (string) $response['raw'];
 
 		if ( $ok && preg_match( '#<return>(.*?)</return>#s', (string) $raw, $m ) ) {
 			$result = trim( $m[1] );
@@ -87,13 +89,16 @@ final class MellatGateway extends AbstractIpgGateway {
 		}
 		$order_id = (string) ( $callback_params['SaleOrderId'] ?? $callback_params['order_id'] ?? '' );
 
-		[ $ok, , $raw ] = $this->post_raw(
+		$response = $this->post_raw(
 			self::WSDL,
 			$this->soap(
 				'bpVerifyRequest',
 				[ 'terminalId' => (int) $this->cfg( 'terminal_id' ), 'userName' => $this->cfg( 'username' ), 'userPassword' => $this->cfg( 'password' ), 'orderId' => $order_id, 'saleOrderId' => $order_id, 'saleReferenceId' => $ref ]
 			)
 		);
+
+		$ok  = (bool) $response['ok'];
+		$raw = (string) $response['raw'];
 
 		if ( $ok && preg_match( '#<return>(.*?)</return>#s', (string) $raw, $m ) && '0' === trim( $m[1] ) ) {
 			// Settle.

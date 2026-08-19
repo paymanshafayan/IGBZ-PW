@@ -35,7 +35,7 @@ final class AsanPardakhtGateway extends AbstractIpgGateway {
 	}
 
 	public function request( float $amount, string $callback_url, array $context = [] ): PaymentRequestResult {
-		[ $ok, $body ] = $this->post_json(
+		$response = $this->post_json(
 			self::REQUEST_URL,
 			[
 				'merchantConfigurationId' => $this->cfg( 'merchant_config' ),
@@ -45,6 +45,9 @@ final class AsanPardakhtGateway extends AbstractIpgGateway {
 				'paymenter'               => $this->cfg( 'api_key' ),
 			]
 		);
+
+		$ok   = (bool) $response['ok'];
+		$body = (array) $response['body'];
 
 		$token = (string) ( $body['token'] ?? '' );
 		if ( $ok && '' !== $token ) {
@@ -60,7 +63,9 @@ final class AsanPardakhtGateway extends AbstractIpgGateway {
 			return PaymentVerifyResult::failure( 'missing_token', __( 'Asan Pardakht did not return a token.', 'igbz-suite' ) );
 		}
 
-		[ $ok, $body ] = $this->post_json( self::VERIFY_URL, [ 'token' => $token ] );
+		$response = $this->post_json( self::VERIFY_URL, [ 'token' => $token ] );
+		$ok       = (bool) $response['ok'];
+		$body     = (array) $response['body'];
 
 		if ( $ok && (int) ( $body['resultCode'] ?? 1 ) === 0 ) {
 			return PaymentVerifyResult::ok( (string) ( $body['paymentId'] ?? $token ), (string) ( $body['cardNumber'] ?? '' ), 0.0 );

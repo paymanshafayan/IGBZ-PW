@@ -60,7 +60,9 @@ final class ParsianGateway extends AbstractIpgGateway {
 
 	public function request( float $amount, string $callback_url, array $context = [] ): PaymentRequestResult {
 		$order_id = (string) ( $context['order_id'] ?? 'ORD-' . time() );
-		[ $ok, , $raw ] = $this->post_raw( self::WSDL, $this->soap_request( Money::to_rial( $amount ), $callback_url, $order_id ) );
+		$response = $this->post_raw( self::WSDL, $this->soap_request( Money::to_rial( $amount ), $callback_url, $order_id ) );
+		$ok       = (bool) $response['ok'];
+		$raw      = (string) $response['raw'];
 
 		if ( $ok && preg_match( '#<SalePaymentResult>(.*?)</SalePaymentResult>#s', (string) $raw, $m ) ) {
 			$xml = @simplexml_load_string( '<r>' . $m[1] . '</r>' );
@@ -79,7 +81,9 @@ final class ParsianGateway extends AbstractIpgGateway {
 			return PaymentVerifyResult::failure( 'missing_token', __( 'Parsian did not return a token.', 'igbz-suite' ) );
 		}
 
-		[ $ok, , $raw ] = $this->post_raw( self::CONFIRM, $this->soap_confirm( $token ) );
+		$response = $this->post_raw( self::CONFIRM, $this->soap_confirm( $token ) );
+		$ok       = (bool) $response['ok'];
+		$raw      = (string) $response['raw'];
 
 		if ( $ok && preg_match( '#<ConfirmPaymentDataResult>(.*?)</ConfirmPaymentDataResult>#s', (string) $raw, $m ) ) {
 			$xml = @simplexml_load_string( '<r>' . $m[1] . '</r>' );
