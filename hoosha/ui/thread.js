@@ -307,6 +307,23 @@ export function dropThinking() {
 	}
 }
 
+/**
+ * جمع‌کردن خروجی ابزارها وقتی جواب مدل می‌رسد.
+ *
+ * کارفرما کارت‌های خروجی ابزار را هم جزو «باکس‌های استدلال» می‌شمارد (Snap24) و
+ * می‌خواهد پیش از رسیدن جواب از صفحه بروند. اینجا کل کارت حذف نمی‌شود — سطر عنوانش
+ * می‌ماند تا معلوم باشد چه ابزاری اجرا شده — ولی بدنهٔ پرحجم جمع می‌شود. باز و بستهٔ
+ * دستی کاربر (`open`) محترم شمرده می‌شود.
+ */
+export function settleTools() {
+	for ( const card of toolEls.values() ) {
+		if ( ! card.classList.contains( 'open' ) ) {
+			card.classList.add( 'settled' );
+			card.querySelector( '.tool-body' )?.classList.remove( 'peek' );
+		}
+	}
+}
+
 /** چند خط آخرِ استدلال که در پنجره می‌ماند — خواستهٔ کارفرما: چهار تا پنج خط. */
 const THINK_LINES = 5;
 
@@ -804,6 +821,8 @@ export function handleEvent( ev ) {
 			hideWorking();
 			// استدلال، داربستِ ساختنِ جواب است؛ با آمدن خودِ جواب، جمع می‌شود.
 			dropThinking();
+			// خروجی ابزارها هم همین‌طور: جواب باید صفحه را در اختیار بگیرد.
+			settleTools();
 			if ( ! streamEl ) {
 				streamEl = addMessage( 'assistant', '' );
 				streamEl._raw = '';

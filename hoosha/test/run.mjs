@@ -3890,8 +3890,12 @@ await test( 'ریست اتصال از صفحهٔ جزئیات، درخواست r
 		const { mountHubPage } = await import( `../ui/hubpage.js?reset=${ Date.now() }` );
 		const box = document.createElement( 'div' );
 		await mountHubPage( box, { view: 'connections' } );
-		const open = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'باز کردن' );
-		assert.ok( open, 'دکمهٔ باز کردن کارت نیست' );
+		/*
+		 * از ۰.۹.۷ کارت سرویس **خودش** کلیک‌پذیر است و به جزئیات می‌برد (سبک Snap4)؛
+		 * دکمهٔ پرِ «باز کردن» برداشته شد چون کارفرما آن را «زمخت» خواند.
+		 */
+		const open = box.querySelector( '.hub-card.linked' );
+		assert.ok( open, 'کارت متصل پیدا نشد' );
 		await open.click();
 		await new Promise( ( r ) => setTimeout( r, 30 ) );
 		const resetBtn = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'ریست و رفع خطا' );
@@ -3921,7 +3925,9 @@ await test( 'مدل‌ها در جزئیات سرویس‌اند: کشف، آز�
 		const box = document.createElement( 'div' );
 		await mountHubPage( box, { view: 'connections' } );
 		( await Promise.resolve() );
-		const open = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'باز کردن' );
+		// کارت خودش کلیک‌پذیر است (۰.۹.۷ — سبک Snap4).
+		const open = box.querySelector( '.hub-card.linked' );
+		assert.ok( open, 'کارت متصل پیدا نشد' );
 		await open.click();
 		await new Promise( ( r ) => setTimeout( r, 30 ) );
 		assert.match( box.textContent, /مدل‌های این سرویس/ );
@@ -6167,6 +6173,71 @@ await test( 'جاروی ترجمه، محتوای کاربر را دست نمی�
 await fs.rm( tmpRoot, { recursive: true, force: true } );
 
 process.stdout.write( `\n${ '-'.repeat( 56 ) }\n` );
+
+section( 'تونل و پراکسی — سازگاری داسپچر (۰.۹.۷)' );
+
+await test( 'تماس از راه SOCKS واقعاً برقرار می‌شود — نه fetch سراسری، نه { url }', async () => {
+	/*
+	 * دو باگ روی هم، تست تونل را **صددرصد** شکست‌خورده می‌کردند و کارفرما می‌دید
+	 * «هیچ کانفیگ سالمی نیست» با کانفیگ‌هایی که در Hiddify کار می‌کردند:
+	 *
+	 *   ۱) `fetch` سراسری Node داسپچرِ بستهٔ undici را نمی‌پذیرد
+	 *      → «invalid onRequestStart method»
+	 *   ۲) `socksDispatcher({ url })` شکل غلط است؛ آبجکت `{ type, host, port }` می‌خواهد
+	 *      → «Invalid SOCKS proxy details were provided»
+	 *
+	 * این تست یک SOCKS5 مینیمالِ واقعی بالا می‌آورد و از راهش یک تماس می‌زند.
+	 */
+	const http = await import( 'node:http' );
+	const netmod = await import( 'node:net' );
+
+	const target = http.createServer( ( q, r ) => { r.writeHead( 204 ); r.end(); } );
+	await new Promise( ( r ) => target.listen( 0, '127.0.0.1', r ) );
+	const tport = target.address().port;
+
+	const socks = netmod.createServer( ( c ) => {
+		let stage = 0;
+		c.on( 'data', () => {
+			if ( stage === 0 ) { c.write( Buffer.from( [ 5, 0 ] ) ); stage = 1; return; }
+			if ( stage === 1 ) {
+				c.write( Buffer.from( [ 5, 0, 0, 1, 127, 0, 0, 1, ( tport >> 8 ) & 255, tport & 255 ] ) );
+				const up = netmod.connect( tport, '127.0.0.1', () => { c.pipe( up ); up.pipe( c ); } );
+				stage = 2;
+			}
+		} );
+		c.on( 'error', () => {} );
+	} );
+	await new Promise( ( r ) => socks.listen( 0, '127.0.0.1', r ) );
+	const sport = socks.address().port;
+
+	try {
+		const { proxyFetch } = await import( `../src/net.js?socks=${ Date.now() }` );
+		const res = await proxyFetch( 'http://example.test/', {}, `socks5://127.0.0.1:${ sport }` );
+		assert.equal( res.status, 204, 'تماس از راه پراکسی socks5 باید برقرار شود' );
+
+		// و موتور تونل هم نباید به fetch سراسری برگردد.
+		const engine = fssync.readFileSync( path.resolve( 'src/tunnel/engine.js' ), 'utf8' );
+		assert.equal( /await fetch\(\s*url,\s*\{[\s\S]{0,80}dispatcher/.test( engine ), false, 'fetch سراسری با داسپچر ممنوع است' );
+		assert.match( engine, /undiciFetch\(\s*url/, 'باید از undiciFetch استفاده کند' );
+		assert.equal( /socksDispatcher\( \{ url:/.test( engine ), false, 'شکل { url } غلط است' );
+	} finally {
+		target.close();
+		socks.close();
+	}
+} );
+
+await test( 'پراکسی در بوت روی هاب می‌نشیند، نه فقط وقتی کاربر صفحه را باز کند', () => {
+	/*
+	 * `syncProxyToHub()` تا ۰.۹.۷ فقط از مسیرهای /api/proxy و /api/tunnel صدا زده
+	 * می‌شد. با هر بار بستن و باز کردن برنامه، hub.data.proxy.url خالی می‌ماند و
+	 * تماس‌های هاب مستقیم می‌رفتند → ۴۲۹ از IP ایران (Snap23).
+	 */
+	const server = fssync.readFileSync( path.resolve( 'src/server.js' ), 'utf8' );
+	assert.match( server, /setProxyPolicy\( runtime\.config\?\.proxy \|\| \{\} \);\s*\n\s*syncProxyToHub\(\)/,
+		'syncProxyToHub باید در بوت هم صدا زده شود' );
+} );
+
+
 if ( failures.length ) {
 	process.stdout.write( `${ passed } تست موفق، ${ failures.length } ناموفق\n` );
 	for ( const f of failures ) {

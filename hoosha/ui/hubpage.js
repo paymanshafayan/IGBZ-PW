@@ -411,37 +411,62 @@ function renderCatalog( box, page ) {
 			if ( filters.mode === 'local' && ! isLocal( p ) ) { continue; }
 			if ( q && ! `${ p.label } ${ p.id }`.toLowerCase().includes( q ) ) { continue; }
 			const bad = mine.some( ( c ) => [ 'مدار باز', 'اعتبار تمام' ].includes( statusOf( c ) ) );
-			grid.appendChild(
-				h( 'div', { class: `hub-card ${ mine.length ? 'linked' : '' } ${ bad ? 'bad' : '' }` }, [
-					h( 'div', { class: 'hub-card-top' }, [
-						h( 'span', { class: 'pav brand', style: `background:${ brandColor( p.id, p.label ) }`, text: ( p.label || '?' ).trim().slice( 0, 1 ).toUpperCase() } ),
-						h( 'div', { class: 'item-main' }, [
-							h( 'b', { text: p.label } ),
-							h( 'p', { class: 'mono note', text: p.baseUrl || p.note || '—' } ),
-						] ),
-					] ),
-					h( 'p', { class: `note ${ bad ? 'error' : '' }`, text: mine.length
-						? `${ mine.length } اتصال · ${ mine.map( ( c ) => statusOf( c ) ).join( '، ' ) }`
-						: 'متصل نیست' } ),
-					h( 'div', { class: 'hub-card-actions' }, [
-						h( 'button', {
-							class: `btn ${ mine.length ? 'outline' : 'solid' }`,
-							text: mine.length ? 'باز کردن' : 'افزودن',
-							onClick: () => { mine.length ? ( state.provider = p.id, again( page ) ) : connWizard( null, p.id, page ); },
-						} ),
-						mine.length ? h( 'button', {
-							class: 'btn outline',
-							text: 'تست',
-							onClick: async () => {
-								const c = mine.find( ( x ) => x.enabled !== false ) || mine[ 0 ];
-								toast( `در حال آزمودن «${ c.label }»…` );
-								const out = await action( { action: 'test-connection', id: c.id } );
-								toast( out.ok ? out.message : `${ out.error }${ out.hint ? ' — ' + out.hint : '' }`, out.ok ? 'ok' : 'error' );
-							},
-						} ) : null,
-					] ),
-				] )
-			);
+			const live = mine.find( ( c ) => c.enabled !== false ) || mine[ 0 ] || null;
+			const on = Boolean( live && live.enabled !== false );
+			const dot = ! mine.length ? 'none' : bad ? 'bad' : 'ok';
+
+			/*
+			 * کارت به سبک Snap4: نقطهٔ وضعیت گوشهٔ بالا، لوگو + نام، چیپ قابلیت، و
+			 * پاورقیِ سبک با کلید روشن/خاموش و «تست» آیکونی.
+			 *
+			 * کارفرما صریح گفت «نه این دکمه‌های زمخت»: دو دکمهٔ هم‌وزنِ پر، جای
+			 * پاورقی مرجع را گرفته بودند. حالا کل کارت کلیک‌پذیر است و کنش‌ها
+					 * سبک‌اند — دقیقاً مثل مرجع.
+			 */
+			const card = h( 'div', {
+				class: `hub-card ${ mine.length ? 'linked' : '' } ${ bad ? 'bad' : '' }`,
+				title: p.baseUrl || p.note || '',
+				onClick: () => {
+					if ( mine.length ) {
+						state.provider = p.id;
+						again( page );
+					} else {
+						connWizard( null, p.id, page );
+					}
+				},
+			}, [
+				h( 'span', { class: `card-dot ${ dot }` } ),
+				h( 'div', { class: 'hub-card-top' }, [
+					h( 'span', { class: 'pav brand', style: `background:${ brandColor( p.id, p.label ) }`, text: ( p.label || '?' ).trim().slice( 0, 1 ).toUpperCase() } ),
+					h( 'b', { class: 'card-name', text: p.label } ),
+				] ),
+				h( 'span', { class: 'cap-chip', text: p.kind === 'anthropic' ? 'Messages' : 'Chat' } ),
+				h( 'div', { class: 'hub-card-foot' }, [
+					h( 'span', { class: `card-state ${ mine.length ? ( bad ? 'bad' : 'ok' ) : '' }`,
+						text: mine.length ? `${ mine.length } اتصال` : 'متصل نیست' } ),
+					h( 'span', { class: 'grow' } ),
+					mine.length ? h( 'button', {
+						class: `btn sw ${ on ? 'on' : '' }`,
+						title: on ? 'روشن — برای خاموش‌کردن کلیک کن' : 'خاموش',
+						onClick: async ( e ) => {
+							e.stopPropagation();
+							await action( { action: 'save-connection', connection: { ...live, apiKey: undefined, enabled: ! on } } );
+							await again( page );
+						},
+					}, [ h( 'span', { class: 'sw-knob' } ) ] ) : null,
+					mine.length ? h( 'button', {
+						class: 'btn icon-act',
+						title: 'تست اتصال',
+						onClick: async ( e ) => {
+							e.stopPropagation();
+							toast( `در حال آزمودن «${ live.label }»…` );
+							const out = await action( { action: 'test-connection', id: live.id } );
+							toast( out.ok ? out.message : `${ out.error }${ out.hint ? ' — ' + out.hint : '' }`, out.ok ? 'ok' : 'error' );
+						},
+					}, [ h( 'span', { html: iconSvg( 'bolt', 11 ) } ), h( 'span', { text: 'تست' } ) ] ) : h( 'span', { class: 'card-add', text: '+ افزودن' } ),
+				] ),
+			] );
+			grid.appendChild( card );
 		}
 		if ( ! grid.children.length ) {
 			grid.appendChild( emptyBox( 'سرویسی با این فیلتر پیدا نشد.' ) );

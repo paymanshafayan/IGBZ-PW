@@ -255,8 +255,17 @@ export async function startServer( { port = 7788, host = '127.0.0.1', workspace 
 		}
 		return url;
 	}
-	// بار اول هم سیاست استثناها فعال باشد.
+	/*
+	 * بار اول هم سیاست استثناها فعال باشد **و پراکسی روی هاب بنشیند**.
+	 *
+	 * باگ تا ۰.۹.۷: `syncProxyToHub()` فقط از مسیرهای `/api/proxy` و `/api/tunnel`
+	 * صدا زده می‌شد — یعنی تنها وقتی کاربر صفحهٔ پراکسی را باز می‌کرد یا دکمه‌ای
+	 * می‌زد. با هر بار بستن و باز کردن برنامه، `hub.data.proxy.url` خالی می‌ماند و
+	 * تماس‌های هاب مستقیم می‌رفتند؛ نتیجه‌اش ۴۲۹/«درخواست‌ها زیاد است» از IP ایران
+	 * بود، دقیقاً همان چیزی که کارفرما در Snap23 دید. حالا در بوت هم اعمال می‌شود.
+	 */
 	setProxyPolicy( runtime.config?.proxy || {} );
+	syncProxyToHub().catch( () => {} );
 
 	const routes = {
 		'GET /api/state': async () => ( { status: 200, body: await buildState() } ),

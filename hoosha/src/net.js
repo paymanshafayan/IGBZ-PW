@@ -98,7 +98,20 @@ export function dispatcherFor( url, proxy, globalProxy = '' ) {
 	}
 	if ( ! cache.has( p ) ) {
 		if ( /^socks[45]?:\/\//i.test( p ) ) {
-			cache.set( p, socksDispatcher( { url: new URL( p ) } ) );
+			/*
+			 * `fetch-socks` آبجکت `{ type, host, port }` می‌خواهد، نه `{ url }`.
+			 * با شکل غلط، «Invalid SOCKS proxy details were provided» می‌دهد — یعنی
+			 * هر پراکسی socks5 (که Hiddify و v2rayN معمولاً همان را می‌دهند) بی‌صدا
+			 * شکست می‌خورد و کاربر فکر می‌کند تحریم است.
+			 */
+			const u = new URL( p );
+			cache.set( p, socksDispatcher( {
+				type: u.protocol === 'socks4:' ? 4 : 5,
+				host: u.hostname,
+				port: Number( u.port ) || 1080,
+				...( u.username ? { userId: decodeURIComponent( u.username ) } : {} ),
+				...( u.password ? { password: decodeURIComponent( u.password ) } : {} ),
+			} ) );
 		} else {
 			cache.set( p, new ProxyAgent( p ) );
 		}

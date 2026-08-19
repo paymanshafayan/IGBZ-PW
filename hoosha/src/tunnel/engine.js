@@ -173,13 +173,29 @@ async function probeThrough( port, url, ttlMs ) {
 	const t0 = Date.now();
 	try {
 		const { socksDispatcher } = await import( 'fetch-socks' );
-		const res = await fetch( url, {
-			dispatcher: socksDispatcher( { url: new URL( `socks5://127.0.0.1:${ port }` ) } ),
+		/*
+		 * ⚠️ `undiciFetch`، نه `fetch` سراسری.
+		 *
+		 * داسپچرِ بستهٔ npm (undici 7) با fetch داخلی Node ناسازگار است و خطای
+		 * «invalid onRequestStart method» می‌دهد. `net.js` این را از ۰.۹.۵ می‌دانست،
+		 * ولی موتور تونل همچنان `fetch` سراسری را صدا می‌زد — یعنی **هر تست کانفیگ
+		 * صرف‌نظر از سالم‌بودن سرور شکست می‌خورد** و کاربر «هیچ کانفیگ سالمی نیست»
+		 * می‌دید، حتی برای کانفیگ‌هایی که در Hiddify کار می‌کردند.
+		 */
+		const { fetch: undiciFetch } = await import( 'undici' );
+		/*
+		 * و شکل آرگومان: `{ type, host, port }` — نه `{ url }`.
+		 * با `{ url }` کتابخانه «Invalid SOCKS proxy details were provided» می‌دهد.
+		 * این دو باگ روی هم، تست تونل را صددرصد شکست‌خورده می‌کردند.
+		 */
+		const res = await undiciFetch( url, {
+			dispatcher: socksDispatcher( { type: 5, host: '127.0.0.1', port } ),
 			signal: AbortSignal.timeout( ttlMs ),
 		} );
 		return { ok: res.ok || res.status === 204, ms: Date.now() - t0, status: res.status };
 	} catch ( e ) {
-		return { ok: false, ms: Date.now() - t0, error: String( e?.message || e ).slice( 0, 80 ) };
+		const msg = String( e?.cause?.message || e?.message || e ).slice( 0, 80 );
+		return { ok: false, ms: Date.now() - t0, error: msg };
 	}
 }
 
@@ -492,10 +508,12 @@ export async function healthCheck() {
 	S.checks += 1;
 	try {
 		const { socksDispatcher } = await import( 'fetch-socks' );
+		// همان دلیل probeThrough: fetch سراسری داسپچر بسته را نمی‌پذیرد.
+		const { fetch: undiciFetch } = await import( 'undici' );
 		const t0 = Date.now();
 		// آی‌پی خروجی را از ipify می‌گیریم (بدنه دارد)؛ سلامت خودش با همین یک تماس.
-		const res = await fetch( 'https://api.ipify.org?format=json', {
-			dispatcher: socksDispatcher( { url: new URL( `socks5://127.0.0.1:${ SOCKS_PORT }` ) } ),
+		const res = await undiciFetch( 'https://api.ipify.org?format=json', {
+			dispatcher: socksDispatcher( { type: 5, host: '127.0.0.1', port: SOCKS_PORT } ),
 			signal: AbortSignal.timeout( 9000 ),
 		} );
 		const body = await res.json().catch( () => ( {} ) );

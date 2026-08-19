@@ -960,11 +960,30 @@ code .f {
 	text-align: left;
 	unicode-bidi: plaintext;
 }
+/*
+ * خروجی بلندِ ابزار، حین کار فقط یک پنجرهٔ پنج‌خطی نشان می‌دهد.
+ *
+ * کارفرما این کارت‌ها را هم جزو «باکس‌های استدلال» می‌شمارد (Snap24): تا ۰.۹.۷
+ * ارتفاعش ۳۸۰px بود و در حالت peek هم ۱۳۲px (حدود هفت-هشت خط) — یعنی یک خروجی
+ * WebFetch نصف صفحه را می‌بلعید. حالا ۵ خط × ۱.۶۵ = ۸.۲۵em، هم‌اندازهٔ پنجرهٔ
+ * بلوک استدلال.
+ */
 .tool-body.peek {
-	max-height: 132px;
+	max-height: 8.25em;
 	overflow: hidden;
-	-webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
-	mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 62%, transparent 100%);
+	mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 62%, transparent 100%);
+}
+/*
+ * با آمدن جواب، بدنهٔ پرحجم جمع می‌شود و فقط سطر عنوان (نام ابزار + خلاصه) می‌ماند.
+ * خواستهٔ کارفرما: «قبل از ارسال جواب، این باکس‌ها از صفحه حذف شوند.» سطر عنوان
+ * می‌ماند تا سابقهٔ «چه ابزاری اجرا شد» گم نشود و با کلیک باز می‌شود.
+ */
+.tool.settled .tool-body {
+	display: none;
+}
+.tool.settled.open .tool-body {
+	display: block;
 }
 .terminal {
 	background: var(--background);
@@ -3455,20 +3474,130 @@ body.sidebar-collapsed .account-menu {
 .hub-catalog.mini {
 	grid-template-columns: repeat( auto-fill, minmax( 184px, 1fr ) );
 }
+/*
+ * کارت سرویس — بازنویسی روی Snap4 (۰.۹.۷).
+ *
+ * کارفرما: «یک کارت می‌خواهم عیناً مثل Snap4، نه این دکمه‌های زمخت.» در مرجع، کنش‌ها
+ * یک **پاورقی سبک** است (کلید روشن/خاموش + «▶ Test» ریز)، نه دو دکمهٔ هم‌وزنِ پر که
+ * نصف کارت را بگیرند. خود کارت کلیک‌پذیر است و به صفحهٔ جزئیات می‌برد.
+ */
 .hub-card {
+	position: relative;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 10px;
 	padding: 14px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius-lg);
 	background: var(--card);
 	text-align: start;
 	cursor: pointer;
-	transition: border-color 0.15s var(--ease);
+	transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
 .hub-card:hover {
+	box-shadow: 0 2px 10px rgb(0 0 0 / 7%);
+}
+/* نقطهٔ وضعیت گوشهٔ بالا — همان جای مرجع. */
+.card-dot {
+	position: absolute;
+	inset-block-start: 12px;
+	inset-inline-end: 12px;
+	inline-size: 7px;
+	block-size: 7px;
+	border-radius: 50%;
+	background: var(--ok);
+}
+.card-dot.bad {
+	background: var(--destructive);
+}
+.card-dot.none {
+	background: var(--border);
+}
+.card-name {
+	font-weight: 600;
+	font-size: 0.95rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* چیپ قابلیت (Chat / Messages) — خاکستری و ریز، مثل مرجع. */
+.cap-chip {
+	align-self: flex-start;
+	background: var(--muted);
+	color: var(--muted-foreground);
+	border-radius: 6px;
+	padding: 2px 8px;
+	font-size: 0.72rem;
+}
+.hub-card-foot {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: auto;
+	padding-top: 10px;
+	border-top: 1px solid var(--border-soft);
+}
+.card-state {
+	font-size: 0.78rem;
+	color: var(--muted-foreground);
+}
+.card-state.ok {
+	color: var(--ok);
+}
+.card-state.bad {
+	color: var(--destructive);
+}
+.card-add {
+	font-size: 0.78rem;
+	color: var(--primary);
+	font-weight: 500;
+}
+/* کنشِ آیکونیِ سبک — به‌جای دکمهٔ پر. */
+.btn.icon-act {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	background: none;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 2px 8px;
+	font-size: 0.75rem;
+	color: var(--muted-foreground);
+	cursor: pointer;
+	font-family: inherit;
+}
+.btn.icon-act:hover {
 	border-color: var(--primary);
+	color: var(--primary);
+}
+/* کلید روشن/خاموش — همان سوییچ کوچک مرجع. */
+.btn.sw {
+	inline-size: 30px;
+	block-size: 17px;
+	border-radius: 999px;
+	background: var(--border);
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	position: relative;
+	flex: none;
+	transition: background 0.15s var(--ease);
+}
+.btn.sw.on {
+	background: var(--ok);
+}
+.sw-knob {
+	position: absolute;
+	inset-block-start: 2px;
+	inset-inline-start: 2px;
+	inline-size: 13px;
+	block-size: 13px;
+	border-radius: 50%;
+	background: #fff;
+	transition: inset-inline-start 0.15s var(--ease);
+}
+.btn.sw.on .sw-knob {
+	inset-inline-start: 15px;
 }
 .hub-card.linked {
 	border-color: var(--primary-line);
@@ -3484,11 +3613,6 @@ body.sidebar-collapsed .account-menu {
 	display: flex;
 	gap: 10px;
 	align-items: center;
-}
-.hub-card-actions {
-	display: flex;
-	gap: 8px;
-	margin-top: auto;
 }
 .pav {
 	width: 34px;
