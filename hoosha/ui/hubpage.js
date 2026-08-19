@@ -24,6 +24,26 @@ async function refresh() {
 }
 
 const CUSTOM = new Set( [ 'openai-compatible', 'anthropic-compatible' ] );
+/* رنگ برندها — حسِ لوگو بدون بستهٔ آیکون (الگوی OmniRoute). */
+const BRANDS = {
+	anthropic: '#d97757', openai: '#10a37f', 'google-gemini': '#4285f4', gemini: '#4285f4',
+	deepseek: '#4d6bfe', groq: '#f55036', mistral: '#ff7000', xai: '#17171b', 'xai (grok)': '#17171b',
+	'together ai': '#0f6fff', 'fireworks ai': '#e8713a', cerebras: '#f5841f', 'azure openai': '#0078d4',
+	ollama: '#0f0f0f', 'lm studio': '#17b26a', vllm: '#13c1c8', openrouter: '#17171b',
+	'openai-compatible': '#13c1c8', 'anthropic-compatible': '#d97757',
+};
+function brandColor( providerId, label ) {
+	const k = String( providerId || '' ).toLowerCase();
+	if ( BRANDS[ k ] ) { return BRANDS[ k ]; }
+	const l = String( label || '' ).toLowerCase();
+	for ( const [ key, c ] of Object.entries( BRANDS ) ) {
+		if ( l.includes( key ) ) { return c; }
+	}
+	let h = 0;
+	for ( const ch of l ) { h = ( h * 31 + ch.codePointAt( 0 ) ) % 360; }
+	return `hsl(${ h } 45% 45%)`;
+}
+
 const isLocal = ( p ) => /localhost|127\.|0\.0\.0\.0|سرور خودت|محلی/i.test( `${ p.baseUrl || '' } ${ p.label || '' }` );
 
 /** دوباره‌سازی همین نما — کاربر نتیجهٔ کارش را ببیند، نه فرم قدیمی را. */
@@ -77,17 +97,17 @@ function draw( box ) {
 		[ 'health', 'سلامت و مصرف', 'health' ],
 	];
 	box.appendChild( statusBar( box ) );
-	box.appendChild(
-		h( 'div', { class: 'nav-tab-wrapper hub-tabs' },
-			views.map( ( [ id, label, ico ] ) =>
-				h( 'button', {
-					class: `btn quiet nav-tab ${ state.view === id ? 'nav-tab-active' : '' }`,
-					onClick: () => { state.view = id; state.provider = null; again( box ); },
-				}, [ h( 'span', { class: 'si-ico', html: iconSvg( ico, 14 ) } ), h( 'span', { text: label } ) ] )
-			) )
-	);
+	/* چیدمان OmniRoute: ستون ناوبری + محتوا */
 	const host = el( 'div', 'hub-view' );
-	box.appendChild( host );
+	const side = h( 'div', { class: 'hub-side' },
+		views.map( ( [ id, label, ico ] ) =>
+			h( 'button', {
+				class: `btn quiet row nav-item hub-side-item ${ state.view === id ? 'active' : '' }`,
+				onClick: () => { state.view = id; state.provider = null; again( box ); },
+			}, [ h( 'span', { class: 'si-ico', html: iconSvg( ico, 15 ) } ), h( 'span', { text: label } ) ] ) )
+	);
+	const layout = h( 'div', { class: 'hub-layout' }, [ side, host ] );
+	box.appendChild( layout );
 	if ( state.view === 'overview' ) {
 		renderOverview( host, box );
 	} else if ( state.view === 'connections' && state.provider ) {
@@ -289,42 +309,7 @@ function renderOverview( box, page ) {
 function renderCatalog( box, page ) {
 	box.appendChild( section( 'اتصال‌ها', 'از کاتالوگ انتخاب کن، کلید بده، تست کن. از یک سرویس می‌توانی چند حساب جدا داشته باشی.' ) );
 
-	/*
-	 * پراکسی هوشا (۰.۹.۵) — Node.js برخلاف مرورگر پراکسی سیستم (Hiddify و مانندش) را
-	 * نمی‌بیند؛ تماس‌های پرووایدر این‌جا از مسیر مشخص‌شده می‌گذرند. مقصدهای محلی
-	 * (Ollama و…) همیشه مستقیم‌اند. درخواست کارفرما: «پراکسی مطمئن برای هوشا».
-	 */
-	const proxyUrl = h( 'input', { class: 'field', dir: 'ltr', value: snap?.hub?.proxy?.url || '', placeholder: 'http://127.0.0.1:7890' } );
-	const proxyResult = el( 'p', 'note' );
-	const proxyCard = h( 'div', { class: 'form-card proxy-card' }, [
-		h( 'div', { class: 'item-main' }, [
-			h( 'b', { text: 'پراکسی هوشا' } ),
-			h( 'p', { class: 'note', text: 'تماس‌های پرووایدر از این مسیر می‌گذرند (Hiddify: http://127.0.0.1:7890). مقصدهای محلی همیشه مستقیم‌اند. هر اتصال می‌تواند پراکسی خودش را هم در ویزارد بگیرد.' } ),
-		] ),
-		proxyUrl,
-		h( 'div', { class: 'modal-actions' }, [
-			h( 'button', {
-				class: 'btn outline', text: 'تست پراکسی',
-				onClick: async () => {
-					proxyResult.textContent = 'در حال آزمودن…';
-					const out = await action( { action: 'proxy-test', proxy: proxyUrl.value.trim() } );
-					const fmt = ( r ) => r?.ok ? `IP ${ r.ip || '؟' } · ${ r.ms }ms` : ( r?.error ? `خطا: ${ String( r.error ).slice( 0, 60 ) }` : '✗' );
-					proxyResult.textContent = `از پراکسی: ${ fmt( out.proxied ) } · مستقیم: ${ fmt( out.direct ) }`;
-				},
-			} ),
-			h( 'span', { class: 'grow' } ),
-			h( 'button', {
-				class: 'btn solid', text: 'ذخیره پراکسی',
-				onClick: async () => {
-					await action( { action: 'update', patch: { proxy: { url: proxyUrl.value.trim() } } } );
-					toast( 'پراکسی ذخیره شد.' );
-					await refresh();
-				},
-			} ),
-		] ),
-		proxyResult,
-	] );
-	box.appendChild( proxyCard );
+
 
 	const hub = snap?.hub || {};
 	const catalog = ( snap?.catalog || [] ).filter( ( p ) => p.id !== 'mock' );
@@ -366,7 +351,7 @@ function renderCatalog( box, page ) {
 			grid.appendChild(
 				h( 'div', { class: `hub-card ${ mine.length ? 'linked' : '' } ${ bad ? 'bad' : '' }` }, [
 					h( 'div', { class: 'hub-card-top' }, [
-						h( 'span', { class: 'pav', text: ( p.label || '?' ).trim().slice( 0, 1 ).toUpperCase() } ),
+						h( 'span', { class: 'pav brand', style: `background:${ brandColor( p.id, p.label ) }`, text: ( p.label || '?' ).trim().slice( 0, 1 ).toUpperCase() } ),
 						h( 'div', { class: 'item-main' }, [
 							h( 'b', { text: p.label } ),
 							h( 'p', { class: 'mono note', text: p.baseUrl || p.note || '—' } ),
@@ -715,7 +700,7 @@ function connWizard( conn, preset, page ) {
 					onClick: () => { data.provider = p.id; draw(); },
 				}, [
 					h( 'div', { class: 'hub-card-top' }, [
-						h( 'span', { class: 'pav', text: ( p.label || '?' ).slice( 0, 1 ).toUpperCase() } ),
+						h( 'span', { class: 'pav brand', style: `background:${ brandColor( p.id, p.label ) }`, text: ( p.label || '?' ).slice( 0, 1 ).toUpperCase() } ),
 						h( 'div', { class: 'item-main' }, [ h( 'b', { text: p.label } ), h( 'p', { class: 'mono note', text: p.baseUrl || p.note || '—' } ) ] ),
 					] ),
 				] ) );

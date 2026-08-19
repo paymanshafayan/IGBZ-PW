@@ -53,9 +53,33 @@ export function isLocalTarget( url ) {
 	return /^(https?:)?\/\/(localhost|127\.|0\.0\.0\.0|\[::1\])/i.test( String( url ) );
 }
 
+/*
+ * استثناها — همان صفحهٔ پراکسی ویندوز (Snap15): «به‌جز نشانی‌هایی که با این‌ها
+ * شروع می‌شوند، با ؛ جدا». الگو با * تمام می‌شود یعنی پیشوند.
+ * @type {{ exceptions: string[], bypassLocal: boolean }}
+ */
+const policy = { exceptions: [], bypassLocal: true };
+
+export function setProxyPolicy( p = {} ) {
+	policy.exceptions = String( p.exceptions || '' ).split( ';' ).map( ( x ) => x.trim().toLowerCase() ).filter( Boolean );
+	policy.bypassLocal = p.bypassLocal !== false;
+}
+
+/** آیا این مقصد در استثناهای کاربر است؟ */
+export function matchesException( url ) {
+	let host = '';
+	try { host = new URL( url ).hostname.toLowerCase(); } catch { return false; }
+	if ( policy.bypassLocal && isLocalTarget( url ) ) { return true; }
+	for ( const pat of policy.exceptions ) {
+		if ( ! pat ) { continue; }
+		if ( pat.endsWith( '*' ) ? host.startsWith( pat.slice( 0, -1 ) ) : host === pat ) { return true; }
+	}
+	return false;
+}
+
 /** داسپچرِ پراکسی برای یک مقصد — null یعنی مستقیم. */
 export function dispatcherFor( url, proxy ) {
-	const p = isLocalTarget( url ) ? '' : normalizeProxy( proxy );
+	const p = ( isLocalTarget( url ) || matchesException( url ) ) ? '' : normalizeProxy( proxy );
 	if ( ! p ) {
 		return null;
 	}

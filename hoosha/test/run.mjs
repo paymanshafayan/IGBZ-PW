@@ -1793,7 +1793,7 @@ await test( 'همهٔ بخش‌های تنظیمات رندرکنندهٔ واق
 	const settings = fssync.readFileSync( path.join( uiDir, 'settings.js' ), 'utf8' );
 	const tabs = [ ...settings.matchAll( /\{ id: '([\w-]+)', label:/g ) ].map( ( m ) => m[ 1 ] );
 	// نوزده تب: چهارده تای قبلی + پنج صفحهٔ هاب.
-	assert.equal( tabs.length, 15, `انتظار ۱۵ تب، ${ tabs.length } پیدا شد` );
+	assert.equal( tabs.length, 17, `انتظار ۱۷ تب، ${ tabs.length } پیدا شد` );
 	for ( const t of tabs ) {
 		if ( t === 'hub-open' ) {
 			continue; // لینک به صفحهٔ تمام‌قد است، رندرکنندهٔ تب ندارد.
@@ -3630,23 +3630,70 @@ await test( 'پراکسی: سرور اکشن تست و اتصال فیلد پر�
 	assert.match( server, /api\.ipify\.org/ );
 	const schema = fssync.readFileSync( path.resolve( 'src/hub/schema.js' ), 'utf8' );
 	assert.match( schema, /proxy: String\( raw\?\.proxy/, 'اتصال باید فیلد پراکسی داشته باشد' );
+	// از ۰.۹.۶ صفحهٔ تنظیمات پراکسی مالکِ کارت است؛ ویزارد هاب فقط فیلد مخصوص اتصال را دارد.
+	const proxyPage = fssync.readFileSync( path.join( uiDir, 'proxy.js' ), 'utf8' );
+	assert.match( proxyPage, /تست اتصال/ );
+	assert.match( proxyPage, /بypassLocal|bypassLocal/ );
 	const page = fssync.readFileSync( path.join( uiDir, 'hubpage.js' ), 'utf8' );
-	assert.match( page, /تست پراکسی/ );
-	assert.match( page, /action: 'proxy-test'/ );
-	assert.match( page, /ذخیره پراکسی/ );
 	assert.match( page, /پراکسی این اتصال/ );
 } );
 
-await test( 'پراکسی: کارت پراکسی در نمای اتصال‌ها ساخته می‌شود', async () => {
-	const dom = ( await import( './fake-dom.mjs' ) ).installFakeDom( { fetch: async () => ( { ok: true, json: async () => hubSnapshotFixture() } ) } );
+await test( 'تونل: پارس چهار پروتکل و اشتراک base64', async () => {
+	const { parseLink, parseAll } = await import( '../src/tunnel/parse.js' );
+	const vmess = 'vmess://' + Buffer.from( JSON.stringify( { v: '2', ps: 'ت', add: '1.2.3.4', port: '443', id: 'ab', aid: '0', net: 'ws', host: 'h', path: '/', tls: 'tls' } ) ).toString( 'base64' );
+	assert.equal( parseLink( vmess )?.proto, 'vmess' );
+	assert.equal( parseLink( 'vless://u@5.6.7.8:8443?encryption=none&security=reality&type=tcp#r' )?.proto, 'vless' );
+	assert.equal( parseLink( 'trojan://p@9.9.9.9:443?security=tls#t' )?.proto, 'trojan' );
+	assert.equal( parseLink( 'ss://' + Buffer.from( 'aes-256-gcm:pw' ).toString( 'base64' ) + '@3.3.3.3:8388#s' )?.proto, 'ss' );
+	assert.equal( parseLink( 'https://not-a-config' ), null );
+	const sub = Buffer.from( [ vmess, 'vless://u@1.1.1.1:443?encryption=none&type=tcp#z' ].join( '\n' ) ).toString( 'base64' );
+	assert.equal( parseAll( sub ).length, 2, 'اشتراک base64 باز نشد' );
+} );
+
+await test( 'لاگر: سطح/کانال/فیلتر و پاک‌کردن', async () => {
+	const logs = await import( '../src/logs.js' );
+	logs.clear();
+	logs.logInfo( 'app', 'پیام عادی' );
+	logs.logError( 'tunnel', 'خطای آزمون', { code: 1 } );
+	assert.equal( logs.recent( { level: 'error' } ).length, 1 );
+	assert.equal( logs.recent( { channel: 'tunnel' } ).length, 1 );
+	assert.ok( logs.recent( { q: 'آزمون' } ).length >= 1 );
+	assert.equal( logs.recent( { level: 'error' } )[ 0 ].data.code, 1 );
+	const clearedN = logs.clear();
+	assert.ok( clearedN >= 1 );
+	// بعد از پاک‌کردن، فقط ردیفِ خودِ «پاک شد» می‌مانَد.
+	assert.ok( logs.recent().every( ( e ) => e.message.includes( 'پاک شد' ) ) );
+} );
+
+await test( 'استثناهای پراکسی: الگوی ویندوزی مطابق می‌شود', async () => {
+	const net = await import( '../src/net.js' );
+	net.setProxyPolicy( { exceptions: 'localhost;10.*;172.16.*;192.168.*;api.internal', bypassLocal: true } );
+	assert.ok( net.matchesException( 'http://localhost:8080/x' ) );
+	assert.ok( net.matchesException( 'http://10.1.2.3/y' ) );
+	assert.ok( net.matchesException( 'https://192.168.1.1/z' ) );
+	assert.ok( net.matchesException( 'https://api.internal/v1' ) );
+	assert.equal( net.matchesException( 'https://api.anthropic.com/v1/messages' ), false, 'نشانی بیرونی نباید استثنا شود' );
+	net.setProxyPolicy( {} );
+} );
+
+await test( 'پراکسی: صفحهٔ تنظیمات (Snap15) ساخته می‌شود — حالت، استثناها، موتور', async () => {
+	const dom = ( await import( './fake-dom.mjs' ) ).installFakeDom( {
+		fetch: async ( url ) => ( { ok: true, json: async () => url.includes( '/api/tunnel' )
+			? { ok: true, corePresent: false, running: false, ports: { socks: 7809, http: 7810 }, current: null, pool: [], sources: [], working: 0, poolSize: 0 }
+			: url.includes( '/api/proxy' )
+			? { ok: true, proxy: { mode: 'manual', address: '127.0.0.1', port: 7890, exceptions: 'localhost', bypassLocal: true }, effective: 'http://127.0.0.1:7890' }
+			: { ok: true } } ),
+	} );
 	try {
-		const { mountHubPage } = await import( `../ui/hubpage.js?proxy=${ Date.now() }` );
+		const { renderProxySettings } = await import( `../ui/proxy.js?set=${ Date.now() }` );
 		const box = document.createElement( 'div' );
-		await mountHubPage( box, { view: 'connections' } );
-		assert.ok( box.querySelector( '.proxy-card' ), 'کارت پراکسی نیست' );
-		const btns = box.querySelectorAll( 'button' );
-		assert.ok( [ ...btns ].some( ( b ) => b.textContent === 'تست پراکسی' ) );
-		assert.ok( [ ...btns ].some( ( b ) => b.textContent === 'ذخیره پراکسی' ) );
+		await renderProxySettings( box );
+		const text = box.textContent;
+		assert.match( text, /پراکسی هوشا/, 'سربرگ نیست' );
+		assert.match( text, /موتور تونل داخلی/, 'بخش موتور نیست' );
+		assert.match( text, /استثناها/, 'استثناها (Snap15) نیست' );
+		assert.match( text, /شبکهٔ داخلی/, 'تیک bypass-local نیست' );
+		assert.ok( box.querySelectorAll( 'select' ).length >= 1, 'انتخاب حالت نیست' );
 	} finally {
 		dom.restore();
 	}
@@ -4231,7 +4278,7 @@ await test( '«سفارشی‌سازی» مودال تنظیمات را باز �
 		assert.equal( q( '#view-chat' ).hidden, false );
 		// سه گروه: «پرووایدر و مدل» به خواستهٔ کارفرما اضافه شد — طرح اصلی نداشتش.
 		assert.deepEqual( all( '.set-group' ).map( ( x ) => x.textContent ), [ 'پرووایدر و مدل', 'تنظیمات', 'سفارشی‌سازی' ] );
-		assert.equal( all( '.set-item' ).length, 15 );
+		assert.equal( all( '.set-item' ).length, 17 );
 		const labels = all( '.set-item' ).map( ( x ) => x.textContent );
 		assert.ok( labels.some( ( l ) => l.includes( 'پرووایدرها و هاب' ) ), 'لینک صفحهٔ هاب باید در منو باشد' );
 		assert.ok( labels.some( ( l ) => l.includes( 'پروفایل تک‌نفره' ) ) );
@@ -4261,7 +4308,7 @@ await test( 'جستجوی ناوبری تنظیمات، فهرست را کم م�
 		// (از ۰.۹.۴ شش تبِ هاب رفت و دو آیتم آمد: ۱۵ آیتم.)
 		document.querySelector( '.nav-item[data-view="customize"]' ).click();
 		await new Promise( ( r ) => setTimeout( r, 150 ) );
-		assert.equal( all( '.set-item' ).length, 15, 'جستجوی دفعهٔ قبل نباید بماند' );
+		assert.equal( all( '.set-item' ).length, 17, 'جستجوی دفعهٔ قبل نباید بماند' );
 	} finally {
 		dom.restore();
 	}

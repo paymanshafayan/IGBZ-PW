@@ -1,6 +1,6 @@
 {
   "name": "hoosha",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "description": "هوشا — دستیار عامل (agent) بومی با پشتیبانی از هر پرووایدری",
   "type": "module",
   "bin": {
@@ -26,6 +26,7 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
+    "adm-zip": "^0.6.0",
     "fetch-socks": "^1.3.3",
     "node-unrar-js": "^2.0.2",
     "undici": "^8.10.0"

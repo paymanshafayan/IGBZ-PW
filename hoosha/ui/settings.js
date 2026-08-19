@@ -9,6 +9,8 @@
 import { $, el, h, toast, timeAgo, confirmDialog } from './lib/dom.js';
 import { api, post, refreshState, getState } from './lib/api.js';
 import { iconSvg } from './lib/icons.js';
+import { renderProxySettings } from './proxy.js';
+import { renderLogsSettings } from './logs.js';
 
 /**
  * دو گروه، دقیقاً مثل ناوبری داخل مودال تنظیمات Claude: «Settings» و «Customize».
@@ -31,6 +33,8 @@ const GROUPS = [
 			{ id: 'sandbox', label: 'سندباکس', ico: 'sandbox' },
 			{ id: 'usage', label: 'مصرف و هزینه', ico: 'usage' },
 			{ id: 'status', label: 'وضعیت و تشخیص', ico: 'health' },
+			{ id: 'proxy', label: 'پراکسی', ico: 'plug-alt' },
+			{ id: 'logs', label: 'لاگ‌ها', ico: 'list' },
 			{ id: 'appearance', label: 'ظاهر', ico: 'appearance' },
 		],
 	},
@@ -1558,6 +1562,8 @@ const RENDER = {
 	memory: renderMemory,
 	tools: renderTools,
 	usage: renderUsage,
+	proxy: renderProxySettings,
+	logs: renderLogsSettings,
 	status: renderStatus,
 	appearance: renderAppearance,
 	todos: renderTodos,

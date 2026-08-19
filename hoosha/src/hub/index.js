@@ -218,7 +218,7 @@ export class Hub {
 
 	/** @param {any} patch */
 	async update( patch ) {
-		for ( const field of [ 'routing', 'budget', 'cache', 'diagnoser' ] ) {
+		for ( const field of [ 'routing', 'budget', 'cache', 'diagnoser', 'proxy' ] ) {
 			if ( patch?.[ field ] ) {
 				this.data[ field ] = { ...this.data[ field ], ...patch[ field ] };
 			}
