@@ -1,6 +1,6 @@
 {
   "name": "hoosha",
-  "version": "0.9.7",
+  "version": "0.9.8",
   "description": "هوشا — دستیار عامل (agent) بومی با پشتیبانی از هر پرووایدری",
   "type": "module",
   "bin": {
