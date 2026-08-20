@@ -54,3 +54,7 @@ hoosha/.work/
 !_bin/*.part-*
 !_bin/*.sha256
 !_bin/*.[0-9][0-9][0-9]
+
+# آرشیوهای بکاپ هوشا — باینری، محلی، و معادل کامیت 647b5b1
+_backup/*.tar.gz
+_backup/.last
