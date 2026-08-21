@@ -36,6 +36,12 @@
 | `WP-Cron-System-Task-Scheduler.md` | مستندات رسمی WP-Cron و کرون سیستمی | قاعدهٔ ۶ در `PROJECT-STATE.md §۵.۵` |
 | `WooCommerce-MCP-Abilities.md` | MCP و Abilities API که **از قبل در ووکامرس ۱۱.۰.۱ ما هست** | فاز ۱ و ۵ هوشواره · ⚠️ تعارض با `CoreSurfaceGuard` |
 
+### `منابع/AI-Commerce/`
+
+| فایل | موضوع | کجای پروژه استفاده شد |
+|---|---|---|
+| `e-commerce-agents-MIT.md` | پروژهٔ MIT با ماژول‌های `hitl.py`، `rate_limit.py`، `guardrails/` | ⭐ الگوی تأیید ادمین هوشواره · چک‌لیست گاردریل |
+
 ### `منابع/IETF/`
 
 | فایل | موضوع | کجای پروژه استفاده شد |
