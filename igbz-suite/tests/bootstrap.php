@@ -453,7 +453,17 @@ function wp_parse_args( $args, array $defaults = [] ): array {
 	return array_merge( $defaults, is_array( $args ) ? $args : [] );
 }
 
+/**
+ * Minimal filter dispatch.
+ *
+ * Was a no-op returning $value untouched, which quietly made every filter-based behaviour
+ * untestable — a test could register a filter, see no effect, and still pass. Callbacks now run in
+ * registration order, which is enough to assert that a value is filterable.
+ */
 function apply_filters( string $hook, $value, ...$rest ) {
+	foreach ( $GLOBALS['igbz_test_filters'][ $hook ] ?? [] as $callback ) {
+		$value = $callback( $value, ...$rest );
+	}
 	return $value;
 }
 
@@ -481,7 +491,23 @@ function igbz_test_reset_actions(): void {
 }
 
 function add_filter( string $hook, $callback, int $priority = 10, int $accepted = 1 ): bool {
+	$GLOBALS['igbz_test_filters'][ $hook ][] = $callback;
 	return true;
+}
+
+function remove_filter( string $hook, $callback, int $priority = 10 ): bool {
+	foreach ( $GLOBALS['igbz_test_filters'][ $hook ] ?? [] as $index => $registered ) {
+		if ( $registered === $callback ) {
+			unset( $GLOBALS['igbz_test_filters'][ $hook ][ $index ] );
+			return true;
+		}
+	}
+	return false;
+}
+
+/** Drop every registered filter, so one test's filter cannot leak into the next. */
+function igbz_test_reset_filters(): void {
+	$GLOBALS['igbz_test_filters'] = [];
 }
 
 /**
@@ -493,6 +519,7 @@ function add_filter( string $hook, $callback, int $priority = 10, int $accepted 
  */
 $GLOBALS['igbz_test_did_action'] = [];
 $GLOBALS['igbz_test_actions']    = [];
+$GLOBALS['igbz_test_filters']    = [];
 
 function did_action( string $hook ): int {
 	return (int) ( $GLOBALS['igbz_test_did_action'][ $hook ] ?? 0 );
