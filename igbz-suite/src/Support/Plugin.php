@@ -76,6 +76,10 @@ final class Plugin {
 		( new \IGBZ\Suite\Support\Admin\StatusPage() )->register();
 		( new \IGBZ\Suite\Support\Cron() )->register();
 
+		// Registered unconditionally: this guards core and WooCommerce routes, which exist
+		// whether or not any of our modules are switched on.
+		( new \IGBZ\Suite\Support\CoreSurfaceGuard( $this->logger() ) )->register();
+
 		do_action( 'igbz_booted', $this );
 	}
 

@@ -37,11 +37,29 @@ final class OtpService {
 			return [ 'ok' => false, 'error' => __( 'The phone number is not valid.', 'igbz-suite' ), 'retry_after' => 0, 'expires_in' => 0 ];
 		}
 
+		/*
+		 * Resend cooldown: same phone AND same IP.
+		 *
+		 * The AND is deliberate and was specified explicitly: the cooldown applies only when both
+		 * match. An OR would be stricter but would punish real users — on mobile networks and
+		 * behind NAT, dozens of genuine customers share one address. With AND they never collide,
+		 * because their phone numbers differ.
+		 *
+		 * The check lives here rather than in a controller because this method is the single
+		 * choke point every caller passes through: the site shortcode, the app's REST route, and
+		 * anything added later. A guard placed higher up is bypassed by the first new caller —
+		 * and a countdown rendered in the browser is bypassed by pressing refresh.
+		 *
+		 * Cost, not just nuisance: every send bills the SMS provider. OWASP API4:2023 lists
+		 * exactly this scenario. See امنیت و مراقبت/منابع/OWASP/.
+		 */
 		$cooldown = igbz()->settings()->int( 'otp.resend_seconds', 120 );
+		$ip_hash  = $this->ip_hash();
 		$last     = $this->db->row(
 			'SELECT created_at FROM ' . $this->db->table( 'otp_codes' ) . '
-			 WHERE phone = %s AND purpose = %s ORDER BY id DESC LIMIT 1',
+			 WHERE phone = %s AND ip_hash = %s AND purpose = %s ORDER BY id DESC LIMIT 1',
 			$phone,
+			$ip_hash,
 			$purpose
 		);
 		if ( $last ) {
@@ -69,7 +87,7 @@ final class OtpService {
 				'code_hash'  => $this->hash( $phone, $code, $purpose ),
 				'purpose'    => $purpose,
 				'expires_at' => $expires,
-				'ip_hash'    => $this->ip_hash(),
+				'ip_hash'    => $ip_hash,
 				'created_at' => current_time( 'mysql', true ),
 			]
 		);

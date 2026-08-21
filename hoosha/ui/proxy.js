@@ -78,9 +78,16 @@ export async function renderProxySettings( box ) {
 		},
 	} );
 
+	/*
+	 * اینجا عمداً هیچ توضیحِ فنی‌ای نیست.
+	 *
+	 * تا ۰.۹.۶ یک جمله دربارهٔ اینکه «Node.js پراکسی سیستم را نمی‌بیند» بالای این کارت
+	 * بود. کارفرما درست گفت که چنین چیزی در رابط جا ندارد: علتِ پیاده‌سازی را توضیح
+	 * می‌داد، نه کاری که کاربر باید بکند. توضیح فنی سر جای خودش در `src/net.js` و
+	 * DESIGN-HUB-UI-FIX §۲.۱۰.۲ هست.
+	 */
 	box.appendChild( h( 'div', { class: 'form-card' }, [
 		h( 'h4', { text: 'پراکسی هوشا' } ),
-		h( 'p', { class: 'note', text: 'Node.js پراکسی سیستم را نمی‌بیند؛ تماس‌های پرووایدر از مسیر انتخابی این‌جا می‌گذرند. مقصدهای استثنا‌شده همیشه مستقیم می‌مانند.' } ),
 		h( 'div', { class: 'field' }, [ h( 'b', { text: 'حالت' } ), mode ] ),
 		manualRow,
 		h( 'div', { class: 'field' }, [
@@ -106,9 +113,14 @@ export async function renderProxySettings( box ) {
 	const coreBtn = h( 'button', {
 		class: 'btn outline', text: core.present ? `هسته نصب است (${ core.version || '؟' })` : 'دانلود هستهٔ xray',
 		onClick: async () => {
+			// کار بدون درصد → اسپینر داخل خود دکمه، تا معلوم باشد چیزی در جریان است.
+			const label = coreBtn.textContent;
 			coreBtn.disabled = true;
-			toast( 'شروع دانلود هستهٔ xray…' );
+			coreBtn.textContent = 'در حال دانلود…';
+			coreBtn.classList.add( 'busy' );
 			const out = await post( '/api/tunnel', { action: 'download-core' } );
+			coreBtn.classList.remove( 'busy' );
+			coreBtn.textContent = label;
 			coreBtn.disabled = false;
 			toast( out.ok ? `هسته آماده شد: ${ out.version || '' }` : ( out.error || 'نشد' ), out.ok ? 'ok' : 'error' );
 			await refresh();
@@ -130,8 +142,11 @@ export async function renderProxySettings( box ) {
 		class: 'btn outline', text: 'به‌روزرسانی منابع',
 		onClick: async () => {
 			harvestBtn.disabled = true;
-			toast( 'در حال جمع‌آوری کانفیگ از منابع…' );
+			harvestBtn.textContent = 'در حال جمع‌آوری…';
+			harvestBtn.classList.add( 'busy' );
 			const out = await post( '/api/tunnel', { action: 'harvest' } );
+			harvestBtn.classList.remove( 'busy' );
+			harvestBtn.textContent = 'به‌روزرسانی منابع';
 			harvestBtn.disabled = false;
 			toast( `${ out.added } کانفیگ تازه (مجموع ${ out.total }).`, 'ok' );
 			await refresh();
@@ -139,14 +154,72 @@ export async function renderProxySettings( box ) {
 			await renderProxySettings( box );
 		},
 	} );
+	/*
+	 * نوار پیشرفت آزمون.
+	 *
+	 * رویداد `progress` را بک‌اند از قبل می‌فرستاد؛ فقط کسی گوش نمی‌داد. حالا مرحله را
+	 * هم نشان می‌دهیم، چون مرحلهٔ ۲ (آزمون سرویس واقعی) کندتر است و بدون توضیح کاربر
+	 * فکر می‌کند گیر کرده.
+	 */
+	const progWrap = h( 'div', { class: 'tunnel-prog', hidden: true } );
+	const progBar = h( 'div', { class: 'prog-fill' } );
+	const progText = h( 'p', { class: 'note' } );
+	const cancelBtn = h( 'button', {
+		class: 'btn outline sm', text: 'لغو',
+		onClick: async () => {
+			cancelBtn.disabled = true;
+			await post( '/api/tunnel', { action: 'cancel-test' } );
+			toast( 'لغو درخواست شد — تا پایان کانفیگ جاری صبر کن.' );
+		},
+	} );
+	progWrap.append(
+		h( 'div', { class: 'prog-track' }, [ progBar ] ),
+		h( 'div', { class: 'prog-row' }, [ progText, h( 'span', { class: 'grow' } ), cancelBtn ] )
+	);
+
+	const paintProgress = ( p ) => {
+		if ( ! p ) {
+			progWrap.hidden = true;
+			return;
+		}
+		progWrap.hidden = false;
+		cancelBtn.disabled = Boolean( p.cancelled );
+		const pct = p.total ? Math.round( ( p.done / p.total ) * 100 ) : 0;
+		progBar.style.inlineSize = `${ pct }%`;
+		const phase = p.phase === 2
+			? `مرحلهٔ ۲ — آزمون سرویس${ p.service ? ` (${ p.service })` : '' }`
+			: 'مرحلهٔ ۱ — غربال سریع';
+		const tally = `✅ ${ p.healthy || 0 }  ·  🟡 ${ p.internetOnly || 0 }  ·  ❌ ${ p.broken || 0 }`;
+		progText.textContent = `${ phase } — ${ p.done } از ${ p.total }  ·  ${ tally }${ p.name ? `  ·  اکنون: ${ p.name }` : '' }`;
+	};
+
+	// اگر آزمونی از قبل در جریان بوده (کاربر پنجره را بسته و برگشته)، نوار ادامه دهد.
+	paintProgress( t.testing );
+
+	const onTunnelEvent = ( e ) => {
+		if ( e.detail?.progress ) {
+			paintProgress( e.detail.progress );
+		}
+	};
+	document.addEventListener( 'hoosha:tunnel', onTunnelEvent );
+
 	const testAllBtn = h( 'button', {
 		class: 'btn outline', text: 'تست همهٔ کانفیگ‌ها',
 		onClick: async () => {
 			testAllBtn.disabled = true;
-			toast( 'در حال آزمودن کانفیگ‌ها — چند دقیقه ممکن است بشود…' );
+			testAllBtn.textContent = 'در حال آزمودن…';
+			cancelBtn.disabled = false;
+			progWrap.hidden = false;
 			const out = await post( '/api/tunnel', { action: 'test-all' } );
+			document.removeEventListener( 'hoosha:tunnel', onTunnelEvent );
 			testAllBtn.disabled = false;
-			toast( out.ok ? `${ out.working } کانفیگ سالم از ${ out.total }.` : ( out.error || 'نشد' ), out.ok ? 'ok' : 'error' );
+			testAllBtn.textContent = 'تست همهٔ کانفیگ‌ها';
+			toast(
+				out.ok
+					? `${ out.working } کانفیگ به سرویس رسید${ out.internetOnly ? `، ${ out.internetOnly } فقط اینترنت` : '' } (از ${ out.total }).${ out.cancelled ? ' — لغو شد' : '' }`
+					: ( out.error || 'نشد' ),
+				out.ok ? 'ok' : 'error'
+			);
 			await refresh();
 			box.replaceChildren();
 			await renderProxySettings( box );
@@ -183,13 +256,28 @@ export async function renderProxySettings( box ) {
 			return;
 		}
 		for ( const c of rows ) {
-			pool.appendChild( h( 'div', { class: `item ${ c.ok ? '' : 'off' } ${ ( t.current?.name === c.name && t.running ) ? 'bad' : '' }` }, [
+			/*
+			 * سه حالت به‌جای «سالم/ناسالم»:
+			 *   ✅ سالم       — سرویس واقعی از این مسیر جواب داد
+			 *   🟡 فقط اینترنت — تونل بالاست ولی سرویس مسدود است
+			 *   ❌ خراب        — حتی اینترنت رد نشد
+			 * علتِ شکست هم دیده می‌شود؛ قبلاً ذخیره می‌شد ولی نمایش داده نمی‌شد.
+			 */
+			const tier = c.serviceOk ? 'ok' : c.ok1 ? 'partial' : c.lastCheck ? 'bad' : 'unknown';
+			const tierLabel = { ok: 'سالم', partial: 'فقط اینترنت', bad: 'خراب', unknown: 'آزموده نشده' }[ tier ];
+			const detail = tier === 'ok'
+				? `سرویس پاسخ داد · ${ c.serviceMs || c.ms }ms`
+				: tier === 'partial'
+					? `اینترنت دارد ولی ${ c.error || 'سرویس جواب نداد' }`
+					: c.error || 'آزموده نشده';
+
+			pool.appendChild( h( 'div', { class: `item ${ tier === 'ok' ? '' : 'off' } ${ ( t.current?.name === c.name && t.running ) ? 'bad' : '' }` }, [
 				h( 'div', { class: 'item-main' }, [
 					h( 'b', { text: `${ c.pinned ? '📌 ' : '' }${ c.name || c.host }` } ),
 					h( 'p', { class: 'mono note', text: `${ c.proto } · ${ c.host }:${ c.port }` } ),
-					h( 'p', { class: 'note', text: `${ c.ok ? `سالم · ${ c.ms }ms` : c.error || 'آزموده نشده' }${ c.lastCheck ? ` · ${ String( c.lastCheck ).slice( 0, 16 ).replace( 'T', ' ' ) }` : '' }` } ),
+					h( 'p', { class: 'note', text: `${ detail }${ c.lastCheck ? ` · ${ String( c.lastCheck ).slice( 0, 16 ).replace( 'T', ' ' ) }` : '' }` } ),
 				] ),
-				c.ok ? h( 'span', { class: 'tag ok', text: `${ c.ms }ms` } ) : h( 'span', { class: 'tag', text: '—' } ),
+				h( 'span', { class: `tag ${ tier === 'ok' ? 'ok' : tier === 'partial' ? 'warn' : '' }`, text: tier === 'ok' ? `${ c.ms }ms` : tierLabel } ),
 				h( 'button', {
 					class: 'btn outline sm', text: c.pinned ? 'برداشتن سنجاق' : 'سنجاق',
 					onClick: async () => { await post( '/api/tunnel', { action: 'toggle-config', id: c.id, pinned: ! c.pinned, enabled: c.enabled } ); await refresh(); drawPool(); },

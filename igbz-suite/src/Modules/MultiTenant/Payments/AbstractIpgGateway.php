@@ -34,7 +34,17 @@ abstract class AbstractIpgGateway implements GatewayInterface {
 		return igbz()->settings()->bool( $this->prefix . '.' . $key, $default );
 	}
 
-	/** POST JSON and return decoded body. */
+	/**
+	 * POST JSON and return decoded body.
+	 *
+	 * Returns an **associative** array: `ok`, `body`, `raw`, `error`. Read it by key —
+	 * `$r = $this->post_json(...); $ok = $r['ok'];` — never by list destructuring.
+	 * `[ $ok, $body ] = $this->post_json(...)` silently yields two nulls (keys 0 and 1 do
+	 * not exist), so every response reads as a failure and PHP emits "Undefined array key".
+	 * Four gateways shipped with exactly that bug; see AGENT-BRIEF §5.
+	 *
+	 * @return array{ok:bool,body:array,raw:string,error:string}
+	 */
 	protected function post_json( string $url, array $payload, int $timeout = 30 ): array {
 		$response = $this->http->post(
 			$url,
@@ -48,7 +58,14 @@ abstract class AbstractIpgGateway implements GatewayInterface {
 		return [ 'ok' => $response->ok(), 'body' => $response->json(), 'raw' => $response->body, 'error' => $response->error_message() ];
 	}
 
-	/** POST raw body (SOAP/XML or form) and return raw response. */
+	/**
+	 * POST raw body (SOAP/XML or form) and return raw response.
+	 *
+	 * Associative array, same contract as post_json(): read `ok` / `raw` by key, never by
+	 * list destructuring.
+	 *
+	 * @return array{ok:bool,body:array,raw:string,error:string}
+	 */
 	protected function post_raw( string $url, string $body, string $content_type = 'application/soap+xml; charset=utf-8', int $timeout = 30 ): array {
 		$response = $this->http->post(
 			$url,

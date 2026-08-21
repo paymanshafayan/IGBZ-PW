@@ -476,6 +476,7 @@ final class Schema {
 			created_at DATETIME NOT NULL,
 			PRIMARY KEY  (id),
 			KEY phone_purpose (phone,purpose),
+			KEY phone_ip_purpose (phone,ip_hash,purpose),
 			KEY expires_at (expires_at)
 		) {$charset};";
 

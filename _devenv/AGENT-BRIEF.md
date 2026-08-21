@@ -32,12 +32,19 @@ The Instagram gateway sits behind an adapter interface so Graph API can be added
 ### Standing constraints
 
 - **The user writes in Persian. Reply in Persian.**
-- **Approval before starting any change.** The client must explicitly approve before work
-  *starts* on any change to this repository — code, docs, settings, however small. Present what
-  you intend to change and wait for the go-ahead. Work that changes nothing (reading, checking,
-  reporting, testing, answering questions) is free. **Committing, pushing and opening PRs after
-  an approved change is free** and needs no separate approval (client's clarification,
-  2026-08-18 / ۱۴۰۵/۰۵/۲۷; the original ۱۴۰۵/۰۵/۲۴ wording also gated commits and pushes).
+- **A plan, then the literal words «شروع کن» ("start"), before any change.** Nothing in this
+  repository — code, docs, settings, however small — may be changed until you have presented a
+  plan, the client has approved it, and the client has said **«شروع کن»**. Implicit approval,
+  "sounds good", silence, or your own reading of what the client wants is **not** enough. Work
+  that changes nothing (reading, checking, testing, analysing, writing the plan itself) is free.
+  **Committing, pushing and opening PRs after an approved change is free** and needs no separate
+  approval (client's clarification, ۱۴۰۵/۰۵/۲۷; the original ۱۴۰۵/۰۵/۲۴ wording also gated
+  commits and pushes; the explicit "شروع کن" keyword was made mandatory on ۱۴۰۵/۰۵/۲۸).
+- **No progress reports. One final report only.** Until the plan is completely finished, send
+  the client nothing — no status updates, no "step one done", no interim findings.
+- **Keep testing light, especially in `hoosha/`.** For a small change, a few normal tests that
+  show the change actually took effect are enough. **The client does the full testing himself.**
+  Do not burn time on exhaustive suites (client's rule, ۱۴۰۵/۰۵/۲۹, reaffirmed ۱۴۰۵/۰۵/۲۸).
 - **Never modify the `IGBZ-NopCommerce` project.** It was a read-only review, and that review is
   finished (`REVIEW-IGBZ-NopCommerce.md`).
 - Tenancy is **single-site with `tenant_id` columns**. Not WordPress Multisite.
@@ -183,6 +190,13 @@ Toman/Rial factor (`payments.currency_multiplier`, default 10).
 3. **dbDelta needs two spaces** in `PRIMARY KEY  (`.
 4. Secrets are encrypted at rest. `Settings::set_many()` skips values equal to `Crypto::MASK` or
    `''`, so a masked field round-trips without wiping the stored secret.
+5. **Never list-destructure an associative return value.** `AbstractIpgGateway::post_json()` and
+   `post_raw()` return `['ok'=>…, 'body'=>…, 'raw'=>…, 'error'=>…]`. Writing
+   `[ $ok, $body ] = $this->post_json(…)` asks for keys `0` and `1`, which do not exist: both
+   variables become `null`, every successful bank response reads as a failure, and PHP emits
+   "Undefined array key". Four gateways (Sadad, Asan Pardakht, Mellat, Parsian) shipped with
+   exactly this bug and it was fixed on ۱۴۰۵/۰۵/۳۰. Read by key, and give any method returning an
+   associative array a `@return array{…}` shape in its PHPDoc.
 
 ---
 

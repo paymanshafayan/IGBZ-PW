@@ -15,6 +15,8 @@ import { iconSvg } from './lib/icons.js';
 let chat = null;
 let streamEl = null;
 let thinkEl = null;
+/** @type {HTMLElement|null} دکمهٔ «برو به آخر» — وضعیتش از چند جا همگام می‌شود. */
+let jumpBtn = null;
 const toolEls = new Map();
 /** @type {(text:string)=>void} */
 let onResend = () => {};
@@ -44,9 +46,33 @@ export function mountThread( opts ) {
 	 */
 	( document.getElementById( 'jump-slot' ) || chat.parentElement ).appendChild( jump );
 
-	chat.addEventListener( 'scroll', () => {
-		jump.hidden = atBottom();
-	} );
+	/*
+	 * وضعیت دکمه فقط با اسکرولِ کاربر به‌روز نمی‌شود.
+	 *
+	 * باگ تا ۰.۹.۶: دکمه `hidden: true` ساخته می‌شد و تنها جای عوض‌شدنش داخل شنوندهٔ
+	 * `scroll` بود. تا کاربر دست به اسکرول نزند آن هندلر اجرا نمی‌شد — یعنی دقیقاً در
+	 * پرکاربردترین حالت (پاسخ بلندی که خودش صفحه را پر می‌کند) دکمه پنهان می‌ماند.
+	 * حالا محتوای تازه و تغییر اندازه هم آن را همگام می‌کنند.
+	 */
+	jumpBtn = jump;
+	syncJump();
+	chat.addEventListener( 'scroll', syncJump );
+
+	// رشدِ خودِ محتوا (استریم پاسخ، باز/بستهٔ بلوک استدلال) هم اسکرول نیست.
+	if ( typeof ResizeObserver !== 'undefined' ) {
+		new ResizeObserver( syncJump ).observe( chat );
+	}
+	window.addEventListener( 'resize', syncJump );
+}
+
+/** همگام‌سازی دکمهٔ «برو به آخر» با وضعیت واقعی اسکرول. */
+export function syncJump() {
+	if ( ! jumpBtn || ! chat ) {
+		return;
+	}
+	// وقتی محتوا کوتاه‌تر از قاب است، اصلاً اسکرولی در کار نیست.
+	const scrollable = chat.scrollHeight - chat.clientHeight > 8;
+	jumpBtn.hidden = ! scrollable || atBottom();
 }
 
 export function clearThread() {
@@ -95,6 +121,7 @@ function append( node ) {
 	if ( stick ) {
 		scrollToEnd();
 	}
+	syncJump();
 	return node;
 }
 
@@ -280,6 +307,26 @@ export function dropThinking() {
 	}
 }
 
+/**
+ * جمع‌کردن خروجی ابزارها وقتی جواب مدل می‌رسد.
+ *
+ * کارفرما کارت‌های خروجی ابزار را هم جزو «باکس‌های استدلال» می‌شمارد (Snap24) و
+ * می‌خواهد پیش از رسیدن جواب از صفحه بروند. اینجا کل کارت حذف نمی‌شود — سطر عنوانش
+ * می‌ماند تا معلوم باشد چه ابزاری اجرا شده — ولی بدنهٔ پرحجم جمع می‌شود. باز و بستهٔ
+ * دستی کاربر (`open`) محترم شمرده می‌شود.
+ */
+export function settleTools() {
+	for ( const card of toolEls.values() ) {
+		if ( ! card.classList.contains( 'open' ) ) {
+			card.classList.add( 'settled' );
+			card.querySelector( '.tool-body' )?.classList.remove( 'peek' );
+		}
+	}
+}
+
+/** چند خط آخرِ استدلال که در پنجره می‌ماند — خواستهٔ کارفرما: چهار تا پنج خط. */
+const THINK_LINES = 5;
+
 export function thinkingBlock() {
 	const body = h( 'div', { class: 'thinking-body' } );
 	// لایهٔ محوکنندهٔ بالای کادر روی همین ظرف می‌نشیند، نه روی متنِ اسکرول‌شونده.
@@ -297,6 +344,33 @@ export function thinkingBlock() {
 		head.querySelector( '.m-ico' ).textContent = body.hidden ? '▸' : '▾';
 	} );
 	box._body = body;
+
+	/*
+	 * پنجرهٔ کشویی: متن کامل نگه داشته می‌شود ولی فقط ۵ خط آخر رندر می‌شود.
+	 *
+	 * چرا نه با اسکرول: نسخهٔ قبلی `max-height` را با **`overflow: hidden`** گذاشته بود
+	 * و بعد سعی می‌کرد با `_body.scrollTop = _body.scrollHeight` به آخر متن برود. روی
+	 * المانی که `overflow:hidden` است این کار قابل اتکا نیست، پس متن از بالا ثابت
+	 * می‌ماند و کاربر **۵ خط اول** را می‌دید نه ۵ خط آخر — یعنی دقیقاً برعکس خواسته.
+	 * رندرِ «۵ خط آخر» به رفتار اسکرول مرورگر وابسته نیست و قطعی است.
+	 * (DESIGN-HUB-UI-FIX §۲.۱۰.۳)
+	 */
+	box._full = '';
+	box._push = ( text ) => {
+		box._full += text;
+		const lines = box._full.split( '\n' );
+		const win = lines.slice( -THINK_LINES );
+		body.replaceChildren(
+			...win.map( ( line, i ) =>
+				h( 'div', {
+					// خط بالاییِ پنجره در حال بیرون‌رفتن است — محو می‌شود.
+					class: `think-line${ i === 0 && lines.length > THINK_LINES ? ' fading' : '' }`,
+					text: line,
+				} )
+			)
+		);
+	};
+
 	append( box );
 	return box;
 }
@@ -731,9 +805,8 @@ export function handleEvent( ev ) {
 			if ( ! thinkEl ) {
 				thinkEl = thinkingBlock();
 			}
-			thinkEl._body.textContent += ev.text;
-			// همیشه آخرین خط‌ها دیده شوند؛ بالایی‌ها از کادر بیرون می‌روند.
-			thinkEl._body.scrollTop = thinkEl._body.scrollHeight;
+			// پنجرهٔ ۵ خطی: خط تازه از پایین می‌آید، بالایی محو می‌شود و بیرون می‌رود.
+			thinkEl._push( ev.text );
 			if ( atBottom() ) {
 				scrollToEnd();
 			}
@@ -748,6 +821,8 @@ export function handleEvent( ev ) {
 			hideWorking();
 			// استدلال، داربستِ ساختنِ جواب است؛ با آمدن خودِ جواب، جمع می‌شود.
 			dropThinking();
+			// خروجی ابزارها هم همین‌طور: جواب باید صفحه را در اختیار بگیرد.
+			settleTools();
 			if ( ! streamEl ) {
 				streamEl = addMessage( 'assistant', '' );
 				streamEl._raw = '';
@@ -785,6 +860,8 @@ export function handleEvent( ev ) {
 
 		case 'permission_request':
 			hideWorking();
+			// کارت اجازه باید تنها چیز روی صفحه باشد؛ استدلالِ پیش از آن دیگر کاربردی ندارد.
+			dropThinking();
 			askCard( ev );
 			break;
 
@@ -798,6 +875,13 @@ export function handleEvent( ev ) {
 			break;
 
 		case 'tool_start':
+			/*
+			 * سوراخ واقعیِ «باکس استدلال حذف نمی‌شود»: `dropThinking` فقط در `text` و
+			 * `assistant_end` بود. اگر مدل استدلال می‌کرد و بعد به‌جای متن یک ابزار صدا
+			 * می‌زد، باکس سر جایش می‌ماند و روی کارت ابزار سوار می‌شد — و اگر آن نوبت
+			 * هیچ‌وقت به `text` نمی‌رسید، تا پایان گفتگو می‌ماند.
+			 */
+			dropThinking();
 			toolCard( ev.id, ev.name, ev.summary, ev.sub );
 			showWorking( workingLabelFor( ev.name ) );
 			break;

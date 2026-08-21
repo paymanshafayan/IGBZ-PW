@@ -276,7 +276,11 @@ export class Runtime {
 
 		let provider;
 		try {
-			provider = useHub ? this.hub.adapter() : createProvider( profile );
+			// حالت تک‌واحد هم باید پراکسی سراسری را ببیند — وگرنه دو حالت، دو رفتار
+			// شبکه‌ای متفاوت دارند و عیب‌یابی گمراه‌کننده می‌شود (۰.۹.۷).
+			provider = useHub
+				? this.hub.adapter()
+				: createProvider( profile, { proxy: this.hub?.data?.proxy?.url || '' } );
 		} catch {
 			provider = null;
 		}

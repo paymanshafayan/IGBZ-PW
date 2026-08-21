@@ -52,7 +52,7 @@ final class SadadGateway extends AbstractIpgGateway {
 			$sign = base64_encode( $sign );
 		}
 
-		[ $ok, $body ] = $this->post_json(
+		$response = $this->post_json(
 			self::REQUEST_URL,
 			[
 				'TerminalId'     => (int) $terminal,
@@ -64,6 +64,9 @@ final class SadadGateway extends AbstractIpgGateway {
 				'SignData'       => $sign,
 			]
 		);
+
+		$ok   = (bool) $response['ok'];
+		$body = (array) $response['body'];
 
 		$token = (string) ( $body['Token'] ?? $body['token'] ?? '' );
 		if ( $ok && '' !== $token ) {
@@ -82,7 +85,9 @@ final class SadadGateway extends AbstractIpgGateway {
 			return PaymentVerifyResult::failure( 'missing_token', __( 'Sadad did not return a token.', 'igbz-suite' ) );
 		}
 
-		[ $ok, $body ] = $this->post_json( self::VERIFY_URL, [ 'Token' => $token ] );
+		$response = $this->post_json( self::VERIFY_URL, [ 'Token' => $token ] );
+		$ok       = (bool) $response['ok'];
+		$body     = (array) $response['body'];
 
 		if ( $ok && '0' === (string) ( $body['ResCode'] ?? '1' ) ) {
 			return PaymentVerifyResult::ok( (string) ( $body['RetrivalRefNo'] ?? $token ), (string) ( $body['CardNumber'] ?? '' ), 0.0 );

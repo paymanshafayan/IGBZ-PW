@@ -3820,7 +3820,13 @@ await test( 'کلید اصلی هاب واقعاً درخواست خاموش‌�
 	}
 } );
 
-await test( 'توپولوژی گره‌ها را با وضعیت واقعی می‌کشد و روی خطا دکمهٔ ریست دارد', async () => {
+await test( 'توپولوژی: گره‌های کوچک، یال‌های سه‌حالته، بدون دکمه داخل گره', async () => {
+	/*
+	 * از ۰.۹.۷ گره‌ها **مستطیل کوچک** یک‌خطه‌اند (خواستهٔ کارفرما، الگوی Snap10) و دکمهٔ
+	 * «ریست و رفع خطا» از داخلشان برداشته شده: هم گره را سه‌برابر بلند می‌کرد و با ده
+	 * پرووایدر گره‌ها روی هم می‌افتادند، هم جای درستش صفحهٔ جزئیات است. کلیک روی گره
+	 * به همان‌جا می‌برد.
+	 */
 	const dom = installFakeDom( { fetch: async () => ( { ok: true, json: async () => hubSnapshotFixture() } ) } );
 	try {
 		const { mountHubPage } = await import( `../ui/hubpage.js?topo=${ Date.now() }` );
@@ -3829,10 +3835,20 @@ await test( 'توپولوژی گره‌ها را با وضعیت واقعی می
 		assert.ok( box.querySelector( '.topo' ), 'نقشه نیست' );
 		assert.equal( box.querySelectorAll( '.topo-node' ).length, 2, 'هر اتصال یک گره' );
 		assert.equal( box.querySelectorAll( '.topo-edge' ).length, 2, 'هر اتصال یک یال' );
+
 		const bad = box.querySelector( '.topo-node.bad' );
 		assert.ok( bad, 'اتصال دارای مدار باز، گرهٔ خطادار ندارد' );
-		const reset = [ ...bad.querySelectorAll( 'button' ) ].find( ( b ) => b.textContent === 'ریست و رفع خطا' );
-		assert.ok( reset, 'دکمهٔ ریست روی گرهٔ خطادار نیست' );
+		assert.equal( bad.querySelectorAll( 'button' ).length, 0, 'گره باید تمیز بماند — دکمه داخلش نه' );
+		assert.ok( typeof bad.onclick === 'function', 'کلیک روی گره باید به جزئیات ببرد' );
+
+		// یالِ اتصالِ خطادار باید حالت error بگیرد، نه شکل پیش‌فرض.
+		const edges = [ ...box.querySelectorAll( '.topo-edge' ) ];
+		assert.ok(
+			edges.some( ( e ) => ( e.getAttribute( 'class' ) || '' ).includes( 'error' ) ),
+			'یال اتصالِ مدارباز باید error باشد'
+		);
+		// و راهنمای سه‌گانه سر جایش است.
+		assert.equal( box.querySelectorAll( '.lg-edge' ).length, 3, 'راهنما باید سه حالت داشته باشد' );
 	} finally {
 		dom.restore();
 	}
@@ -3874,8 +3890,12 @@ await test( 'ریست اتصال از صفحهٔ جزئیات، درخواست r
 		const { mountHubPage } = await import( `../ui/hubpage.js?reset=${ Date.now() }` );
 		const box = document.createElement( 'div' );
 		await mountHubPage( box, { view: 'connections' } );
-		const open = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'باز کردن' );
-		assert.ok( open, 'دکمهٔ باز کردن کارت نیست' );
+		/*
+		 * از ۰.۹.۷ کارت سرویس **خودش** کلیک‌پذیر است و به جزئیات می‌برد (سبک Snap4)؛
+		 * دکمهٔ پرِ «باز کردن» برداشته شد چون کارفرما آن را «زمخت» خواند.
+		 */
+		const open = box.querySelector( '.hub-card.linked' );
+		assert.ok( open, 'کارت متصل پیدا نشد' );
 		await open.click();
 		await new Promise( ( r ) => setTimeout( r, 30 ) );
 		const resetBtn = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'ریست و رفع خطا' );
@@ -3905,7 +3925,9 @@ await test( 'مدل‌ها در جزئیات سرویس‌اند: کشف، آز�
 		const box = document.createElement( 'div' );
 		await mountHubPage( box, { view: 'connections' } );
 		( await Promise.resolve() );
-		const open = box.querySelectorAll( 'button' ).find( ( b ) => b.textContent === 'باز کردن' );
+		// کارت خودش کلیک‌پذیر است (۰.۹.۷ — سبک Snap4).
+		const open = box.querySelector( '.hub-card.linked' );
+		assert.ok( open, 'کارت متصل پیدا نشد' );
 		await open.click();
 		await new Promise( ( r ) => setTimeout( r, 30 ) );
 		assert.match( box.textContent, /مدل‌های این سرویس/ );
@@ -4722,6 +4744,10 @@ await test( 'اجرا از ریشهٔ مخزن ممکن است — هر دو ر�
 		const src = fssync.readFileSync( full, 'utf8' );
 		assert.match( src, /cli\.js/, `${ file } باید cli را صدا بزند` );
 		assert.match( src, /node_modules/, `${ file } باید نبودِ وابستگی‌ها را هم بپوشاند` );
+		// ۰.۹.۹: راه‌انداز حق ندارد خودش npm ci بزند. نصب خودکار هر بار چند ده ثانیه
+		// از وقت کاربر می‌گرفت، آن هم وقتی وابستگی‌ها اصلاً عوض نشده بودند — مارکر به
+		// «نسخه» گره خورده بود، و نسخه با هر تغییر کد بالا می‌رود. فقط راهنمایی کن.
+		assert.doesNotMatch( src, /^\s*(call\s+)?npm ci/m, `${ file } نباید خودش npm ci اجرا کند` );
 		// گزینه‌ها باید رد شوند، وگرنه --port و --dir بی‌اثر می‌مانند.
 		assert.match( src, /%\*|"\$@"/, `${ file } باید آرگومان‌ها را پاس بدهد` );
 	}
@@ -5266,9 +5292,17 @@ await test( 'کادر استدلال پنج‌خطی است، بالایش مح�
 	// و متن واقعاً داخل همان ظرف می‌نشیند، وگرنه لایه روی هوا می‌افتد.
 	assert.match( fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' ), /class: 'thinking-view' \}, \[ body \]/ );
 
-	// و در جاوااسکریپت، هر خط تازه کادر را به آخر می‌برد.
+	/*
+	 * و در جاوااسکریپت، پنجره فقط ۵ خط آخر را نگه می‌دارد.
+	 *
+	 * تا ۰.۹.۶ اینجا `scrollTop = scrollHeight` بود، ولی روی المانی که
+	 * `overflow: hidden` دارد قابل اتکا نیست: متن از بالا ثابت می‌ماند و کاربر ۵ خط
+	 * **اول** را می‌دید نه آخر — دقیقاً برعکس خواستهٔ کارفرما. حالا رندرِ صریحِ
+	 * `slice(-5)` جای آن را گرفته که به رفتار اسکرول مرورگر وابسته نیست.
+	 */
 	const thread = fssync.readFileSync( path.join( uiDir, 'thread.js' ), 'utf8' );
-	assert.match( thread, /_body\.scrollTop = thinkEl\._body\.scrollHeight/ );
+	assert.match( thread, /slice\(\s*-THINK_LINES\s*\)/, 'باید فقط چند خط آخر رندر شود' );
+	assert.match( thread, /const THINK_LINES = 5/, 'اندازهٔ پنجره باید ۵ خط باشد' );
 } );
 
 await test( 'کادر استدلال با آمدن جواب پاک می‌شود، نه اینکه تا رفرش بماند', async () => {
@@ -5286,7 +5320,14 @@ await test( 'کادر استدلال با آمدن جواب پاک می‌شود
 		const box = document.querySelector( '.thinking' );
 		assert.ok( box, 'کادر استدلال ساخته نشد' );
 		assert.match( document.querySelector( '.thinking-body' ).textContent, /خط دوم/ );
-		assert.ok( document.querySelector( '.thinking-body' ).scrollTop > 0, 'کادر باید به آخرین خط اسکرول شود' );
+
+		// پنجرهٔ ۵ خطی: خط‌های قدیمی‌تر از پنجره بیرون می‌روند، نه اینکه بمانند و اول
+		// فهرست دیده شوند.
+		thread.handleEvent( { type: 'thinking', text: 'س\nچ\nپ\nش\nه\n' } );
+		await new Promise( ( r ) => setTimeout( r, 30 ) );
+		const shown = document.querySelector( '.thinking-body' ).textContent;
+		assert.equal( /خط اول/.test( shown ), false, 'خط قدیمی باید از پنجره بیرون رفته باشد' );
+		assert.match( shown, /ه/, 'تازه‌ترین خط باید دیده شود' );
 
 		thread.handleEvent( { type: 'text', text: 'جواب مدل' } );
 		await new Promise( ( r ) => setTimeout( r, 40 ) );
@@ -6136,6 +6177,71 @@ await test( 'جاروی ترجمه، محتوای کاربر را دست نمی�
 await fs.rm( tmpRoot, { recursive: true, force: true } );
 
 process.stdout.write( `\n${ '-'.repeat( 56 ) }\n` );
+
+section( 'تونل و پراکسی — سازگاری داسپچر (۰.۹.۷)' );
+
+await test( 'تماس از راه SOCKS واقعاً برقرار می‌شود — نه fetch سراسری، نه { url }', async () => {
+	/*
+	 * دو باگ روی هم، تست تونل را **صددرصد** شکست‌خورده می‌کردند و کارفرما می‌دید
+	 * «هیچ کانفیگ سالمی نیست» با کانفیگ‌هایی که در Hiddify کار می‌کردند:
+	 *
+	 *   ۱) `fetch` سراسری Node داسپچرِ بستهٔ undici را نمی‌پذیرد
+	 *      → «invalid onRequestStart method»
+	 *   ۲) `socksDispatcher({ url })` شکل غلط است؛ آبجکت `{ type, host, port }` می‌خواهد
+	 *      → «Invalid SOCKS proxy details were provided»
+	 *
+	 * این تست یک SOCKS5 مینیمالِ واقعی بالا می‌آورد و از راهش یک تماس می‌زند.
+	 */
+	const http = await import( 'node:http' );
+	const netmod = await import( 'node:net' );
+
+	const target = http.createServer( ( q, r ) => { r.writeHead( 204 ); r.end(); } );
+	await new Promise( ( r ) => target.listen( 0, '127.0.0.1', r ) );
+	const tport = target.address().port;
+
+	const socks = netmod.createServer( ( c ) => {
+		let stage = 0;
+		c.on( 'data', () => {
+			if ( stage === 0 ) { c.write( Buffer.from( [ 5, 0 ] ) ); stage = 1; return; }
+			if ( stage === 1 ) {
+				c.write( Buffer.from( [ 5, 0, 0, 1, 127, 0, 0, 1, ( tport >> 8 ) & 255, tport & 255 ] ) );
+				const up = netmod.connect( tport, '127.0.0.1', () => { c.pipe( up ); up.pipe( c ); } );
+				stage = 2;
+			}
+		} );
+		c.on( 'error', () => {} );
+	} );
+	await new Promise( ( r ) => socks.listen( 0, '127.0.0.1', r ) );
+	const sport = socks.address().port;
+
+	try {
+		const { proxyFetch } = await import( `../src/net.js?socks=${ Date.now() }` );
+		const res = await proxyFetch( 'http://example.test/', {}, `socks5://127.0.0.1:${ sport }` );
+		assert.equal( res.status, 204, 'تماس از راه پراکسی socks5 باید برقرار شود' );
+
+		// و موتور تونل هم نباید به fetch سراسری برگردد.
+		const engine = fssync.readFileSync( path.resolve( 'src/tunnel/engine.js' ), 'utf8' );
+		assert.equal( /await fetch\(\s*url,\s*\{[\s\S]{0,80}dispatcher/.test( engine ), false, 'fetch سراسری با داسپچر ممنوع است' );
+		assert.match( engine, /undiciFetch\(\s*url/, 'باید از undiciFetch استفاده کند' );
+		assert.equal( /socksDispatcher\( \{ url:/.test( engine ), false, 'شکل { url } غلط است' );
+	} finally {
+		target.close();
+		socks.close();
+	}
+} );
+
+await test( 'پراکسی در بوت روی هاب می‌نشیند، نه فقط وقتی کاربر صفحه را باز کند', () => {
+	/*
+	 * `syncProxyToHub()` تا ۰.۹.۷ فقط از مسیرهای /api/proxy و /api/tunnel صدا زده
+	 * می‌شد. با هر بار بستن و باز کردن برنامه، hub.data.proxy.url خالی می‌ماند و
+	 * تماس‌های هاب مستقیم می‌رفتند → ۴۲۹ از IP ایران (Snap23).
+	 */
+	const server = fssync.readFileSync( path.resolve( 'src/server.js' ), 'utf8' );
+	assert.match( server, /setProxyPolicy\( runtime\.config\?\.proxy \|\| \{\} \);\s*\n\s*syncProxyToHub\(\)/,
+		'syncProxyToHub باید در بوت هم صدا زده شود' );
+} );
+
+
 if ( failures.length ) {
 	process.stdout.write( `${ passed } تست موفق، ${ failures.length } ناموفق\n` );
 	for ( const f of failures ) {

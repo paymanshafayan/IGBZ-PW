@@ -24,17 +24,11 @@ fi
 
 cd "$app"
 
-# اگر package.json عوض شده باشد (git pull با وابستگی تازه) خودمان npm ci می‌زنیم —
-# نه خطی مثل "Cannot find package 'undici'" سرِ راه کاربر بیاید.
-deps_current() {
-	[ -d node_modules ] || return 1
-	[ -f .deps-marker ] || return 1
-	node -e "const fs=require('fs');const v=(JSON.parse(fs.readFileSync('package.json','utf8'))||{}).version||'';const m=fs.readFileSync('.deps-marker','utf8').trim();process.exit(v===m?0:1)" 2>/dev/null
-}
-if ! deps_current; then
-	printf '  وابستگی‌ها تازه یا کهنه‌اند — یک بار npm ci اجرا می‌شود...\n'
-	npm ci || exit 1
-	node -e "const fs=require('fs');fs.writeFileSync('.deps-marker',((fs.readFileSync('package.json','utf8').match(/\"version\"\s*:\s*\"[^\"]+\"/))||[''])[0])"
+# وابستگی‌ها را خودمان نصب نمی‌کنیم — npm ci هر بار وقت کاربر را می‌گرفت.
+# فقط اگر واقعاً غایب باشند، سریع و روشن می‌گوییم چه بزند و بیرون می‌آییم.
+if [ ! -d node_modules ]; then
+	printf '\n  وابستگی‌ها نصب نیستند. یک بار این را بزن:\n\n      cd %s && npm ci\n\n' "$app" >&2
+	exit 1
 fi
 
 exec node src/cli.js "$@"

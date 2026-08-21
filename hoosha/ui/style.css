@@ -838,8 +838,27 @@ code .f {
 	font-size: 0.85rem;
 	font-family: var(--serif);
 	line-height: 1.6;
+	/* پنجرهٔ پنج‌خطی: ۵ × ۱.۶ = ۸em. رندر در JS همیشه ۵ خط آخر را می‌گذارد. */
 	max-height: 8em;
 	overflow: hidden;
+}
+.think-line {
+	transition: opacity 0.25s var(--ease);
+}
+/*
+ * خط بالای پنجره در حال بیرون‌رفتن است.
+ *
+ * محوشدگی روی **خود خط** می‌نشیند، نه روی گرادیانِ ظرف. گرادیان قبلی روی
+ * `.thinking-view` بود ولی متن فرزندِ آن است و ۱۲ پیکسل هم برای خطی به ارتفاع ۱.۶em
+ * کم بود، پس عملاً محوی دیده نمی‌شد.
+ */
+.think-line.fading {
+	opacity: 0.28;
+}
+@media (prefers-reduced-motion: reduce) {
+	.think-line {
+		transition: none;
+	}
 }
 
 /* ═══════════════════════════════════════════════ کارت‌های ابزار */
@@ -941,11 +960,30 @@ code .f {
 	text-align: left;
 	unicode-bidi: plaintext;
 }
+/*
+ * خروجی بلندِ ابزار، حین کار فقط یک پنجرهٔ پنج‌خطی نشان می‌دهد.
+ *
+ * کارفرما این کارت‌ها را هم جزو «باکس‌های استدلال» می‌شمارد (Snap24): تا ۰.۹.۷
+ * ارتفاعش ۳۸۰px بود و در حالت peek هم ۱۳۲px (حدود هفت-هشت خط) — یعنی یک خروجی
+ * WebFetch نصف صفحه را می‌بلعید. حالا ۵ خط × ۱.۶۵ = ۸.۲۵em، هم‌اندازهٔ پنجرهٔ
+ * بلوک استدلال.
+ */
 .tool-body.peek {
-	max-height: 132px;
+	max-height: 8.25em;
 	overflow: hidden;
-	-webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
-	mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
+	-webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 62%, transparent 100%);
+	mask-image: linear-gradient(to bottom, transparent 0, #000 14%, #000 62%, transparent 100%);
+}
+/*
+ * با آمدن جواب، بدنهٔ پرحجم جمع می‌شود و فقط سطر عنوان (نام ابزار + خلاصه) می‌ماند.
+ * خواستهٔ کارفرما: «قبل از ارسال جواب، این باکس‌ها از صفحه حذف شوند.» سطر عنوان
+ * می‌ماند تا سابقهٔ «چه ابزاری اجرا شد» گم نشود و با کلیک باز می‌شود.
+ */
+.tool.settled .tool-body {
+	display: none;
+}
+.tool.settled.open .tool-body {
+	display: block;
 }
 .terminal {
 	background: var(--background);
@@ -2480,6 +2518,18 @@ body.sidebar-collapsed .account-menu {
 	margin-inline: auto;
 	padding: 64px 32px;
 }
+/*
+ * صفحه‌های داشبوردی (هاب پرووایدر) تمام‌قد‌اند.
+ *
+ * ۵۶rem برای متن‌خوانی درست است و برای بقیهٔ صفحه‌ها می‌ماند، ولی صفحهٔ هاب که قرار بود
+ * «تمام‌قد» باشد داخل همین ظرف می‌افتاد و روی مانیتور عریض، کاتالوگ دو ستون می‌شد و
+ * نیمهٔ صفحه سفید می‌ماند — در حالی که مرجع (OmniRoute) چهار ستون تمام‌عرض دارد.
+ * (DESIGN-HUB-UI-FIX §۴)
+ */
+.page-inner.wide {
+	max-width: min( 1600px, 100% );
+	padding: 32px 40px;
+}
 .page-head {
 	display: flex;
 	align-items: center;
@@ -3389,10 +3439,26 @@ body.sidebar-collapsed .account-menu {
 	flex-direction: column;
 	gap: 14px;
 }
+/*
+ * نوار وضعیت.
+ *
+ * بدون `min-width:0` روی ستون متنی، فرزندِ flex زیر عرض محتوایش کوچک نمی‌شود و متن
+ * بدجا می‌شکند — در تصویر کارفرما کلمهٔ «روشن» به خط بعد پرت شده بود. دکمه‌ها هم با
+ * `margin-inline-start:auto` به انتهای ردیف می‌روند تا به متن نچسبند.
+ */
 .hub-status {
 	display: flex;
 	align-items: center;
-	gap: 10px;
+	gap: 12px;
+	flex-wrap: wrap;
+}
+.hub-status > .item-main {
+	min-width: 0;
+	flex: 1 1 260px;
+}
+.hub-status > .btn {
+	margin-inline-start: auto;
+	flex: none;
 }
 .hub-status.ok {
 	border-inline-start: 3px solid var(--ok);
@@ -3408,20 +3474,130 @@ body.sidebar-collapsed .account-menu {
 .hub-catalog.mini {
 	grid-template-columns: repeat( auto-fill, minmax( 184px, 1fr ) );
 }
+/*
+ * کارت سرویس — بازنویسی روی Snap4 (۰.۹.۷).
+ *
+ * کارفرما: «یک کارت می‌خواهم عیناً مثل Snap4، نه این دکمه‌های زمخت.» در مرجع، کنش‌ها
+ * یک **پاورقی سبک** است (کلید روشن/خاموش + «▶ Test» ریز)، نه دو دکمهٔ هم‌وزنِ پر که
+ * نصف کارت را بگیرند. خود کارت کلیک‌پذیر است و به صفحهٔ جزئیات می‌برد.
+ */
 .hub-card {
+	position: relative;
 	display: flex;
 	flex-direction: column;
-	gap: 8px;
+	gap: 10px;
 	padding: 14px;
 	border: 1px solid var(--border);
 	border-radius: var(--radius-lg);
 	background: var(--card);
 	text-align: start;
 	cursor: pointer;
-	transition: border-color 0.15s var(--ease);
+	transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
 }
 .hub-card:hover {
+	box-shadow: 0 2px 10px rgb(0 0 0 / 7%);
+}
+/* نقطهٔ وضعیت گوشهٔ بالا — همان جای مرجع. */
+.card-dot {
+	position: absolute;
+	inset-block-start: 12px;
+	inset-inline-end: 12px;
+	inline-size: 7px;
+	block-size: 7px;
+	border-radius: 50%;
+	background: var(--ok);
+}
+.card-dot.bad {
+	background: var(--destructive);
+}
+.card-dot.none {
+	background: var(--border);
+}
+.card-name {
+	font-weight: 600;
+	font-size: 0.95rem;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+/* چیپ قابلیت (Chat / Messages) — خاکستری و ریز، مثل مرجع. */
+.cap-chip {
+	align-self: flex-start;
+	background: var(--muted);
+	color: var(--muted-foreground);
+	border-radius: 6px;
+	padding: 2px 8px;
+	font-size: 0.72rem;
+}
+.hub-card-foot {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: auto;
+	padding-top: 10px;
+	border-top: 1px solid var(--border-soft);
+}
+.card-state {
+	font-size: 0.78rem;
+	color: var(--muted-foreground);
+}
+.card-state.ok {
+	color: var(--ok);
+}
+.card-state.bad {
+	color: var(--destructive);
+}
+.card-add {
+	font-size: 0.78rem;
+	color: var(--primary);
+	font-weight: 500;
+}
+/* کنشِ آیکونیِ سبک — به‌جای دکمهٔ پر. */
+.btn.icon-act {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	background: none;
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	padding: 2px 8px;
+	font-size: 0.75rem;
+	color: var(--muted-foreground);
+	cursor: pointer;
+	font-family: inherit;
+}
+.btn.icon-act:hover {
 	border-color: var(--primary);
+	color: var(--primary);
+}
+/* کلید روشن/خاموش — همان سوییچ کوچک مرجع. */
+.btn.sw {
+	inline-size: 30px;
+	block-size: 17px;
+	border-radius: 999px;
+	background: var(--border);
+	border: none;
+	padding: 0;
+	cursor: pointer;
+	position: relative;
+	flex: none;
+	transition: background 0.15s var(--ease);
+}
+.btn.sw.on {
+	background: var(--ok);
+}
+.sw-knob {
+	position: absolute;
+	inset-block-start: 2px;
+	inset-inline-start: 2px;
+	inline-size: 13px;
+	block-size: 13px;
+	border-radius: 50%;
+	background: #fff;
+	transition: inset-inline-start 0.15s var(--ease);
+}
+.btn.sw.on .sw-knob {
+	inset-inline-start: 15px;
 }
 .hub-card.linked {
 	border-color: var(--primary-line);
@@ -3437,11 +3613,6 @@ body.sidebar-collapsed .account-menu {
 	display: flex;
 	gap: 10px;
 	align-items: center;
-}
-.hub-card-actions {
-	display: flex;
-	gap: 8px;
-	margin-top: auto;
 }
 .pav {
 	width: 34px;
@@ -3503,6 +3674,21 @@ body.sidebar-collapsed .account-menu {
 .topo {
 	position: relative;
 	margin-inline: auto;
+	width: 100%;
+	max-width: 900px;
+	aspect-ratio: 900 / 420;
+	/*
+	 * مختصات SVG نباید از جهت راست‌به‌چپِ سند تأثیر بگیرد، وگرنه نقشه آینه می‌شود و
+	 * نقطه‌های متحرک برعکس حرکت می‌کنند.
+	 */
+	direction: ltr;
+}
+.topo-edges {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
 }
 .topo-center {
 	position: absolute;
@@ -3523,21 +3709,47 @@ body.sidebar-collapsed .account-menu {
 	border-color: var(--primary);
 	color: var(--primary);
 }
+/*
+ * گرهٔ پرووایدر: مستطیل کوچکِ تک‌خطه، نه کارت.
+ *
+ * خواستهٔ کارفرما و الگوی Snap10. نسخهٔ قبلی کارت عمودی سه‌طبقه با ارتفاع ~۷۰px بود
+ * (سه برابر مرجع) و با ده پرووایدر گره‌ها روی هم می‌افتادند.
+ */
 .topo-node {
 	position: absolute;
-	transform: translate( -50%, -50% );
+	transform: translate( 50%, -50% );
 	background: var(--card);
 	border: 1px solid var(--border);
-	border-radius: 12px;
-	padding: 8px 10px;
+	border-radius: 8px;
+	padding: 4px 9px 4px 7px;
 	display: flex;
-	flex-direction: column;
+	flex-direction: row;
 	align-items: center;
-	gap: 2px;
+	gap: 6px;
 	cursor: pointer;
 	z-index: 2;
-	min-width: 96px;
-	text-align: center;
+	max-width: 15ch;
+	height: 28px;
+	font-size: 0.8rem;
+	white-space: nowrap;
+	box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+	transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
+}
+.topo-node:hover {
+	border-color: var(--primary);
+	box-shadow: 0 2px 8px rgb(0 0 0 / 10%);
+	z-index: 3;
+}
+.topo-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.pav.brand.xs {
+	width: 17px;
+	height: 17px;
+	border-radius: 5px;
+	font-size: 0.62rem;
+	flex: none;
 }
 .topo-node.ok {
 	border-color: var(--ok);
@@ -3573,17 +3785,77 @@ body.sidebar-collapsed .account-menu {
 .topo-dot.off {
 	background: var(--muted-foreground);
 }
+/*
+ * یال‌های سه‌حالته (خواستهٔ کارفرما، الگوی راهنمای Snap10).
+ *
+ *   active → نقطه‌چین سبزِ **متحرک**، نقطه‌ها از هاب به سمت پرووایدر
+ *   recent → خط ممتد کهربایی
+ *   error  → خط ممتد قرمز
+ *
+ * جهت حرکت از ترتیب مختصات می‌آید: هر خط از مرکز (x1,y1) به پرووایدر (x2,y2) کشیده
+ * شده، و `stroke-dashoffset` منفی می‌شود، پس نقطه‌ها رو به بیرون می‌روند.
+ * با `div` چرخانده این ممکن نبود؛ برای همین به SVG منتقل شد.
+ */
 .topo-edge {
-	position: absolute;
-	background: var(--border);
-	z-index: 1;
-	border-radius: 2px;
+	fill: none;
+	stroke: var(--border);
+	stroke-width: 1.5;
+}
+.topo-edge.active {
+	stroke: var(--ok);
+	stroke-width: 2;
+	stroke-linecap: round;
+	stroke-dasharray: 2 7;
+	animation: topo-flow 1.1s linear infinite;
+}
+@keyframes topo-flow {
+	to {
+		/* دقیقاً برابر مجموع dasharray → حلقهٔ بی‌درز */
+		stroke-dashoffset: -9;
+	}
+}
+.topo-edge.recent {
+	stroke: #d9a441;
+}
+.topo-edge.error {
+	stroke: var(--destructive);
+}
+.topo-edge.idle {
+	stroke: var(--border);
+}
+/*
+ * در حالت کاهش حرکت، انیمیشن عملاً متوقف می‌شود و active از recent قابل تشخیص
+ * نمی‌ماند. پس نقطه‌چین را نگه می‌داریم (شکلش خودش تمایز می‌دهد) و فقط حرکت را
+ * برمی‌داریم.
+ */
+@media (prefers-reduced-motion: reduce) {
+	.topo-edge.active {
+		animation: none;
+		stroke-dasharray: 3 5;
+	}
 }
 .topo-legend {
 	display: flex;
 	align-items: center;
 	gap: 6px;
 	flex-wrap: wrap;
+}
+.lg-edge {
+	width: 22px;
+	height: 0;
+	border-top: 2px solid var(--border);
+	display: inline-block;
+}
+.lg-edge.active {
+	border-top-style: dotted;
+	border-top-width: 3px;
+	border-color: var(--ok);
+}
+.lg-edge.recent {
+	border-color: #d9a441;
+}
+.lg-edge.error {
+	border-color: var(--destructive);
 }
 .topo-empty {
 	display: flex;
@@ -3609,28 +3881,38 @@ body.sidebar-collapsed .account-menu {
 
 /* ════════════ ۰.۹.۶ — OmniRoute-style hub + پراکسی + لاگ ════════════ */
 
-.hub-layout {
+/*
+ * نوار تب افقی — جایگزین ستون کناریِ داخل صفحه (که «سایدبار داخل سایدبار» می‌ساخت).
+ */
+.hub-tabs {
 	display: flex;
-	gap: 18px;
-	align-items: flex-start;
+	gap: 4px;
+	flex-wrap: wrap;
+	border-bottom: 1px solid var(--border);
+	padding-bottom: 0;
 }
-.hub-side {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
-	width: 168px;
-	flex: none;
-	position: sticky;
-	top: 0;
-}
-.btn.hub-side-item {
-	justify-content: flex-start;
+.btn.hub-tab {
 	font-weight: 500;
+	border-radius: var(--radius) var(--radius) 0 0;
+	border-bottom: 2px solid transparent;
+	margin-bottom: -1px;
 }
-.btn.hub-side-item.active {
-	background: var(--accent);
+.btn.hub-tab.active {
 	color: var(--primary);
-	border-inline-start: 2px solid var(--primary);
+	border-bottom-color: var(--primary);
+	background: var(--accent);
+}
+.tab-count {
+	background: var(--muted);
+	color: var(--muted-foreground);
+	border-radius: 999px;
+	padding: 0 6px;
+	font-size: 0.72rem;
+	line-height: 1.5;
+}
+.btn.hub-tab.active .tab-count {
+	background: var(--primary);
+	color: #fff;
 }
 .pav.brand {
 	color: #fff;
@@ -3655,4 +3937,60 @@ body.sidebar-collapsed .account-menu {
 }
 .item.log-row {
 	flex-wrap: wrap;
+}
+
+/* ═══════════════ ۰.۹.۷ — پیشرفت آزمون تونل و دکمهٔ مشغول ═══════════════ */
+
+/*
+ * نوار پیشرفت «تست همهٔ کانفیگ‌ها».
+ *
+ * تا ۰.۹.۶ کاربر یک toast می‌دید و بعد تا چند دقیقه هیچ نشانه‌ای — با ۴۰۰ کانفیگ،
+ * سکوتِ طولانی از «هنگ‌کردن» قابل تشخیص نبود. دادهٔ پیشرفت از قبل فرستاده می‌شد.
+ */
+.tunnel-prog {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	margin-top: 10px;
+}
+.prog-track {
+	block-size: 6px;
+	inline-size: 100%;
+	background: var(--muted);
+	border-radius: 999px;
+	overflow: hidden;
+}
+.prog-fill {
+	block-size: 100%;
+	inline-size: 0%;
+	background: var(--primary);
+	border-radius: 999px;
+	transition: inline-size 0.25s var(--ease);
+}
+.prog-row {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+.prog-row .note {
+	margin: 0;
+}
+
+/* دکمهٔ در حال کار: اسپینر کوچک پیش از متن، برای کارهای بدون درصد. */
+.btn.busy::before {
+	content: '';
+	inline-size: 12px;
+	block-size: 12px;
+	border: 2px solid currentColor;
+	border-block-start-color: transparent;
+	border-radius: 50%;
+	display: inline-block;
+	animation: spin 0.7s linear infinite;
+	margin-inline-end: 6px;
+	vertical-align: -2px;
+}
+@media (prefers-reduced-motion: reduce) {
+	.btn.busy::before {
+		animation-duration: 2s;
+	}
 }

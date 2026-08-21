@@ -19,7 +19,21 @@ import { logInfo, logWarn, logError } from '../logs.js';
 export const SOCKS_PORT = 7809;
 export const HTTP_PORT = 7810;
 const POOL_FILE = () => path.join( String( HOME ), 'tunnel', 'pool.json' );
-const TEST_URL = 'https://api.ipify.org?format=json';
+
+/**
+ * مقصدهای غربال سریع (مرحلهٔ ۱).
+ *
+ * تا ۰.۹.۶ فقط یک آدرس بود (`api.ipify.org`) و اگر خودش پاسخ نمی‌داد — مسدود، خطای
+ * DNS، یا rate-limit — **همهٔ کانفیگ‌ها یک‌جا «خراب» علامت می‌خوردند**؛ همان تجربهٔ
+ * «هیچ‌کدام اکتیو نیست» با کانفیگ‌هایی که در Hiddify کار می‌کردند. حالا چند مقصد سبک
+ * داریم و شکست فقط وقتی است که **همه** رد شوند. `generate_204` بدنه ندارد، پس
+ * پارس JSON هم لازم نیست (همان چیزی که Hiddify استفاده می‌کند).
+ */
+const PROBE_URLS = [
+	'http://cp.cloudflare.com/generate_204',
+	'http://www.gstatic.com/generate_204',
+	'https://api.ipify.org?format=json',
+];
 
 /**
  * منابع پیش‌فرض — فهرست شش‌گانهٔ کارفرما (۱۴۰۵/۰۵/۲۹) با مسیرهای raw راستی‌آزمایی‌شده
@@ -42,7 +56,7 @@ export const DEFAULT_SOURCES = [
 ];
 
 /** @type {{ pool: any[], sources: string[], running: boolean, proc: any, currentIdx: number, startedAt: string, lastCheck: any, exitIp: string, checks: number }} */
-const S = { pool: [], sources: [ ...DEFAULT_SOURCES ], running: false, proc: null, currentIdx: -1, startedAt: '', lastCheck: null, exitIp: '', checks: 0 };
+const S = { pool: [], sources: [ ...DEFAULT_SOURCES ], running: false, proc: null, currentIdx: -1, startedAt: '', lastCheck: null, exitIp: '', checks: 0, testing: null };
 
 export function loadState() {
 	try {
@@ -70,9 +84,12 @@ export function status() {
 		exitIp: S.exitIp,
 		poolSize: S.pool.length,
 		working: S.pool.filter( ( c ) => c.ok ).length,
+		internetOnly: S.pool.filter( ( c ) => c.ok1 && ! c.serviceOk ).length,
 		pool: S.pool,
 		sources: S.sources,
 		defaults: DEFAULT_SOURCES,
+		// آزمونِ در جریان — تا بستن و بازکردن پنجره، نوار پیشرفت را گم نکند.
+		testing: S.testing ? { ...S.testing } : null,
 	};
 }
 
@@ -111,7 +128,96 @@ function freePort() {
 	} );
 }
 
-function runOnce( outbound, port, ttlMs ) {
+/**
+ * صبر تا وقتی درگاه محلی واقعاً جواب بدهد.
+ *
+ * جایگزین `setTimeout(350)`ِ قبلی. روی ویندوز، xray برای خواندن کانفیگ و آماده‌کردن
+ * inbound معمولاً ۱ تا ۳ ثانیه می‌خواهد — مخصوصاً بار اول که Defender فایل را اسکن
+ * می‌کند. با صبر ثابتِ کوتاه، `fetch` زودتر می‌رسید، `ECONNREFUSED` می‌گرفت و کانفیگِ
+ * **سالم** «خراب» علامت می‌خورد. (DESIGN-HUB-UI-FIX §۲.۷ باگ ۱)
+ *
+ * @param {number} port
+ * @param {number} timeoutMs
+ */
+function waitForPort( port, timeoutMs ) {
+	const deadline = Date.now() + timeoutMs;
+	return new Promise( ( resolve ) => {
+		const attempt = () => {
+			if ( Date.now() > deadline ) {
+				resolve( false );
+				return;
+			}
+			const sock = net.connect( { host: '127.0.0.1', port } );
+			sock.setTimeout( 400 );
+			const retry = () => {
+				sock.destroy();
+				setTimeout( attempt, 120 );
+			};
+			sock.on( 'connect', () => { sock.destroy(); resolve( true ); } );
+			sock.on( 'timeout', retry );
+			sock.on( 'error', retry );
+		};
+		attempt();
+	} );
+}
+
+/**
+ * یک تماس از راه درگاه SOCKS محلی.
+ *
+ * @param {number} port
+ * @param {string} url
+ * @param {number} ttlMs
+ * @returns {Promise<{ok:boolean, ms:number, status?:number, error?:string}>}
+ */
+async function probeThrough( port, url, ttlMs ) {
+	const t0 = Date.now();
+	try {
+		const { socksDispatcher } = await import( 'fetch-socks' );
+		/*
+		 * ⚠️ `undiciFetch`، نه `fetch` سراسری.
+		 *
+		 * داسپچرِ بستهٔ npm (undici 7) با fetch داخلی Node ناسازگار است و خطای
+		 * «invalid onRequestStart method» می‌دهد. `net.js` این را از ۰.۹.۵ می‌دانست،
+		 * ولی موتور تونل همچنان `fetch` سراسری را صدا می‌زد — یعنی **هر تست کانفیگ
+		 * صرف‌نظر از سالم‌بودن سرور شکست می‌خورد** و کاربر «هیچ کانفیگ سالمی نیست»
+		 * می‌دید، حتی برای کانفیگ‌هایی که در Hiddify کار می‌کردند.
+		 */
+		const { fetch: undiciFetch } = await import( 'undici' );
+		/*
+		 * و شکل آرگومان: `{ type, host, port }` — نه `{ url }`.
+		 * با `{ url }` کتابخانه «Invalid SOCKS proxy details were provided» می‌دهد.
+		 * این دو باگ روی هم، تست تونل را صددرصد شکست‌خورده می‌کردند.
+		 */
+		const res = await undiciFetch( url, {
+			dispatcher: socksDispatcher( { type: 5, host: '127.0.0.1', port } ),
+			signal: AbortSignal.timeout( ttlMs ),
+		} );
+		return { ok: res.ok || res.status === 204, ms: Date.now() - t0, status: res.status };
+	} catch ( e ) {
+		const msg = String( e?.cause?.message || e?.message || e ).slice( 0, 80 );
+		return { ok: false, ms: Date.now() - t0, error: msg };
+	}
+}
+
+/**
+ * یک کانفیگ را بالا می‌آورد و آزمون‌های خواسته‌شده را از راهش می‌زند.
+ *
+ * دو مرحله (خواستهٔ کارفرما ۱۴۰۵/۰۵/۳۰):
+ *   ۱) غربال سریع: آیا تونل اصلاً به اینترنت می‌رسد؟
+ *   ۲) آزمون سرویس: آیا از این تونل، **پرووایدر واقعی** جواب می‌دهد؟
+ *
+ * مرحلهٔ ۲ فقط وقتی اجرا می‌شود که `serviceUrl` داده شده باشد — و فراخواننده آن را
+ * فقط برای بازماندگان مرحلهٔ ۱ می‌دهد، تا کانفیگ مرده بی‌خود سرویس را صدا نزند.
+ *
+ * @param {any} outbound
+ * @param {number} port
+ * @param {{ttlMs?:number, serviceUrl?:string, serviceTtlMs?:number}} [opts]
+ */
+function runOnce( outbound, port, opts = {} ) {
+	const ttlMs = opts.ttlMs || 6000;
+	const serviceUrl = opts.serviceUrl || '';
+	const serviceTtl = opts.serviceTtlMs || 12000;
+
 	return new Promise( ( resolve ) => {
 		const cfg = {
 			inbounds: [ { listen: '127.0.0.1', port, protocol: 'socks', settings: { udp: false } } ],
@@ -120,59 +226,198 @@ function runOnce( outbound, port, ttlMs ) {
 		const tmp = path.join( String( HOME ), 'tunnel', `probe-${ port }.json` );
 		fs.mkdirSync( path.dirname( tmp ), { recursive: true } );
 		fs.writeFileSync( tmp, JSON.stringify( cfg ) );
-		const proc = spawn( coreBin(), [ 'run', '-c', tmp ], { stdio: 'ignore' } );
+
+		let proc;
+		try {
+			proc = spawn( coreBin(), [ 'run', '-c', tmp ], { stdio: 'ignore' } );
+		} catch ( e ) {
+			fs.rmSync( tmp, { force: true } );
+			resolve( { ok: false, ms: 0, error: String( e?.message || e ).slice( 0, 80 ) } );
+			return;
+		}
+
+		let settled = false;
 		const done = ( result ) => {
+			if ( settled ) { return; }
+			settled = true;
 			try { proc.kill(); } catch {}
 			fs.rmSync( tmp, { force: true } );
 			resolve( result );
 		};
-		const timer = setTimeout( () => done( { ok: false, ms: ttlMs, error: 'timeout' } ), ttlMs );
-		proc.on( 'error', ( e ) => { clearTimeout( timer ); done( { ok: false, ms: 0, error: String( e.message ).slice( 0, 80 ) } ); } );
+
+		proc.on( 'error', ( e ) => done( { ok: false, ms: 0, error: String( e.message ).slice( 0, 80 ) } ) );
+
 		( async () => {
-			await new Promise( ( r ) => setTimeout( r, 350 ) ); // فرصت بالا آمدن
-			try {
-				const t0 = Date.now();
-				const { socksDispatcher } = await import( 'fetch-socks' );
-				const res = await fetch( TEST_URL, {
-					dispatcher: socksDispatcher( { url: new URL( `socks5://127.0.0.1:${ port }` ) } ),
-					signal: AbortSignal.timeout( ttlMs - 500 ),
-				} );
-				const body = await res.json().catch( () => ( {} ) );
-				clearTimeout( timer );
-				done( { ok: res.ok, ms: Date.now() - t0, ip: body.ip || '' } );
-			} catch ( e ) {
-				clearTimeout( timer );
-				done( { ok: false, ms: 0, error: String( e?.message || e ).slice( 0, 80 ) } );
+			// مرحلهٔ صفر: تا درگاه بالا نیامده، هیچ تماسی معنا ندارد.
+			if ( ! ( await waitForPort( port, 5000 ) ) ) {
+				done( { ok: false, ms: 0, error: 'هسته بالا نیامد' } );
+				return;
 			}
+
+			// مرحلهٔ ۱ — غربال سریع، با چند مقصد جایگزین.
+			let stage1 = null;
+			for ( const url of PROBE_URLS ) {
+				stage1 = await probeThrough( port, url, ttlMs );
+				if ( stage1.ok ) { break; }
+			}
+			if ( ! stage1?.ok ) {
+				done( { ok: false, stage: 1, ms: 0, error: stage1?.error || 'اینترنت رد شد' } );
+				return;
+			}
+
+			if ( ! serviceUrl ) {
+				// بدون سرویس معیار: فقط اینترنت تأیید شد.
+				done( { ok: true, stage: 1, ms: stage1.ms, serviceOk: null } );
+				return;
+			}
+
+			// مرحلهٔ ۲ — آیا پرووایدر واقعی از این تونل جواب می‌دهد؟
+			const stage2 = await probeThrough( port, serviceUrl, serviceTtl );
+
+			/*
+			 * ظرافت مهم: ۴۰۱/۴۰۳ـِ خودِ سرویس یعنی **تونل سالم است** و فقط کلید
+			 * اشکال دارد — به آنجا رسیده‌ایم. بدون این تفکیک، یک کلید غلط باعث
+			 * می‌شد همهٔ کانفیگ‌های خوب دور ریخته شوند.
+			 */
+			const reached = stage2.ok || stage2.status === 401 || stage2.status === 403;
+			done( {
+				ok: true,
+				stage: reached ? 2 : 1,
+				ms: stage1.ms,
+				serviceMs: stage2.ms,
+				serviceOk: reached,
+				error: reached ? '' : ( stage2.error || `سرویس پاسخ نداد (${ stage2.status || '—' })` ),
+			} );
 		} )();
 	} );
 }
 
-/** تست همهٔ کاندیدهای فعال — با هم‌زمانی محدود. نتیجه در انبار ذخیره می‌شود. */
-export async function testAll( onProgress = () => {} ) {
+/** درخواست لغو آزمون در حال اجرا (دکمهٔ «لغو» در رابط). */
+export function cancelTest() {
+	if ( ! S.testing ) {
+		return { ok: false, error: 'آزمونی در جریان نیست.' };
+	}
+	S.testing.cancelled = true;
+	logInfo( 'tunnel', 'لغو آزمون درخواست شد.' );
+	return { ok: true };
+}
+
+/**
+ * تست همهٔ کاندیدهای فعال — دومرحله‌ای، با هم‌زمانی محدود.
+ *
+ * مرحلهٔ ۱ روی همه؛ مرحلهٔ ۲ (سرویس واقعی) **فقط روی بازماندگان**. خواستهٔ کارفرما:
+ * «بعد از تست اولیه، کانفیگ‌های غیرفعال را بی‌خود تست نگیرد.»
+ *
+ * @param {(p:any)=>void} [onProgress]
+ * @param {{serviceUrl?:string, serviceLabel?:string}} [opts]
+ */
+export async function testAll( onProgress = () => {}, opts = {} ) {
 	if ( ! corePresent() ) {
 		return { ok: false, error: 'هستهٔ xray نصب نیست — اول «دانلود هسته».' };
 	}
+	if ( S.testing && ! S.testing.cancelled ) {
+		return { ok: false, error: 'یک آزمون همین حالا در جریان است.' };
+	}
+
 	const cands = S.pool.filter( ( c ) => c.enabled );
-	let done = 0;
-	const CONC = 4;
-	const queue = [ ...cands ];
-	const worker = async () => {
-		while ( queue.length ) {
-			const c = queue.shift();
-			const port = await freePort();
-			const r = await runOnce( c.outbound, port, 8000 );
-			c.ok = r.ok; c.ms = r.ok ? r.ms : 0; c.error = r.error || ''; c.lastCheck = new Date().toISOString();
-			done += 1;
-			onProgress( { done, total: cands.length, name: c.name, ok: c.ok, ms: c.ms } );
-		}
+	const serviceUrl = String( opts.serviceUrl || '' );
+
+	// وضعیت پایدار: اگر کاربر پنجره را ببندد و برگردد، نوار پیشرفت گم نمی‌شود.
+	S.testing = {
+		phase: 1,
+		done: 0,
+		total: cands.length,
+		healthy: 0,
+		internetOnly: 0,
+		broken: 0,
+		name: '',
+		service: String( opts.serviceLabel || '' ),
+		cancelled: false,
+		startedAt: new Date().toISOString(),
 	};
-	await Promise.all( Array.from( { length: CONC }, worker ) );
-	S.pool.sort( ( a, b ) => ( Number( b.pinned ) - Number( a.pinned ) ) || ( Number( b.ok ) - Number( a.ok ) ) || ( ( a.ms || 1e9 ) - ( b.ms || 1e9 ) ) );
-	S.pool = S.pool.slice( 0, 60 ); // انبار: فقط کارکردنی‌ها و برترین‌ها می‌مانند
+
+	const emit = () => onProgress( { ...S.testing } );
+	emit();
+
+	/** یک صف با هم‌زمانی مشخص. */
+	const drain = async ( queue, conc, work ) => {
+		const worker = async () => {
+			while ( queue.length && ! S.testing.cancelled ) {
+				await work( queue.shift() );
+			}
+		};
+		await Promise.all( Array.from( { length: Math.min( conc, Math.max( 1, queue.length ) ) }, worker ) );
+	};
+
+	// ── مرحلهٔ ۱: غربال سریع روی همه ─────────────────────────────────────────
+	await drain( [ ...cands ], 8, async ( c ) => {
+		const port = await freePort();
+		const r = await runOnce( c.outbound, port, { ttlMs: 6000 } );
+		c.ok1 = r.ok;
+		c.ms = r.ok ? r.ms : 0;
+		c.error = r.error || '';
+		c.serviceOk = null;
+		c.lastCheck = new Date().toISOString();
+		S.testing.done += 1;
+		S.testing.name = c.name;
+		if ( ! r.ok ) { S.testing.broken += 1; }
+		emit();
+	} );
+
+	// ── مرحلهٔ ۲: فقط بازماندگان، و فقط اگر سرویس معیار داریم ────────────────
+	const survivors = cands.filter( ( c ) => c.ok1 );
+	if ( serviceUrl && survivors.length && ! S.testing.cancelled ) {
+		S.testing.phase = 2;
+		S.testing.done = 0;
+		S.testing.total = survivors.length;
+		emit();
+
+		await drain( [ ...survivors ], 3, async ( c ) => {
+			const port = await freePort();
+			const r = await runOnce( c.outbound, port, { ttlMs: 6000, serviceUrl, serviceTtlMs: 12000 } );
+			c.serviceOk = Boolean( r.serviceOk );
+			c.serviceMs = r.serviceMs || 0;
+			if ( ! c.serviceOk ) { c.error = r.error || 'سرویس از این مسیر جواب نداد'; }
+			c.lastCheck = new Date().toISOString();
+			S.testing.done += 1;
+			S.testing.name = c.name;
+			if ( c.serviceOk ) { S.testing.healthy += 1; } else { S.testing.internetOnly += 1; }
+			emit();
+		} );
+	} else if ( ! serviceUrl ) {
+		// بدون سرویس معیار، بازمانده‌ها «فقط اینترنت» می‌مانند.
+		S.testing.internetOnly = survivors.length;
+	}
+
+	/*
+	 * `ok` نهایی = به سرویس واقعی رسیدیم. اگر سرویس معیاری نبود، همان مرحلهٔ ۱ ملاک
+	 * است تا کاربرِ بدون اتصال بن‌بست نخورد.
+	 */
+	for ( const c of cands ) {
+		c.ok = serviceUrl ? Boolean( c.serviceOk ) : Boolean( c.ok1 );
+	}
+
+	// ✅ سالم (سرویس‌دیده) → 🟡 فقط اینترنت → ❌ خراب
+	const rank = ( c ) => ( c.serviceOk ? 2 : c.ok1 ? 1 : 0 );
+	S.pool.sort( ( a, b ) =>
+		( Number( b.pinned ) - Number( a.pinned ) ) ||
+		( rank( b ) - rank( a ) ) ||
+		( ( a.ms || 1e9 ) - ( b.ms || 1e9 ) )
+	);
+	S.pool = S.pool.slice( 0, 60 );
+
+	const cancelled = S.testing.cancelled;
+	const summary = {
+		ok: true,
+		cancelled,
+		working: S.pool.filter( ( c ) => c.ok ).length,
+		internetOnly: S.pool.filter( ( c ) => c.ok1 && ! c.serviceOk ).length,
+		total: S.pool.length,
+	};
+	S.testing = null;
 	saveState();
-	logInfo( 'tunnel', 'آزمون همه تمام شد.', { working: S.pool.filter( ( c ) => c.ok ).length, total: S.pool.length } );
-	return { ok: true, working: S.pool.filter( ( c ) => c.ok ).length, total: S.pool.length };
+	logInfo( 'tunnel', cancelled ? 'آزمون لغو شد.' : 'آزمون همه تمام شد.', summary );
+	return summary;
 }
 
 function serviceConfig( outbound ) {
@@ -185,9 +430,19 @@ function serviceConfig( outbound ) {
 	};
 }
 
+/**
+ * بهترین کانفیگ از `from` به بعد.
+ *
+ * اول ✅ سالم‌ها (به سرویس واقعی رسیده‌اند)، و فقط اگر هیچ‌کدام نبود 🟡 «فقط اینترنت».
+ * کانفیگی که سرویس از راهش جواب می‌دهد، بر کانفیگی که صرفاً اینترنت دارد مقدم است.
+ */
 function pickBest( from = 0 ) {
+	const usable = ( c ) => c.enabled !== false;
 	for ( let i = from; i < S.pool.length; i += 1 ) {
-		if ( S.pool[ i ].ok && S.pool[ i ].enabled !== false ) { return i; }
+		if ( usable( S.pool[ i ] ) && S.pool[ i ].serviceOk ) { return i; }
+	}
+	for ( let i = from; i < S.pool.length; i += 1 ) {
+		if ( usable( S.pool[ i ] ) && ( S.pool[ i ].ok || S.pool[ i ].ok1 ) ) { return i; }
 	}
 	return -1;
 }
@@ -253,9 +508,12 @@ export async function healthCheck() {
 	S.checks += 1;
 	try {
 		const { socksDispatcher } = await import( 'fetch-socks' );
+		// همان دلیل probeThrough: fetch سراسری داسپچر بسته را نمی‌پذیرد.
+		const { fetch: undiciFetch } = await import( 'undici' );
 		const t0 = Date.now();
-		const res = await fetch( TEST_URL, {
-			dispatcher: socksDispatcher( { url: new URL( `socks5://127.0.0.1:${ SOCKS_PORT }` ) } ),
+		// آی‌پی خروجی را از ipify می‌گیریم (بدنه دارد)؛ سلامت خودش با همین یک تماس.
+		const res = await undiciFetch( 'https://api.ipify.org?format=json', {
+			dispatcher: socksDispatcher( { type: 5, host: '127.0.0.1', port: SOCKS_PORT } ),
 			signal: AbortSignal.timeout( 9000 ),
 		} );
 		const body = await res.json().catch( () => ( {} ) );

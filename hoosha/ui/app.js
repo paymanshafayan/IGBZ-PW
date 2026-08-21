@@ -145,6 +145,9 @@ async function showView( next ) {
 
 	const meta = PAGES[ view ];
 	const box = $( '#panel-body' );
+
+	// صفحه‌های داشبوردی تمام‌قد‌اند؛ بقیه همان ستون خوانای ۵۶rem را نگه می‌دارند.
+	box.classList.toggle( 'wide', view === 'hub' );
 	/*
 	 * محتوای صفحه داخل همین ظرف می‌نشیند و **همین** ظرف است که به بخش‌هایش فاصله
 	 * می‌دهد.
@@ -574,6 +577,14 @@ function connectEvents() {
 
 			case 'mode':
 				setMode( ev.mode );
+				return;
+
+			/*
+			 * پیشرفت تونل. بک‌اند از ۰.۹.۶ این را می‌فرستاد ولی **هیچ‌کس گوش نمی‌داد**،
+			 * پس کاربر بعد از زدن «تست همه» تا چند دقیقه هیچ نشانه‌ای نمی‌دید.
+			 */
+			case 'tunnel':
+				document.dispatchEvent( new CustomEvent( 'hoosha:tunnel', { detail: ev } ) );
 				return;
 
 			case 'git':

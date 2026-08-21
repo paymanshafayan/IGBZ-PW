@@ -72,6 +72,8 @@ export class Health {
 		}
 		e.usedToday += 1;
 		e.lastUsedAt = this.now();
+		// نتیجهٔ **آخرین** تلاش — مبنای حالت «error» در یال‌های توپولوژی.
+		e.lastOk = Boolean( result.ok );
 
 		if ( result.ok ) {
 			e.ok += 1;
@@ -246,6 +248,14 @@ export class Health {
 				lastError: e.lastError,
 				lastErrorKind: e.lastErrorKind,
 				usedToday: e.usedToday,
+				/*
+				 * این دو برای یال‌های سه‌حالتهٔ توپولوژی لازم‌اند (active/recent/error).
+				 * `lastUsedAt` از قبل نگه داشته می‌شد ولی بیرون داده نمی‌شد؛ و `lastOk`
+				 * لازم است چون «آخرین نتیجه خطا بود» با `fail > 0` قابل تشخیص نیست —
+				 * یک شکستِ قدیمی که بعدش ده موفقیت آمده، خطا نیست.
+				 */
+				lastUsedAt: e.lastUsedAt || 0,
+				lastOk: e.lastOk !== false,
 			};
 		}
 		return out;

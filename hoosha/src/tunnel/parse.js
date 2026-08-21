@@ -3,10 +3,38 @@
  * بخشی از «تونل هوشا» (۰.۹.۶): موتور داخلیِ شبیه v2ray با جمع‌آوری کانفیگ رایگان.
  */
 
-/** @param {string} s */ function b64( s ) {
-	const t = s.replace( /-/g, '+' ).replace( /_/g, '/' );
+/**
+ * دیکد base64url به **متن خام**.
+ *
+ * @param {string} s
+ * @returns {string} رشتهٔ خالی یعنی دیکد نشد
+ */
+function b64Text( s ) {
+	const t = String( s || '' ).replace( /-/g, '+' ).replace( /_/g, '/' );
 	try {
-		return JSON.parse( Buffer.from( t + '='.repeat( ( 4 - ( t.length % 4 ) ) % 4 ), 'base64' ).toString( 'utf8' ) );
+		return Buffer.from( t + '='.repeat( ( 4 - ( t.length % 4 ) ) % 4 ), 'base64' ).toString( 'utf8' );
+	} catch {
+		return '';
+	}
+}
+
+/**
+ * دیکد base64url و سپس `JSON.parse` — فقط برای vmess که محتوایش JSON است.
+ *
+ * ⚠️ تا ۰.۹.۶ یک تابع `b64()` وجود داشت که **همیشه** `JSON.parse` می‌کرد و همه‌جا از آن
+ * استفاده می‌شد. برای `ss://` که محتوایش `method:password` است (نه JSON) همیشه `null`
+ * برمی‌گرداند، یعنی **هر کانفیگ Shadowsocks بی‌صدا دور ریخته می‌شد**. جداکردن این دو،
+ * همان باگ است. (DESIGN-HUB-UI-FIX §۲.۷ باگ ۳)
+ *
+ * @param {string} s
+ */
+function b64Json( s ) {
+	const text = b64Text( s );
+	if ( ! text ) {
+		return null;
+	}
+	try {
+		return JSON.parse( text );
 	} catch {
 		return null;
 	}
@@ -21,7 +49,7 @@ export function parseLink( raw ) {
 	const link = String( raw ).trim();
 	try {
 		if ( link.startsWith( 'vmess://' ) ) {
-			const j = b64( link.slice( 8 ) );
+			const j = b64Json( link.slice( 8 ) );
 			if ( ! j?.add ) { return null; }
 			const stream = streamSettings( j.net, j.host, j.path, j.tls === 'tls' ? 'tls' : 'none', j.sni || j.host, j.fp );
 			return {
@@ -52,17 +80,20 @@ export function parseLink( raw ) {
 			const at = body.lastIndexOf( '@' );
 			let method = '', password = '', hostPart = body;
 			if ( at > 0 ) {
-				const cred = b64( body.slice( 0, at ) );
-				if ( cred ) {
+				// `method:password` است، نه JSON — پس متن خام می‌خواهیم.
+				const cred = b64Text( body.slice( 0, at ) );
+				if ( cred && cred.includes( ':' ) ) {
 					const i = cred.indexOf( ':' );
 					method = cred.slice( 0, i ); password = cred.slice( i + 1 ); hostPart = body.slice( at + 1 );
 				} else {
+					// شکل بدون base64: ss://method:pass@host:port
 					const i = body.slice( 0, at ).indexOf( ':' );
+					if ( i < 0 ) { return null; }
 					method = body.slice( 0, i ); password = body.slice( i + 1, at ); hostPart = body.slice( at + 1 );
 				}
 			} else {
-				const whole = b64( body );
-				if ( ! whole ) { return null; }
+				const whole = b64Text( body );
+				if ( ! whole || ! whole.includes( '@' ) ) { return null; }
 				const i = whole.lastIndexOf( '@' );
 				const cred = whole.slice( 0, i );
 				const ci = cred.indexOf( ':' );

@@ -6,11 +6,17 @@ import { createMockProvider } from './mock.js';
 export { PROVIDERS, providerInfo } from './catalog.js';
 
 /**
- * ساخت آداپتور از روی پروفایل ذخیره‌شده.
+ * ساخت آداپتور از روی پروفایل ذخیره‌شده (حالت تک‌واحد).
  *
- * @param {{provider:string,baseUrl?:string,apiKey?:string,model?:string}} profile
+ * `proxy` از ۰.۹.۷ اضافه شد. تا پیش از آن این سازنده اصلاً فیلد پراکسی نداشت، یعنی
+ * حالت تک‌واحد از صفحهٔ پراکسیِ خود برنامه هیچ خبری نداشت و تماس‌هایش همیشه مستقیم
+ * می‌رفت — رفتاری متفاوت با حالت هاب، که سرِ همین تفاوت کارفرما فکر می‌کرد «پراکسی
+ * مشکل نیست، چون تک‌واحد کار می‌کند». حالا هر دو مسیر یک زنجیره دارند.
+ *
+ * @param {{provider:string,baseUrl?:string,apiKey?:string,model?:string,proxy?:string}} profile
+ * @param {{proxy?:string}} [opts] پراکسی سراسری (صفحهٔ پراکسی/تونل)
  */
-export function createProvider( profile ) {
+export function createProvider( profile, opts = {} ) {
 	const info = providerInfo( profile.provider );
 	if ( ! info ) {
 		throw new Error( `پرووایدر ناشناخته: ${ profile.provider }` );
@@ -23,6 +29,7 @@ export function createProvider( profile ) {
 		baseUrl: profile.baseUrl || info.baseUrl,
 		apiKey: profile.apiKey || '',
 		model: profile.model || info.defaultModel || '',
+		proxy: profile.proxy || opts.proxy || '',
 	};
 
 	if ( info.kind === 'mock' ) {
